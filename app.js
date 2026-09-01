@@ -45,9 +45,10 @@
   const selNup = $('selNup');
   const btnOcr = $('btnOcr');
   const btnLimpiar = $('btnLimpiar');
-  const btnDescargar = $('btnDescargar');
   const btnDescargar2 = $('btnDescargar2');
   const btnAjustes = $('btnAjustes');
+  const btnTema = $('btnTema');
+  const temaIcono = $('temaIcono');
 
   /* ---------- Persistencia ---------- */
   function guardar() {
@@ -320,7 +321,6 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     showToast('Descarga iniciada (esqueleto).');
   }
-  btnDescargar.addEventListener('click', descargarWord);
   btnDescargar2.addEventListener('click', descargarWord);
 
   /* ---------- Modal OCR ---------- */
@@ -390,9 +390,35 @@
     toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
   }
 
+  /* ---------- Tema claro/oscuro ---------- */
+  const TEMA_KEY = 'libro-mayor-tema';
+  function temaActual() {
+    return document.documentElement.dataset.tema === 'claro' ? 'claro' : 'oscuro';
+  }
+  function aplicarTema(tema) {
+    document.documentElement.dataset.tema = tema;
+    temaIcono.textContent = tema === 'claro' ? '☀' : '☾';
+    btnTema.title = tema === 'claro' ? 'Cambiar a oscuro' : 'Cambiar a claro';
+  }
+  function initTema() {
+    let tema = localStorage.getItem(TEMA_KEY);
+    if (!tema) {
+      // Default: seguir preferencia del sistema; si no, oscuro (actual).
+      const pref = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'oscuro';
+      tema = pref;
+    }
+    aplicarTema(tema);
+  }
+  btnTema.addEventListener('click', () => {
+    const nuevo = temaActual() === 'claro' ? 'oscuro' : 'claro';
+    localStorage.setItem(TEMA_KEY, nuevo);
+    aplicarTema(nuevo);
+  });
+
   /* ---------- Init ---------- */
   cargar();
   selNup.value = state.nup;
   renderCodigo();
   renderHojas();
+  initTema();
 })();
