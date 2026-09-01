@@ -38,7 +38,6 @@
   const metaHojas = $('metaHojas');
   const dropzone = $('dropzone');
   const fileInput = $('fileInput');
-  const btnPegar = $('btnPegar');
   const chkCodigo = $('chkCodigo');
   const numCodigo = $('numCodigo');
   const inputCodigo = $('inputCodigo');
@@ -215,8 +214,6 @@
     }
     if (files.length) agregarArchivos(files);
   });
-
-  btnPegar.addEventListener('click', () => fileInput.click());
 
   /* ---------- Quitar / drag ---------- */
   sheetsEl.addEventListener('click', (e) => {
