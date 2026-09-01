@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cortar y Ordenar Facturas — Libro Mayor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Barra superior -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">✂</span>
+        <div class="brand-text">
+          <h1 class="brand-title">Cortar y Ordenar Facturas</h1>
+          <p class="brand-sub">Lote · Recorte &amp; OCR · Export Word</p>
+        </div>
+      </div>
+      <div class="monto-box">
+        <span class="monto-label">MONTO TOTAL</span>
+        <span class="monto-valor" id="montoTotal">US$ 0.00</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" id="btnAjustes" title="Ajustes de IA y moneda">Ajustes</button>
+        <button class="btn btn-primary" id="btnDescargar" title="Descargar Word">Descargar Word</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <section class="panel panel-entrada">
+          <header class="panel-head">
+            <span class="panel-title">Entrada</span>
+          </header>
+          <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Pegar, subir o arrastrar archivos">
+            <span class="dz-ico">＋</span>
+            <p class="dz-txt"><strong>Pegar / Subir / Arrastrar</strong></p>
+            <p class="dz-sub">Ctrl+V · clic · arrastrar</p>
+            <span class="dz-fmt">JPG · PNG · WEBP · PDF</span>
+          </div>
+          <input type="file" id="fileInput" multiple accept="image/*,.pdf" hidden />
+          <button class="btn btn-big btn-block" id="btnPegar">Pegar del portapapeles</button>
+        </section>
+
+        <section class="panel panel-codigo">
+          <header class="panel-head">
+            <label class="switch-row">
+              <span class="panel-title">Código de pedido</span>
+              <span class="switch">
+                <input type="checkbox" id="chkCodigo" />
+                <span class="switch-track"></span>
+              </span>
+            </label>
+          </header>
+          <div class="codigo-row">
+            <label class="field-mini" for="numCodigo">N° dígitos</label>
+            <input type="number" id="numCodigo" min="1" max="12" value="6" />
+            <input type="text" id="inputCodigo" inputmode="numeric" placeholder="Código" maxlength="12" />
+          </div>
+          <p class="hint">Pie de página derecho en el Word. Si el check está activo, se exige el código completo al descargar.</p>
+        </section>
+
+        <section class="panel panel-ordenar">
+          <header class="panel-head">
+            <span class="panel-title">Ordenar</span>
+          </header>
+          <div class="nup-row">
+            <label for="selNup">Comprobantes por hoja</label>
+            <select id="selNup">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4" selected>4 (2×2)</option>
+              <option value="5">5</option>
+              <option value="6">6 (3×2)</option>
+            </select>
+          </div>
+          <p class="hint">Arrastrá cada comprobante dentro de la hoja para reubicarlo.</p>
+        </section>
+
+        <section class="panel panel-acciones">
+          <button class="btn btn-mini btn-ghost" id="btnOcr">Ver OCR</button>
+          <button class="btn btn-mini btn-danger" id="btnLimpiar">Limpiar</button>
+          <button class="btn btn-primary btn-block" id="btnDescargar2">Descargar Word</button>
+        </section>
+      </aside>
+
+      <!-- Área principal -->
+      <main class="canvas">
+        <div class="canvas-head">
+          <span class="canvas-titulo">Hojas</span>
+          <span class="canvas-meta" id="metaHojas">0 hojas</span>
+        </div>
+        <div class="sheets" id="sheets">
+          <!-- <article class="sheet">... generado por JS ...</article> -->
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal OCR -->
+  <div class="modal" id="modalOcr" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>Texto OCR</h2>
+        <button class="btn btn-icon" id="btnCerrarModal" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="ocr-selector">
+          <label for="selOcr">Comprobante</label>
+          <select id="selOcr"></select>
+        </div>
+        <pre class="ocr-text" id="ocrTexto"></pre>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-primary" id="btnCopiarOcr">Copiar texto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Ajustes -->
+  <div class="modal" id="modalAjustes" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>Ajustes</h2>
+        <button class="btn btn-icon" id="btnCerrarAjustes" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <label>Base URL <input type="url" id="cfgBaseUrl" placeholder="https://api.openai.com/v1" /></label>
+        <label>Modelo <input type="text" id="cfgModel" placeholder="gpt-4o-mini" /></label>
+        <label>API Key <input type="password" id="cfgApiKey" placeholder="sk-..." /></label>
+        <label>Moneda
+          <select id="cfgMoneda">
+            <option value="USD">USD · US$</option>
+            <option value="ARS">ARS · AR$</option>
+            <option value="EUR">EUR · €</option>
+          </select>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-primary" id="btnGuardarAjustes">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
