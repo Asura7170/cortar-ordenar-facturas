@@ -6,3 +6,8 @@ dist/
 # Configuración local de herramientas
 .commandcode/
 .impeccable/
+
+# Carpetas de herramientas
+.firecrawl/
+.playwright-mcp/
+.vite/
