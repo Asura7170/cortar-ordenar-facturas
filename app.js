@@ -101,13 +101,14 @@
   }
 
   function posicionesGrid(n) {
-    // patrones de grilla razonables por N
+    // Posición [fila, columna, span] por comprobante en la grilla de la hoja.
+    // 1-3: una fila · 4: 2×2 · 5: 3 arriba + 2 abajo centrados (grilla de 6 col.)
+    // 6: 3×2.
     switch (n) {
-      case 1: return [['1fr', '1fr']];
-      case 2: return [['1fr', '1fr']];
-      case 3: return [['1fr', '1fr', '1fr']];
-      case 5: return [['1fr', '1fr'], ['1fr', '1fr', '1fr']];
-      default: return [['1fr', '1fr'], ['1fr', '1fr']]; // 4 y 6 (6 => 2 filas 3 cols)
+      case 4: return [[1, 1, 1], [1, 2, 1], [2, 1, 1], [2, 2, 1]];
+      case 5: return [[1, 1, 2], [1, 3, 2], [1, 5, 2], [2, 2, 2], [2, 4, 2]];
+      case 6: return [[1, 1, 1], [1, 2, 1], [1, 3, 1], [2, 1, 1], [2, 2, 1], [2, 3, 1]];
+      default: return Array.from({ length: n }, (_, i) => [1, i + 1, 1]);
     }
   }
 
@@ -129,23 +130,26 @@
       const sheet = document.createElement('article');
       sheet.className = 'sheet';
       sheet.dataset.hoja = idx + 1;
-      const cols = state.nup >= 3 ? 3 : state.nup;
-      const grid = posicionesGrid(state.nup);
+      const pos = posicionesGrid(state.nup);
+      const filas = Math.max(...pos.map((p) => p[0]));
+      const cols = Math.max(...pos.map((p) => p[1] + p[2] - 1));
+      const posLibres = pos.slice(items.length);
       sheet.innerHTML = `
         <span class="sheet-tag">HOJA ${idx + 1}</span>
-        <div class="sheet-grid" style="grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: ${grid.length === 2 ? '1fr 1fr' : '1fr'}">
-          ${items.map((c) => celda(c)).join('')}
-          ${Array.from({ length: Math.max(0, state.nup - items.length) }, () => '<div class="cell empty">Vacío</div>').join('')}
+        <div class="sheet-grid" style="grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${filas}, 1fr)">
+          ${items.map((c, i) => celda(c, pos[i])).join('')}
+          ${posLibres.map((p) => `<div class="cell empty" style="grid-row: ${p[0]}; grid-column: ${p[1]} / span ${p[2]};">Vacío</div>`).join('')}
         </div>`;
       sheetsEl.appendChild(sheet);
     });
     renderMonto();
   }
 
-  function celda(c) {
+  function celda(c, pos) {
     const badge = c.montoCents != null ? `<span class="cell-badge">${formatearMoneda(c.montoCents)}</span>` : '';
+    const estilo = pos ? `grid-row: ${pos[0]}; grid-column: ${pos[1]} / span ${pos[2]};` : '';
     return `
-      <div class="cell cell-${c.estado}" data-id="${c.id}">
+      <div class="cell cell-${c.estado}" data-id="${c.id}" style="${estilo}">
         <img src="${c.imgUrl}" alt="${c.nombre}" draggable="true" loading="lazy" decoding="async" />
         <button class="cell-remove" data-accion="quitar" title="Quitar">×</button>
         ${badge}
