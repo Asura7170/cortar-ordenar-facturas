@@ -6,7 +6,7 @@
    - entrada (dropzone / pegar / subir)
    - cola secuencial de procesamiento (placeholder para OpenCV+OCR)
    - monto acumulado en cents (suma exacta)
-   - N comprobantes por hoja, reordenar con arrastre
+   - hojas independientes con N propio (1-6) vía popover flotante
    - código de pedido persistente, modal OCR y ajustes
    - export .docx (stub que arma un Blob)
    ============================================================ */
@@ -16,8 +16,7 @@
 
   /* ---------- Estado global ---------- */
   const state = {
-    comprobantes: [],      // {id, nombre, imgUrl, textoOcr, montoCents|null, moneda, estado, posicion}
-    nup: 4,
+    hojas: [],             // [{id, nup, items:[comprobante...]}] — cada hoja con su N (se inicia en el init)
     codigoActivo: false,
     codigoLongitud: 6,
     codigoValor: '',
@@ -29,7 +28,8 @@
   const LS_KEY = 'libro-mayor-state';
   const MONEDAS = { USD: { simbolo: 'US$', factor: 1 }, ARS: { simbolo: 'AR$', factor: 1 }, EUR: { simbolo: '€', factor: 1 } };
 
-  let seq = 0;
+  let seq = 0;        // ids de comprobantes
+  let seqHoja = 0;    // ids de hojas
 
   /* ---------- Referencias DOM ---------- */
   const $ = (id) => document.getElementById(id);
@@ -41,7 +41,6 @@
   const chkCodigo = $('chkCodigo');
   const numCodigo = $('numCodigo');
   const inputCodigo = $('inputCodigo');
-  const selNup = $('selNup');
   const btnOcr = $('btnOcr');
   const btnLimpiar = $('btnLimpiar');
   const btnDescargar2 = $('btnDescargar2');
@@ -52,7 +51,6 @@
   /* ---------- Persistencia ---------- */
   function guardar() {
     const persist = {
-      nup: state.nup,
       codigoActivo: state.codigoActivo,
       codigoLongitud: state.codigoLongitud,
       codigoValor: state.codigoValor,
@@ -67,7 +65,6 @@
       const raw = localStorage.getItem(LS_KEY);
       if (!raw) return;
       const p = JSON.parse(raw);
-      state.nup = p.nup ?? 4;
       state.codigoActivo = p.codigoActivo ?? false;
       state.codigoLongitud = p.codigoLongitud ?? 6;
       state.codigoValor = p.codigoValor ?? '';
@@ -83,66 +80,125 @@
   }
 
   function sumaTotal() {
-    return state.comprobantes.reduce((acc, c) => acc + (c.montoCents || 0), 0);
+    return state.hojas.reduce((acc, h) => acc + h.items.reduce((a, c) => a + (c.montoCents || 0), 0), 0);
   }
 
   function renderMonto() {
     montoEl.textContent = formatearMoneda(sumaTotal());
   }
 
-  /* ---------- Hojas ---------- */
-  function paginar() {
-    const n = state.nup;
-    const hojas = [];
-    for (let i = 0; i < state.comprobantes.length; i += n) {
-      hojas.push(state.comprobantes.slice(i, i + n));
-    }
-    return hojas;
+  function totalItems() {
+    return state.hojas.reduce((acc, h) => acc + h.items.length, 0);
   }
 
-  function posicionesGrid(n) {
-    // Posición [fila, columna, span] por comprobante en la grilla de la hoja.
-    // 1-3: una fila · 4: 2×2 · 5: 3 arriba + 2 abajo centrados (grilla de 6 col.)
-    // 6: 3×2.
-    switch (n) {
-      case 4: return [[1, 1, 1], [1, 2, 1], [2, 1, 1], [2, 2, 1]];
-      case 5: return [[1, 1, 2], [1, 3, 2], [1, 5, 2], [2, 2, 2], [2, 4, 2]];
-      case 6: return [[1, 1, 1], [1, 2, 1], [1, 3, 1], [2, 1, 1], [2, 2, 1], [2, 3, 1]];
-      default: return Array.from({ length: n }, (_, i) => [1, i + 1, 1]);
+  function crearHoja(layoutId = 'u4x2') {
+    return { id: ++seqHoja, layout: layoutDe(layoutId).id || layoutId, items: [] };
+  }
+
+  function hojaPorId(id) {
+    return state.hojas.find((h) => h.id === Number(id));
+  }
+
+  function limpiarHojas() {
+    state.hojas = state.hojas.filter((h) => h.items.length > 0);
+    if (state.hojas.length === 0) state.hojas.push(crearHoja());
+  }
+
+  // Reparte todos los comprobantes en orden global respetando la capacidad de cada hoja:
+  // llena hojas hacia la izquierda (al subir N una hoja atrae items de las siguientes)
+  // y empuja excedentes hacia adelante (al bajar N). Crea hojas al final si sobran.
+  function redistribuir() {
+    const items = state.hojas.flatMap((h) => h.items);
+    let pos = 0;
+    for (const h of state.hojas) {
+      const cap = layoutDe(h.layout).total;
+      h.items = items.slice(pos, pos + cap);
+      pos += cap;
+    }
+    while (pos < items.length) {
+      const h = crearHoja(state.hojas[state.hojas.length - 1].layout);
+      const cap = layoutDe(h.layout).total;
+      h.items = items.slice(pos, pos + cap);
+      pos += cap;
+      state.hojas.push(h);
+    }
+    limpiarHojas();
+  }
+
+  // Mueve el excedente de una hoja (cuando items > capacidad) a las siguientes con espacio,
+  // creando hojas al final si hace falta. Preserva el orden de los comprobantes.
+  function reflowExceso(desdeIdx) {
+    let extra = [];
+    for (let i = desdeIdx; i < state.hojas.length; i++) {
+      const h = state.hojas[i];
+      const cap = layoutDe(h.layout).total;
+      while (extra.length && h.items.length < cap) {
+        h.items.push(extra.shift());
+      }
+      if (h.items.length > cap) {
+        // El excedente previo (anterior en el orden global) va primero
+        extra = extra.concat(h.items.splice(cap, h.items.length - cap));
+      }
+    }
+    while (extra.length) {
+      const h = crearHoja(state.hojas[state.hojas.length - 1].layout);
+      const cap = layoutDe(h.layout).total;
+      while (h.items.length < cap && extra.length) {
+        h.items.push(extra.shift());
+      }
+      state.hojas.push(h);
     }
   }
 
-  function renderHojas() {
-    const hojas = paginar();
-    metaHojas.textContent = `${hojas.length} hoja${hojas.length === 1 ? '' : 's'} · ${state.comprobantes.length} comprobante${state.comprobantes.length === 1 ? '' : 's'}`;
-    sheetsEl.innerHTML = '';
+  function cambiarLayoutHoja(hojaId, layoutId) {
+    const h = hojaPorId(hojaId);
+    if (!h || !PLANTILLAS[layoutId]) return;
+    h.layout = layoutId;
+    redistribuir();
+    guardar();
+    renderHojas();
+  }
 
-    if (state.comprobantes.length === 0) {
-      sheetsEl.innerHTML = `
-        <div class="empty-state">
-          <h2>Comenzá pegando tus comprobantes</h2>
-          <p>Usá <strong>Ctrl+V</strong>, arrastrá imágenes o hacé clic en el cuadro de entrada. Cada comprobante se recorta, se lee su texto y se suma su total.</p>
-        </div>`;
-      return;
-    }
+  function aplicarATodas(hojaId) {
+    const h = hojaPorId(hojaId);
+    if (!h) return;
+    const layoutId = h.layout;
+    state.hojas.forEach((x) => { x.layout = layoutId; });
+    redistribuir();
+    guardar();
+    renderHojas();
+  }
 
-    hojas.forEach((items, idx) => {
-      const sheet = document.createElement('article');
-      sheet.className = 'sheet';
-      sheet.dataset.hoja = idx + 1;
-      const pos = posicionesGrid(state.nup);
-      const filas = Math.max(...pos.map((p) => p[0]));
-      const cols = Math.max(...pos.map((p) => p[1] + p[2] - 1));
-      const posLibres = pos.slice(items.length);
-      sheet.innerHTML = `
-        <span class="sheet-tag">HOJA ${idx + 1}</span>
-        <div class="sheet-grid" style="grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${filas}, 1fr)">
-          ${items.map((c, i) => celda(c, pos[i])).join('')}
-          ${posLibres.map((p) => `<div class="cell empty" style="grid-row: ${p[0]}; grid-column: ${p[1]} / span ${p[2]};">Vacío</div>`).join('')}
-        </div>`;
-      sheetsEl.appendChild(sheet);
-    });
-    renderMonto();
+  /* ---------- Plantillas de distribución ---------- */
+  // Cada plantilla define filas/columnas del grid de la hoja y la posición
+  // [fila, columna, span] de cada comprobante. La mini-vista replica esta grilla.
+  const PLANTILLAS = {
+    u1:   { total: 1, filas: 1, cols: 2, pos: [[1, 1, 2]] },
+    u2h:  { total: 2, filas: 1, cols: 2, pos: [[1, 1, 1], [1, 2, 1]] },
+    u2v:  { total: 2, filas: 2, cols: 1, pos: [[1, 1, 1], [2, 1, 1]] },
+    u3h:  { total: 3, filas: 1, cols: 3, pos: [[1, 1, 1], [1, 2, 1], [1, 3, 1]] },
+    u3v:  { total: 3, filas: 3, cols: 1, pos: [[1, 1, 1], [2, 1, 1], [3, 1, 1]] },
+    u3m:  { total: 3, filas: 2, cols: 2, pos: [[1, 1, 1], [1, 2, 1], [2, 1, 2]] },
+    u4x2: { total: 4, filas: 2, cols: 2, pos: [[1, 1, 1], [1, 2, 1], [2, 1, 1], [2, 2, 1]] },
+    u5m:  { total: 5, filas: 2, cols: 6, pos: [[1, 1, 2], [1, 3, 2], [1, 5, 2], [2, 2, 2], [2, 4, 2]] },
+    u6x2: { total: 6, filas: 2, cols: 3, pos: [[1, 1, 1], [1, 2, 1], [1, 3, 1], [2, 1, 1], [2, 2, 1], [2, 3, 1]] },
+    u6m:  { total: 6, filas: 3, cols: 2, pos: [[1, 1, 1], [1, 2, 1], [2, 1, 1], [2, 2, 1], [3, 1, 1], [3, 2, 1]] },
+  };
+
+  const NOMBRES_LAYOUT = {
+    u1: '1 · Centrado',
+    u2h: '2 · Fila', u2v: '2 · Columna',
+    u3h: '3 · Fila', u3v: '3 · Columna', u3m: '3 · 2+1',
+    u4x2: '4 · Cuadrado',
+    u5m: '5 · 3+2',
+    u6x2: '6 · 3×2', u6m: '6 · 2+2+2',
+  };
+
+  // Orden de presentación en el panel (agrupado por cantidad de comprobantes)
+  const ORDEN_PLANTILLAS = ['u1', 'u2h', 'u2v', 'u3h', 'u3v', 'u3m', 'u4x2', 'u5m', 'u6x2', 'u6m'];
+
+  function layoutDe(id) {
+    return PLANTILLAS[id] || PLANTILLAS.u4x2;
   }
 
   function celda(c, pos) {
@@ -156,21 +212,79 @@
       </div>`;
   }
 
+  function panelHoja(hoja, idx) {
+    const tarjetas = ORDEN_PLANTILLAS.map((id) => {
+      const l = PLANTILLAS[id];
+      const fichas = l.pos.map(([f, c, s]) => `<span class="ficha" style="grid-row:${f};grid-column:${c} / span ${s};"></span>`).join('');
+      const activa = id === hoja.layout ? ' active' : '';
+      return `<button class="grid-opt${activa}" data-accion="layout" data-hoja="${hoja.id}" data-layout="${id}" title="${NOMBRES_LAYOUT[id]}">
+        <span class="layout-mini" style="grid-template-columns:repeat(${l.cols},1fr);grid-template-rows:repeat(${l.filas},1fr);" aria-hidden="true">${fichas}</span>
+        <span class="layout-name">${NOMBRES_LAYOUT[id]}</span>
+      </button>`;
+    }).join('');
+    return `
+      <aside class="sheet-panel" aria-label="Distribución de la hoja ${idx + 1}">
+        <header class="sheet-panel-head">
+          <span class="sheet-panel-title">HOJA ${idx + 1}</span>
+          <span class="sheet-panel-count">${hoja.items.length}/${layoutDe(hoja.layout).total}</span>
+        </header>
+        <div class="grid-opts">${tarjetas}</div>
+        <button class="apply-all" data-accion="apply-all" data-hoja="${hoja.id}">Aplicar a todas las hojas</button>
+      </aside>`;
+  }
+
+  function renderHojas() {
+    metaHojas.textContent = `${state.hojas.length} hoja${state.hojas.length === 1 ? '' : 's'} · ${totalItems()} comprobante${totalItems() === 1 ? '' : 's'}`;
+    sheetsEl.innerHTML = '';
+
+    if (totalItems() === 0) {
+      sheetsEl.innerHTML = `
+        <div class="empty-state">
+          <h2>Comenzá pegando tus comprobantes</h2>
+          <p>Usá <strong>Ctrl+V</strong>, arrastrá imágenes o hacé clic en el cuadro de entrada. Cada comprobante se recorta, se lee su texto y se suma su total.</p>
+        </div>`;
+      return;
+    }
+
+    state.hojas.forEach((hoja, idx) => {
+      const l = layoutDe(hoja.layout);
+      const sheet = document.createElement('article');
+      sheet.className = 'sheet';
+      sheet.dataset.hoja = hoja.id;
+      const posLibres = l.pos.slice(hoja.items.length);
+      sheet.innerHTML = `
+        <span class="sheet-tag">HOJA ${idx + 1}</span>
+        <div class="sheet-grid" style="grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)">
+          ${hoja.items.map((c, i) => celda(c, l.pos[i])).join('')}
+          ${posLibres.map((p) => `<div class="cell empty" style="grid-row: ${p[0]}; grid-column: ${p[1]} / span ${p[2]};">Vacío</div>`).join('')}
+        </div>`;
+      const row = document.createElement('div');
+      row.className = 'sheet-row';
+      row.dataset.hoja = hoja.id;
+      row.innerHTML = panelHoja(hoja, idx);
+      row.insertBefore(sheet, row.firstChild);
+      sheetsEl.appendChild(row);
+    });
+    renderMonto();
+  }
+
   /* ---------- Cola de procesamiento (placeholder) ---------- */
   async function procesarCola() {
     if (state.colaEnProceso) return;
     state.colaEnProceso = true;
-    for (const c of state.comprobantes) {
-      if (c.estado === 'pendiente') {
-        c.estado = 'procesando';
-        renderHojas();
-        // Placeholder: aquí irá el pipeline OpenCV→OCR→LLM.
-        await new Promise((r) => setTimeout(r, 900));
-        // Simular resultado: texto OCR ficticio y monto total.
-        c.textoOcr = `FACTURA ${c.nombre}\nFecha: 12/08/2026\nTOTAL: US$ 1,234.56`;
-        c.montoCents = 123456;
-        c.estado = 'ok';
-        renderHojas();
+    for (const hoja of state.hojas) {
+      for (const c of hoja.items) {
+        if (c.estado === 'pendiente') {
+          c.estado = 'procesando';
+          renderHojas();
+          // Placeholder: aquí irá el pipeline OpenCV→OCR→LLM.
+          await new Promise((r) => setTimeout(r, 900));
+          // Simular resultado: texto OCR ficticio y monto total.
+          c.textoOcr = `FACTURA ${c.nombre}\nFecha: 12/08/2026\nTOTAL: US$ 1,234.56`;
+          c.montoCents = 123456;
+          c.estado = 'ok';
+          renderHojas();
+        }
       }
     }
     state.colaEnProceso = false;
@@ -182,14 +296,25 @@
     if (files.length > 0 && validos.length === 0) {
       showToast('Solo se aceptan imágenes (JPG, PNG, WEBP, BMP, GIF) o PDF. HEIC no soportado.');
     }
-    for (const f of validos) {
+    const nuevas = validos.map((f) => {
       const id = ++seq;
-      const url = URL.createObjectURL(f);
-      const moneda = 'USD';
-      state.comprobantes.push({
-        id, nombre: f.name, imgUrl: url, textoOcr: '',
-        montoCents: null, moneda, estado: 'pendiente', posicion: state.comprobantes.length,
-      });
+      return {
+        id, nombre: f.name, imgUrl: URL.createObjectURL(f), textoOcr: '',
+        montoCents: null, moneda: 'USD', estado: 'pendiente', posicion: 0,
+      };
+    });
+    // Repartir empezando por la última hoja con espacio; crear hojas nuevas si hace falta
+    let hoja = state.hojas[state.hojas.length - 1] || crearHoja();
+    if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
+    while (nuevas.length) {
+      const cap = layoutDe(hoja.layout).total;
+      while (hoja.items.length < cap && nuevas.length) {
+        hoja.items.push(nuevas.shift());
+      }
+      if (nuevas.length) {
+        hoja = crearHoja(hoja.layout);
+        state.hojas.push(hoja);
+      }
     }
     renderHojas();
     procesarCola();
@@ -218,21 +343,40 @@
     if (files.length) agregarArchivos(files);
   });
 
-  /* ---------- Quitar / drag ---------- */
-  sheetsEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-accion="quitar"]');
-    if (!btn) return;
-    const cell = btn.closest('.cell');
-    const id = Number(cell.dataset.id);
-    const idx = state.comprobantes.findIndex((c) => c.id === id);
-    if (idx >= 0) {
-      URL.revokeObjectURL(state.comprobantes[idx].imgUrl);
-      state.comprobantes.splice(idx, 1);
+  /* ---------- Quitar / drag entre hojas ---------- */
+  function quitarComprobante(id) {
+    for (const h of state.hojas) {
+      const idx = h.items.findIndex((c) => c.id === id);
+      if (idx >= 0) {
+        URL.revokeObjectURL(h.items[idx].imgUrl);
+        h.items.splice(idx, 1);
+        break;
+      }
     }
+    // Limpiar hojas vacías (conservar al menos una)
+    limpiarHojas();
+    guardar();
     renderHojas();
+  }
+
+  sheetsEl.addEventListener('click', (e) => {
+    const btnQuitar = e.target.closest('[data-accion="quitar"]');
+    if (btnQuitar) {
+      quitarComprobante(Number(btnQuitar.closest('.cell').dataset.id));
+      return;
+    }
+    const btnLayout = e.target.closest('[data-accion="layout"]');
+    if (btnLayout) {
+      cambiarLayoutHoja(btnLayout.dataset.hoja, btnLayout.dataset.layout);
+      return;
+    }
+    const btnApply = e.target.closest('[data-accion="apply-all"]');
+    if (btnApply) {
+      aplicarATodas(btnApply.dataset.hoja);
+    }
   });
 
-  // Arrastre libre dentro de la hoja (posición física; el orden no cambia)
+  // Arrastre entre hojas (mover comprobante de una hoja a otra)
   let dragSrc = null;
   sheetsEl.addEventListener('dragstart', (e) => {
     const cell = e.target.closest('.cell');
@@ -259,15 +403,25 @@
     const el = document.elementFromPoint(e.clientX, e.clientY);
     const cell = el?.closest?.('.cell');
     if (!cell || !dragSrc || cell === dragSrc) return;
-    // En el esqueleto: mover la imagen visualmente dentro de la hoja (swap de contenido de celda)
-    const imgSrc = dragSrc.querySelector('img');
-    const imgDest = cell.querySelector('img');
-    if (imgSrc && imgDest) {
-      const tmp = imgSrc.src;
-      imgSrc.src = imgDest.src;
-      imgDest.src = tmp;
+    const hojaOrigen = dragSrc.closest('.sheet');
+    const hojaDestino = cell.closest('.sheet');
+    if (!hojaOrigen || !hojaDestino || hojaOrigen === hojaDestino) return;
+    const id = Number(dragSrc.dataset.id);
+    const origen = hojaPorId(hojaOrigen.dataset.hoja);
+    const destino = hojaPorId(hojaDestino.dataset.hoja);
+    if (!origen || !destino) return;
+    const idx = origen.items.findIndex((c) => c.id === id);
+    if (idx < 0) return;
+    const [item] = origen.items.splice(idx, 1);
+    // Auto-desbordar: si la hoja destino no está llena, el item entra; si está
+    // llena, entra y el último pasa a la siguiente con espacio (o crea una nueva).
+    destino.items.push(item);
+    if (destino.items.length > layoutDe(destino.layout).total) {
+      reflowExceso(state.hojas.indexOf(destino));
     }
-    cell.style.outline = '';
+    limpiarHojas();
+    guardar();
+    renderHojas();
   });
 
   /* ---------- Código de pedido ---------- */
@@ -302,15 +456,15 @@
       showToast(`Código de pedido inválido: se requieren ${state.codigoLongitud} dígitos.`);
       return;
     }
-    if (state.comprobantes.length === 0) { showToast('No hay comprobantes para descargar.'); return; }
+    if (totalItems() === 0) { showToast('No hay comprobantes para descargar.'); return; }
     showToast('Generando .docx… (esqueleto)');
 
     // Stub: armar un blob de texto simple (en la implementación real usa docx.js)
     const contenido = [
       'DOCX STUB — Cortar y Ordenar Facturas',
       `Código de pedido: ${state.codigoActivo ? state.codigoValor : '(sin código)'}`,
-      `Hojas: ${paginar().length}`,
-      ...state.comprobantes.map((c) => `- ${c.nombre}: ${formatearMoneda(c.montoCents || 0)}`),
+      `Hojas: ${state.hojas.length}`,
+      ...state.hojas.flatMap((h) => h.items).map((c) => `- ${c.nombre}: ${formatearMoneda(c.montoCents || 0)}`),
     ].join('\n');
     const blob = new Blob([contenido], { type: 'text/plain' });
     const a = document.createElement('a');
@@ -328,13 +482,15 @@
   const selOcr = $('selOcr');
   const ocrTexto = $('ocrTexto');
   btnOcr.addEventListener('click', () => {
-    if (state.comprobantes.length === 0) { showToast('No hay comprobantes todavía.'); return; }
-    selOcr.innerHTML = state.comprobantes.map((c) => `<option value="${c.id}">${c.nombre}</option>`).join('');
+    if (totalItems() === 0) { showToast('No hay comprobantes todavía.'); return; }
+    const todos = state.hojas.flatMap((h) => h.items);
+    selOcr.innerHTML = todos.map((c) => `<option value="${c.id}">${c.nombre}</option>`).join('');
     selOcr.dispatchEvent(new Event('change'));
     modalOcr.showModal();
   });
   selOcr.addEventListener('change', () => {
-    const c = state.comprobantes.find((x) => x.id === Number(selOcr.value));
+    const todos = state.hojas.flatMap((h) => h.items);
+    const c = todos.find((x) => x.id === Number(selOcr.value));
     ocrTexto.textContent = c?.textoOcr || '(sin texto OCR)';
   });
   $('btnCopiarOcr').addEventListener('click', () => {
@@ -364,17 +520,11 @@
 
   /* ---------- Limpiar ---------- */
   btnLimpiar.addEventListener('click', () => {
-    for (const c of state.comprobantes) URL.revokeObjectURL(c.imgUrl);
-    state.comprobantes = [];
-    renderHojas();
-    showToast('Lote limpiado. Se conservan check, N y ajustes.');
-  });
-
-  /* ---------- N-up ---------- */
-  selNup.addEventListener('change', () => {
-    state.nup = Number(selNup.value);
+    for (const h of state.hojas) for (const c of h.items) URL.revokeObjectURL(c.imgUrl);
+    state.hojas = [crearHoja()];
     guardar();
     renderHojas();
+    showToast('Lote limpiado. Se conservan check y ajustes.');
   });
 
   /* ---------- Toast ---------- */
@@ -414,7 +564,7 @@
 
   /* ---------- Init ---------- */
   cargar();
-  selNup.value = state.nup;
+  state.hojas = state.hojas.length ? state.hojas : [crearHoja()];
   renderCodigo();
   renderHojas();
   initTema();
