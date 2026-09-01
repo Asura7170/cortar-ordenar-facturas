@@ -56,6 +56,8 @@
   --sombra-panel: 0 10px 30px rgba(0,0,0,0.35);
   --sombra-hoja: 0 6px 14px rgba(0,0,0,0.4), 0 18px 50px rgba(0,0,0,0.25);
   --focus: 0 0 0 3px rgba(143,191,138,0.5);
+
+  color-scheme: dark;
 }
 
 /* ============ TEMA CLARO (Libro Mayor en papel) ============ */
@@ -100,6 +102,8 @@
   --error-cell-bg: rgba(178,58,46,0.06);
   --celda-remove: rgba(44,58,40,0.8);
   --footer-barra: rgba(250,246,234,0.95);
+
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -206,6 +210,7 @@ input, select { font-family: inherit; }
 
 /* Dropzone */
 .dropzone {
+  display: block;
   border: 2px dashed var(--dropzone-borde);
   border-radius: var(--radio);
   padding: 22px 12px;
@@ -234,10 +239,6 @@ input, select { font-family: inherit; }
 }
 
 /* Switch */
-.switch-row {
-  display: flex; align-items: center; justify-content: space-between;
-  width: 100%;
-}
 .switch { position: relative; display: inline-block; width: 42px; height: 22px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .switch-track {
@@ -472,14 +473,16 @@ input::placeholder { color: var(--input-placeholder); }
 
 /* ============ MODALES ============ */
 .modal {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.55);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 100;
-}
-.modal[hidden] { display: none; }
-.modal-card {
+  border: none;
+  padding: 0;
+  background: transparent;
   width: min(560px, 92vw);
+  max-width: none;
+  margin: auto;
+}
+.modal[open] { display: block; }
+.modal::backdrop { background: rgba(0,0,0,0.55); }
+.modal-card {
   max-height: 82vh;
   background: var(--papel);
   border-radius: 12px;

@@ -35,40 +35,38 @@
     <div class="workspace">
       <!-- Sidebar -->
       <aside class="sidebar">
-        <section class="panel panel-entrada">
+        <section class="panel panel-entrada" aria-labelledby="tituloEntrada">
           <header class="panel-head">
-            <span class="panel-title">Entrada</span>
+            <h2 class="panel-title" id="tituloEntrada">Entrada</h2>
           </header>
-          <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Pegar, subir o arrastrar archivos">
+          <label class="dropzone" id="dropzone" for="fileInput" tabindex="0">
             <span class="dz-ico">＋</span>
             <p class="dz-txt"><strong>Pegar / Subir / Arrastrar</strong></p>
             <p class="dz-sub">Ctrl+V · clic · arrastrar</p>
             <span class="dz-fmt">JPG · PNG · WEBP · PDF</span>
-          </div>
+          </label>
           <input type="file" id="fileInput" multiple accept="image/*,.pdf" hidden />
         </section>
 
-        <section class="panel panel-codigo">
+        <section class="panel panel-codigo" aria-labelledby="tituloCodigo">
           <header class="panel-head">
-            <label class="switch-row">
-              <span class="panel-title">Código de pedido</span>
-              <span class="switch">
-                <input type="checkbox" id="chkCodigo" />
-                <span class="switch-track"></span>
-              </span>
+            <h2 class="panel-title" id="tituloCodigo">Código de pedido</h2>
+            <label class="switch">
+              <input type="checkbox" id="chkCodigo" aria-label="Activar código de pedido" />
+              <span class="switch-track"></span>
             </label>
           </header>
           <div class="codigo-row">
             <label class="field-mini" for="numCodigo">N° dígitos</label>
             <input type="number" id="numCodigo" min="1" max="12" value="6" />
-            <input type="text" id="inputCodigo" inputmode="numeric" placeholder="Código" maxlength="12" />
+            <input type="text" id="inputCodigo" inputmode="numeric" placeholder="Código" maxlength="12" spellcheck="false" autocorrect="off" autocomplete="off" />
           </div>
           <p class="hint">Pie de página derecho en el Word. Si el check está activo, se exige el código completo al descargar.</p>
         </section>
 
-        <section class="panel panel-ordenar">
+        <section class="panel panel-ordenar" aria-labelledby="tituloOrdenar">
           <header class="panel-head">
-            <span class="panel-title">Ordenar</span>
+            <h2 class="panel-title" id="tituloOrdenar">Ordenar</h2>
           </header>
           <div class="nup-row">
             <label for="selNup">Comprobantes por hoja</label>
@@ -94,7 +92,7 @@
       <!-- Área principal -->
       <main class="canvas">
         <div class="canvas-head">
-          <span class="canvas-titulo">Hojas</span>
+          <h2 class="canvas-titulo">Hojas</h2>
           <span class="canvas-meta" id="metaHojas">0 hojas</span>
         </div>
         <div class="sheets" id="sheets">
@@ -105,11 +103,11 @@
   </div>
 
   <!-- Modal OCR -->
-  <div class="modal" id="modalOcr" hidden>
+  <dialog class="modal" id="modalOcr" closedby="any" aria-labelledby="tituloOcr">
     <div class="modal-card">
       <div class="modal-head">
-        <h2>Texto OCR</h2>
-        <button class="btn btn-icon" id="btnCerrarModal" aria-label="Cerrar">×</button>
+        <h2 id="tituloOcr">Texto OCR</h2>
+        <button class="btn btn-icon" command="close" commandfor="modalOcr" aria-label="Cerrar">×</button>
       </div>
       <div class="modal-body">
         <div class="ocr-selector">
@@ -122,34 +120,36 @@
         <button class="btn btn-primary" id="btnCopiarOcr">Copiar texto</button>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- Modal Ajustes -->
-  <div class="modal" id="modalAjustes" hidden>
+  <dialog class="modal" id="modalAjustes" closedby="any" aria-labelledby="tituloAjustes">
     <div class="modal-card">
       <div class="modal-head">
-        <h2>Ajustes</h2>
-        <button class="btn btn-icon" id="btnCerrarAjustes" aria-label="Cerrar">×</button>
+        <h2 id="tituloAjustes">Ajustes</h2>
+        <button class="btn btn-icon" command="close" commandfor="modalAjustes" aria-label="Cerrar">×</button>
       </div>
-      <div class="modal-body">
-        <label>Base URL <input type="url" id="cfgBaseUrl" placeholder="https://api.openai.com/v1" /></label>
-        <label>Modelo <input type="text" id="cfgModel" placeholder="gpt-4o-mini" /></label>
-        <label>API Key <input type="password" id="cfgApiKey" placeholder="sk-..." /></label>
-        <label>Moneda
-          <select id="cfgMoneda">
-            <option value="USD">USD · US$</option>
-            <option value="ARS">ARS · AR$</option>
-            <option value="EUR">EUR · €</option>
-          </select>
-        </label>
-      </div>
-      <div class="modal-foot">
-        <button class="btn btn-primary" id="btnGuardarAjustes">Guardar</button>
-      </div>
+      <form id="formAjustes" method="dialog">
+        <div class="modal-body">
+          <label>Base URL <input type="url" id="cfgBaseUrl" name="cfgBaseUrl" placeholder="https://api.openai.com/v1" /></label>
+          <label>Modelo <input type="text" id="cfgModel" name="cfgModel" placeholder="gpt-4o-mini" /></label>
+          <label>API Key <input type="password" id="cfgApiKey" name="cfgApiKey" autocomplete="off" spellcheck="false" placeholder="sk-..." /></label>
+          <label>Moneda
+            <select id="cfgMoneda" name="cfgMoneda">
+              <option value="USD">USD · US$</option>
+              <option value="ARS">ARS · AR$</option>
+              <option value="EUR">EUR · €</option>
+            </select>
+          </label>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-primary" type="submit" id="btnGuardarAjustes">Guardar</button>
+        </div>
+      </form>
     </div>
-  </div>
+  </dialog>
 
-  <div class="toast" id="toast" hidden></div>
+  <div class="toast" id="toast" role="status" hidden></div>
 
   <script src="app.js"></script>
 </body>

@@ -146,7 +146,7 @@
     const badge = c.montoCents != null ? `<span class="cell-badge">${formatearMoneda(c.montoCents)}</span>` : '';
     return `
       <div class="cell cell-${c.estado}" data-id="${c.id}">
-        <img src="${c.imgUrl}" alt="${c.nombre}" draggable="true" />
+        <img src="${c.imgUrl}" alt="${c.nombre}" draggable="true" loading="lazy" decoding="async" />
         <button class="cell-remove" data-accion="quitar" title="Quitar">×</button>
         ${badge}
       </div>`;
@@ -191,7 +191,6 @@
     procesarCola();
   }
 
-  dropzone.addEventListener('click', () => fileInput.click());
   dropzone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
   fileInput.addEventListener('change', () => { agregarArchivos(fileInput.files); fileInput.value = ''; });
 
@@ -328,13 +327,12 @@
     if (state.comprobantes.length === 0) { showToast('No hay comprobantes todavía.'); return; }
     selOcr.innerHTML = state.comprobantes.map((c) => `<option value="${c.id}">${c.nombre}</option>`).join('');
     selOcr.dispatchEvent(new Event('change'));
-    modalOcr.hidden = false;
+    modalOcr.showModal();
   });
   selOcr.addEventListener('change', () => {
     const c = state.comprobantes.find((x) => x.id === Number(selOcr.value));
     ocrTexto.textContent = c?.textoOcr || '(sin texto OCR)';
   });
-  $('btnCerrarModal').addEventListener('click', () => { modalOcr.hidden = true; });
   $('btnCopiarOcr').addEventListener('click', () => {
     navigator.clipboard.writeText(ocrTexto.textContent);
     showToast('Texto OCR copiado.');
@@ -347,10 +345,9 @@
     $('cfgModel').value = state.configIA.model;
     $('cfgApiKey').value = state.configIA.apiKey;
     $('cfgMoneda').value = state.moneda;
-    modalAjustes.hidden = false;
+    modalAjustes.showModal();
   });
-  $('btnCerrarAjustes').addEventListener('click', () => { modalAjustes.hidden = true; });
-  $('btnGuardarAjustes').addEventListener('click', () => {
+  $('formAjustes').addEventListener('submit', () => {
     state.configIA.baseUrl = $('cfgBaseUrl').value || 'https://api.openai.com/v1';
     state.configIA.model = $('cfgModel').value || 'gpt-4o-mini';
     state.configIA.apiKey = $('cfgApiKey').value;
@@ -358,7 +355,6 @@
     guardar();
     renderMonto();
     renderHojas();
-    modalAjustes.hidden = true;
     showToast('Ajustes guardados.');
   });
 
