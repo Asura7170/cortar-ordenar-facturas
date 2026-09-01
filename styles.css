@@ -151,9 +151,9 @@ input, select { font-family: inherit; }
 
 .monto-box {
   margin-left: auto;
-  display: flex; flex-direction: column; align-items: flex-end;
-  gap: 2px;
-  padding: 8px 16px;
+  display: flex; flex-direction: row; align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
   background: var(--monto-bg);
   border: 1px solid var(--borde-panel);
   border-radius: var(--radio-s);
