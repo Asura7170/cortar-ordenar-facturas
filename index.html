@@ -64,8 +64,17 @@
           <p class="hint">Pie de página derecho en el Word. Si el check está activo, se exige el código completo al descargar.</p>
         </section>
 
+        <section class="panel panel-ocr" aria-labelledby="tituloOcrToggle">
+          <header class="panel-head">
+            <h2 class="panel-title" id="tituloOcrToggle">OCR <span class="ocr-estado" id="ocrEstado">OFF</span></h2>
+            <label class="switch">
+              <input type="checkbox" id="chkOcr" aria-label="Activar modo OCR" />
+              <span class="switch-track"></span>
+            </label>
+          </header>
+        </section>
+
         <section class="panel panel-acciones">
-          <button class="btn btn-mini btn-ghost" id="btnOcr">Ver OCR</button>
           <button class="btn btn-mini btn-danger" id="btnLimpiar">Limpiar</button>
           <button class="btn btn-primary btn-block" id="btnDescargar2">Descargar Word</button>
         </section>

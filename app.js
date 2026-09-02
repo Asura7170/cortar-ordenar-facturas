@@ -41,7 +41,6 @@
   const chkCodigo = $('chkCodigo');
   const numCodigo = $('numCodigo');
   const inputCodigo = $('inputCodigo');
-  const btnOcr = $('btnOcr');
   const btnLimpiar = $('btnLimpiar');
   const btnDescargar2 = $('btnDescargar2');
   const btnAjustes = $('btnAjustes');
@@ -634,15 +633,24 @@
 
   /* ---------- Modo OCR (toggle global sobre las hojas) ---------- */
   let modoOcr = false;
+  const chkOcr = $('chkOcr');
+  const ocrEstado = $('ocrEstado');
+
+  function renderOcrToggle() {
+    chkOcr.checked = modoOcr;
+    ocrEstado.textContent = modoOcr ? 'ON' : 'OFF';
+    ocrEstado.classList.toggle('on', modoOcr);
+  }
 
   function toggleModoOcr() {
     modoOcr = !modoOcr;
-    btnOcr.textContent = modoOcr ? 'Ver imágenes' : 'Ver OCR';
-    btnOcr.title = modoOcr ? 'Volver a ver las imágenes de los comprobantes' : 'Mostrar el texto OCR de cada comprobante en su casilla';
+    renderOcrToggle();
     renderHojas();
   }
 
-  btnOcr.addEventListener('click', toggleModoOcr);
+  chkOcr.addEventListener('change', () => {
+    if (chkOcr.checked !== modoOcr) toggleModoOcr();
+  });
 
   /* ---------- Modal Ajustes ---------- */
   const modalAjustes = $('modalAjustes');
