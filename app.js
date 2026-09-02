@@ -192,7 +192,7 @@
     const badge = item.montoCents != null ? `<span class="cell-badge">${formatearMoneda(item.montoCents)}</span>` : '';
     return `
       <div class="cell cell-${item.estado}" data-id="${item.id}" data-slot="${slotIdx}" data-hoja="${hojaId}" style="${estilo}">
-        <img src="${item.imgUrl}" alt="${item.nombre}" draggable="true" loading="lazy" decoding="async" />
+        <img src="${item.imgUrl}" alt="${item.nombre}" draggable="false" loading="lazy" decoding="async" />
         <button class="cell-remove" data-accion="quitar" title="Quitar">×</button>
         ${badge}
       </div>`;
@@ -368,9 +368,9 @@
     }
   });
 
-  /* ---------- Arrastre de comprobantes (mover/swap entre casillas y hojas) ---------- */
+  /* ---------- Arrastre de comprobantes (Pointer Events: mover/swap entre casillas y hojas) ---------- */
   const canvasEl = document.querySelector('.canvas');
-  let dragSrc = null; // { id, hojaId, slotIdx }
+  let pointerDrag = null; // { id, hojaId, slotIdx, img, ghost, startX, startY, activo }
   let scrollTimer = null;
 
   function detenerScroll() {
@@ -381,7 +381,8 @@
     sheetsEl.querySelectorAll('.drop-target').forEach((c) => c.classList.remove('drop-target'));
     sheetsEl.querySelectorAll('.sheet-grid.dragging').forEach((g) => g.classList.remove('dragging'));
     sheetsEl.querySelectorAll('.sheet.file-drop').forEach((s) => s.classList.remove('file-drop'));
-    sheetsEl.querySelectorAll('img.drag').forEach((i) => i.classList.remove('drag'));
+    sheetsEl.querySelectorAll('.cell.pickup').forEach((c) => c.classList.remove('pickup'));
+    document.querySelectorAll('.drag-ghost').forEach((g) => g.remove());
     detenerScroll();
   }
 
@@ -401,80 +402,142 @@
     return Array.from(e.dataTransfer?.types || []).includes('Files');
   }
 
-  sheetsEl.addEventListener('dragstart', (e) => {
+  // Resuelve la celda destino bajo un punto: primero la que está exactamente bajo el
+  // cursor; si no (gap/padding de la grilla), la celda más cercana de la hoja más
+  // próxima (< 150px), excluyendo la celda origen (excluir) para no caer en un no-op.
+  function celdaBajoPunto(x, y, excluir) {
+    const el = document.elementFromPoint(x, y);
+    const directa = el?.closest?.('.cell');
+    if (directa) return directa;
+    const hoja = el?.closest?.('.sheet');
+    const celulas = [...(hoja || sheetsEl).querySelectorAll('.cell')].filter((c) => c !== excluir);
+    let mejor = null, mejorD = Infinity;
+    for (const c of celulas) {
+      const r = c.getBoundingClientRect();
+      const dx = Math.max(r.left - x, 0, x - r.right);
+      const dy = Math.max(r.top - y, 0, y - r.bottom);
+      const d = Math.hypot(dx, dy);
+      if (d < mejorD) { mejorD = d; mejor = c; }
+    }
+    return mejorD < 150 ? mejor : null;
+  }
+
+  sheetsEl.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
     const cell = e.target.closest('.cell');
     if (!cell || cell.classList.contains('empty')) return;
-    dragSrc = {
+    if (e.target.closest('[data-accion="quitar"]')) return; // el × no inicia drag
+    e.preventDefault();
+    pointerDrag = {
       id: Number(cell.dataset.id),
       hojaId: Number(cell.closest('.sheet').dataset.hoja),
       slotIdx: Number(cell.dataset.slot),
+      ghost: null,
+      startX: e.clientX, startY: e.clientY,
+      activo: false,
     };
-    e.dataTransfer.setData('text/plain', String(dragSrc.id));
-    e.dataTransfer.effectAllowed = 'move';
-    const img = cell.querySelector('img');
-    if (img) img.classList.add('drag');
     cell.closest('.sheet-grid').classList.add('dragging');
   });
 
-  sheetsEl.addEventListener('dragend', () => {
-    dragSrc = null;
-    cancelarDragVisual();
-  });
+  function iniciarGhost(pointerDrag) {
+    if (pointerDrag.ghost) return;
+    // Buscar la imagen actual en el DOM (el render puede recrear el nodo durante el drag)
+    const celdaOrigen = sheetsEl.querySelector(`.cell[data-id="${pointerDrag.id}"]`);
+    const img = celdaOrigen?.querySelector('img');
+    if (!img) return;
+    const r = img.getBoundingClientRect();
+    const ghost = img.cloneNode(true);
+    ghost.className = 'drag-ghost';
+    ghost.style.width = r.width + 'px';
+    ghost.style.height = r.height + 'px';
+    document.body.appendChild(ghost);
+    pointerDrag.ghost = ghost;
+    celdaOrigen.classList.add('pickup');
+    pointerDrag.activo = true;
+  }
 
-  sheetsEl.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    autoScroll(e);
-    if (esDragDeArchivos(e)) {
-      e.dataTransfer.dropEffect = 'copy';
-      const sheet = e.target.closest('.sheet');
-      sheetsEl.querySelectorAll('.sheet.file-drop').forEach((s) => { if (s !== sheet) s.classList.remove('file-drop'); });
-      if (sheet) sheet.classList.add('file-drop');
-      return;
-    }
-    if (!dragSrc) return;
-    e.dataTransfer.dropEffect = 'move';
-    const cell = e.target.closest('.cell');
+  function moverGhost(pointerDrag, x, y) {
+    if (!pointerDrag.ghost) return;
+    const r = pointerDrag.ghost.getBoundingClientRect();
+    pointerDrag.ghost.style.left = (x - r.width / 2) + 'px';
+    pointerDrag.ghost.style.top = (y - r.height / 2) + 'px';
+  }
+
+  function resaltarDestino(cell) {
     sheetsEl.querySelectorAll('.drop-target').forEach((c) => c.classList.remove('drop-target'));
     if (cell) {
-      const misma = cell.dataset.id === String(dragSrc.id);
+      const misma = cell.dataset.id === String(pointerDrag?.id);
       if (!misma) cell.classList.add('drop-target');
-      else cell.classList.remove('drop-target');
     }
+  }
+
+  document.addEventListener('pointermove', (e) => {
+    if (!pointerDrag) return;
+    if (!pointerDrag.activo) {
+      const d = Math.hypot(e.clientX - pointerDrag.startX, e.clientY - pointerDrag.startY);
+      if (d > 5) iniciarGhost(pointerDrag);
+      else return;
+    }
+    moverGhost(pointerDrag, e.clientX, e.clientY);
+    autoScroll(e);
+    const celdaOrigen = sheetsEl.querySelector(`.cell[data-id="${pointerDrag.id}"]`);
+    resaltarDestino(celdaBajoPunto(e.clientX, e.clientY, celdaOrigen));
   });
 
-  sheetsEl.addEventListener('dragleave', (e) => {
-    // Si salimos hacia fuera de una hoja al arrastrar archivos, limpiar el resaltado
-    if (esDragDeArchivos(e)) {
-      const sheet = e.target.closest('.sheet');
-      if (sheet && !sheet.contains(e.relatedTarget)) sheet.classList.remove('file-drop');
-      return;
-    }
-    const cell = e.target.closest('.cell');
-    // No limpiar si el relacionado sigue dentro de la misma celda (evita parpadeo)
-    if (cell && (!e.relatedTarget || !cell.contains(e.relatedTarget))) {
-      cell.classList.remove('drop-target');
-    }
-  });
-
-  sheetsEl.addEventListener('drop', (e) => {
-    e.preventDefault();
-    if (esDragDeArchivos(e)) {
-      const sheet = e.target.closest('.sheet');
-      cancelarDragVisual();
-      if (sheet) agregarArchivos(e.dataTransfer.files, Number(sheet.dataset.hoja));
-      else showToast('Soltá archivos sobre una hoja para agregarlos.');
-      return;
-    }
-    const cell = e.target.closest('.cell');
+  document.addEventListener('pointerup', (e) => {
+    if (!pointerDrag) return;
+    const drag = pointerDrag;
+    const fueActivo = drag.activo;
+    const celdaOrigen = sheetsEl.querySelector(`.cell[data-id="${drag.id}"]`);
+    pointerDrag = null;
     cancelarDragVisual();
-    if (!cell || !dragSrc) return;
+    if (!fueActivo) return; // fue un clic
+    const cell = celdaBajoPunto(e.clientX, e.clientY, celdaOrigen);
+    if (!cell) return;
     const hojaDestino = hojaPorId(Number(cell.closest('.sheet').dataset.hoja));
     const slotDestino = Number(cell.dataset.slot);
     if (!hojaDestino || !Number.isInteger(slotDestino)) return;
-    moverSlot(dragSrc, hojaDestino, slotDestino);
+    moverSlot(drag, hojaDestino, slotDestino);
   });
 
-  // Mueve (o intercambia, si el destino está ocupado) el comprobante dragSrc al slot pedido.
+  document.addEventListener('pointercancel', () => {
+    pointerDrag = null;
+    cancelarDragVisual();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pointerDrag) {
+      pointerDrag = null;
+      cancelarDragVisual();
+    }
+  });
+
+  // Drag de archivos del explorador: se mantiene con el drag nativo (DataTransfer)
+  sheetsEl.addEventListener('dragover', (e) => {
+    if (!esDragDeArchivos(e)) return;
+    e.preventDefault();
+    autoScroll(e);
+    const sheet = e.target.closest('.sheet');
+    sheetsEl.querySelectorAll('.sheet.file-drop').forEach((s) => { if (s !== sheet) s.classList.remove('file-drop'); });
+    if (sheet) sheet.classList.add('file-drop');
+  });
+
+  sheetsEl.addEventListener('dragleave', (e) => {
+    if (!esDragDeArchivos(e)) return;
+    const sheet = e.target.closest('.sheet');
+    if (sheet && !sheet.contains(e.relatedTarget)) sheet.classList.remove('file-drop');
+  });
+
+  sheetsEl.addEventListener('drop', (e) => {
+    if (!esDragDeArchivos(e)) return;
+    e.preventDefault();
+    const sheet = e.target.closest('.sheet');
+    cancelarDragVisual();
+    if (sheet) agregarArchivos(e.dataTransfer.files, Number(sheet.dataset.hoja));
+    else showToast('Soltá archivos sobre una hoja para agregarlos.');
+  });
+
+  // Mueve (o intercambia, si el destino está ocupado) el comprobante al slot pedido.
   function moverSlot(drag, hojaDestino, slotDestino) {
     const origen = hojaPorId(drag.hojaId);
     if (!origen) return;

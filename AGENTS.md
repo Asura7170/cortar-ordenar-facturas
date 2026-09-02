@@ -1,3 +1,26 @@
+# 🎯 Regla obligatoria de la app (Cortar y Ordenar Facturas)
+
+## Chrome-first — sin retrocompatibilidad, sin mobile
+
+- Esta página está diseñada **únicamente para Chrome (Chromium)** y navegadores basados en Chromium (Brave, Edge, Opera, Arc) **en desktop**.
+- **NUNCA** optimizar, arreglar ni tomar en cuenta la retrocompatibilidad con Firefox, Safari, o cualquier navegador no-Chromium.
+- **NUNCA** considerar responsive ni tamaños pequeños (celulares, tablets, etc.). Solo desktop.
+- Se pueden usar **sin preguntar y sin duda alguna** los elementos, funciones, propiedades, atributos y features más modernas y experimentales — **siempre que estén disponibles en Chrome/Chromium** (ej: `<dialog closedby>`, Invoker Commands `command`/`commandfor`, Popover API, CSS `:has()`, `color-scheme`, nesting, etc.).
+- **No** escribir fallbacks, polyfills, `@supports`, prefijos de vendor ni comentarios de compatibilidad para navegadores no-Chromium. Si algo no está en Chrome, no se usa.
+
+## Cómo correr la app
+
+```bash
+# Vite (recomendado) — abre en el navegador por defecto
+npm run dev
+
+# Alternativa estática
+python -m http.server 8000
+# → http://localhost:8000
+```
+
+---
+
 # AGENTS.md — Errores y Soluciones: Firecrawl CLI + TinyFish CLI
 
 Diagnóstico de las causas raíz de los errores recurrentes al usar **Firecrawl** y **TinyFish** en este entorno (Windows + cmd), con soluciones directas.
