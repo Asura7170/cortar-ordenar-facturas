@@ -337,6 +337,8 @@ input::placeholder { color: var(--input-placeholder); }
 }
 .ocr-estado.on { color: limegreen; }
 .ocr-estado:not(.on) { color: chocolate; }
+[data-tema="claro"] .ocr-estado.on { color: var(--verde-tinta); }
+[data-tema="claro"] .ocr-estado:not(.on) { color: var(--sello); }
 
 .panel-acciones { display: flex; flex-direction: column; gap: 8px; }
 
