@@ -189,6 +189,20 @@
     if (!item) {
       return `<div class="cell empty" data-slot="${slotIdx}" data-hoja="${hojaId}" style="${estilo}">Vacío</div>`;
     }
+    // Modo OCR: la casilla muestra el texto OCR en lugar de la imagen
+    if (modoOcr) {
+      let texto = item.textoOcr;
+      if (!texto) {
+        texto = item.estado === 'procesando' ? 'Procesando…'
+          : item.estado === 'pendiente' ? '(pendiente)'
+          : '(sin texto OCR)';
+      }
+      return `
+        <div class="cell cell-ocr" data-id="${item.id}" data-slot="${slotIdx}" data-hoja="${hojaId}" style="${estilo}">
+          <pre class="cell-ocr-text">${texto}</pre>
+          <button class="cell-remove" data-accion="copiar-ocr" title="Copiar OCR" aria-label="Copiar OCR">⧉</button>
+        </div>`;
+    }
     const badge = item.montoCents != null ? `<span class="cell-badge">${formatearMoneda(item.montoCents)}</span>` : '';
     return `
       <div class="cell cell-${item.estado}" data-id="${item.id}" data-slot="${slotIdx}" data-hoja="${hojaId}" style="${estilo}">
@@ -352,6 +366,16 @@
   }
 
   sheetsEl.addEventListener('click', (e) => {
+    const btnCopiar = e.target.closest('[data-accion="copiar-ocr"]');
+    if (btnCopiar) {
+      const id = Number(btnCopiar.closest('.cell').dataset.id);
+      const item = aplanar().find((c) => c.id === id);
+      if (!item) return;
+      if (!item.textoOcr) { showToast('Sin texto OCR para copiar.'); return; }
+      navigator.clipboard.writeText(item.textoOcr);
+      showToast('Texto OCR copiado.');
+      return;
+    }
     const btnQuitar = e.target.closest('[data-accion="quitar"]');
     if (btnQuitar) {
       quitarComprobante(Number(btnQuitar.closest('.cell').dataset.id));
@@ -424,6 +448,7 @@
 
   sheetsEl.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
+    if (modoOcr) return; // vista de lectura/copia: sin arrastre
     const cell = e.target.closest('.cell');
     if (!cell || cell.classList.contains('empty')) return;
     if (e.target.closest('[data-accion="quitar"]')) return; // el × no inicia drag
@@ -515,6 +540,7 @@
   // Drag de archivos del explorador: se mantiene con el drag nativo (DataTransfer)
   sheetsEl.addEventListener('dragover', (e) => {
     if (!esDragDeArchivos(e)) return;
+    if (modoOcr) return;
     e.preventDefault();
     autoScroll(e);
     const sheet = e.target.closest('.sheet');
@@ -531,6 +557,7 @@
   sheetsEl.addEventListener('drop', (e) => {
     if (!esDragDeArchivos(e)) return;
     e.preventDefault();
+    if (modoOcr) return; // vista de lectura/copia: no se sueltan archivos
     const sheet = e.target.closest('.sheet');
     cancelarDragVisual();
     if (sheet) agregarArchivos(e.dataTransfer.files, Number(sheet.dataset.hoja));
@@ -605,26 +632,17 @@
   }
   btnDescargar2.addEventListener('click', descargarWord);
 
-  /* ---------- Modal OCR ---------- */
-  const modalOcr = $('modalOcr');
-  const selOcr = $('selOcr');
-  const ocrTexto = $('ocrTexto');
-  btnOcr.addEventListener('click', () => {
-    if (totalItems() === 0) { showToast('No hay comprobantes todavía.'); return; }
-    const todos = aplanar();
-    selOcr.innerHTML = todos.map((c) => `<option value="${c.id}">${c.nombre}</option>`).join('');
-    selOcr.dispatchEvent(new Event('change'));
-    modalOcr.showModal();
-  });
-  selOcr.addEventListener('change', () => {
-    const todos = aplanar();
-    const c = todos.find((x) => x.id === Number(selOcr.value));
-    ocrTexto.textContent = c?.textoOcr || '(sin texto OCR)';
-  });
-  $('btnCopiarOcr').addEventListener('click', () => {
-    navigator.clipboard.writeText(ocrTexto.textContent);
-    showToast('Texto OCR copiado.');
-  });
+  /* ---------- Modo OCR (toggle global sobre las hojas) ---------- */
+  let modoOcr = false;
+
+  function toggleModoOcr() {
+    modoOcr = !modoOcr;
+    btnOcr.textContent = modoOcr ? 'Ver imágenes' : 'Ver OCR';
+    btnOcr.title = modoOcr ? 'Volver a ver las imágenes de los comprobantes' : 'Mostrar el texto OCR de cada comprobante en su casilla';
+    renderHojas();
+  }
+
+  btnOcr.addEventListener('click', toggleModoOcr);
 
   /* ---------- Modal Ajustes ---------- */
   const modalAjustes = $('modalAjustes');

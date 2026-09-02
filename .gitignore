@@ -11,3 +11,4 @@ dist/
 .firecrawl/
 .playwright-mcp/
 .vite/
+image-test/

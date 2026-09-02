@@ -528,6 +528,50 @@ input::placeholder { color: var(--input-placeholder); }
 .cell:hover .cell-remove, .cell:focus-within .cell-remove { display: block; }
 .cell-remove:hover { background: var(--sello); }
 
+/* Modo OCR: la casilla muestra el texto del comprobante */
+.cell.cell-ocr {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
+  background: var(--papel-brillo);
+  border: 1px solid var(--renglon);
+  border-radius: 4px;
+}
+.cell-ocr-text {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 8px 8px 34px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--tinta);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cell.cell-ocr .cell-remove {
+  display: block;
+  position: absolute;
+  top: auto;
+  bottom: 6px;
+  right: 6px;
+  width: auto;
+  height: auto;
+  padding: 3px 9px;
+  border: 1px solid var(--renglon);
+  border-radius: 4px;
+  background: var(--verde-claro);
+  color: var(--verde-tinta);
+  font-size: 11px;
+  font-family: var(--mono);
+  line-height: 1.2;
+  z-index: 2;
+}
+.cell.cell-ocr .cell-remove:hover { background: var(--verde-tinta); color: #fff; border-color: var(--verde-tinta); }
+
 .cell-procesando::after {
   content: 'Procesando…';
   position: absolute; bottom: 6px; left: 6px;
@@ -602,21 +646,6 @@ input::placeholder { color: var(--input-placeholder); }
 .modal-body { padding: 20px; overflow-y: auto; }
 .modal-body label { display: block; font-size: 13px; color: var(--tinta-suave); margin-bottom: 14px; }
 .modal-body label input, .modal-body label select { width: 100%; background: var(--papel-brillo); color: var(--tinta); border-color: var(--renglon); margin-top: 5px; }
-.ocr-selector { margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
-.ocr-selector label { font-size: 13px; color: var(--tinta-suave); margin: 0; }
-.ocr-selector select { flex: 1; background: var(--papel-brillo); color: var(--tinta); border-color: var(--renglon); padding: 7px 10px; }
-.ocr-text {
-  font-family: var(--mono); font-size: 13px; line-height: 1.6;
-  background: var(--papel-brillo);
-  border: 1px solid var(--renglon);
-  border-radius: 6px;
-  padding: 14px;
-  white-space: pre-wrap;
-  min-height: 200px;
-  color: var(--tinta);
-  max-height: 40vh;
-  overflow-y: auto;
-}
 .modal-foot {
   padding: 14px 20px;
   border-top: 1px solid var(--renglon);
