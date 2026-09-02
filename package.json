@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "vite --open",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "typescript": "7.0.2",
     "vite": "^7.0.0"
   }
 }
