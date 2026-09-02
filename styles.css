@@ -327,9 +327,10 @@ input::placeholder { color: var(--input-placeholder); }
 }
 .tema-ico { line-height: 1; }
 
+.panel-ocr .panel-head { margin-bottom: 0; }
 .panel-ocr .panel-title .ocr-estado {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.06em;
   margin-left: 6px;
