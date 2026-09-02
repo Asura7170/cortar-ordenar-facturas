@@ -16,7 +16,7 @@
 
   /* ---------- Estado global ---------- */
   const state = {
-    hojas: [],             // [{id, nup, items:[comprobante...]}] — cada hoja con su N (se inicia en el init)
+    hojas: [],             // [{id, layout, slots:[comprobante|null...]}] — una casilla fija por posición de la plantilla
     codigoActivo: false,
     codigoLongitud: 6,
     codigoValor: '',
@@ -80,7 +80,7 @@
   }
 
   function sumaTotal() {
-    return state.hojas.reduce((acc, h) => acc + h.items.reduce((a, c) => a + (c.montoCents || 0), 0), 0);
+    return state.hojas.reduce((acc, h) => acc + itemsDe(h).reduce((a, c) => a + (c.montoCents || 0), 0), 0);
   }
 
   function renderMonto() {
@@ -88,11 +88,20 @@
   }
 
   function totalItems() {
-    return state.hojas.reduce((acc, h) => acc + h.items.length, 0);
+    return state.hojas.reduce((acc, h) => acc + itemsDe(h).length, 0);
+  }
+
+  function itemsDe(hoja) { return hoja.slots.filter(Boolean); }
+  function cuentaHoja(hoja) { return itemsDe(hoja).length; }
+
+  // Orden visual global (por slots, huecos ignorados)
+  function aplanar() {
+    return state.hojas.flatMap((h) => itemsDe(h));
   }
 
   function crearHoja(layoutId = 'u4x2') {
-    return { id: ++seqHoja, layout: layoutDe(layoutId).id || layoutId, items: [] };
+    const l = layoutDe(layoutId);
+    return { id: ++seqHoja, layout: l.id, slots: Array(l.total).fill(null) };
   }
 
   function hojaPorId(id) {
@@ -100,54 +109,28 @@
   }
 
   function limpiarHojas() {
-    state.hojas = state.hojas.filter((h) => h.items.length > 0);
+    state.hojas = state.hojas.filter((h) => h.slots.some(Boolean));
     if (state.hojas.length === 0) state.hojas.push(crearHoja());
   }
 
-  // Reparte todos los comprobantes en orden global respetando la capacidad de cada hoja:
-  // llena hojas hacia la izquierda (al subir N una hoja atrae items de las siguientes)
-  // y empuja excedentes hacia adelante (al bajar N). Crea hojas al final si sobran.
+  // Reparte todos los comprobantes en orden visual respetando la capacidad de cada hoja:
+  // rellena los slots consecutivamente (recompacta, sin huecos) y crea hojas al final si sobran.
   function redistribuir() {
-    const items = state.hojas.flatMap((h) => h.items);
+    const items = aplanar();
     let pos = 0;
     for (const h of state.hojas) {
       const cap = layoutDe(h.layout).total;
-      h.items = items.slice(pos, pos + cap);
-      pos += cap;
+      h.slots = Array(cap).fill(null);
+      for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = items[pos++];
     }
     while (pos < items.length) {
       const h = crearHoja(state.hojas[state.hojas.length - 1].layout);
       const cap = layoutDe(h.layout).total;
-      h.items = items.slice(pos, pos + cap);
-      pos += cap;
+      h.slots = Array(cap).fill(null);
+      for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = items[pos++];
       state.hojas.push(h);
     }
     limpiarHojas();
-  }
-
-  // Mueve el excedente de una hoja (cuando items > capacidad) a las siguientes con espacio,
-  // creando hojas al final si hace falta. Preserva el orden de los comprobantes.
-  function reflowExceso(desdeIdx) {
-    let extra = [];
-    for (let i = desdeIdx; i < state.hojas.length; i++) {
-      const h = state.hojas[i];
-      const cap = layoutDe(h.layout).total;
-      while (extra.length && h.items.length < cap) {
-        h.items.push(extra.shift());
-      }
-      if (h.items.length > cap) {
-        // El excedente previo (anterior en el orden global) va primero
-        extra = extra.concat(h.items.splice(cap, h.items.length - cap));
-      }
-    }
-    while (extra.length) {
-      const h = crearHoja(state.hojas[state.hojas.length - 1].layout);
-      const cap = layoutDe(h.layout).total;
-      while (h.items.length < cap && extra.length) {
-        h.items.push(extra.shift());
-      }
-      state.hojas.push(h);
-    }
   }
 
   function cambiarLayoutHoja(hojaId, layoutId) {
@@ -201,12 +184,15 @@
     return PLANTILLAS[id] || PLANTILLAS.u4x2;
   }
 
-  function celda(c, pos) {
-    const badge = c.montoCents != null ? `<span class="cell-badge">${formatearMoneda(c.montoCents)}</span>` : '';
+  function celda(item, pos, slotIdx, hojaId) {
     const estilo = pos ? `grid-row: ${pos[0]}; grid-column: ${pos[1]} / span ${pos[2]};` : '';
+    if (!item) {
+      return `<div class="cell empty" data-slot="${slotIdx}" data-hoja="${hojaId}" style="${estilo}">Vacío</div>`;
+    }
+    const badge = item.montoCents != null ? `<span class="cell-badge">${formatearMoneda(item.montoCents)}</span>` : '';
     return `
-      <div class="cell cell-${c.estado}" data-id="${c.id}" style="${estilo}">
-        <img src="${c.imgUrl}" alt="${c.nombre}" draggable="true" loading="lazy" decoding="async" />
+      <div class="cell cell-${item.estado}" data-id="${item.id}" data-slot="${slotIdx}" data-hoja="${hojaId}" style="${estilo}">
+        <img src="${item.imgUrl}" alt="${item.nombre}" draggable="true" loading="lazy" decoding="async" />
         <button class="cell-remove" data-accion="quitar" title="Quitar">×</button>
         ${badge}
       </div>`;
@@ -226,7 +212,7 @@
       <aside class="sheet-panel" aria-label="Distribución de la hoja ${idx + 1}">
         <header class="sheet-panel-head">
           <span class="sheet-panel-title">HOJA ${idx + 1}</span>
-          <span class="sheet-panel-count">${hoja.items.length}/${layoutDe(hoja.layout).total}</span>
+          <span class="sheet-panel-count">${cuentaHoja(hoja)}/${layoutDe(hoja.layout).total}</span>
         </header>
         <div class="grid-opts">${tarjetas}</div>
         <button class="apply-all" data-accion="apply-all" data-hoja="${hoja.id}">Aplicar a todas las hojas</button>
@@ -251,12 +237,10 @@
       const sheet = document.createElement('article');
       sheet.className = 'sheet';
       sheet.dataset.hoja = hoja.id;
-      const posLibres = l.pos.slice(hoja.items.length);
       sheet.innerHTML = `
         <span class="sheet-tag">HOJA ${idx + 1}</span>
         <div class="sheet-grid" style="grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)">
-          ${hoja.items.map((c, i) => celda(c, l.pos[i])).join('')}
-          ${posLibres.map((p) => `<div class="cell empty" style="grid-row: ${p[0]}; grid-column: ${p[1]} / span ${p[2]};">Vacío</div>`).join('')}
+          ${l.pos.map((p, i) => celda(hoja.slots[i], p, i, hoja.id)).join('')}
         </div>`;
       const row = document.createElement('div');
       row.className = 'sheet-row';
@@ -273,7 +257,7 @@
     if (state.colaEnProceso) return;
     state.colaEnProceso = true;
     for (const hoja of state.hojas) {
-      for (const c of hoja.items) {
+      for (const c of itemsDe(hoja)) {
         if (c.estado === 'pendiente') {
           c.estado = 'procesando';
           renderHojas();
@@ -291,7 +275,9 @@
   }
 
   /* ---------- Entrada ---------- */
-  function agregarArchivos(files) {
+  // Agrega archivos: si hojaId se indica, rellena los primeros huecos de ESA hoja
+  // (y crea hojas nuevas al final si sobran); si no, usa la última hoja con hueco.
+  function agregarArchivos(files, hojaId = null) {
     const validos = Array.from(files).filter((f) => /^image\/(jpeg|png|webp|bmp|gif)$/.test(f.type) || f.name.toLowerCase().endsWith('.pdf'));
     if (files.length > 0 && validos.length === 0) {
       showToast('Solo se aceptan imágenes (JPG, PNG, WEBP, BMP, GIF) o PDF. HEIC no soportado.');
@@ -303,18 +289,24 @@
         montoCents: null, moneda: 'USD', estado: 'pendiente', posicion: 0,
       };
     });
-    // Repartir empezando por la última hoja con espacio; crear hojas nuevas si hace falta
-    let hoja = state.hojas[state.hojas.length - 1] || crearHoja();
-    if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
+    if (nuevas.length === 0) return;
+
+    let hoja = hojaId ? hojaPorId(hojaId) : null;
+    if (!hoja) {
+      // Repartir empezando por la última hoja con hueco; crear hojas nuevas si hace falta
+      hoja = state.hojas.find((h) => cuentaHoja(h) < layoutDe(h.layout).total) || state.hojas[state.hojas.length - 1] || crearHoja();
+      if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
+    }
+    function llenar(h, lista) {
+      for (let i = 0; i < h.slots.length && lista.length; i++) {
+        if (!h.slots[i]) h.slots[i] = lista.shift();
+      }
+    }
+    llenar(hoja, nuevas);
     while (nuevas.length) {
-      const cap = layoutDe(hoja.layout).total;
-      while (hoja.items.length < cap && nuevas.length) {
-        hoja.items.push(nuevas.shift());
-      }
-      if (nuevas.length) {
-        hoja = crearHoja(hoja.layout);
-        state.hojas.push(hoja);
-      }
+      hoja = crearHoja(hoja.layout);
+      state.hojas.push(hoja);
+      llenar(hoja, nuevas);
     }
     renderHojas();
     procesarCola();
@@ -346,10 +338,10 @@
   /* ---------- Quitar / drag entre hojas ---------- */
   function quitarComprobante(id) {
     for (const h of state.hojas) {
-      const idx = h.items.findIndex((c) => c.id === id);
+      const idx = h.slots.findIndex((c) => c && c.id === id);
       if (idx >= 0) {
-        URL.revokeObjectURL(h.items[idx].imgUrl);
-        h.items.splice(idx, 1);
+        URL.revokeObjectURL(h.slots[idx].imgUrl);
+        h.slots[idx] = null;
         break;
       }
     }
@@ -376,53 +368,126 @@
     }
   });
 
-  // Arrastre entre hojas (mover comprobante de una hoja a otra)
-  let dragSrc = null;
+  /* ---------- Arrastre de comprobantes (mover/swap entre casillas y hojas) ---------- */
+  const canvasEl = document.querySelector('.canvas');
+  let dragSrc = null; // { id, hojaId, slotIdx }
+  let scrollTimer = null;
+
+  function detenerScroll() {
+    if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
+  }
+
+  function cancelarDragVisual() {
+    sheetsEl.querySelectorAll('.drop-target').forEach((c) => c.classList.remove('drop-target'));
+    sheetsEl.querySelectorAll('.sheet-grid.dragging').forEach((g) => g.classList.remove('dragging'));
+    sheetsEl.querySelectorAll('.sheet.file-drop').forEach((s) => s.classList.remove('file-drop'));
+    sheetsEl.querySelectorAll('img.drag').forEach((i) => i.classList.remove('drag'));
+    detenerScroll();
+  }
+
+  function autoScroll(e) {
+    if (!canvasEl) return;
+    const r = canvasEl.getBoundingClientRect();
+    const margen = 70, vel = 14;
+    const dir = e.clientY < r.top + margen ? -vel : e.clientY > r.bottom - margen ? vel : 0;
+    if (dir && !scrollTimer) {
+      scrollTimer = setInterval(() => canvasEl.scrollBy({ top: dir }), 16);
+    } else if (!dir && scrollTimer) {
+      detenerScroll();
+    }
+  }
+
+  function esDragDeArchivos(e) {
+    return Array.from(e.dataTransfer?.types || []).includes('Files');
+  }
+
   sheetsEl.addEventListener('dragstart', (e) => {
     const cell = e.target.closest('.cell');
-    if (!cell) return;
-    dragSrc = cell;
-    cell.classList.add('drag');
+    if (!cell || cell.classList.contains('empty')) return;
+    dragSrc = {
+      id: Number(cell.dataset.id),
+      hojaId: Number(cell.closest('.sheet').dataset.hoja),
+      slotIdx: Number(cell.dataset.slot),
+    };
+    e.dataTransfer.setData('text/plain', String(dragSrc.id));
     e.dataTransfer.effectAllowed = 'move';
+    const img = cell.querySelector('img');
+    if (img) img.classList.add('drag');
+    cell.closest('.sheet-grid').classList.add('dragging');
   });
+
   sheetsEl.addEventListener('dragend', () => {
-    if (dragSrc) dragSrc.classList.remove('drag');
     dragSrc = null;
+    cancelarDragVisual();
   });
+
   sheetsEl.addEventListener('dragover', (e) => {
     e.preventDefault();
+    autoScroll(e);
+    if (esDragDeArchivos(e)) {
+      e.dataTransfer.dropEffect = 'copy';
+      const sheet = e.target.closest('.sheet');
+      sheetsEl.querySelectorAll('.sheet.file-drop').forEach((s) => { if (s !== sheet) s.classList.remove('file-drop'); });
+      if (sheet) sheet.classList.add('file-drop');
+      return;
+    }
+    if (!dragSrc) return;
+    e.dataTransfer.dropEffect = 'move';
     const cell = e.target.closest('.cell');
-    if (cell && cell !== dragSrc) cell.style.outline = '2px dashed var(--renglon-fuerte)';
+    sheetsEl.querySelectorAll('.drop-target').forEach((c) => c.classList.remove('drop-target'));
+    if (cell) {
+      const misma = cell.dataset.id === String(dragSrc.id);
+      if (!misma) cell.classList.add('drop-target');
+      else cell.classList.remove('drop-target');
+    }
   });
+
   sheetsEl.addEventListener('dragleave', (e) => {
+    // Si salimos hacia fuera de una hoja al arrastrar archivos, limpiar el resaltado
+    if (esDragDeArchivos(e)) {
+      const sheet = e.target.closest('.sheet');
+      if (sheet && !sheet.contains(e.relatedTarget)) sheet.classList.remove('file-drop');
+      return;
+    }
     const cell = e.target.closest('.cell');
-    if (cell) cell.style.outline = '';
+    // No limpiar si el relacionado sigue dentro de la misma celda (evita parpadeo)
+    if (cell && (!e.relatedTarget || !cell.contains(e.relatedTarget))) {
+      cell.classList.remove('drop-target');
+    }
   });
+
   sheetsEl.addEventListener('drop', (e) => {
     e.preventDefault();
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const cell = el?.closest?.('.cell');
-    if (!cell || !dragSrc || cell === dragSrc) return;
-    const hojaOrigen = dragSrc.closest('.sheet');
-    const hojaDestino = cell.closest('.sheet');
-    if (!hojaOrigen || !hojaDestino || hojaOrigen === hojaDestino) return;
-    const id = Number(dragSrc.dataset.id);
-    const origen = hojaPorId(hojaOrigen.dataset.hoja);
-    const destino = hojaPorId(hojaDestino.dataset.hoja);
-    if (!origen || !destino) return;
-    const idx = origen.items.findIndex((c) => c.id === id);
-    if (idx < 0) return;
-    const [item] = origen.items.splice(idx, 1);
-    // Auto-desbordar: si la hoja destino no está llena, el item entra; si está
-    // llena, entra y el último pasa a la siguiente con espacio (o crea una nueva).
-    destino.items.push(item);
-    if (destino.items.length > layoutDe(destino.layout).total) {
-      reflowExceso(state.hojas.indexOf(destino));
+    if (esDragDeArchivos(e)) {
+      const sheet = e.target.closest('.sheet');
+      cancelarDragVisual();
+      if (sheet) agregarArchivos(e.dataTransfer.files, Number(sheet.dataset.hoja));
+      else showToast('Soltá archivos sobre una hoja para agregarlos.');
+      return;
     }
+    const cell = e.target.closest('.cell');
+    cancelarDragVisual();
+    if (!cell || !dragSrc) return;
+    const hojaDestino = hojaPorId(Number(cell.closest('.sheet').dataset.hoja));
+    const slotDestino = Number(cell.dataset.slot);
+    if (!hojaDestino || !Number.isInteger(slotDestino)) return;
+    moverSlot(dragSrc, hojaDestino, slotDestino);
+  });
+
+  // Mueve (o intercambia, si el destino está ocupado) el comprobante dragSrc al slot pedido.
+  function moverSlot(drag, hojaDestino, slotDestino) {
+    const origen = hojaPorId(drag.hojaId);
+    if (!origen) return;
+    const item = origen.slots[drag.slotIdx];
+    if (!item) return;
+    if (origen === hojaDestino && drag.slotIdx === slotDestino) return; // misma casilla: no-op
+    const reemplazo = hojaDestino.slots[slotDestino] || null;
+    hojaDestino.slots[slotDestino] = item;
+    origen.slots[drag.slotIdx] = reemplazo;
     limpiarHojas();
     guardar();
     renderHojas();
-  });
+  }
 
   /* ---------- Código de pedido ---------- */
   chkCodigo.addEventListener('change', () => { state.codigoActivo = chkCodigo.checked; guardar(); renderCodigo(); });
@@ -464,7 +529,7 @@
       'DOCX STUB — Cortar y Ordenar Facturas',
       `Código de pedido: ${state.codigoActivo ? state.codigoValor : '(sin código)'}`,
       `Hojas: ${state.hojas.length}`,
-      ...state.hojas.flatMap((h) => h.items).map((c) => `- ${c.nombre}: ${formatearMoneda(c.montoCents || 0)}`),
+      ...aplanar().map((c) => `- ${c.nombre}: ${formatearMoneda(c.montoCents || 0)}`),
     ].join('\n');
     const blob = new Blob([contenido], { type: 'text/plain' });
     const a = document.createElement('a');
@@ -483,13 +548,13 @@
   const ocrTexto = $('ocrTexto');
   btnOcr.addEventListener('click', () => {
     if (totalItems() === 0) { showToast('No hay comprobantes todavía.'); return; }
-    const todos = state.hojas.flatMap((h) => h.items);
+    const todos = aplanar();
     selOcr.innerHTML = todos.map((c) => `<option value="${c.id}">${c.nombre}</option>`).join('');
     selOcr.dispatchEvent(new Event('change'));
     modalOcr.showModal();
   });
   selOcr.addEventListener('change', () => {
-    const todos = state.hojas.flatMap((h) => h.items);
+    const todos = aplanar();
     const c = todos.find((x) => x.id === Number(selOcr.value));
     ocrTexto.textContent = c?.textoOcr || '(sin texto OCR)';
   });
@@ -520,7 +585,7 @@
 
   /* ---------- Limpiar ---------- */
   btnLimpiar.addEventListener('click', () => {
-    for (const h of state.hojas) for (const c of h.items) URL.revokeObjectURL(c.imgUrl);
+    for (const h of state.hojas) for (const c of itemsDe(h)) URL.revokeObjectURL(c.imgUrl);
     state.hojas = [crearHoja()];
     guardar();
     renderHojas();

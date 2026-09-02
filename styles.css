@@ -468,10 +468,30 @@ input::placeholder { color: var(--input-placeholder); }
   border-radius: 2px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
   transition: box-shadow 0.15s, transform 0.15s;
 }
 .cell img:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
 .cell img.drag { opacity: 0.7; transform: scale(0.98); }
+
+/* Celda destino durante el drag de un comprobante */
+.cell.drop-target {
+  box-shadow: inset 0 0 0 2px var(--verde-tinta);
+  background: var(--verde-claro);
+  border-radius: 4px;
+}
+.cell.empty.drop-target { border-style: solid; border-color: var(--verde-tinta); }
+
+/* Durante el drag, el botón × y el badge no deben capturar el drop */
+.sheet-grid.dragging .cell-remove,
+.sheet-grid.dragging .cell-badge { pointer-events: none; }
+
+/* Hoja como destino al soltar archivos desde el explorador */
+.sheet.file-drop {
+  outline: 2px dashed var(--verde-tinta);
+  outline-offset: 4px;
+}
 
 .cell-badge {
   position: absolute; bottom: 6px; right: 6px;
@@ -496,7 +516,7 @@ input::placeholder { color: var(--input-placeholder); }
 .cell:hover .cell-remove, .cell:focus-within .cell-remove { display: block; }
 .cell-remove:hover { background: var(--sello); }
 
-.cell-estado-procesando::after {
+.cell-procesando::after {
   content: 'Procesando…';
   position: absolute; bottom: 6px; left: 6px;
   font-family: var(--mono); font-size: 11px;
@@ -506,12 +526,12 @@ input::placeholder { color: var(--input-placeholder); }
   border-radius: 4px; padding: 2px 6px;
   z-index: 2;
 }
-.cell-estado-error {
+.cell-error {
   border: 2px solid var(--sello);
   border-radius: 4px;
   background: var(--error-cell-bg);
 }
-.cell-estado-error::after {
+.cell-error::after {
   content: 'Error: revisar imagen';
   position: absolute; bottom: 6px; left: 6px;
   font-family: var(--mono); font-size: 11px;
