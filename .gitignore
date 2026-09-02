@@ -13,8 +13,5 @@ dist/
 .vite/
 image-test/
 
-# Cheat sheets generados
-html_2024-2026.md
-CSS_2024-2026.md
-JavaScript_2024-2026_CheatSheet.md
-TypeScript_2024-2026_CheatSheet.md
+# Referencia local generada (cheatsheets)
+docs/
