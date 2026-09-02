@@ -335,8 +335,8 @@ input::placeholder { color: var(--input-placeholder); }
   letter-spacing: 0.06em;
   margin-left: 6px;
 }
-.ocr-estado.on { color: var(--verde-tinta); }
-.ocr-estado:not(.on) { color: var(--sello); }
+.ocr-estado.on { color: limegreen; }
+.ocr-estado:not(.on) { color: chocolate; }
 
 .panel-acciones { display: flex; flex-direction: column; gap: 8px; }
 
