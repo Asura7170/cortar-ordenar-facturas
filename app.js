@@ -51,6 +51,37 @@ const temaIcono = $('temaIcono');
 // de tocar el DOM. toWellFormed() repara surrogates sueltos (Chrome 111+).
 const sanear = (s) => String(s ?? '').toWellFormed();
 
+/* ---------- Miniaturas ---------- */
+// La imagen completa queda en item.imgUrl (para el futuro recorte/exportación);
+// en pantalla se muestra un WebP reducido: así el render, el ghost del drag y la
+// memoria no dependen de bitmaps de decenas de megapíxeles.
+const THUMB_MAX = 1280; // ≈ 2× la celda más grande de la hoja (pantallas 2x)
+
+async function generarMiniatura(file) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const escala = Math.min(1, THUMB_MAX / Math.max(bmp.width, bmp.height));
+    let red = bmp;
+    if (escala < 1) {
+      red = await createImageBitmap(bmp, {
+        resizeWidth: Math.max(1, Math.round(bmp.width * escala)),
+        resizeHeight: Math.max(1, Math.round(bmp.height * escala)),
+        resizeQuality: 'high',
+      });
+      bmp.close();
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = red.width;
+    canvas.height = red.height;
+    canvas.getContext('2d').drawImage(red, 0, 0);
+    red.close();
+    const blob = await new Promise((res) => canvas.toBlob(res, 'image/webp', 0.82));
+    return blob ? URL.createObjectURL(blob) : null;
+  } catch {
+    return null; // PDF o imagen no decodificable: se muestra el original
+  }
+}
+
 /* ---------- Persistencia ---------- */
 function guardar() {
   const persist = {
@@ -109,6 +140,15 @@ function crearHoja(layoutId = 'u4x2') {
 
 function hojaPorId(id) {
   return state.hojas.find((h) => h.id === Number(id));
+}
+
+// Posición actual {hoja, idx} de un comprobante por id, o null si ya no existe.
+function buscarSlot(id) {
+  for (const h of state.hojas) {
+    const idx = h.slots.findIndex((c) => c?.id === id);
+    if (idx >= 0) return { hoja: h, idx };
+  }
+  return null;
 }
 
 function limpiarHojas() {
@@ -195,18 +235,27 @@ function celda(item, pos, slotIdx, hojaId) {
   const div = document.createElement('div');
   div.className = 'cell';
   div.style.cssText = estilo;
+  pintarCelda(div, item, slotIdx, hojaId);
+  return div;
+}
+
+// Pinta (o repinta) el contenido de una celda sobre un nodo existente.
+// El grid-area pertenece al slot, no al contenido: por esto el swap puede
+// parchear solo 2 celdas sin reconstruir la grilla entera.
+function pintarCelda(div, item, slotIdx, hojaId) {
+  div.replaceChildren();
+  div.className = 'cell';
+  delete div.dataset.id;
+  div.dataset.slot = slotIdx;
+  div.dataset.hoja = hojaId;
 
   if (!item) {
     div.classList.add('empty');
-    div.dataset.slot = slotIdx;
-    div.dataset.hoja = hojaId;
     div.textContent = 'Vacío';
-    return div;
+    return;
   }
 
   div.dataset.id = item.id;
-  div.dataset.slot = slotIdx;
-  div.dataset.hoja = hojaId;
 
   // Modo OCR: la casilla muestra el texto OCR en lugar de la imagen
   if (state.modoOcr) {
@@ -227,12 +276,12 @@ function celda(item, pos, slotIdx, hojaId) {
     btn.setAttribute('aria-label', 'Copiar OCR');
     btn.textContent = '⧉';
     div.append(pre, btn);
-    return div;
+    return;
   }
 
   div.classList.add(`cell-${item.estado}`);
   const img = document.createElement('img');
-  img.src = item.imgUrl; // blob interno generado por la app (no es entrada del usuario)
+  img.src = item.thumbUrl || item.imgUrl; // blob interno generado por la app (no es entrada del usuario)
   img.alt = sanear(item.nombre);
   img.draggable = false;
   img.loading = 'lazy';
@@ -249,7 +298,6 @@ function celda(item, pos, slotIdx, hojaId) {
     badge.textContent = formatearMoneda(item.montoCents);
     div.append(badge);
   }
-  return div;
 }
 
 function panelHoja(hoja, idx) {
@@ -274,7 +322,11 @@ function panelHoja(hoja, idx) {
 }
 
 function renderHojas() {
+  // Durante un arrastre nunca se reconstruye la grilla (rompería nodos y rects en
+  // uso): el render se pospone y se aplica al cerrar el drag.
+  if (pointerDrag) { renderPendiente = true; return; }
   const render = () => {
+    rectsCache = null; // el árbol cambió: los rects congelados ya no sirven
     metaHojas.textContent = `${state.hojas.length} hoja${state.hojas.length === 1 ? '' : 's'} · ${totalItems()} comprobante${totalItems() === 1 ? '' : 's'}`;
     sheetsEl.innerHTML = '';
 
@@ -312,8 +364,19 @@ function renderHojas() {
     renderMonto();
   };
   // Transición suave en re-render (Chrome 111+); fallback síncrono sin ella.
-  if (document.startViewTransition) document.startViewTransition(render);
-  else render();
+  if (document.startViewTransition) {
+    const t = document.startViewTransition(render);
+    // Si se solapan dos renders, la anterior se "skipea" y su ready rechaza: inocuo.
+    t.ready?.catch(() => {});
+    t.finished?.catch(() => {});
+  } else render();
+}
+
+// Aplica el re-render que quedó pospuesto por un drag en curso (ver renderHojas).
+function soltarRenderPendiente() {
+  if (!renderPendiente) return;
+  renderPendiente = false;
+  renderHojas();
 }
 
 /* ---------- Cola de procesamiento (placeholder) ---------- */
@@ -361,11 +424,13 @@ function agregarArchivos(files, hojaId = null) {
   const nuevas = validos.map((f) => {
     const id = ++seq;
     return {
-      id, nombre: sanear(f.name), imgUrl: URL.createObjectURL(f), textoOcr: '',
+      id, nombre: sanear(f.name), file: f,
+      imgUrl: URL.createObjectURL(f), thumbUrl: null, textoOcr: '',
       montoCents: null, moneda: 'USD', estado: 'pendiente', posicion: 0,
     };
   });
   if (nuevas.length === 0) return;
+  const recienIngresados = [...nuevas]; // llenar() vacía `nuevas` con shift()
 
   let hoja = hojaId ? hojaPorId(hojaId) : null;
   if (!hoja) {
@@ -386,6 +451,20 @@ function agregarArchivos(files, hojaId = null) {
   }
   renderHojas();
   procesarCola();
+
+  // Miniaturas en segundo plano: la app queda usable de inmediato con el blob
+  // original y cada casilla se actualiza sola cuando su thumb está lista.
+  for (const item of recienIngresados) {
+    if (!/^image\//i.test(item.file.type)) continue; // PDF: sin miniatura
+    Promise.try(async () => {
+      const url = await generarMiniatura(item.file);
+      if (!url) return;
+      if (!buscarSlot(item.id)) { URL.revokeObjectURL(url); return; } // lo quitaron mientras se generaba
+      item.thumbUrl = url;
+      const img = sheetsEl.querySelector(`.cell[data-id="${item.id}"] img`);
+      if (img) img.src = url;
+    });
+  }
 }
 
 const abortCtrl = new AbortController();
@@ -413,6 +492,7 @@ function quitarComprobante(id) {
     const idx = h.slots.findIndex((c) => c && c.id === id);
     if (idx >= 0) {
       URL.revokeObjectURL(h.slots[idx].imgUrl);
+      if (h.slots[idx].thumbUrl) URL.revokeObjectURL(h.slots[idx].thumbUrl);
       h.slots[idx] = null;
       break;
     }
@@ -452,8 +532,12 @@ sheetsEl.addEventListener('click', (e) => {
 
 /* ---------- Arrastre de comprobantes (Pointer Events: mover/swap entre casillas y hojas) ---------- */
 const canvasEl = document.querySelector('.canvas');
-let pointerDrag = null; // { id, hojaId, slotIdx, ghost, startX, startY, activo }
+let pointerDrag = null; // { id, ghost, gw, gh, startX, startY, lastX, lastY, activo }
 let scrollRaf = null;   // id del requestAnimationFrame de auto-scroll
+let moveRaf = null;     // id del rAF que agrupa hit-test/auto-scroll a 1 por frame
+let celdaResaltada = null;
+let rectsCache = null;  // rects de celdas congelados durante el drag (Map nodo->rect)
+let renderPendiente = false; // re-render pedido por trabajo asíncrono durante un drag
 
 function detenerScroll() {
   if (scrollRaf !== null) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
@@ -465,15 +549,22 @@ function cancelarDragVisual() {
   sheetsEl.querySelectorAll('.sheet.file-drop').forEach((s) => s.classList.remove('file-drop'));
   sheetsEl.querySelectorAll('.cell.pickup').forEach((c) => c.classList.remove('pickup'));
   document.querySelectorAll('.drag-ghost').forEach((g) => g.remove());
+  document.body.classList.remove('is-dragging');
+  celdaResaltada = null;
+  rectsCache = null;
+  if (moveRaf !== null) { cancelAnimationFrame(moveRaf); moveRaf = null; }
   detenerScroll();
+  // Cualquier selección de texto residual (arrastres nacidos fuera de una celda): limpiar
+  const sel = window.getSelection();
+  if (sel?.rangeCount) sel.removeAllRanges();
 }
 
 // Loop de auto-scroll con requestAnimationFrame (más fluido que setInterval)
-function autoScroll(e) {
+function autoScroll(x, y) {
   if (!canvasEl) return;
   const r = canvasEl.getBoundingClientRect();
   const margen = 70, vel = 14;
-  const dir = e.clientY < r.top + margen ? -vel : e.clientY > r.bottom - margen ? vel : 0;
+  const dir = y < r.top + margen ? -vel : y > r.bottom - margen ? vel : 0;
   if (dir && scrollRaf === null) {
     const paso = () => {
       canvasEl.scrollBy({ top: dir });
@@ -489,6 +580,22 @@ function esDragDeArchivos(e) {
   return Iterator.from(e.dataTransfer?.types || []).includes('Files');
 }
 
+// Rects de todas las celdas cacheados durante el drag: getBoundingClientRect solo
+// se lee una vez por cambio real de layout (scroll del canvas), no por evento de
+// puntero. Se invalida con el scroll; el resto del arrastre lee de memoria.
+function celdaRect(c) {
+  if (!rectsCache) {
+    rectsCache = new Map();
+    for (const el of sheetsEl.querySelectorAll('.cell')) rectsCache.set(el, el.getBoundingClientRect());
+  }
+  // Si la grilla cambió sin aviso (render pospuesto que corrió tarde, nodo nuevo),
+  // se mide y se agrega a la cache en vez de leer un undefined.
+  let r = rectsCache.get(c);
+  if (!r) { r = c.getBoundingClientRect(); rectsCache.set(c, r); }
+  return r;
+}
+canvasEl.addEventListener('scroll', () => { rectsCache = null; }, { passive: true, signal });
+
 // Resuelve la celda destino bajo un punto: primero la que está exactamente bajo el
 // cursor; si no (gap/padding de la grilla), la celda más cercana de la hoja más
 // próxima (< 150px), excluyendo la celda origen (excluir) para no caer en un no-op.
@@ -500,7 +607,7 @@ function celdaBajoPunto(x, y, excluir) {
   const celulas = [...(hoja || sheetsEl).querySelectorAll('.cell')].filter((c) => c !== excluir);
   let mejor = null, mejorD = Infinity;
   for (const c of celulas) {
-    const r = c.getBoundingClientRect();
+    const r = celdaRect(c);
     const dx = Math.max(r.left - x, 0, x - r.right);
     const dy = Math.max(r.top - y, 0, y - r.bottom);
     const d = Math.hypot(dx, dy);
@@ -510,52 +617,63 @@ function celdaBajoPunto(x, y, excluir) {
 }
 
 sheetsEl.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || !e.isPrimary) return;
   if (state.modoOcr) return; // vista de lectura/copia: sin arrastre
   const cell = e.target.closest('.cell');
   if (!cell || cell.classList.contains('empty')) return;
   if (e.target.closest('[data-accion="quitar"]')) return; // el × no inicia drag
   e.preventDefault();
+  if (pointerDrag) { // drag anterior sin cerrar (pointerup perdido): finalizar antes de abrir otro
+    pointerDrag = null;
+    cancelarDragVisual();
+  }
   pointerDrag = {
     id: Number(cell.dataset.id),
-    hojaId: Number(cell.closest('.sheet').dataset.hoja),
-    slotIdx: Number(cell.dataset.slot),
-    ghost: null,
+    ghost: null, gw: 0, gh: 0,
     startX: e.clientX, startY: e.clientY,
+    lastX: e.clientX, lastY: e.clientY,
     activo: false,
   };
   cell.closest('.sheet-grid').classList.add('dragging');
+  try { sheetsEl.setPointerCapture(e.pointerId); } catch { /* puntero ya inactivo */ } // garantiza pointerup aunque se suelte fuera de la ventana
 }, { signal });
 
-function iniciarGhost(pointerDrag) {
-  if (pointerDrag.ghost) return;
+function iniciarGhost(d, x, y) {
+  if (d.ghost) return;
   // Buscar la imagen actual en el DOM (el render puede recrear el nodo durante el drag)
-  const celdaOrigen = sheetsEl.querySelector(`.cell[data-id="${pointerDrag.id}"]`);
+  const celdaOrigen = sheetsEl.querySelector(`.cell[data-id="${d.id}"]`);
   const img = celdaOrigen?.querySelector('img');
   if (!img) return;
   const r = img.getBoundingClientRect();
+  const base = r.width > 2 ? r : celdaOrigen.getBoundingClientRect(); // imagen aún sin decodificar/layout
   const ghost = img.cloneNode(true);
   ghost.className = 'drag-ghost';
-  ghost.style.width = r.width + 'px';
-  ghost.style.height = r.height + 'px';
+  ghost.style.width = base.width + 'px';
+  ghost.style.height = base.height + 'px';
   document.body.appendChild(ghost);
-  pointerDrag.ghost = ghost;
+  d.ghost = ghost;
+  d.gw = base.width / 2;
+  d.gh = base.height / 2;
+  d.activo = true;
   celdaOrigen.classList.add('pickup');
-  pointerDrag.activo = true;
+  document.body.classList.add('is-dragging');
+  posicionarGhost(d, x, y);
 }
 
-function moverGhost(pointerDrag, x, y) {
-  if (!pointerDrag.ghost) return;
-  const r = pointerDrag.ghost.getBoundingClientRect();
-  pointerDrag.ghost.style.left = (x - r.width / 2) + 'px';
-  pointerDrag.ghost.style.top = (y - r.height / 2) + 'px';
+// El ghost se mueve solo con transform (capa de compositor): lecturas de layout cero.
+function posicionarGhost(d, x, y) {
+  if (!d.ghost) return;
+  d.ghost.style.transform = `translate(${x - d.gw}px, ${y - d.gh}px) rotate(1.5deg) scale(1.04)`;
 }
 
 function resaltarDestino(cell) {
-  sheetsEl.querySelectorAll('.drop-target').forEach((c) => c.classList.remove('drop-target'));
-  if (cell) {
-    const misma = cell.dataset.id === String(pointerDrag?.id);
-    if (!misma) cell.classList.add('drop-target');
+  if (cell && cell.dataset.id === String(pointerDrag?.id)) cell = null; // el origen nunca es destino
+  if (cell === celdaResaltada) return; // evitar mutar clases cada frame si no cambió
+  if (celdaResaltada) celdaResaltada.classList.remove('drop-target');
+  celdaResaltada = null;
+  if (cell && sheetsEl.contains(cell)) {
+    cell.classList.add('drop-target');
+    celdaResaltada = cell;
   }
 }
 
@@ -563,40 +681,64 @@ document.addEventListener('pointermove', (e) => {
   if (!pointerDrag) return;
   if (!pointerDrag.activo) {
     const d = Math.hypot(e.clientX - pointerDrag.startX, e.clientY - pointerDrag.startY);
-    if (d > 5) iniciarGhost(pointerDrag);
-    else return;
+    if (d <= 5) return;
+    iniciarGhost(pointerDrag, e.clientX, e.clientY);
+    if (!pointerDrag?.activo) return;
   }
-  moverGhost(pointerDrag, e.clientX, e.clientY);
-  autoScroll(e);
-  const celdaOrigen = sheetsEl.querySelector(`.cell[data-id="${pointerDrag.id}"]`);
-  resaltarDestino(celdaBajoPunto(e.clientX, e.clientY, celdaOrigen));
+  pointerDrag.lastX = e.clientX;
+  pointerDrag.lastY = e.clientY;
+  posicionarGhost(pointerDrag, e.clientX, e.clientY); // escritura pura: cero lag del ghost
+  if (moveRaf !== null) return;
+  moveRaf = requestAnimationFrame(() => { // auto-scroll + hit-test: como máximo 1 por frame
+    moveRaf = null;
+    const drag = pointerDrag;
+    if (!drag) return;
+    autoScroll(drag.lastX, drag.lastY);
+    const celdaOrigen = sheetsEl.querySelector(`.cell[data-id="${drag.id}"]`);
+    resaltarDestino(celdaBajoPunto(drag.lastX, drag.lastY, celdaOrigen));
+  });
 }, { signal });
 
-document.addEventListener('pointerup', (e) => {
+// Único camino de cierre del drag (pointerup y red de seguridad de capture).
+function finalizarDrag(x, y) {
   if (!pointerDrag) return;
   const drag = pointerDrag;
   const fueActivo = drag.activo;
   const celdaOrigen = sheetsEl.querySelector(`.cell[data-id="${drag.id}"]`);
   pointerDrag = null;
   cancelarDragVisual();
+  soltarRenderPendiente(); // aplicar re-renders de la cola pospuestos durante el arrastre
   if (!fueActivo) return; // fue un clic
-  const cell = celdaBajoPunto(e.clientX, e.clientY, celdaOrigen);
+  const cell = celdaBajoPunto(x, y, celdaOrigen);
   if (!cell) return;
   const hojaDestino = hojaPorId(Number(cell.closest('.sheet').dataset.hoja));
   const slotDestino = Number(cell.dataset.slot);
   if (!hojaDestino || !Number.isInteger(slotDestino)) return;
-  moverSlot(drag, hojaDestino, slotDestino);
+  moverSlot(drag, hojaDestino, slotDestino, { x, y });
+}
+
+document.addEventListener('pointerup', (e) => finalizarDrag(e.clientX, e.clientY), { signal });
+
+// Red de seguridad: si la captura se pierde sin haber recibido pointerup (gesto del
+// sistema, pérdida de foco), se suelta el drag con la última coordenada conocida.
+// Es posterior al pointerup natural, cuando ya no queda drag que cerrar.
+sheetsEl.addEventListener('lostpointercapture', (e) => {
+  if (!e.isPrimary || !pointerDrag) return;
+  finalizarDrag(pointerDrag.lastX, pointerDrag.lastY);
 }, { signal });
 
 document.addEventListener('pointercancel', () => {
+  if (!pointerDrag) return;
   pointerDrag = null;
   cancelarDragVisual();
+  soltarRenderPendiente();
 }, { signal });
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && pointerDrag) {
     pointerDrag = null;
     cancelarDragVisual();
+    soltarRenderPendiente();
   }
 }, { signal });
 
@@ -605,7 +747,7 @@ sheetsEl.addEventListener('dragover', (e) => {
   if (!esDragDeArchivos(e)) return;
   if (state.modoOcr) return;
   e.preventDefault();
-  autoScroll(e);
+  autoScroll(e.clientX, e.clientY);
   const sheet = e.target.closest('.sheet');
   sheetsEl.querySelectorAll('.sheet.file-drop').forEach((s) => { if (s !== sheet) s.classList.remove('file-drop'); });
   if (sheet) sheet.classList.add('file-drop');
@@ -627,19 +769,69 @@ sheetsEl.addEventListener('drop', (e) => {
   else showToast('Soltá archivos sobre una hoja para agregarlos.');
 }, { signal });
 
+// FLIP "Play": hace volar `img` desde un centro aparente hasta su posición real.
+// Solo usa transform (Web Animations): sin limpieza de estilos, sin VT, y el área
+// de clic del navegador sigue a la imagen animada (what-you-see-is-what-you-grab).
+function animarFlipDesde(img, cx, cy) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = img.getBoundingClientRect();
+  if (r.width < 2) return; // todavía sin layout
+  const dx = cx - (r.left + r.width / 2);
+  const dy = cy - (r.top + r.height / 2);
+  if (Math.hypot(dx, dy) < 2) return;
+  img.animate(
+    [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+    { duration: 170, easing: 'cubic-bezier(.2, .8, .2, 1)' },
+  );
+}
+
+function actualizarConteoPanel(hoja) {
+  const span = sheetsEl.querySelector(`.sheet-row[data-hoja="${hoja.id}"] .sheet-panel-count`);
+  if (span) span.textContent = `${cuentaHoja(hoja)}/${layoutDe(hoja.layout).total}`;
+}
+
 // Mueve (o intercambia, si el destino está ocupado) el comprobante al slot pedido.
-function moverSlot(drag, hojaDestino, slotDestino) {
-  const origen = hojaPorId(drag.hojaId);
-  if (!origen) return;
-  const item = origen.slots[drag.slotIdx];
-  if (!item) return;
-  if (origen === hojaDestino && drag.slotIdx === slotDestino) return; // misma casilla: no-op
+// Repinta solo las 2 casillas afectadas (pintarCelda) + animación FLIP: no hay
+// re-render total ni View Transition en este camino, que era lo que dejaba el DOM
+// desacompasado de lo visible y hacía que el siguiente pointerdown marcara el monto.
+function moverSlot(drag, hojaDestino, slotDestino, centroA) {
+  const actual = buscarSlot(drag.id); // revalidar posición real por id (pudo moverse entre down y up)
+  if (!actual) return;
+  const { hoja: origen, idx: idxOrigen } = actual;
+  if (origen === hojaDestino && idxOrigen === slotDestino) return; // misma casilla: no-op
+
+  // FLIP "First": centro actual de la imagen desplazada (antes de repintar)
+  const ocupante = hojaDestino.slots[slotDestino];
+  const imgB = ocupante ? sheetsEl.querySelector(`.cell[data-id="${ocupante.id}"] img`) : null;
+  const rB = imgB?.getBoundingClientRect();
+
+  const idsHojasAntes = state.hojas.map((h) => h.id).join();
   const reemplazo = hojaDestino.slots[slotDestino] || null;
-  hojaDestino.slots[slotDestino] = item;
-  origen.slots[drag.slotIdx] = reemplazo;
+  hojaDestino.slots[slotDestino] = origen.slots[idxOrigen];
+  origen.slots[idxOrigen] = reemplazo;
   limpiarHojas();
   guardar();
-  renderHojas();
+
+  // Si la operación cambió la estructura de hojas (origen vaciada y eliminada),
+  // el parcheo local no alcanza: fallback a render completo (poco frecuente).
+  const estructural = state.hojas.map((h) => h.id).join() !== idsHojasAntes;
+  const nodoOrigen = sheetsEl.querySelector(`.sheet[data-hoja="${origen.id}"] .cell[data-slot="${idxOrigen}"]`);
+  const nodoDestino = sheetsEl.querySelector(`.sheet[data-hoja="${hojaDestino.id}"] .cell[data-slot="${slotDestino}"]`);
+  if (estructural || !nodoOrigen || !nodoDestino) { renderHojas(); return; }
+
+  pintarCelda(nodoOrigen, origen.slots[idxOrigen], idxOrigen, origen.id);
+  pintarCelda(nodoDestino, hojaDestino.slots[slotDestino], slotDestino, hojaDestino.id);
+
+  // A vuela desde el punto de soltura (handoff perfecto con el ghost);
+  // B vuela desde la casilla que ocupaba hacia la casilla origen.
+  const imgA = nodoDestino.querySelector('img');
+  if (imgA && centroA) animarFlipDesde(imgA, centroA.x, centroA.y);
+  const imgBDestino = nodoOrigen.querySelector('img');
+  if (imgBDestino && rB) animarFlipDesde(imgBDestino, rB.left + rB.width / 2, rB.top + rB.height / 2);
+
+  actualizarConteoPanel(origen);
+  if (hojaDestino !== origen) actualizarConteoPanel(hojaDestino);
+  renderMonto();
 }
 
 /* ---------- Código de pedido ---------- */
@@ -737,7 +929,10 @@ $('formAjustes').addEventListener('submit', () => {
 
 /* ---------- Limpiar ---------- */
 btnLimpiar.addEventListener('click', () => {
-  for (const h of state.hojas) for (const c of itemsDe(h)) URL.revokeObjectURL(c.imgUrl);
+  for (const h of state.hojas) for (const c of itemsDe(h)) {
+    URL.revokeObjectURL(c.imgUrl);
+    if (c.thumbUrl) URL.revokeObjectURL(c.thumbUrl);
+  }
   state.hojas = [crearHoja()];
   guardar();
   renderHojas();

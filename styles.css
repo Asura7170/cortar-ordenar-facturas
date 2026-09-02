@@ -478,7 +478,9 @@ input::placeholder { color: var(--input-placeholder); }
   position: relative;
   display: flex; align-items: center; justify-content: center;
   min-height: 0;
+  user-select: none; /* nada de texto seleccionable en la casilla: ni el monto ni el × */
 }
+.cell.cell-ocr, .cell.cell-ocr * { user-select: text; } /* en modo OCR el texto sí se puede seleccionar */
 .cell:not(.empty) { cursor: grab; }
 .cell.empty {
   border: 1px dashed var(--renglon-fuerte);
@@ -493,21 +495,29 @@ input::placeholder { color: var(--input-placeholder); }
   border-radius: 2px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   pointer-events: none; /* el pointerdown cae en la celda, no en la imagen */
-  user-select: none;
+  -webkit-user-drag: none;
   transition: box-shadow 0.15s;
 }
 .cell img:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
 
-/* Fantasma del comprobante mientras se arrastra (Pointer Events) */
+/* Fantasma del comprobante mientras se arrastra (Pointer Events).
+   JS lo mueve únicamente con transform (compositor): left/top quedan en 0. */
 .drag-ghost {
   position: fixed;
+  left: 0; top: 0;
   pointer-events: none;
   z-index: 9999;
   object-fit: contain;
-  opacity: 0.85;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  opacity: 0.9;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.4);
   border-radius: 4px;
+  will-change: transform;
+  transform-origin: center;
 }
+
+/* Cursor coherente y selección bloqueada durante todo el arrastre */
+body.is-dragging { user-select: none; }
+body.is-dragging, body.is-dragging .cell:not(.empty) { cursor: grabbing; }
 .cell.pickup img { opacity: 0.3; }
 .cell.pickup { cursor: grabbing; }
 
