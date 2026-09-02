@@ -76,6 +76,23 @@
     color-mix(in srgb, #22311f 92%, transparent)
   );
 
+  /* Superficies del modal (claro = marfil, oscuro = panel de la app) */
+  --modal-bg: light-dark(var(--papel), var(--panel));
+  --modal-input-bg: light-dark(var(--papel-brillo), var(--input-bg));
+  --modal-texto: light-dark(var(--tinta), var(--texto-panel));
+  --modal-texto-suave: light-dark(var(--tinta-suave), var(--texto-panel-suave));
+  --modal-borde: light-dark(var(--renglon), var(--borde-panel));
+
+  /* Opciones de distribución (minivista grid + aplicar a todas) */
+  --gridopt-bg: light-dark(var(--papel-brillo), var(--panel-claro));
+  --gridopt-hover: light-dark(var(--verde-claro), color-mix(in srgb, var(--verde-tinta) 28%, transparent));
+  --gridopt-activo: light-dark(var(--verde-claro), color-mix(in srgb, var(--verde-tinta) 30%, transparent));
+  --gridopt-borde: light-dark(var(--renglon), var(--borde-panel));
+  /* Estado activo de la minivista: claro = solo marco (fichas lavadas);
+     oscuro = fichas encendidas y texto en el verde luminoso del monto */
+  --ficha-activa: light-dark(var(--verde-claro), var(--monto-valor));
+  --layout-activo: light-dark(var(--verde-tinta), var(--monto-valor));
+
   /* Tipografía */
   --serif: 'Libre Baskerville', Georgia, serif;
   --mono: 'IBM Plex Mono', 'Courier New', monospace;
@@ -410,15 +427,15 @@ input::placeholder { color: var(--input-placeholder); }
 .grid-opt {
   display: flex; flex-direction: column; align-items: center; gap: 5px;
   padding: 7px 3px;
-  border: 1px solid var(--renglon);
+  border: 1px solid var(--gridopt-borde);
   border-radius: 8px;
-  background: var(--papel-brillo);
-  color: var(--tinta);
+  background: var(--gridopt-bg);
+  color: var(--texto-panel);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
-.grid-opt:hover { border-color: var(--renglon-fuerte); background: var(--verde-claro); }
-.grid-opt.active { border-color: var(--verde-tinta); background: var(--verde-claro); }
+.grid-opt:hover { border-color: var(--renglon-fuerte); background: var(--gridopt-hover); }
+.grid-opt.active { border-color: var(--verde-tinta); background: var(--gridopt-activo); }
 
 /* Mini-vista de la distribución (fichas en grilla real) */
 .layout-mini {
@@ -431,22 +448,22 @@ input::placeholder { color: var(--input-placeholder); }
   border-radius: 2px;
   min-width: 0; min-height: 0;
 }
-.grid-opt.active .ficha { background: var(--verde-claro); border: 1px solid var(--verde-tinta); }
+.grid-opt.active .ficha { background: var(--ficha-activa); border: 1px solid var(--verde-tinta); }
 .layout-name {
   font-size: 9px; line-height: 1.2;
-  color: var(--tinta-suave);
+  color: var(--texto-panel-suave);
   text-align: center;
   text-wrap: balance;
 }
-.grid-opt.active .layout-name { color: var(--verde-tinta); font-weight: 600; }
+.grid-opt.active .layout-name { color: var(--layout-activo); font-weight: 600; }
 
 .apply-all {
-  border: 1px solid var(--renglon);
+  border: 1px solid var(--gridopt-borde);
   border-radius: 8px;
   padding: 6px;
   font-size: 12px;
-  background: var(--verde-claro);
-  color: var(--verde-tinta);
+  background: var(--gridopt-activo);
+  color: var(--texto-panel);
   cursor: pointer;
 }
 .apply-all:hover { border-color: var(--verde-tinta); }
@@ -653,7 +670,7 @@ input::placeholder { color: var(--input-placeholder); }
 @starting-style { .modal::backdrop { opacity: 0; } }
 .modal-card {
   max-height: 82vh;
-  background: var(--papel);
+  background: var(--modal-bg);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.5);
   display: flex; flex-direction: column;
@@ -662,17 +679,17 @@ input::placeholder { color: var(--input-placeholder); }
 .modal-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--renglon);
-  color: var(--tinta);
+  border-bottom: 1px solid var(--modal-borde);
+  color: var(--modal-texto);
 }
 .modal-head h2 { font-size: 18px; }
-.modal-head .btn-icon { color: var(--tinta); }
+.modal-head .btn-icon { color: var(--modal-texto); }
 .modal-body { padding: 20px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--renglon-fuerte) transparent; }
-.modal-body label { display: block; font-size: 13px; color: var(--tinta-suave); margin-bottom: 14px; }
-.modal-body label input, .modal-body label select { width: 100%; background: var(--papel-brillo); color: var(--tinta); border-color: var(--renglon); margin-top: 5px; }
+.modal-body label { display: block; font-size: 13px; color: var(--modal-texto-suave); margin-bottom: 14px; }
+.modal-body label input, .modal-body label select { width: 100%; background: var(--modal-input-bg); color: var(--modal-texto); border-color: var(--modal-borde); margin-top: 5px; }
 .modal-foot {
   padding: 14px 20px;
-  border-top: 1px solid var(--renglon);
+  border-top: 1px solid var(--modal-borde);
   display: flex; justify-content: flex-end;
 }
 
