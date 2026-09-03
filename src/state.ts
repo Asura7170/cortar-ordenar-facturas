@@ -1,5 +1,5 @@
 /* Estado global + persistencia + operaciones puras de estado. */
-import type { Comprobante, EstadoApp, Hoja, LayoutId, Moneda, PersistedState } from './types';
+import type { Comprobante, ConfigIA, EstadoApp, Hoja, LayoutId, Moneda, PersistedState } from './types';
 import { layoutDe } from './ui/layout';
 
 export const LS_KEY = 'libro-mayor-state';
@@ -11,13 +11,16 @@ export const MONEDAS: Record<Moneda, { simbolo: string }> = {
   BOB: { simbolo: 'Bs' },
 };
 
+export const CONFIG_IA_DEFAULT: ConfigIA = { baseUrl: 'https://api.groq.com/openai/v1/chat/completions', model: 'qwen/qwen3.8-27b', apiKey: '' };
+export const MONEDA_DEFAULT: Moneda = 'USD';
+
 export const state: EstadoApp = {
   hojas: [],
   codigoActivo: false,
   codigoLongitud: 6,
   codigoValor: '',
-  configIA: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', apiKey: '' },
-  moneda: 'USD',
+  configIA: { ...CONFIG_IA_DEFAULT },
+  moneda: MONEDA_DEFAULT,
   colaEnProceso: false,
   modoOcr: false,
 };
@@ -46,6 +49,13 @@ export function guardar(): void {
 
 export function isMoneda(v: unknown): v is Moneda {
   return v === 'USD' || v === 'ARS' || v === 'EUR' || v === 'BOB';
+}
+
+// Vuelve los ajustes del modal a sus valores de fábrica (código y tema intactos).
+export function restablecerAjustes(): void {
+  state.configIA = { ...CONFIG_IA_DEFAULT };
+  state.moneda = MONEDA_DEFAULT;
+  guardar();
 }
 
 function isPersistedState(v: unknown): v is PersistedState {

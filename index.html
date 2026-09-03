@@ -104,8 +104,8 @@
       </div>
       <form id="formAjustes" method="dialog">
         <div class="modal-body">
-          <label>Base URL <input type="url" id="cfgBaseUrl" name="cfgBaseUrl" placeholder="https://api.openai.com/v1" /></label>
-          <label>Modelo <input type="text" id="cfgModel" name="cfgModel" placeholder="gpt-4o-mini" /></label>
+          <label>Base URL <input type="url" id="cfgBaseUrl" name="cfgBaseUrl" placeholder="https://api.groq.com/openai/v1/chat/completions" /></label>
+          <label>Modelo <input type="text" id="cfgModel" name="cfgModel" placeholder="qwen/qwen3.8-27b" /></label>
           <label>API Key <input type="password" id="cfgApiKey" name="cfgApiKey" autocomplete="off" spellcheck="false" placeholder="sk-..." /></label>
           <label>Moneda
             <select id="cfgMoneda" name="cfgMoneda">
@@ -117,6 +117,7 @@
           </label>
         </div>
         <div class="modal-foot">
+          <button class="btn btn-ghost" type="button" id="btnResetAjustes">Predeterminado</button>
           <button class="btn btn-primary" type="submit" id="btnGuardarAjustes">Guardar</button>
         </div>
       </form>

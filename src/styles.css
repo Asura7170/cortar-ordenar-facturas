@@ -715,7 +715,7 @@ body.is-dragging, body.is-dragging .cell:not(.empty) { cursor: grabbing; }
 .modal-foot {
   padding: 14px 20px;
   border-top: 1px solid var(--modal-borde);
-  display: flex; justify-content: flex-end;
+  display: flex; justify-content: flex-end; gap: 10px;
 }
 
 /* Confirmación destructiva: reutiliza .modal; solo identidad de peligro. */
