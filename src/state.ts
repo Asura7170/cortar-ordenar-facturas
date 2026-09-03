@@ -36,15 +36,44 @@ export function nextHojaId(): number {
   return ++seqHoja;
 }
 
-export function guardar(): void {
-  const persist: PersistedState = {
+function leerBlob(): Record<string, unknown> {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return {};
+    const p: unknown = JSON.parse(raw);
+    return typeof p === 'object' && p !== null ? (p as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Solo la ventana Código: el switch arma el guardado, editar longitud/valor lo dispara.
+export function guardarCodigo(): void {
+  localStorage.setItem(LS_KEY, JSON.stringify({
+    ...leerBlob(),
     codigoActivo: state.codigoActivo,
     codigoLongitud: state.codigoLongitud,
     codigoValor: state.codigoValor,
+  }));
+}
+
+// Solo la ventana Ajustes (Guardar y Predeterminado): el código queda intacto.
+export function guardarAjustes(): void {
+  localStorage.setItem(LS_KEY, JSON.stringify({
+    ...leerBlob(),
     moneda: state.moneda,
     configIA: state.configIA,
-  };
-  localStorage.setItem(LS_KEY, JSON.stringify(persist));
+  }));
+}
+
+// Switch OFF: la ventana Código retira lo suyo y deja ajustes/LS limpio.
+export function borrarCodigo(): void {
+  const blob = leerBlob();
+  delete blob['codigoActivo'];
+  delete blob['codigoLongitud'];
+  delete blob['codigoValor'];
+  if (Object.keys(blob).length === 0) localStorage.removeItem(LS_KEY);
+  else localStorage.setItem(LS_KEY, JSON.stringify(blob));
 }
 
 export function isMoneda(v: unknown): v is Moneda {
@@ -55,16 +84,15 @@ export function isMoneda(v: unknown): v is Moneda {
 export function restablecerAjustes(): void {
   state.configIA = { ...CONFIG_IA_DEFAULT };
   state.moneda = MONEDA_DEFAULT;
-  guardar();
+  guardarAjustes();
 }
 
-function isPersistedState(v: unknown): v is PersistedState {
+function isPersistedState(v: unknown): v is PersistedState & { moneda: Moneda } {
   if (typeof v !== 'object' || v === null) return false;
   const p = v as Record<string, unknown>;
-  return typeof p['codigoActivo'] === 'boolean'
-    && typeof p['codigoLongitud'] === 'number'
-    && typeof p['codigoValor'] === 'string'
-    && isMoneda(p['moneda']);
+  // Solo moneda es obligatoria: cada ventana guarda lo suyo y el LS vive
+  // lo más vacío posible (p. ej. sin código tras desmarcar el switch).
+  return isMoneda(p['moneda']);
 }
 
 export function cargar(): void {
@@ -73,9 +101,11 @@ export function cargar(): void {
     if (!raw) return;
     const p: unknown = JSON.parse(raw);
     if (!isPersistedState(p)) return; // estado corrupto o de otra versión: ignorar
-    state.codigoActivo = p.codigoActivo;
-    state.codigoLongitud = Math.max(1, Math.min(12, Math.floor(p.codigoLongitud) || 6));
-    state.codigoValor = p.codigoValor;
+    const r = p as Record<string, unknown>;
+    state.codigoActivo = typeof r['codigoActivo'] === 'boolean' ? r['codigoActivo'] : false;
+    const lon = r['codigoLongitud'];
+    state.codigoLongitud = typeof lon === 'number' ? Math.max(1, Math.min(12, Math.floor(lon) || 6)) : 6;
+    state.codigoValor = typeof r['codigoValor'] === 'string' ? r['codigoValor'] : '';
     state.moneda = p.moneda;
     const ia = (p as { configIA?: unknown }).configIA;
     if (typeof ia === 'object' && ia !== null) {

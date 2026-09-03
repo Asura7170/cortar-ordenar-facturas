@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { montarFixture, el } from '../test/fixture';
 
 montarFixture();
-const { state, crearHoja } = await import('../state');
+const { state, crearHoja, guardarCodigo } = await import('../state');
 const { initSettings } = await import('./settingsModal');
 const { comprobante } = await import('../test/factoria');
 
@@ -37,10 +37,12 @@ describe('abrir', () => {
 });
 
 describe('submit', () => {
-  it('persiste config+moneda y repinta el total', () => {
+  it('persiste config+moneda, deja el código intacto y repinta el total', () => {
     const h = crearHoja();
     h.slots[0] = comprobante({ montoCents: 100 });
     state.hojas.push(h);
+    state.codigoValor = '777';
+    guardarCodigo();
     cfgBaseUrl.value = 'http://nuevo';
     cfgModel.value = 'modelo-x';
     cfgApiKey.value = 'secreto';
@@ -49,8 +51,9 @@ describe('submit', () => {
     expect(state.configIA).toEqual({ baseUrl: 'http://nuevo', model: 'modelo-x', apiKey: 'secreto' });
     expect(state.moneda).toBe('ARS');
     expect(document.getElementById('montoTotal')?.textContent).toBe('AR$ 1.00');
-    const raw = JSON.parse(localStorage.getItem('libro-mayor-state') ?? '{}') as { moneda: string };
-    expect(raw.moneda).toBe('ARS');
+    const raw = JSON.parse(localStorage.getItem('libro-mayor-state') ?? '{}') as Record<string, unknown>;
+    expect(raw['moneda']).toBe('ARS');
+    expect(raw['codigoValor']).toBe('777');
   });
 
   it('vacíos caen a defaults Groq y moneda inválida a USD', () => {

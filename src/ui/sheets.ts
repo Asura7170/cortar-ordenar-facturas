@@ -1,5 +1,5 @@
 /* Hojas carta: render de casillas + drag & drop de comprobantes. */
-import { buscarSlot, guardar, hojaPorId, limpiarHojas, redistribuir, state } from '../state';
+import { buscarSlot, hojaPorId, limpiarHojas, redistribuir, state } from '../state';
 import type { Comprobante, Hoja, Plantilla } from '../types';
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from './layout';
 import { aplanar, cuentaHoja, formatearMoneda, renderMonto, totalItems } from './monto';
@@ -182,7 +182,6 @@ export function cambiarLayoutHoja(hojaId: string | number, layoutId: string): vo
   if (!h || !isLayoutId(layoutId)) return;
   h.layout = layoutId;
   redistribuir();
-  guardar();
   renderHojas();
 }
 
@@ -192,7 +191,6 @@ export function aplicarATodas(hojaId: string | number): void {
   const layoutId = h.layout;
   state.hojas.forEach((x) => { x.layout = layoutId; });
   redistribuir();
-  guardar();
   renderHojas();
 }
 
@@ -210,7 +208,6 @@ export function quitarComprobante(id: number): void {
     }
   }
   limpiarHojas();
-  guardar();
   renderHojas();
 }
 
@@ -389,7 +386,6 @@ function moverSlot(drag: { id: number }, hojaDestino: Hoja, slotDestino: number,
   hojaDestino.slots[slotDestino] = movida;
   origen.slots[idxOrigen] = reemplazo;
   limpiarHojas();
-  guardar();
 
   const estructural = state.hojas.map((h) => h.id).join() !== idsHojasAntes;
   const nodoOrigen = sheetsEl.querySelector<HTMLElement>(`.sheet[data-hoja="${origen.id}"] .cell[data-slot="${idxOrigen}"]`);

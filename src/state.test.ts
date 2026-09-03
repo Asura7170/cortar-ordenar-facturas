@@ -2,10 +2,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   LS_KEY,
+  borrarCodigo,
   buscarSlot,
   cargar,
   crearHoja,
-  guardar,
+  guardarAjustes,
+  guardarCodigo,
   hojaPorId,
   isMoneda,
   limpiarHojas,
@@ -45,14 +47,15 @@ describe('crearHoja', () => {
   });
 });
 
-describe('guardar/cargar', () => {
-  it('round-trip: persiste ajustes y los restaura', () => {
+describe('guardar/cargar por ventana', () => {
+  it('round-trip: cada ventana persiste lo suyo y lo restaura', () => {
     state.codigoActivo = true;
     state.codigoLongitud = 8;
     state.codigoValor = '12345678';
+    guardarCodigo();
     state.moneda = 'BOB';
     state.configIA = { baseUrl: 'http://test', model: 'm', apiKey: 'k' };
-    guardar();
+    guardarAjustes();
 
     state.codigoActivo = false;
     state.codigoLongitud = 6;
@@ -68,17 +71,58 @@ describe('guardar/cargar', () => {
     expect(state.configIA).toEqual({ baseUrl: 'http://test', model: 'm', apiKey: 'k' });
   });
 
+  it('cada guardado preserva la otra ventana (merge, no reemplazo)', () => {
+    state.moneda = 'ARS';
+    state.configIA = { baseUrl: 'http://a', model: 'm', apiKey: 'k' };
+    guardarAjustes();
+    state.codigoActivo = true;
+    state.codigoLongitud = 8;
+    state.codigoValor = '87654321';
+    guardarCodigo();
+
+    const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as Record<string, unknown>;
+    expect(raw['moneda']).toBe('ARS');
+    expect(raw['codigoValor']).toBe('87654321');
+  });
+
   it('solo persiste el subset PersistedState (hojas y modoOcr quedan fuera)', () => {
     const h = crearHoja();
     h.slots[0] = comprobante();
     state.hojas.push(h);
     state.modoOcr = true;
-    guardar();
+    guardarCodigo();
+    guardarAjustes();
 
     const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as Record<string, unknown>;
     expect(Object.keys(raw).sort()).toEqual(
       ['codigoActivo', 'codigoLongitud', 'codigoValor', 'configIA', 'moneda'],
     );
+  });
+
+  it('borrarCodigo retira lo suyo, conserva ajustes y vacía la clave si queda sola', () => {
+    state.moneda = 'EUR';
+    guardarAjustes();
+    state.codigoValor = '123';
+    guardarCodigo();
+    borrarCodigo();
+    const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as Record<string, unknown>;
+    expect(raw['moneda']).toBe('EUR');
+    expect('codigoValor' in raw).toBe(false);
+
+    localStorage.clear();
+    state.codigoValor = '123';
+    guardarCodigo();
+    borrarCodigo();
+    expect(localStorage.getItem(LS_KEY)).toBeNull();
+  });
+
+  it('cargar sin código: defaults false/6/″″ y conserva ajustes', () => {
+    localStorage.setItem(LS_KEY, JSON.stringify({ moneda: 'ARS', configIA: {} }));
+    cargar();
+    expect(state.codigoActivo).toBe(false);
+    expect(state.codigoLongitud).toBe(6);
+    expect(state.codigoValor).toBe('');
+    expect(state.moneda).toBe('ARS');
   });
 
   it('JSON corrupto: no tira y conserva el estado', () => {
@@ -126,7 +170,9 @@ describe('isMoneda', () => {
 });
 
 describe('restablecerAjustes', () => {
-  it('vuelve a defaults Groq/USD y lo persiste', () => {
+  it('vuelve a defaults Groq/USD, lo persiste y deja el código intacto', () => {
+    state.codigoValor = '4242';
+    guardarCodigo();
     state.configIA = { baseUrl: 'xxx', model: 'yyy', apiKey: 'zzz' };
     state.moneda = 'ARS';
     restablecerAjustes();
@@ -134,8 +180,9 @@ describe('restablecerAjustes', () => {
     expect(state.configIA.model).toBe('qwen/qwen3.8-27b');
     expect(state.configIA.apiKey).toBe('');
     expect(state.moneda).toBe('USD');
-    const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as { moneda: string };
-    expect(raw.moneda).toBe('USD');
+    const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as Record<string, unknown>;
+    expect(raw['moneda']).toBe('USD');
+    expect(raw['codigoValor']).toBe('4242');
   });
 });
 

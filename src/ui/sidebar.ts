@@ -1,5 +1,5 @@
 /* Sidebar: entrada (dropzone/pegar/subir), código de pedido y limpiar. */
-import { crearHoja, guardar, hojaPorId, nextComprobanteId, state } from '../state';
+import { borrarCodigo, crearHoja, guardarCodigo, hojaPorId, nextComprobanteId, state } from '../state';
 import type { Comprobante } from '../types';
 import { cuentaHoja, itemsDe } from './monto';
 import { layoutDe } from './layout';
@@ -108,20 +108,21 @@ export function initSidebar(): void {
     if (files.length) agregarArchivos(files);
   });
 
+  // El switch solo arma el guardado de su ventana; ON no escribe, OFF retira lo suyo.
   chkCodigo.addEventListener('change', () => {
     state.codigoActivo = chkCodigo.checked;
-    guardar();
+    if (!chkCodigo.checked) borrarCodigo();
     renderCodigo();
   });
   numCodigo.addEventListener('input', () => {
     state.codigoLongitud = Math.max(1, Math.min(12, Number(numCodigo.value) || 6));
-    guardar();
+    if (chkCodigo.checked) guardarCodigo();
     renderCodigo();
   });
   inputCodigo.addEventListener('input', () => {
     state.codigoValor = inputCodigo.value.replace(/\D/g, '').slice(0, state.codigoLongitud);
     inputCodigo.value = state.codigoValor;
-    guardar();
+    if (chkCodigo.checked) guardarCodigo();
   });
 
   // El botón Limpiar abre el dialog vía commandfor (cero JS); acá solo se
@@ -133,7 +134,6 @@ export function initSidebar(): void {
       if (c.thumbUrl) URL.revokeObjectURL(c.thumbUrl);
     }
     state.hojas = [crearHoja()];
-    guardar();
     renderHojas();
   });
 }

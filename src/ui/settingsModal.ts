@@ -1,5 +1,5 @@
 /* Modal de ajustes: endpoint IA, modelo, key y moneda (persisten). */
-import { CONFIG_IA_DEFAULT, MONEDA_DEFAULT, guardar, isMoneda, restablecerAjustes, state } from '../state';
+import { CONFIG_IA_DEFAULT, MONEDA_DEFAULT, guardarAjustes, isMoneda, restablecerAjustes, state } from '../state';
 import { renderMonto } from './monto';
 import { renderHojas } from './sheets';
 import { getEl } from '../utils';
@@ -36,7 +36,7 @@ export function initSettings(): void {
     state.configIA.model = cfgModel.value || CONFIG_IA_DEFAULT.model;
     state.configIA.apiKey = cfgApiKey.value;
     state.moneda = isMoneda(cfgMoneda.value) ? cfgMoneda.value : MONEDA_DEFAULT;
-    guardar();
+    guardarAjustes();
     renderMonto();
     renderHojas();
   });

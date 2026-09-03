@@ -77,10 +77,10 @@ export interface EstadoApp {
   modoOcr: boolean;
 }
 
-/** Subset persistido en localStorage (clave `libro-mayor-state`). */
-export type PersistedState = Pick<
+/** Subset persistido en localStorage (clave `libro-mayor-state`); cada ventana guarda solo lo suyo. */
+export type PersistedState = Partial<Pick<
   EstadoApp,
   'codigoActivo' | 'codigoLongitud' | 'codigoValor' | 'moneda' | 'configIA'
->;
+>>;
 
 // ponytail: OcrResult/ExtractResult borrados (0 usos); vuelven con el pipeline real.

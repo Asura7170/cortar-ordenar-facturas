@@ -119,14 +119,37 @@ describe('fileInput / dropzone / paste', () => {
 });
 
 describe('código de pedido', () => {
-  it('switch activa/guarda y habilita el input', () => {
-    renderCodigo();
-    expect(inputCodigo.disabled).toBe(true);
+  function armar(): void {
     chkCodigo.checked = true;
     chkCodigo.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  it('switch ON arma sin escribir en LS y habilita el input', () => {
+    renderCodigo();
+    expect(inputCodigo.disabled).toBe(true);
+    armar();
     expect(state.codigoActivo).toBe(true);
     expect(inputCodigo.disabled).toBe(false);
-    expect(JSON.parse(localStorage.getItem('libro-mayor-state') ?? '{}')).toMatchObject({ codigoActivo: true });
+    expect(localStorage.getItem('libro-mayor-state')).toBeNull();
+  });
+
+  it('editar longitud/valor guarda solo armado; OFF retira el código', () => {
+    armar();
+    numCodigo.value = '8';
+    numCodigo.dispatchEvent(new Event('input', { bubbles: true }));
+    inputCodigo.value = '12345678';
+    inputCodigo.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(JSON.parse(localStorage.getItem('libro-mayor-state') ?? '{}')).toMatchObject({
+      codigoActivo: true, codigoLongitud: 8, codigoValor: '12345678',
+    });
+
+    chkCodigo.checked = false;
+    chkCodigo.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(localStorage.getItem('libro-mayor-state')).toBeNull();
+
+    numCodigo.value = '5';
+    numCodigo.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(localStorage.getItem('libro-mayor-state')).toBeNull();
   });
 
   it('longitud clamp 1..12 y fallback 6', () => {
