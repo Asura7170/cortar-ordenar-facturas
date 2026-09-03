@@ -28,6 +28,8 @@ function pintarCelda(div: HTMLElement, item: Comprobante | null, slotIdx: number
   delete div.dataset['id'];
   div.dataset['slot'] = String(slotIdx);
   div.dataset['hoja'] = String(hojaId);
+  // Solo la celda ocupada es tabulable: así el × se revela por :focus-within.
+  div.tabIndex = item === null ? -1 : 0;
 
   if (!item) {
     div.classList.add('empty');

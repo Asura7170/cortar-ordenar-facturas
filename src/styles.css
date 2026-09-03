@@ -569,11 +569,18 @@ body.is-dragging, body.is-dragging .cell:not(.empty) { cursor: grabbing; }
   width: 28px; height: 28px;
   border: none; border-radius: 50%;
   background: var(--celda-remove);
-  color: #fff; font-size: 13px; line-height: 1;
+  color: #fff; font-size: 17px; line-height: 1;
   display: none;
   z-index: 3;
 }
+/* Hit-area 44px: el visual queda en 28px, el ::after recibe el tap. */
+.cell-remove::after { content: ""; position: absolute; inset: -8px; }
 .cell:hover .cell-remove, .cell:focus-within .cell-remove { display: block; }
+/* Sin hover (táctil) no hay revelado: siempre visible. Es capacidad, no breakpoint. */
+@media (hover: none) {
+  .cell .cell-remove { display: block; }
+}
+.cell-remove:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .cell-remove:hover { background: var(--sello); }
 
 /* Modo OCR: la casilla muestra el texto del comprobante */
