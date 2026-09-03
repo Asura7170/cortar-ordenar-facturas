@@ -3,7 +3,6 @@ import { buscarSlot, guardar, hojaPorId, limpiarHojas, redistribuir, state } fro
 import type { Comprobante, Hoja, Plantilla } from '../types';
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from './layout';
 import { aplanar, cuentaHoja, formatearMoneda, renderMonto, totalItems } from './monto';
-import { showToast } from './toast';
 import { getEl, sanear } from '../utils';
 
 const sheetsEl: HTMLElement = getEl('sheets');
@@ -66,6 +65,7 @@ function pintarCelda(div: HTMLElement, item: Comprobante | null, slotIdx: number
   btn.className = 'cell-remove';
   btn.dataset['accion'] = 'quitar';
   btn.title = 'Quitar';
+  btn.setAttribute('aria-label', 'Quitar comprobante');
   btn.textContent = '×';
   div.append(img, btn);
   if (item.montoCents != null) {
@@ -140,7 +140,9 @@ export function renderHojas(): void {
     });
     renderMonto();
   };
-  if (document.startViewTransition) {
+  // ponytail: sin ViewTransition con reduced-motion; es solo un adorno.
+  const reduceMovimiento = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  if (!reduceMovimiento && document.startViewTransition) {
     const t = document.startViewTransition(render);
     t.ready?.catch(() => {});
     t.finished?.catch(() => {});
@@ -479,9 +481,8 @@ export function initSheets(cb: SheetsCallbacks): void {
       case 'copiar-ocr': {
         const item = aplanar().find((c) => c.id === id);
         if (!item) return;
-        if (!item.textoOcr) { showToast('Sin texto OCR para copiar.'); return; }
+        if (!item.textoOcr) return;
         void Promise.try(() => navigator.clipboard.writeText(item.textoOcr));
-        showToast('Texto OCR copiado.');
         return;
       }
       case 'quitar':

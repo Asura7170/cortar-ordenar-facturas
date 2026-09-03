@@ -1,9 +1,7 @@
 /* Modal de ajustes: endpoint IA, modelo, key y moneda (persisten). */
-import { guardar, state } from '../state';
-import type { Moneda } from '../types';
+import { guardar, isMoneda, state } from '../state';
 import { renderMonto } from './monto';
 import { renderHojas } from './sheets';
-import { showToast } from './toast';
 import { getEl } from '../utils';
 
 const modalAjustes: HTMLDialogElement = getEl<HTMLDialogElement>('modalAjustes');
@@ -13,10 +11,6 @@ const cfgBaseUrl: HTMLInputElement = getEl<HTMLInputElement>('cfgBaseUrl');
 const cfgModel: HTMLInputElement = getEl<HTMLInputElement>('cfgModel');
 const cfgApiKey: HTMLInputElement = getEl<HTMLInputElement>('cfgApiKey');
 const cfgMoneda: HTMLSelectElement = getEl<HTMLSelectElement>('cfgMoneda');
-
-function isMoneda(v: string): v is Moneda {
-  return v === 'USD' || v === 'ARS' || v === 'EUR';
-}
 
 export function initSettings(): void {
   btnAjustes.addEventListener('click', () => {
@@ -34,6 +28,5 @@ export function initSettings(): void {
     guardar();
     renderMonto();
     renderHojas();
-    showToast('Ajustes guardados.');
   });
 }

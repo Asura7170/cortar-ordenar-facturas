@@ -43,7 +43,7 @@ export function guardar(): void {
   localStorage.setItem(LS_KEY, JSON.stringify(persist));
 }
 
-function isMoneda(v: unknown): v is Moneda {
+export function isMoneda(v: unknown): v is Moneda {
   return v === 'USD' || v === 'ARS' || v === 'EUR';
 }
 

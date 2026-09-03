@@ -83,13 +83,4 @@ export type PersistedState = Pick<
   'codigoActivo' | 'codigoLongitud' | 'codigoValor' | 'moneda' | 'configIA'
 >;
 
-/** Resultado OCR (mock actual; PaddleOCR PP-OCRv6 en el futuro). */
-export interface OcrResult {
-  readonly texto: string;
-}
-
-/** Resultado de extracción del TOTAL vía LLM (mock actual). */
-export interface ExtractResult {
-  readonly total: Cents;
-  readonly currency: Moneda;
-}
+// ponytail: OcrResult/ExtractResult borrados (0 usos); vuelven con el pipeline real.

@@ -3,7 +3,6 @@
    vivirá acá; la firma descargarWord() y el nombre de archivo ya son finales. */
 import { state } from '../state';
 import { aplanar, formatearMoneda, totalItems } from '../ui/monto';
-import { showToast } from '../ui/toast';
 import { getEl } from '../utils';
 
 const btnDescargar: HTMLButtonElement = getEl<HTMLButtonElement>('btnDescargar2');
@@ -19,12 +18,8 @@ export function nombreArchivo(): string {
 }
 
 export async function descargarWord(): Promise<void> {
-  if (!codigoValido()) {
-    showToast(`Código de pedido inválido: se requieren ${state.codigoLongitud} dígitos.`);
-    return;
-  }
-  if (totalItems() === 0) { showToast('No hay comprobantes para descargar.'); return; }
-  showToast('Generando .docx… (esqueleto)');
+  if (!codigoValido()) return;
+  if (totalItems() === 0) return;
 
   const contenido = [
     'DOCX STUB — Cortar y Ordenar Facturas',
@@ -38,7 +33,6 @@ export async function descargarWord(): Promise<void> {
   a.download = nombreArchivo();
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-  showToast('Descarga iniciada (esqueleto).');
 }
 
 export function initExport(): void {

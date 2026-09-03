@@ -492,6 +492,7 @@ input::placeholder { color: var(--input-placeholder); }
 .cell img {
   max-width: 100%;
   max-height: 100%;
+  aspect-ratio: 4 / 3; /* reserva el hueco antes de que llegue la miniatura: sin CLS */
   object-fit: contain;
   border-radius: 2px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.18);
@@ -499,7 +500,7 @@ input::placeholder { color: var(--input-placeholder); }
   -webkit-user-drag: none;
   transition: box-shadow 0.15s;
 }
-.cell img:hover { box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
+.cell:hover img { box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
 
 /* Fantasma del comprobante mientras se arrastra (Pointer Events).
    JS lo mueve únicamente con transform (compositor): left/top quedan en 0. */
@@ -553,7 +554,7 @@ body.is-dragging, body.is-dragging .cell:not(.empty) { cursor: grabbing; }
 }
 .cell-remove {
   position: absolute; top: 6px; right: 6px;
-  width: 22px; height: 22px;
+  width: 28px; height: 28px;
   border: none; border-radius: 50%;
   background: var(--celda-remove);
   color: #fff; font-size: 13px; line-height: 1;
@@ -705,21 +706,23 @@ body.is-dragging, body.is-dragging .cell:not(.empty) { cursor: grabbing; }
   display: flex; justify-content: flex-end;
 }
 
-/* ============ TOAST ============ */
-.toast {
-  position: fixed;
-  bottom: 24px; left: 50%;
-  transform: translateX(-50%);
-  background: var(--tinta);
-  color: var(--papel);
-  border: 1px solid var(--renglon-fuerte);
-  border-radius: 8px;
-  padding: 10px 18px;
-  font-size: 13px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  z-index: 120;
+/* Confirmación destructiva: reutiliza .modal; solo identidad de peligro. */
+.modal-confirm .modal-head h2 { display: flex; align-items: center; gap: 10px; }
+.sello-peligro {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--sello); color: #fff;
+  font-size: 16px; font-weight: 700;
+  rotate: -8deg; /* guiño al sello de goma */
 }
-.toast[hidden] { display: none; }
+.modal-confirm .modal-body p { margin: 0 0 8px; color: var(--modal-texto); font-size: 14px; }
+.modal-confirm .modal-body p:last-child { margin-bottom: 0; }
+.modal-confirm .modal-nota { color: var(--modal-texto-suave); font-size: 13px; }
+.modal-confirm .modal-foot { gap: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .modal, .modal::backdrop { transition: none; }
+}
 
 /* ============ EMPTY STATE ============ */
 .empty-state {

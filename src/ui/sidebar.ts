@@ -6,7 +6,6 @@ import { layoutDe } from './layout';
 import { renderHojas } from './sheets';
 import { generarMiniatura, procesarCola } from '../pipeline/queue';
 import { buscarSlot } from '../state';
-import { showToast } from './toast';
 import { getEl, sanear } from '../utils';
 
 const dropzone: HTMLElement = getEl('dropzone');
@@ -14,7 +13,7 @@ const fileInput: HTMLInputElement = getEl<HTMLInputElement>('fileInput');
 const chkCodigo: HTMLInputElement = getEl<HTMLInputElement>('chkCodigo');
 const numCodigo: HTMLInputElement = getEl<HTMLInputElement>('numCodigo');
 const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>('inputCodigo');
-const btnLimpiar: HTMLButtonElement = getEl<HTMLButtonElement>('btnLimpiar');
+const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>('modalLimpiar');
 const sheetsRoot: HTMLElement = getEl('sheets');
 
 // Si hojaId se indica, rellena los huecos de ESA hoja (y crea al final si
@@ -22,9 +21,6 @@ const sheetsRoot: HTMLElement = getEl('sheets');
 export function agregarArchivos(files: FileList | readonly File[] | null | undefined, hojaId: number | null = null): void {
   const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
   const validos = lista.filter((f) => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type) || f.name.toLowerCase().endsWith('.pdf'));
-  if (lista.length > 0 && validos.length === 0) {
-    showToast('Solo se aceptan imágenes (JPG, PNG, WEBP, BMP, GIF) o PDF. HEIC no soportado.');
-  }
   const nuevas: Comprobante[] = validos.map((f) => ({
     id: nextComprobanteId(),
     nombre: sanear(f.name),
@@ -61,20 +57,23 @@ export function agregarArchivos(files: FileList | readonly File[] | null | undef
   renderHojas();
   void procesarCola();
 
-  // Miniaturas en segundo plano: cada casilla se actualiza sola al estar lista.
-  for (const item of recienIngresados) {
-    if (!item.file || !/^image\//i.test(item.file.type)) continue; // PDF: sin miniatura
-    const file = item.file;
-    const id = item.id;
-    void Promise.try(async () => {
-      const url = await generarMiniatura(file);
-      if (!url) return;
-      if (!buscarSlot(id)) { URL.revokeObjectURL(url); return; }
-      item.thumbUrl = url;
-      const img = sheetsRoot.querySelector(`.cell[data-id="${id}"] img`);
-      if (img instanceof HTMLImageElement) img.src = url;
-    });
-  }
+  // Miniaturas en segundo plano, de 3 en 3: N createImageBitmap en paralelo
+  // saturan memoria en lotes grandes. Cada casilla se pinta sola al estar lista.
+  // ponytail: concurrencia fija 3; pool dinámico solo si 3 se queda corto.
+  const pintarMiniatura = async (item: Comprobante): Promise<void> => {
+    if (!item.file || !/^image\//i.test(item.file.type)) return; // PDF: sin miniatura
+    const url = await generarMiniatura(item.file);
+    if (!url) return;
+    if (!buscarSlot(item.id)) { URL.revokeObjectURL(url); return; }
+    item.thumbUrl = url;
+    const img = sheetsRoot.querySelector(`.cell[data-id="${item.id}"] img`);
+    if (img instanceof HTMLImageElement) img.src = url;
+  };
+  void (async () => {
+    for (let i = 0; i < recienIngresados.length; i += 3) {
+      await Promise.all(recienIngresados.slice(i, i + 3).map(pintarMiniatura));
+    }
+  })();
 }
 
 export function renderCodigo(): void {
@@ -87,9 +86,7 @@ export function renderCodigo(): void {
 }
 
 export function initSidebar(): void {
-  dropzone.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') fileInput.click();
-  });
+  // ponytail: label[for] nativo ya abre el diálogo con Enter/Espacio; sin keydown manual.
   fileInput.addEventListener('change', () => {
     agregarArchivos(fileInput.files);
     fileInput.value = '';
@@ -128,7 +125,10 @@ export function initSidebar(): void {
     guardar();
   });
 
-  btnLimpiar.addEventListener('click', () => {
+  // El botón Limpiar abre el dialog vía commandfor (cero JS); acá solo se
+  // ejecuta el vaciado si se confirmó. Esc/backdrop/Cancelar → returnValue ''.
+  modalLimpiar.addEventListener('close', () => {
+    if (modalLimpiar.returnValue !== 'ok') return;
     for (const h of state.hojas) for (const c of itemsDe(h)) {
       URL.revokeObjectURL(c.imgUrl);
       if (c.thumbUrl) URL.revokeObjectURL(c.thumbUrl);
@@ -136,6 +136,5 @@ export function initSidebar(): void {
     state.hojas = [crearHoja()];
     guardar();
     renderHojas();
-    showToast('Lote limpiado. Se conservan check y ajustes.');
   });
 }

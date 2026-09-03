@@ -60,7 +60,7 @@
           <div class="codigo-row">
             <label class="field-mini" for="numCodigo">N° dígitos</label>
             <input type="number" id="numCodigo" min="1" max="12" value="6" />
-            <input type="text" id="inputCodigo" inputmode="numeric" placeholder="Código" maxlength="12" spellcheck="false" autocorrect="off" autocomplete="off" />
+            <input type="text" id="inputCodigo" aria-label="Código de pedido" inputmode="numeric" placeholder="Código" maxlength="12" spellcheck="false" autocorrect="off" autocomplete="off" />
           </div>
           <p class="hint">Pie de página derecho en el Word. Si el check está activo, se exige el código completo al descargar.</p>
         </section>
@@ -76,7 +76,7 @@
         </section>
 
         <section class="panel panel-acciones">
-          <button class="btn btn-mini btn-danger" id="btnLimpiar">Limpiar</button>
+          <button class="btn btn-mini btn-danger" id="btnLimpiar" command="show-modal" commandfor="modalLimpiar">Limpiar</button>
           <button class="btn btn-primary btn-block" id="btnDescargar2">Descargar Word</button>
         </section>
       </aside>
@@ -121,7 +121,23 @@
     </div>
   </dialog>
 
-  <div class="toast" id="toast" role="status" hidden></div>
+  <!-- Modal Confirmar vaciado -->
+  <dialog class="modal modal-confirm" id="modalLimpiar" closedby="any" aria-labelledby="tituloLimpiar" aria-describedby="descLimpiar">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 id="tituloLimpiar"><span class="sello-peligro" aria-hidden="true">!</span> Vaciar lote</h2>
+        <button class="btn btn-icon" command="close" commandfor="modalLimpiar" aria-label="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="descLimpiar">Se quitarán todos los comprobantes. Esta acción no se puede deshacer.</p>
+        <p class="modal-nota">Se conservan el código de pedido y los ajustes.</p>
+      </div>
+      <form method="dialog" class="modal-foot">
+        <button class="btn btn-ghost" type="submit" value="cancel" autofocus>Cancelar</button>
+        <button class="btn btn-danger" type="submit" value="ok">Sí, vaciar</button>
+      </form>
+    </div>
+  </dialog>
 
   <script type="module" src="/src/main.ts"></script>
 </body>
