@@ -55,19 +55,36 @@ function pintarCelda(div: HTMLElement, item: Comprobante | null, slotIdx: number
   }
 
   div.classList.add(`cell-${item.estado}`);
-  const img = document.createElement('img');
-  img.src = item.thumbUrl ?? item.imgUrl; // blob interno de la app, no entrada del usuario
-  img.alt = sanear(item.nombre);
-  img.draggable = false;
-  img.loading = 'lazy';
-  img.decoding = 'async';
   const btn = document.createElement('button');
   btn.className = 'cell-remove';
   btn.dataset['accion'] = 'quitar';
   btn.title = 'Quitar';
   btn.setAttribute('aria-label', 'Quitar comprobante');
   btn.textContent = '×';
-  div.append(img, btn);
+  if (item.thumbUrl) {
+    const img = document.createElement('img');
+    img.src = item.thumbUrl; // solo el thumb: el full-res nunca se decodifica en la grilla
+    img.alt = sanear(item.nombre);
+    img.draggable = false;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    div.append(img, btn);
+  } else if (item.file && /^image\//i.test(item.file.type)) {
+    // Thumb aún en camino: esqueleto con el mismo hueco (cero decodificación).
+    const skel = document.createElement('div');
+    skel.className = 'cell-skel';
+    skel.setAttribute('aria-hidden', 'true');
+    div.append(skel, btn);
+  } else {
+    // PDF u otro sin miniatura: fallback al original.
+    const img = document.createElement('img');
+    img.src = item.imgUrl; // blob interno de la app, no entrada del usuario
+    img.alt = sanear(item.nombre);
+    img.draggable = false;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    div.append(img, btn);
+  }
   if (item.montoCents != null) {
     const badge = document.createElement('span');
     badge.className = 'cell-badge';
@@ -140,9 +157,10 @@ export function renderHojas(): void {
     });
     renderMonto();
   };
-  // ponytail: sin ViewTransition con reduced-motion; es solo un adorno.
+  // ponytail: sin ViewTransition con reduced-motion ni durante la carga
+  // inicial (los snapshots compiten con el drag/scroll); es solo un adorno.
   const reduceMovimiento = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-  if (!reduceMovimiento && document.startViewTransition) {
+  if (!reduceMovimiento && !state.colaEnProceso && document.startViewTransition) {
     const t = document.startViewTransition(render);
     t.ready?.catch(() => {});
     t.finished?.catch(() => {});
@@ -196,6 +214,15 @@ export function quitarComprobante(id: number): void {
 
 function cellById(id: number): HTMLElement | null {
   return sheetsEl.querySelector<HTMLElement>(`.cell[data-id="${id}"]`);
+}
+
+// Repinta UNA celda (llegó su miniatura) sin reconstruir la grilla.
+export function actualizarMiniatura(id: number): void {
+  const cell = cellById(id);
+  if (!cell) return;
+  const slot = buscarSlot(id);
+  if (!slot) return;
+  pintarCelda(cell, slot.hoja.slots[slot.idx] ?? null, slot.idx, slot.hoja.id);
 }
 
 /* ---------- Drag entre casillas (Pointer Events: mover/swap) ---------- */

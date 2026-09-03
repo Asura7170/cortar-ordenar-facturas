@@ -6,7 +6,7 @@ import { itemsDe } from '../ui/monto';
 import { renderHojas } from '../ui/sheets';
 import { sanear, sleep } from '../utils';
 
-const THUMB_MAX = 1280; // ≈ 2× la celda más grande (pantallas 2x)
+const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
 
 /** Miniatura WebP; null si es PDF o no decodificable (se muestra el original). */
 export async function generarMiniatura(file: File): Promise<string | null> {
@@ -42,8 +42,8 @@ export async function procesarCola(): Promise<void> {
   for (const hoja of state.hojas) {
     for (const c of itemsDe(hoja)) {
       if (c.estado === 'pendiente') {
+        // Sin render intermedio: el esqueleto ya comunica la espera (2N+1 → N+1 renders).
         c.estado = 'procesando';
-        renderHojas();
         // Placeholder: aquí irá el pipeline OpenCV→OCR→LLM.
         await sleep(900);
         // Valores de ejemplo para validar UI/UX (diseño primero, pipeline después).

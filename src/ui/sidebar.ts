@@ -3,7 +3,7 @@ import { crearHoja, guardar, hojaPorId, nextComprobanteId, state } from '../stat
 import type { Comprobante } from '../types';
 import { cuentaHoja, itemsDe } from './monto';
 import { layoutDe } from './layout';
-import { renderHojas } from './sheets';
+import { actualizarMiniatura, renderHojas } from './sheets';
 import { generarMiniatura, procesarCola } from '../pipeline/queue';
 import { buscarSlot } from '../state';
 import { getEl, sanear } from '../utils';
@@ -14,7 +14,6 @@ const chkCodigo: HTMLInputElement = getEl<HTMLInputElement>('chkCodigo');
 const numCodigo: HTMLInputElement = getEl<HTMLInputElement>('numCodigo');
 const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>('inputCodigo');
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>('modalLimpiar');
-const sheetsRoot: HTMLElement = getEl('sheets');
 
 // Si hojaId se indica, rellena los huecos de ESA hoja (y crea al final si
 // sobran); si no, usa la última hoja con hueco.
@@ -58,7 +57,8 @@ export function agregarArchivos(files: FileList | readonly File[] | null | undef
   void procesarCola();
 
   // Miniaturas en segundo plano, de 3 en 3: N createImageBitmap en paralelo
-  // saturan memoria en lotes grandes. Cada casilla se pinta sola al estar lista.
+  // saturan memoria en lotes grandes. Cada casilla se repinta sola al estar
+  // lista (esqueleto → thumb: una sola decodificación por foto).
   // ponytail: concurrencia fija 3; pool dinámico solo si 3 se queda corto.
   const pintarMiniatura = async (item: Comprobante): Promise<void> => {
     if (!item.file || !/^image\//i.test(item.file.type)) return; // PDF: sin miniatura
@@ -66,8 +66,7 @@ export function agregarArchivos(files: FileList | readonly File[] | null | undef
     if (!url) return;
     if (!buscarSlot(item.id)) { URL.revokeObjectURL(url); return; }
     item.thumbUrl = url;
-    const img = sheetsRoot.querySelector(`.cell[data-id="${item.id}"] img`);
-    if (img instanceof HTMLImageElement) img.src = url;
+    actualizarMiniatura(item.id);
   };
   void (async () => {
     for (let i = 0; i < recienIngresados.length; i += 3) {
