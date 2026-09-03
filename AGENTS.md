@@ -7,7 +7,8 @@ Frontend-only, sin backend. TypeScript + Vite. Solo Chrome/Chromium en desktop.
 ```bash
 pnpm install    # instalar
 pnpm dev        # dev server, abre Chrome solo (server.open)
-pnpm typecheck  # tsc --noEmit — verificación principal (no hay tests/lint/CI)
+pnpm test       # vitest run (103 tests P0+P1, ~2s)
+pnpm typecheck  # tsc --noEmit
 pnpm build      # build prod → dist/
 pnpm preview    # previsualizar el build
 ```
