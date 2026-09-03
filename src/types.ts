@@ -5,7 +5,7 @@
    ============================================================ */
 
 /** Monedas soportadas (ver MONEDAS en state). */
-export type Moneda = 'USD' | 'ARS' | 'EUR';
+export type Moneda = 'USD' | 'ARS' | 'EUR' | 'BOB';
 
 /** Estado del pipeline por comprobante. `error` reservado para el pipeline real. */
 export type EstadoComprobante = 'pendiente' | 'procesando' | 'ok' | 'error';

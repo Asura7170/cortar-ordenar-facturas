@@ -8,6 +8,7 @@ export const MONEDAS: Record<Moneda, { simbolo: string }> = {
   USD: { simbolo: 'US$' },
   ARS: { simbolo: 'AR$' },
   EUR: { simbolo: '€' },
+  BOB: { simbolo: 'Bs' },
 };
 
 export const state: EstadoApp = {
@@ -44,7 +45,7 @@ export function guardar(): void {
 }
 
 export function isMoneda(v: unknown): v is Moneda {
-  return v === 'USD' || v === 'ARS' || v === 'EUR';
+  return v === 'USD' || v === 'ARS' || v === 'EUR' || v === 'BOB';
 }
 
 function isPersistedState(v: unknown): v is PersistedState {
