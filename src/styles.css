@@ -478,7 +478,8 @@ input::placeholder { color: var(--input-placeholder); }
 .cell {
   position: relative;
   display: flex; align-items: center; justify-content: center;
-  min-height: 0;
+  min-width: 0; min-height: 0;
+  overflow: hidden;
   user-select: none; /* nada de texto seleccionable en la casilla: ni el monto ni el × */
 }
 .cell.cell-ocr, .cell.cell-ocr * { user-select: text; } /* en modo OCR el texto sí se puede seleccionar */
@@ -490,10 +491,9 @@ input::placeholder { color: var(--input-placeholder); }
   font-size: 12px;
 }
 .cell img {
-  max-width: 100%;
-  max-height: 100%;
-  aspect-ratio: 4 / 3; /* reserva el hueco antes de que llegue la miniatura: sin CLS */
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* entera y lo más grande posible; bandas solo si difiere el ratio */
   border-radius: 2px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   pointer-events: none; /* el pointerdown cae en la celda, no en la imagen */
@@ -505,9 +505,7 @@ input::placeholder { color: var(--input-placeholder); }
 /* Esqueleto mientras llega el thumb: mismo hueco que la foto, cero decodificación. */
 .cell-skel {
   width: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  aspect-ratio: 4 / 3;
+  height: 100%;
   border-radius: 2px;
   background: linear-gradient(100deg, var(--papel-sombra) 30%, var(--papel-brillo) 50%, var(--papel-sombra) 70%);
   background-size: 200% 100%;
