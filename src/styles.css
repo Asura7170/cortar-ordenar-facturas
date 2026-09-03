@@ -29,7 +29,7 @@
     color-mix(in srgb, #fff 8%, transparent)
   );
   --texto-panel: light-dark(#2c3a28, #f0ead9);      /* texto sobre panel */
-  --texto-panel-suave: light-dark(#6c7a66, #c9c0a8);
+  --texto-panel-suave: light-dark(#57644f, #c9c0a8); /* claro ≈4.8:1 sobre #e3e1d4 (AA) */
 
   /* Tema */
   --input-bg: light-dark(#fffdf6, #241f18);
@@ -344,7 +344,8 @@ input::placeholder { color: var(--input-placeholder); }
   margin-left: 6px;
 }
 .ocr-estado.on { color: light-dark(var(--verde-tinta), limegreen); }
-.ocr-estado:not(.on) { color: light-dark(var(--sello), chocolate); }
+/* Contraste AA: tan sobre panel oscuro ≈ 5.3:1 (chocolate daba 2.85). */
+.ocr-estado:not(.on) { color: light-dark(var(--sello), tan); }
 
 .panel-acciones { display: flex; flex-direction: column; gap: 8px; }
 

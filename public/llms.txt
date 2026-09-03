@@ -1,0 +1,7 @@
+# Cortar y Ordenar Facturas
+
+Herramienta local (Chrome desktop) para recortar, ordenar y extraer totales de facturas en lotes y exportarlos a Word.
+
+## Enlaces
+
+- [Aplicación](/)
