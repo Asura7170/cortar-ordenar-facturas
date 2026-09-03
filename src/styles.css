@@ -264,6 +264,7 @@ input, select { font-family: inherit; }
 .switch input:checked + .switch-track { background: var(--verde-tinta); }
 .switch input:checked + .switch-track::after { transform: translateX(20px); }
 .switch input:focus-visible + .switch-track { box-shadow: var(--anillo); }
+.switch, #cfgMoneda { cursor: pointer; }
 
 .codigo-row { display: flex; align-items: center; gap: 8px; }
 .field-mini { font-size: 11px; color: var(--texto-panel-suave); white-space: nowrap; }
@@ -481,7 +482,7 @@ input::placeholder { color: var(--input-placeholder); }
   user-select: none; /* nada de texto seleccionable en la casilla: ni el monto ni el × */
 }
 .cell.cell-ocr, .cell.cell-ocr * { user-select: text; } /* en modo OCR el texto sí se puede seleccionar */
-.cell:not(.empty) { cursor: grab; }
+.cell:not(.empty):not(.cell-ocr) { cursor: grab; } /* en OCR no hay drag: flecha normal */
 .cell.empty {
   border: 1px dashed var(--renglon-fuerte);
   border-radius: 4px;
@@ -587,6 +588,7 @@ body.is-dragging, body.is-dragging .cell:not(.empty) { cursor: grabbing; }
   word-break: break-word;
   scrollbar-width: thin;
   scrollbar-color: var(--renglon-fuerte) transparent;
+  cursor: text;
 }
 .cell.cell-ocr .cell-remove {
   display: block;
