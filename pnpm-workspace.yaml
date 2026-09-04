@@ -5,6 +5,7 @@ catalog:
   vite-plus: 0.3.0
 overrides:
   vite@*: "catalog:"
+  vitest: "4.1.11"
 peerDependencyRules:
   allowAny:
     - vite

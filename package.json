@@ -17,7 +17,7 @@
     "typescript": "7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:",
-    "vitest": "^4.1.11"
+    "vitest": "4.1.11"
   },
   "devEngines": {
     "packageManager": {
@@ -25,5 +25,8 @@
       "version": "^11.0.0",
       "onFail": "download"
     }
+  },
+  "engines": {
+    "node": "^20.19.0 || ^22.18.0 || >=24.11.0"
   }
 }
