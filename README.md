@@ -9,9 +9,11 @@ App frontend-only para recortar comprobantes/facturas (OpenCV.js), extraer texto
 ## Comandos
 
 ```bash
-npm install        # instalar dependencias (Vite, TypeScript, docx, etc.)
-npm run dev --open # servidor de desarrollo + abre Chrome automáticamente
-npm run build      # build de producción → dist/
+pnpm install    # instalar dependencias (Vite, TypeScript)
+pnpm dev        # servidor de desarrollo + abre Chrome automáticamente
+pnpm build      # build de producción → dist/
+pnpm preview    # previsualizar el build
+pnpm typecheck  # verificación de tipos sin emitir
 ```
 
 ## Spec

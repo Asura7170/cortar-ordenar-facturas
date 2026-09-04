@@ -7,3 +7,12 @@ dist/
 # Configuración local de herramientas
 .commandcode/
 .impeccable/
+
+# Carpetas de herramientas
+.firecrawl/
+.playwright-mcp/
+.vite/
+image-test/
+
+# Referencia local generada (cheatsheets)
+docs/

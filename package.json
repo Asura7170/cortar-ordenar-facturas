@@ -1,0 +1,21 @@
+{
+  "name": "cortar-ordenar-facturas",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "vite --open",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "oxlint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1",
+    "oxlint": "^1.81.0",
+    "typescript": "7.0.2",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.11"
+  }
+}
