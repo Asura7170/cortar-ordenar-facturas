@@ -115,7 +115,7 @@ export function initSidebar(): void {
     renderCodigo();
   });
   numCodigo.addEventListener('input', () => {
-    state.codigoLongitud = Math.max(1, Math.min(12, Number(numCodigo.value) || 6));
+    state.codigoLongitud = Math.max(1, Math.min(12, Math.floor(Number(numCodigo.value)) || 6));
     if (chkCodigo.checked) guardarCodigo();
     renderCodigo();
   });

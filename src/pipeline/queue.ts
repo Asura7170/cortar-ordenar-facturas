@@ -1,8 +1,8 @@
 /* Cola secuencial de procesamiento — MOCK de UI.
    El pipeline real (OpenCV crop → PaddleOCR → LLM extract) vivirá en
    crop.ts/ocr.ts/pdf.ts/extract.ts; la firma procesarCola() ya es la final. */
-import { state } from '../state';
-import { itemsDe } from '../ui/monto';
+import { buscarSlot, state } from '../state';
+import { aplanar } from '../ui/monto';
 import { renderHojas } from '../ui/sheets';
 import { sanear, sleep } from '../utils';
 
@@ -39,20 +39,24 @@ export async function generarMiniatura(file: File): Promise<string | null> {
 export async function procesarCola(): Promise<void> {
   if (state.colaEnProceso) return;
   state.colaEnProceso = true;
-  for (const hoja of state.hojas) {
-    for (const c of itemsDe(hoja)) {
-      if (c.estado === 'pendiente') {
-        // Sin render intermedio: el esqueleto ya comunica la espera (2N+1 → N+1 renders).
-        c.estado = 'procesando';
-        // Placeholder: aquí irá el pipeline OpenCV→OCR→LLM.
-        await sleep(900);
-        // Valores de ejemplo para validar UI/UX (diseño primero, pipeline después).
-        c.textoOcr = sanear(`FACTURA ${c.nombre}\nFecha: 12/08/2026\nTOTAL: US$ 1,234.56`);
-        c.montoCents = 123456;
-        c.estado = 'ok';
-        renderHojas();
-      }
+  try {
+    // ponytail: drenado por pendiente, no snapshot; token generación si el MOCK se vuelve concurrente.
+    for (;;) {
+      // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
+      const sig = aplanar().find((c) => c.estado === 'pendiente');
+      if (!sig) break;
+      // Sin render intermedio: el esqueleto ya comunica la espera (2N+1 → N+1 renders).
+      sig.estado = 'procesando';
+      // Placeholder: aquí irá el pipeline OpenCV→OCR→LLM.
+      await sleep(900);
+      if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
+      // Valores de ejemplo para validar UI/UX (diseño primero, pipeline después).
+      sig.textoOcr = sanear(`FACTURA ${sig.nombre}\nFecha: 12/08/2026\nTOTAL: US$ 1,234.56`);
+      sig.montoCents = 123456;
+      sig.estado = 'ok';
+      renderHojas();
     }
+  } finally {
+    state.colaEnProceso = false;
   }
-  state.colaEnProceso = false;
 }

@@ -125,6 +125,16 @@ describe('guardar/cargar por ventana', () => {
     expect(state.moneda).toBe('ARS');
   });
 
+  it('blob legacy solo-código (sin moneda): restaura el código y conserva la moneda', () => {
+    state.moneda = 'EUR';
+    localStorage.setItem(LS_KEY, JSON.stringify({ codigoActivo: true, codigoLongitud: 8, codigoValor: '12345678' }));
+    cargar();
+    expect(state.codigoActivo).toBe(true);
+    expect(state.codigoLongitud).toBe(8);
+    expect(state.codigoValor).toBe('12345678');
+    expect(state.moneda).toBe('EUR');
+  });
+
   it('JSON corrupto: no tira y conserva el estado', () => {
     state.moneda = 'ARS';
     localStorage.setItem(LS_KEY, 'no-json{');

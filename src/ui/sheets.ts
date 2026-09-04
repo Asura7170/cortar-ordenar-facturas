@@ -228,7 +228,7 @@ export function actualizarMiniatura(id: number): void {
 
 interface DragState {
   id: number;
-  ghost: HTMLImageElement | null;
+  ghost: HTMLElement | null;
   gw: number;
   gh: number;
   startX: number;
@@ -240,12 +240,14 @@ interface DragState {
 
 let pointerDrag: DragState | null = null;
 let scrollRaf: number | null = null;
+let scrollDir = 0; // dirección vigente del loop; autoScroll la actualiza
 let moveRaf: number | null = null;
 let celdaResaltada: HTMLElement | null = null;
 let rectsCache: Map<Element, DOMRect> | null = null;
 let renderPendiente = false;
 
 function detenerScroll(): void {
+  scrollDir = 0;
   if (scrollRaf !== null) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
 }
 
@@ -268,14 +270,15 @@ function autoScroll(x: number, y: number): void {
   if (!canvasEl) return;
   const r = canvasEl.getBoundingClientRect();
   const margen = 70, vel = 14;
-  const dir = y < r.top + margen ? -vel : y > r.bottom - margen ? vel : 0;
-  if (dir && scrollRaf === null) {
+  scrollDir = y < r.top + margen ? -vel : y > r.bottom - margen ? vel : 0;
+  if (scrollDir && scrollRaf === null) {
     const paso = (): void => {
-      canvasEl.scrollBy({ top: dir });
-      if (dir && scrollRaf !== null) scrollRaf = requestAnimationFrame(paso);
+      if (!scrollDir) { detenerScroll(); return; }
+      canvasEl.scrollBy({ top: scrollDir });
+      if (scrollRaf !== null) scrollRaf = requestAnimationFrame(paso);
     };
     scrollRaf = requestAnimationFrame(paso);
-  } else if (!dir) {
+  } else if (!scrollDir) {
     detenerScroll();
   }
 }
@@ -316,11 +319,14 @@ function celdaBajoPunto(x: number, y: number, excluir: Element | null): HTMLElem
 function iniciarGhost(d: DragState, x: number, y: number): void {
   if (d.ghost) return;
   const celdaOrigen = cellById(d.id);
-  const img = celdaOrigen?.querySelector('img');
-  if (!img || !celdaOrigen) return;
-  const r = img.getBoundingClientRect();
-  const base = r.width > 2 ? r : celdaOrigen.getBoundingClientRect();
-  const ghost = img.cloneNode(true) as HTMLImageElement;
+  if (!celdaOrigen) return;
+  // Thumb en camino (esqueleto sin <img>): fantasma desde la caja para no
+  // dejar el drag muerto en lotes grandes.
+  const img = celdaOrigen.querySelector('img');
+  const fuente = img ?? celdaOrigen;
+  const base = fuente.getBoundingClientRect();
+  if (base.width < 2) return;
+  const ghost = fuente.cloneNode(img !== null) as HTMLElement;
   ghost.className = 'drag-ghost';
   ghost.style.width = `${base.width}px`;
   ghost.style.height = `${base.height}px`;
@@ -507,7 +513,8 @@ export function initSheets(cb: SheetsCallbacks): void {
         const item = aplanar().find((c) => c.id === id);
         if (!item) return;
         if (!item.textoOcr) return;
-        void Promise.try(() => navigator.clipboard.writeText(item.textoOcr));
+        void Promise.try(() => navigator.clipboard.writeText(item.textoOcr))
+          .catch(() => { btn.title = 'Copiar falló (sin permiso del portapapeles)'; });
         return;
       }
       case 'quitar':

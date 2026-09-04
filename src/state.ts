@@ -87,12 +87,17 @@ export function restablecerAjustes(): void {
   guardarAjustes();
 }
 
-function isPersistedState(v: unknown): v is PersistedState & { moneda: Moneda } {
+function isPersistedState(v: unknown): v is PersistedState {
   if (typeof v !== 'object' || v === null) return false;
   const p = v as Record<string, unknown>;
-  // Solo moneda es obligatoria: cada ventana guarda lo suyo y el LS vive
-  // lo más vacío posible (p. ej. sin código tras desmarcar el switch).
-  return isMoneda(p['moneda']);
+  // Cada ventana guarda lo suyo: moneda es opcional (blobs legacy solo-código
+  // de guardarCodigo() sin moneda). Si viene, debe ser válida.
+  if ('moneda' in p && !isMoneda(p['moneda'])) return false;
+  return typeof p['codigoActivo'] === 'boolean'
+    || typeof p['codigoLongitud'] === 'number'
+    || typeof p['codigoValor'] === 'string'
+    || isMoneda(p['moneda'])
+    || typeof p['configIA'] === 'object';
 }
 
 export function cargar(): void {
@@ -106,7 +111,7 @@ export function cargar(): void {
     const lon = r['codigoLongitud'];
     state.codigoLongitud = typeof lon === 'number' ? Math.max(1, Math.min(12, Math.floor(lon) || 6)) : 6;
     state.codigoValor = typeof r['codigoValor'] === 'string' ? r['codigoValor'] : '';
-    state.moneda = p.moneda;
+    if (isMoneda(r['moneda'])) state.moneda = r['moneda']; // ausente en blobs legacy: se conserva
     const ia = (p as { configIA?: unknown }).configIA;
     if (typeof ia === 'object' && ia !== null) {
       const c = ia as Record<string, unknown>;

@@ -13,7 +13,7 @@ pnpm build      # build prod → dist/
 pnpm preview    # previsualizar el build
 ```
 
-No hay tests, linter ni CI. Verificar con `pnpm typecheck` (y `pnpm build` si toca config de Vite).
+No hay linter ni CI. Verificar con `pnpm test` y `pnpm typecheck` (y `pnpm build` si toca config de Vite).
 
 ## Arquitectura
 
