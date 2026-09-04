@@ -513,7 +513,8 @@ export function initSheets(cb: SheetsCallbacks): void {
         const item = aplanar().find((c) => c.id === id);
         if (!item) return;
         if (!item.textoOcr) return;
-        void Promise.try(() => navigator.clipboard.writeText(item.textoOcr))
+        // Sin Promise.try (ausente en Node 22 del CI): writeText ya devuelve promesa.
+        void navigator.clipboard.writeText(item.textoOcr)
           .catch(() => { btn.title = 'Copiar falló (sin permiso del portapapeles)'; });
         return;
       }
