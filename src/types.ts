@@ -41,9 +41,9 @@ export type Cents = number;
 export interface Comprobante {
   readonly id: number;
   readonly nombre: string;
-  /** Blob URL de la imagen original (revocar con URL.revokeObjectURL al quitar). */
+  /** Blob URL de la imagen original (revocar con URL.revokeObjectURL al quitar; PDF: render WebP de la página, no el PDF entero). */
   readonly imgUrl: string;
-  /** Miniatura WebP o null (→ esqueleto) hasta que se genere (PDF: portada o null). */
+  /** Miniatura WebP o null (→ esqueleto) hasta que se genere (PDF: mismo blob que imgUrl). */
   thumbUrl: string | null;
   /** Texto OCR (mock de ejemplo hasta integrar PaddleOCR). */
   textoOcr: string;

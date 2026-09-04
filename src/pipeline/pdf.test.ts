@@ -6,8 +6,10 @@ import {
   admitirPdf,
   admiteTamanoPdf,
   esPdf,
-  generarMiniaturaPdf,
+  esPaginaBlanca,
+  expandirPdf,
 } from "./pdf";
+import type { DocumentoPdf } from "./pdf";
 
 function pdfDe(nombre: string, type: string, size: number): File {
   const f = new File(["x"], nombre, { type });
@@ -95,14 +97,115 @@ describe("admitirPdf", () => {
   });
 });
 
-describe("generarMiniaturaPdf", () => {
-  it("pasado de peso: null sin abrir", async () => {
-    expect(
-      await generarMiniaturaPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1)),
-    ).toBeNull();
+describe("esPaginaBlanca", () => {
+  // Lienzo falso con píxeles dados (jsdom no da contexto 2d real).
+  function lienzoFalso(pixeles: number[]): HTMLCanvasElement {
+    const datos = new Uint8ClampedArray(pixeles);
+    return {
+      width: 2,
+      height: 2,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+      toBlob: (cb: (b: Blob | null) => void): void => {
+        cb(new Blob(["x"], { type: "image/webp" }));
+      },
+    } as unknown as HTMLCanvasElement;
+  }
+  const px = (n: number, r: number, g: number, b: number, a = 255): number[] =>
+    Array.from({ length: n }, () => [r, g, b, a]).flat();
+
+  it("todo blanco → vacía", () => {
+    expect(esPaginaBlanca(lienzoFalso(px(4, 255, 255, 255)))).toBe(true);
   });
 
-  it("bytes basura: null sin lanzar (jsdom no rasteriza)", async () => {
-    await expect(generarMiniaturaPdf(pdfDe("b.pdf", "application/pdf", 100))).resolves.toBeNull();
+  it("transparente cuenta como blanco (PDF sin fondo)", () => {
+    expect(esPaginaBlanca(lienzoFalso(px(4, 0, 0, 0, 0)))).toBe(true);
+  });
+
+  it("un píxel de tinta → no vacía", () => {
+    expect(esPaginaBlanca(lienzoFalso([...px(1, 0, 0, 0), ...px(3, 255, 255, 255)]))).toBe(false);
+  });
+
+  it("canal justo en 250 no es blanco (umbral exclusivo)", () => {
+    expect(esPaginaBlanca(lienzoFalso(px(4, 250, 250, 250)))).toBe(false);
+  });
+});
+
+describe("expandirPdf", () => {
+  function abrirFalso(opc: { total?: number; blancas?: number[]; rotas?: number[] } = {}): {
+    abrir: (f: File) => Promise<DocumentoPdf>;
+    fueCerrado: () => boolean;
+  } {
+    let cerrado = false;
+    const tin = (blanca: boolean): number[] => (blanca ? [255, 255, 255, 255] : [0, 0, 0, 255]);
+    const abrir = async (): Promise<DocumentoPdf> => ({
+      total: opc.total ?? 3,
+      renderizar: async (i: number): Promise<HTMLCanvasElement | null> => {
+        if (opc.rotas?.includes(i)) throw new Error("rota");
+        const t = tin(opc.blancas?.includes(i) ?? false);
+        const datos = new Uint8ClampedArray([
+          ...t,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+          255,
+        ]);
+        return {
+          width: 2,
+          height: 2,
+          getContext: (): unknown => ({
+            getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+          }),
+          toBlob: (cb: (b: Blob | null) => void): void => {
+            cb(new Blob(["x"], { type: "image/webp" }));
+          },
+        } as unknown as HTMLCanvasElement;
+      },
+      cerrar: async (): Promise<void> => {
+        cerrado = true;
+      },
+    });
+    return { abrir, fueCerrado: (): boolean => cerrado };
+  }
+
+  it("3 páginas con 1 blanca → 2 útiles en orden, y cierra", async () => {
+    const { abrir, fueCerrado } = abrirFalso({ blancas: [2] });
+    const pags = await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir);
+    expect(pags.map((p) => [p.indice, p.total])).toEqual([
+      [1, 3],
+      [3, 3],
+    ]);
+    expect(pags.every((p) => p.blob instanceof Blob)).toBe(true);
+    expect(fueCerrado()).toBe(true);
+  });
+
+  it("página rota no tumba a las hermanas", async () => {
+    const { abrir } = abrirFalso({ rotas: [2] });
+    const pags = await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir);
+    expect(pags.map((p) => p.indice)).toEqual([1, 3]);
+  });
+
+  it("peso excedido → [] sin abrir", async () => {
+    const { abrir } = abrirFalso();
+    const espia = vi.fn(abrir);
+    expect(await expandirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), espia)).toEqual(
+      [],
+    );
+    expect(espia).not.toHaveBeenCalled();
+  });
+
+  it("apertura rota → [] sin lanzar", async () => {
+    const abrir = async (): Promise<DocumentoPdf> => {
+      throw new Error("ilegible");
+    };
+    await expect(expandirPdf(pdfDe("r.pdf", "application/pdf", 100), abrir)).resolves.toEqual([]);
   });
 });

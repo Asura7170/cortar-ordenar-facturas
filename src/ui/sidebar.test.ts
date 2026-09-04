@@ -1,18 +1,22 @@
 /* Tests P1: sidebar — entrada de archivos, código de pedido y limpiar (DOM aislado). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture, el, eventoDrop, eventoDragover, eventoPaste } from "../test/fixture";
+import type { PaginaPdf } from "../pipeline/pdf";
 
 // El conteo real abre el PDF con pdf.js: stub fijo (cada test lo ajusta).
 let paginasSimuladas = 5;
-// El raster real necesita Chrome: stub fijo (cada test lo ajusta).
-let thumbSimulada: string | null = null;
-vi.mock("../pipeline/queue", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../pipeline/queue")>();
-  return { ...real, generarMiniatura: async (): Promise<string | null> => thumbSimulada };
-});
+// El raster real necesita Chrome: expansión stub (cada test la ajusta).
+function paginaSimulada(indice: number, total: number): PaginaPdf {
+  return { indice, total, blob: new Blob(["x"], { type: "image/webp" }) };
+}
+let expansionSimulada: PaginaPdf[] = [paginaSimulada(1, 1)];
 vi.mock("../pipeline/pdf", async (importOriginal) => {
   const real = await importOriginal<typeof import("../pipeline/pdf")>();
-  return { ...real, contarPaginasPdf: async (): Promise<number> => paginasSimuladas };
+  return {
+    ...real,
+    contarPaginasPdf: async (): Promise<number> => paginasSimuladas,
+    expandirPdf: async (): Promise<PaginaPdf[]> => expansionSimulada,
+  };
 });
 
 montarFixture();
@@ -34,7 +38,7 @@ beforeEach(() => {
   // La cola MOCK usa sleep(900ms): timers falsos para que nunca avance en tests.
   vi.useFakeTimers();
   paginasSimuladas = 5;
-  thumbSimulada = null;
+  expansionSimulada = [paginaSimulada(1, 1)];
 });
 
 afterEach(() => {
@@ -56,7 +60,7 @@ describe("agregarArchivos", () => {
       archivo("c.PDF", "application/pdf"),
     ]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["a.png", "c.PDF", null, null]);
+    expect(nombres).toEqual(["a.png", "c p.1/1", null, null]);
   });
 
   it("acepta pdf por extensión aunque el type sea genérico", async () => {
@@ -174,7 +178,7 @@ describe("gate PDF (tamaño + páginas)", () => {
       archivo("vale.pdf", "application/pdf"),
     ]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["ok.png", "vale.pdf", null, null]);
+    expect(nombres).toEqual(["ok.png", "vale p.1/1", null, null]);
     expect(aviso.textContent).toContain("gordo.pdf");
   });
 
@@ -193,22 +197,23 @@ describe("gate PDF (tamaño + páginas)", () => {
     expect(m?.innerHTML).toBe("pesa más de 5 MB"); // sin marcado inyectado
   });
 
-  it("pdf admitido recibe miniatura cuando el raster la genera", async () => {
+  it("pdf de 3 páginas (1 blanca) → 2 comprobantes p.1/3 y p.3/3 con thumb", async () => {
     aviso.textContent = "";
-    thumbSimulada = "blob:thumb-pdf";
-    await agregarArchivos([archivo("p.pdf", "application/pdf")]);
-    await vi.waitFor(() => {
-      expect(state.hojas[0]?.slots[0]?.thumbUrl).toBe("blob:thumb-pdf");
-    });
+    expansionSimulada = [paginaSimulada(1, 3), paginaSimulada(3, 3)];
+    await agregarArchivos([archivo("fac.pdf", "application/pdf")]);
+    const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
+    expect(nombres).toEqual(["fac p.1/3", "fac p.3/3", null, null]);
+    const thumbs = state.hojas.flatMap((h) => h.slots.map((c) => c?.thumbUrl ?? null));
+    expect(thumbs.slice(0, 2).every((t) => t?.startsWith("blob:mock-") ?? false)).toBe(true);
     expect(aviso.textContent).toBe("");
   });
 
-  it("raster sin miniatura: el pdf entra igual (fallback actual)", async () => {
-    thumbSimulada = null;
-    await agregarArchivos([archivo("p.pdf", "application/pdf")]);
-    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(state.hojas[0]?.slots[0]?.thumbUrl).toBeNull();
+  it("pdf todo en blanco → aviso sin comprobante", async () => {
+    aviso.textContent = "";
+    expansionSimulada = [];
+    await agregarArchivos([archivo("vacio.pdf", "application/pdf")]);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("no se pudo leer");
   });
 });
 

@@ -12,8 +12,8 @@ import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
 import { actualizarMiniatura, renderHojas } from "./sheets";
 import { generarMiniatura, procesarCola } from "../pipeline/queue";
-import { admitirPdf, contarPaginasPdf, esPdf } from "../pipeline/pdf";
-import type { MotivoRechazo } from "../pipeline/pdf";
+import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
+import type { MotivoRechazo, PaginaPdf } from "../pipeline/pdf";
 import { buscarSlot } from "../state";
 import { getEl, sanear } from "../utils";
 
@@ -67,7 +67,6 @@ export async function agregarArchivos(
 ): Promise<void> {
   const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
   const esImagen = (f: File): boolean => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type);
-  const imagenes: File[] = lista.filter(esImagen);
   const pdfs: File[] = lista.filter((f) => !esImagen(f) && esPdf(f));
   const avisos: AvisoRechazo[] = lista
     .filter((f) => !esImagen(f) && !esPdf(f))
@@ -81,22 +80,52 @@ export async function agregarArchivos(
     if (v?.admite === true) pdfOk.add(f);
     else avisos.push({ archivo: sanear(f.name), motivo: textoMotivo(v?.motivo ?? "ilegible") });
   });
+  // Fan-out PDF: cada página no-blanca = un comprobante "base p.i/N" (mismo
+  // blob para img+thumb; un render por página). Blancas en silencio; si no
+  // queda ninguna útil, aviso "no se pudo leer".
+  const expansiones: PaginaPdf[][] = await Promise.all(
+    pdfs.map((f) => (pdfOk.has(f) ? expandirPdf(f) : Promise.resolve([]))),
+  );
+  const nuevas: Comprobante[] = [];
+  for (const f of lista) {
+    if (esImagen(f)) {
+      nuevas.push({
+        id: nextComprobanteId(),
+        nombre: sanear(f.name),
+        file: f,
+        imgUrl: URL.createObjectURL(f),
+        thumbUrl: null,
+        textoOcr: "",
+        montoCents: null,
+        moneda: "USD",
+        estado: "pendiente",
+        posicion: 0,
+      });
+      continue;
+    }
+    if (!pdfOk.has(f)) continue;
+    const pags = expansiones[pdfs.indexOf(f)] ?? [];
+    if (pags.length === 0) {
+      avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+      continue;
+    }
+    const base = sanear(f.name).replace(/\.pdf$/i, "");
+    for (const p of pags) {
+      const url = URL.createObjectURL(p.blob);
+      nuevas.push({
+        id: nextComprobanteId(),
+        nombre: `${base} p.${p.indice}/${p.total}`,
+        imgUrl: url,
+        thumbUrl: url,
+        textoOcr: "",
+        montoCents: null,
+        moneda: "USD",
+        estado: "pendiente",
+        posicion: 0,
+      });
+    }
+  }
   if (avisos.length > 0) avisar(avisos);
-  const admitidos = new Set<File>([...imagenes, ...pdfOk]);
-  const nuevas: Comprobante[] = lista
-    .filter((f) => admitidos.has(f))
-    .map((f) => ({
-      id: nextComprobanteId(),
-      nombre: sanear(f.name),
-      file: f,
-      imgUrl: URL.createObjectURL(f),
-      thumbUrl: null,
-      textoOcr: "",
-      montoCents: null,
-      moneda: "USD",
-      estado: "pendiente",
-      posicion: 0,
-    }));
   if (nuevas.length === 0) return;
   const recienIngresados = [...nuevas]; // llenar() vacía `nuevas` con shift()
 

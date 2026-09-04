@@ -36,8 +36,10 @@ export type ContadorPaginas = (f: File) => Promise<number>;
     ilegible o cifrado (no captura: clasifica admitirPdf). */
 export async function contarPaginasPdf(f: File): Promise<number> {
   const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
-  const datos: ArrayBuffer = await f.arrayBuffer();
+  // ponytail: respeta workerSrc ya configurado (tests fijan file:// local).
+  pdfjs.GlobalWorkerOptions.workerSrc ||= workerSrc;
+  // Vista propia (no copia en Chrome): blinda Buffer/vistas raras de arrayBuffer().
+  const datos: Uint8Array = new Uint8Array(await f.arrayBuffer());
   const tarea = pdfjs.getDocument({ data: datos });
   const doc = await tarea.promise;
   try {
@@ -65,25 +67,34 @@ export async function admitirPdf(f: File, contar: ContadorPaginas): Promise<Vere
   return paginas <= PDF_MAX_PAGINAS ? { admite: true } : { admite: false, motivo: "paginas" };
 }
 
-/** Ancho fijo de la miniatura (≈2× la celda u4x2: nítida en 1x y 2x). */
+/** Ancho fijo del render por página (≈2× la celda u4x2: nítido en 1x y 2x). */
 const ANCHO_MINI_PDF = 720;
 
-/**
- * Miniatura WebP de la primera página; null si no rasterizable.
- * Apertura única: cuenta y renderiza con el mismo documento (sin reabrir).
- * Nunca lanza: si algo falla, la celda usa el fallback actual.
- */
-export async function generarMiniaturaPdf(f: File): Promise<string | null> {
-  try {
-    if (!admiteTamanoPdf(f)) return null;
-    const pdfjs = await import("pdfjs-dist");
-    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
-    const datos: ArrayBuffer = await f.arrayBuffer();
-    const tarea = pdfjs.getDocument({ data: datos });
-    const doc = await tarea.promise;
-    try {
-      if (doc.numPages < 1 || doc.numPages > PDF_MAX_PAGINAS) return null;
-      const pagina = await doc.getPage(1);
+/** Página útil de un PDF: índice 1-based, total del documento y su imagen WebP. */
+export interface PaginaPdf {
+  readonly indice: number;
+  readonly total: number;
+  readonly blob: Blob;
+}
+
+/** Documento abierto: total + render por página + cierre (seam inyectable). */
+export interface DocumentoPdf {
+  readonly total: number;
+  readonly renderizar: (indice: number) => Promise<HTMLCanvasElement | null>;
+  readonly cerrar: () => Promise<void>;
+}
+
+/** Apertura real con pdf.js (import dinámico: solo se descarga con PDFs). */
+async function abrirPdfReal(f: File): Promise<DocumentoPdf> {
+  const pdfjs = await import("pdfjs-dist");
+  pdfjs.GlobalWorkerOptions.workerSrc ||= workerSrc;
+  const datos: Uint8Array = new Uint8Array(await f.arrayBuffer());
+  const tarea = pdfjs.getDocument({ data: datos });
+  const doc = await tarea.promise;
+  return {
+    total: doc.numPages,
+    renderizar: async (indice: number): Promise<HTMLCanvasElement | null> => {
+      const pagina = await doc.getPage(indice);
       const escala = ANCHO_MINI_PDF / pagina.getViewport({ scale: 1 }).width;
       const vista = pagina.getViewport({ scale: escala });
       const lienzo = document.createElement("canvas");
@@ -92,12 +103,88 @@ export async function generarMiniaturaPdf(f: File): Promise<string | null> {
       const ctx = lienzo.getContext("2d");
       if (!ctx) return null;
       await pagina.render({ canvasContext: ctx, canvas: lienzo, viewport: vista }).promise;
-      const blob = await new Promise<Blob | null>((res) => lienzo.toBlob(res, "image/webp", 0.82));
-      return blob ? URL.createObjectURL(blob) : null;
-    } finally {
+      return lienzo;
+    },
+    cerrar: async (): Promise<void> => {
       await tarea.destroy();
+    },
+  };
+}
+
+/** Apertura inyectable: el llamador pasa la real; los tests, un stub. */
+export type AbrirPdf = (f: File) => Promise<DocumentoPdf>;
+
+/** Canal >250 = blanco; píxeles muestreados cada 4px. */
+const BLANCO_UMBRAL = 250;
+const BLANCO_MUESTRA = 4;
+/** ≥99.5% blancos/transparentes → página vacía (se omite). */
+const BLANCO_RATIO = 0.995;
+
+/**
+ * Página vacía: casi todo blanco o transparente (el PDF sin fondo se
+ * compone sobre blanco). Sin píxeles legibles no se puede juzgar → se conserva.
+ */
+// ponytail: umbral fijo 250/99.5%; conteo por texto/OCR si hay falsos positivos en tickets ralos.
+export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
+  const ctx = lienzo.getContext("2d");
+  if (!ctx || lienzo.width < 1 || lienzo.height < 1) return false;
+  let datos: Uint8ClampedArray;
+  try {
+    datos = ctx.getImageData(0, 0, lienzo.width, lienzo.height).data;
+  } catch {
+    return false;
+  }
+  let blancos = 0;
+  let total = 0;
+  for (let i = 0; i + 3 < datos.length; i += 4 * BLANCO_MUESTRA) {
+    total += 1;
+    if ((datos[i + 3] ?? 0) < 128) {
+      blancos += 1;
+    } else if (
+      (datos[i] ?? 0) > BLANCO_UMBRAL &&
+      (datos[i + 1] ?? 0) > BLANCO_UMBRAL &&
+      (datos[i + 2] ?? 0) > BLANCO_UMBRAL
+    ) {
+      blancos += 1;
+    }
+  }
+  return total > 0 && blancos / total >= BLANCO_RATIO;
+}
+
+/**
+ * Fan-out: cada página no-blanca → una PaginaPdf (un render por página,
+ * apertura única, un destroy). Nunca lanza: lo ilegible da [].
+ * El llamador avisa "no se pudo leer" si vuelve vacío.
+ */
+export async function expandirPdf(f: File, abrir: AbrirPdf = abrirPdfReal): Promise<PaginaPdf[]> {
+  const utiles: PaginaPdf[] = [];
+  let doc: DocumentoPdf | null = null;
+  try {
+    if (!admiteTamanoPdf(f)) return utiles;
+    doc = await abrir(f);
+    const total = doc.total;
+    if (total < 1 || total > PDF_MAX_PAGINAS) return utiles;
+    // ponytail: secuencial a propósito; N renders en paralelo saturan memoria.
+    for (let i = 1; i <= total; i++) {
+      try {
+        const lienzo = await doc.renderizar(i);
+        if (!lienzo || esPaginaBlanca(lienzo)) continue;
+        const blob = await new Promise<Blob | null>((res) =>
+          lienzo.toBlob(res, "image/webp", 0.82),
+        );
+        if (blob) utiles.push({ indice: i, total, blob });
+      } catch {
+        continue; // ponytail: página mala no tumba a las hermanas
+      }
     }
   } catch {
-    return null;
+    return utiles;
+  } finally {
+    try {
+      await doc?.cerrar();
+    } catch {
+      // ponytail: destroy best-effort; el worker muere con la página
+    }
   }
+  return utiles;
 }

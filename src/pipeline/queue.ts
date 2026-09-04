@@ -5,13 +5,11 @@ import { buscarSlot, state } from "../state";
 import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear, sleep } from "../utils";
-import { esPdf, generarMiniaturaPdf } from "./pdf";
 
 const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
 
 /** Miniatura WebP; null si no decodificable (se muestra el original). */
 export async function generarMiniatura(file: File): Promise<string | null> {
-  if (esPdf(file)) return generarMiniaturaPdf(file);
   try {
     const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
     const escala = Math.min(1, THUMB_MAX / Math.max(bmp.width, bmp.height));
