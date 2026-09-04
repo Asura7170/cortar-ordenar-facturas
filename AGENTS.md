@@ -47,3 +47,4 @@ Solo Chrome/Chromium desktop. Se vale usar lo más moderno disponible en Chrome 
 - Comentarios `ponytail:` marcan simplificaciones deliberadas — no "arreglarlos" sin motivo.
 - `docs/` e `image-test/` están en `.gitignore` (referencia/scratch local): no commitear ni importar desde ahí.
 - API key del LLM vive solo en localStorage (form Ajustes). Nunca al repo.
+- Prohibido `git commit`, `push`, `merge`, crear PRs o reescribir historial (`--force`, `reset --hard`) sin petición explícita del usuario en el prompt. Sin esa orden, los cambios quedan sin commitear.
