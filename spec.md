@@ -1,6 +1,6 @@
 # Especificación — Cortar y Ordenar Facturas
 
-App frontend-only, Chrome-only. TypeScript + Vite (dev server con `--open` y build de producción). Sin backend.
+App frontend-only, Chrome-only. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vitest, Oxlint, Oxfmt; comandos `vp`, package manager pnpm 11). Sin backend.
 
 ## Resumen
 
@@ -12,8 +12,9 @@ Pegar/subir/arrastrar imágenes y PDFs → recorte con OpenCV.js → OCR con Pad
 facturas/
 ├─ index.html
 ├─ package.json
+├─ pnpm-workspace.yaml   # catalog: vite/vite-plus + overrides (no tocar los alias)
 ├─ tsconfig.json
-├─ vite.config.ts          # COOP/COEP, server.open, build → dist/
+├─ vite.config.ts          # vite-plus: bloques staged/fmt/lint + COOP/COEP, server.open, build → dist/
 ├─ .gitignore
 ├─ spec.md
 └─ src/
@@ -50,7 +51,7 @@ facturas/
 - **OCR modal:** solo lectura, select por comprobante, botón copiar; texto usado solo por el LLM.
 - **IA:** modal ajustes (baseURL, apiKey en localStorage, model por defecto gpt-4o-mini); sin config → monto manual; nunca expone la key en el repo.
 - **Word:** docx.js estándar OOXML; imágenes flotantes con posición absoluta en EMU relativa a página + wrap SQUARE; footer derecho en todas las hojas; un solo archivo `{codigo}-comprobante.docx`; validar en Word y LibreOffice.
-- **Dev/Prod:** `npm run dev --open` (Vite dev server, COOP/COEP en vite.config para WASM threads); `npm run build` → `dist/` para producción.
+- **Dev/Prod:** `pnpm dev` (vp dev --open, COOP/COEP en vite.config para WASM threads); `pnpm build` (vp build) → `dist/` para producción; `vp check` (lint+formato+tipos), tests con binario `vitest` local (ver AGENTS.md: `vp test` roto en vp 0.3.0 con pnpm/jsdom).
 
 ## Diagrama de flujo (mermaid)
 
