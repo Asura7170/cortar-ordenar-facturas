@@ -12,6 +12,9 @@
     "test:watch": "vitest",
     "prepare": "vp config"
   },
+  "dependencies": {
+    "pdfjs-dist": "^6.3.289"
+  },
   "devDependencies": {
     "jsdom": "^30.0.1",
     "typescript": "7.0.2",

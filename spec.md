@@ -45,7 +45,7 @@ facturas/
 - **Monto:** 1 TOTAL por comprobante; suma exacta en cents (sin float); badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); LLM sin TOTAL → campo manual en tarjeta (sí suma).
 - **Limpiar:** borra comprobantes, montos y textos OCR; conserva check, N, y configuración IA/moneda.
 - **Errores:** continuar + estado por item; el monto suma solo los OK; el resto se procesa.
-- **Formato de entrada:** imágenes + PDF multipágina (cada página = comprobante, raster todas, sin omitir blancas); HEIC → aviso "formato no soportado", no falla la cola.
+- **Formato de entrada:** imágenes + PDF multipágina (cada página = comprobante, raster todas, sin omitir blancas); un PDF entra solo si pesa ≤ 5 MB y tiene ≤ 10 páginas (cada archivo se evalúa solo; rechazo → aviso en la entrada, sin entrar a la cola); HEIC → aviso "formato no soportado", no falla la cola.
 - **EXIF:** createImageBitmap con orientación respetada; redimensionar automática si > 2000px lado mayor.
 - **Grilla:** N por hoja default 4; arrastre libre dentro de la hoja (posiciones % página, z-order), NO cambia el orden de inserción; X elimina comprobante completo; scroll vertical, hojas ajustadas al ancho.
 - **OCR modal:** solo lectura, select por comprobante, botón copiar; texto usado solo por el LLM.

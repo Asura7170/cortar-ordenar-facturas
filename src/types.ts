@@ -43,7 +43,7 @@ export interface Comprobante {
   readonly nombre: string;
   /** Blob URL de la imagen original (revocar con URL.revokeObjectURL al quitar). */
   readonly imgUrl: string;
-  /** Miniatura WebP o null (→ esqueleto) hasta que se genere (PDF: siempre null). */
+  /** Miniatura WebP o null (→ esqueleto) hasta que se genere (PDF: portada o null). */
   thumbUrl: string | null;
   /** Texto OCR (mock de ejemplo hasta integrar PaddleOCR). */
   textoOcr: string;

@@ -29,7 +29,7 @@ src/main.ts         # bootstrap: cargar() → init* → renders. Entrada única
 src/types.ts        # tipos de dominio (Comprobante, Hoja, EstadoApp). Solo tipos
 src/state.ts        # estado global + localStorage + ops puras (redistribuir, limpiarHojas)
 src/ui/             # layout, sidebar, sheets, monto, ocrMode, settingsModal
-src/pipeline/       # solo queue.ts (MOCK con sleep 900ms + valores ejemplo). crop/ocr/pdf/extract no existen aún
+src/pipeline/       # queue.ts (MOCK con sleep 900ms + valores ejemplo) + pdf.ts (gate admisión PDF ≤10p/≤5MB con aviso + miniatura portada 720px). crop/ocr/extract no existen aún
 src/export/docx.ts  # STUB: descarga .txt con nombre final. docx.js real va acá
 spec.md             # spec del pipeline objetivo (OpenCV → PaddleOCR → LLM → docx). Fuente de verdad del diseño
 ```
