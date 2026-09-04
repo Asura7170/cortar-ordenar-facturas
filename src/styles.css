@@ -67,6 +67,7 @@
   );
   --error-bg: light-dark(#fdf6f4, color-mix(in srgb, #f4ecd8 95%, transparent));
   --error-cell-bg: color-mix(in srgb, #b23a2e 6%, transparent);
+  --aviso-motivo: light-dark(#b23a2e, #e59a8d); /* rojo sello; AA en ambos temas */
   --celda-remove: light-dark(
     color-mix(in srgb, #2c3a28 80%, transparent),
     color-mix(in srgb, #22311f 75%, transparent)
@@ -404,6 +405,12 @@ input::placeholder {
   margin-top: 10px;
   line-height: 1.5;
   text-wrap: pretty;
+}
+/* Motivo del rechazo: rojo sello semibold (el nombre queda tenue). */
+.hint .motivo {
+  color: var(--aviso-motivo);
+  font-weight: 600;
+  font-size: 13px;
 }
 
 /* Botones */

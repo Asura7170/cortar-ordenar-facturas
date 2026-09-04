@@ -70,8 +70,8 @@ export const PLANTILLAS: Record<LayoutId, Plantilla> = {
       [1, 1, 2],
       [1, 3, 2],
       [1, 5, 2],
-      [2, 2, 2],
-      [2, 4, 2],
+      [2, 1, 3],
+      [2, 4, 3],
     ],
   },
   u6x2: {

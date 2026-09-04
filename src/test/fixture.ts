@@ -7,6 +7,7 @@ export const FIXTURE_HTML = `
 <div class="canvas"></div>
 <div id="dropzone"></div>
 <input id="fileInput" type="file" multiple>
+<p id="aviso" role="status"></p>
 <input id="chkCodigo" type="checkbox">
 <input id="numCodigo" type="number" value="6">
 <input id="inputCodigo" type="text">

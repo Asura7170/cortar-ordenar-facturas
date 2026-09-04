@@ -12,7 +12,7 @@ dist/
 .firecrawl/
 .playwright-mcp/
 .vite/
-image-test/
+archivos-test/
 
 # Referencia local generada (cheatsheets)
 docs/

@@ -310,7 +310,7 @@ function autoScroll(x: number, y: number): void {
         detenerScroll();
         return;
       }
-      canvasEl.scrollBy({ top: scrollDir });
+      canvasEl.scrollBy?.({ top: scrollDir }); // ?. : jsdom no implementa scrollBy; en Chrome siempre existe.
       if (scrollRaf !== null) scrollRaf = requestAnimationFrame(paso);
     };
     scrollRaf = requestAnimationFrame(paso);
@@ -624,8 +624,10 @@ export function initSheets(cb: SheetsCallbacks): void {
     const target = e.target as HTMLElement | null;
     const related = e.relatedTarget as Node | null;
     const sheet = target?.closest?.(".sheet");
-    if (sheet instanceof HTMLElement && !sheet.contains(related))
+    if (sheet instanceof HTMLElement && !sheet.contains(related)) {
       sheet.classList.remove("file-drop");
+      detenerScroll(); // el arrastre salió: sin esto el loop rAF seguía scrolleando.
+    }
   });
 
   sheetsEl.addEventListener("drop", (e) => {

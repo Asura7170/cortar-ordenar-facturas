@@ -29,7 +29,7 @@ src/main.ts         # bootstrap: cargar() → init* → renders. Entrada única
 src/types.ts        # tipos de dominio (Comprobante, Hoja, EstadoApp). Solo tipos
 src/state.ts        # estado global + localStorage + ops puras (redistribuir, limpiarHojas)
 src/ui/             # layout, sidebar, sheets, monto, ocrMode, settingsModal
-src/pipeline/       # solo queue.ts (MOCK con sleep 900ms + valores ejemplo). crop/ocr/pdf/extract no existen aún
+src/pipeline/       # queue.ts (MOCK con sleep 900ms + valores ejemplo) + pdf.ts (gate PDF ≤10p/≤5MB con aviso + fan-out 1 página=1 comprobante, omite blancas). crop/ocr/extract no existen aún
 src/export/docx.ts  # STUB: descarga .txt con nombre final. docx.js real va acá
 spec.md             # spec del pipeline objetivo (OpenCV → PaddleOCR → LLM → docx). Fuente de verdad del diseño
 ```
@@ -54,3 +54,4 @@ Solo Chrome/Chromium desktop. Se vale usar lo más moderno disponible en Chrome 
 - `docs/` e `image-test/` están en `.gitignore` (referencia/scratch local): no commitear ni importar desde ahí.
 - API key del LLM vive solo en localStorage (form Ajustes). Nunca al repo.
 - Prohibido `git commit`, `push`, `merge`, crear PRs o reescribir historial (`--force`, `reset --hard`) sin petición explícita del usuario en el prompt. Sin esa orden, los cambios quedan sin commitear.
+- Tras crear o actualizar un PR, como ÚLTIMO paso comentar `@coderabbitai review` en el PR para activar el review de CodeRabbit (obligatorio, sin excepciones).

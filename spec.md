@@ -1,6 +1,6 @@
 # Especificación — Cortar y Ordenar Facturas
 
-App frontend-only, Chrome-only. TypeScript + Vite (dev server con `--open` y build de producción). Sin backend.
+App frontend-only, Chrome-only. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vitest, Oxlint, Oxfmt; comandos `vp`, package manager pnpm 11). Sin backend.
 
 ## Resumen
 
@@ -12,8 +12,9 @@ Pegar/subir/arrastrar imágenes y PDFs → recorte con OpenCV.js → OCR con Pad
 facturas/
 ├─ index.html
 ├─ package.json
+├─ pnpm-workspace.yaml   # catalog: vite/vite-plus + overrides (no tocar los alias)
 ├─ tsconfig.json
-├─ vite.config.ts          # COOP/COEP, server.open, build → dist/
+├─ vite.config.ts          # vite-plus: bloques staged/fmt/lint + COOP/COEP, server.open, build → dist/
 ├─ .gitignore
 ├─ spec.md
 └─ src/
@@ -44,13 +45,13 @@ facturas/
 - **Monto:** 1 TOTAL por comprobante; suma exacta en cents (sin float); badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); LLM sin TOTAL → campo manual en tarjeta (sí suma).
 - **Limpiar:** borra comprobantes, montos y textos OCR; conserva check, N, y configuración IA/moneda.
 - **Errores:** continuar + estado por item; el monto suma solo los OK; el resto se procesa.
-- **Formato de entrada:** imágenes + PDF multipágina (cada página = comprobante, raster todas, sin omitir blancas); HEIC → aviso "formato no soportado", no falla la cola.
+- **Formato de entrada:** imágenes + PDF multipágina (cada página no-blanca = comprobante; blancas/vacías se omiten); un PDF entra solo si pesa ≤ 5 MB y tiene ≤ 10 páginas (cada archivo se evalúa solo; rechazo → aviso en la entrada, sin entrar a la cola); HEIC → aviso "formato no soportado", no falla la cola.
 - **EXIF:** createImageBitmap con orientación respetada; redimensionar automática si > 2000px lado mayor.
 - **Grilla:** N por hoja default 4; arrastre libre dentro de la hoja (posiciones % página, z-order), NO cambia el orden de inserción; X elimina comprobante completo; scroll vertical, hojas ajustadas al ancho.
 - **OCR modal:** solo lectura, select por comprobante, botón copiar; texto usado solo por el LLM.
 - **IA:** modal ajustes (baseURL, apiKey en localStorage, model por defecto gpt-4o-mini); sin config → monto manual; nunca expone la key en el repo.
 - **Word:** docx.js estándar OOXML; imágenes flotantes con posición absoluta en EMU relativa a página + wrap SQUARE; footer derecho en todas las hojas; un solo archivo `{codigo}-comprobante.docx`; validar en Word y LibreOffice.
-- **Dev/Prod:** `npm run dev --open` (Vite dev server, COOP/COEP en vite.config para WASM threads); `npm run build` → `dist/` para producción.
+- **Dev/Prod:** `pnpm dev` (vp dev --open, COOP/COEP en vite.config para WASM threads); `pnpm build` (vp build) → `dist/` para producción; `vp check` (lint+formato+tipos), tests con binario `vitest` local (ver AGENTS.md: `vp test` roto en vp 0.3.0 con pnpm/jsdom).
 
 ## Diagrama de flujo (mermaid)
 

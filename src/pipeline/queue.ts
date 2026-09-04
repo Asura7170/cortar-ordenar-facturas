@@ -8,7 +8,7 @@ import { sanear, sleep } from "../utils";
 
 const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
 
-/** Miniatura WebP; null si es PDF o no decodificable (se muestra el original). */
+/** Miniatura WebP; null si no decodificable (se muestra el original). */
 export async function generarMiniatura(file: File): Promise<string | null> {
   try {
     const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
