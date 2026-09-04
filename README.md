@@ -3,6 +3,7 @@
 App frontend-only para recortar comprobantes/facturas (OpenCV.js), extraer texto (PaddleOCR PP-OCRv6_small), sumar montos (LLM openai-compatible) y exportar a Word (.docx).
 
 ## Requisitos
+
 - Node.js 18+
 - Chrome (la app usa WASM, SharedArrayBuffer y APIs modernas)
 
@@ -17,4 +18,5 @@ pnpm typecheck  # verificación de tipos sin emitir
 ```
 
 ## Spec
+
 Ver [spec.md](./spec.md).

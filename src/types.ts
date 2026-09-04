@@ -5,19 +5,23 @@
    ============================================================ */
 
 /** Monedas soportadas (ver MONEDAS en state). */
-export type Moneda = 'USD' | 'ARS' | 'EUR' | 'BOB';
+export type Moneda = "USD" | "ARS" | "EUR" | "BOB";
 
 /** Estado del pipeline por comprobante. `error` reservado para el pipeline real. */
-export type EstadoComprobante = 'pendiente' | 'procesando' | 'ok' | 'error';
+export type EstadoComprobante = "pendiente" | "procesando" | "ok" | "error";
 
 /** Ids de plantilla en el orden de presentación del panel. */
 export type LayoutId =
-  | 'u1'
-  | 'u2h' | 'u2v'
-  | 'u3h' | 'u3v' | 'u3m'
-  | 'u4x2'
-  | 'u5m'
-  | 'u6x2' | 'u6m';
+  | "u1"
+  | "u2h"
+  | "u2v"
+  | "u3h"
+  | "u3v"
+  | "u3m"
+  | "u4x2"
+  | "u5m"
+  | "u6x2"
+  | "u6m";
 
 /** Posición [fila, columna, span] dentro del grid de la hoja. */
 export type PlantillaPos = readonly [fila: number, col: number, span: number];
@@ -78,9 +82,8 @@ export interface EstadoApp {
 }
 
 /** Subset persistido en localStorage (clave `libro-mayor-state`); cada ventana guarda solo lo suyo. */
-export type PersistedState = Partial<Pick<
-  EstadoApp,
-  'codigoActivo' | 'codigoLongitud' | 'codigoValor' | 'moneda' | 'configIA'
->>;
+export type PersistedState = Partial<
+  Pick<EstadoApp, "codigoActivo" | "codigoLongitud" | "codigoValor" | "moneda" | "configIA">
+>;
 
 // ponytail: OcrResult/ExtractResult borrados (0 usos); vuelven con el pipeline real.

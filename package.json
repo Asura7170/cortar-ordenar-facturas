@@ -1,15 +1,23 @@
 {
   "name": "cortar-ordenar-facturas",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "dev": "vite --open",
-    "build": "vite build",
-    "preview": "vite preview",
-    "lint": "oxlint",
+    "dev": "vp dev --open",
+    "build": "vp build",
+    "preview": "vp preview",
+    "lint": "vp lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepare": "vp config"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1",
+    "typescript": "7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "^4.1.11"
   },
   "devEngines": {
     "packageManager": {
@@ -17,12 +25,5 @@
       "version": "^11.0.0",
       "onFail": "download"
     }
-  },
-  "devDependencies": {
-    "jsdom": "^30.0.1",
-    "oxlint": "^1.81.0",
-    "typescript": "7.0.2",
-    "vite": "^8.0.0",
-    "vitest": "^4.1.11"
   }
 }

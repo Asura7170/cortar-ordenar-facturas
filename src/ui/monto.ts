@@ -1,17 +1,19 @@
 /* Montos en cents (suma exacta) + colecciones de comprobantes. */
-import { MONEDAS, state } from '../state';
-import type { Cents, Comprobante, Hoja } from '../types';
-import { getEl } from '../utils';
+import { MONEDAS, state } from "../state";
+import type { Cents, Comprobante, Hoja } from "../types";
+import { getEl } from "../utils";
 
-const montoEl: HTMLElement = getEl('montoTotal');
+const montoEl: HTMLElement = getEl("montoTotal");
 
 export function formatearMoneda(cents: Cents): string {
   const m = MONEDAS[state.moneda] ?? MONEDAS.USD;
-  return `${m.simbolo} ${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${m.simbolo} ${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function itemsDe(hoja: Hoja): Comprobante[] {
-  return Iterator.from(hoja.slots).filter((c) => c !== null).toArray();
+  return Iterator.from(hoja.slots)
+    .filter((c) => c !== null)
+    .toArray();
 }
 
 export function cuentaHoja(hoja: Hoja): number {
