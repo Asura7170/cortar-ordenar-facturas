@@ -42,25 +42,25 @@ export function el<T extends HTMLElement>(id: string): T {
 
 /** Drop sintético con archivos (jsdom no trae un DataTransfer útil). */
 export function eventoDrop(files: File[]): Event {
-  const e = new Event('drop', { bubbles: true, cancelable: true });
-  Object.defineProperty(e, 'dataTransfer', { value: { files, types: ['Files'] } });
+  const e = new Event("drop", { bubbles: true, cancelable: true });
+  Object.defineProperty(e, "dataTransfer", { value: { files, types: ["Files"] } });
   return e;
 }
 
 /** Dragover sintético (con coords: el handler hace autoScroll). */
-export function eventoDragover(types: string[] = ['Files']): Event {
-  const e = new Event('dragover', { bubbles: true, cancelable: true });
-  Object.defineProperty(e, 'dataTransfer', { value: { files: [], types } });
-  Object.defineProperty(e, 'clientX', { value: 10 });
-  Object.defineProperty(e, 'clientY', { value: 10 });
+export function eventoDragover(types: string[] = ["Files"]): Event {
+  const e = new Event("dragover", { bubbles: true, cancelable: true });
+  Object.defineProperty(e, "dataTransfer", { value: { files: [], types } });
+  Object.defineProperty(e, "clientX", { value: 10 });
+  Object.defineProperty(e, "clientY", { value: 10 });
   return e;
 }
 
 /** Paste sintético con archivos en el portapapeles. */
 export function eventoPaste(files: File[]): Event {
-  const e = new Event('paste', { bubbles: true, cancelable: true });
-  Object.defineProperty(e, 'clipboardData', {
-    value: { items: files.map((f) => ({ kind: 'file', getAsFile: (): File => f })) },
+  const e = new Event("paste", { bubbles: true, cancelable: true });
+  Object.defineProperty(e, "clipboardData", {
+    value: { items: files.map((f) => ({ kind: "file", getAsFile: (): File => f })) },
   });
   return e;
 }

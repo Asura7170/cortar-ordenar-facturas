@@ -3,6 +3,7 @@
 App frontend-only, Chrome-only. TypeScript + Vite (dev server con `--open` y build de producción). Sin backend.
 
 ## Resumen
+
 Pegar/subir/arrastrar imágenes y PDFs → recorte con OpenCV.js → OCR con PaddleOCR (PP-OCRv6_small) → extracción de TOTAL con LLM openai-compatible (o monto manual) → grilla carta N-up (default 4, arrastre libre tipo Word) → exportar .docx con footer derecho (código de pedido).
 
 ## Estructura / esqueleto

@@ -1,19 +1,25 @@
 # AGENTS.md — Cortar y Ordenar Facturas
 
-Frontend-only, sin backend. TypeScript + Vite. Solo Chrome/Chromium en desktop.
+Frontend-only, sin backend. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vitest, Oxlint, Oxfmt). Solo Chrome/Chromium en desktop.
 
-## Comandos (pnpm, no npm)
+## Comandos (pnpm, no npm; `vp` donde aplique)
 
 ```bash
-pnpm install    # instalar
-pnpm dev        # dev server, abre Chrome solo (server.open)
-pnpm test       # vitest run (103 tests P0+P1, ~2s)
+vp install      # instalar (delega a pnpm 11, fijado en devEngines)
+pnpm dev        # vp dev --open: dev server, abre Chrome solo (server.open)
+pnpm test       # vitest run local (110 tests, ~2s). Ver NOTA abajo: NO usar `vp test`
 pnpm typecheck  # tsc --noEmit
-pnpm build      # build prod → dist/
-pnpm preview    # previsualizar el build
+vp check        # lint + formato + tipos (válido para loops de validación)
+pnpm build      # vp build: build prod → dist/
+pnpm preview    # vp preview: previsualizar el build
 ```
 
-Hay linter (Oxlint, `pnpm lint`) y CI (GitHub Actions: lint + typecheck + test + build en cada PR). Verificar con `pnpm lint`, `pnpm test` y `pnpm typecheck` (y `pnpm build` si toca config de Vite).
+Hay CI (GitHub Actions: `vp check` + typecheck + test + build en cada PR, job `check` requerido por el ruleset). Verificar con `vp check`, `pnpm test` y `pnpm typecheck` (y `pnpm build` si toca config de Vite).
+
+- NOTA (`ponytail:` divergencia deliberada del toolchain): `vp test` está roto en vp 0.3.0 con pnpm — su vitest interno no resuelve el peer opcional `jsdom` (`Cannot find package 'jsdom'`, environment de los tests). Por eso `test`/`test:watch` usan el binario `vitest` local (dep explícita) en vez de `vp test`. Revertir a `vp test` cuando upstream lo arregle.
+- `vite`/`vite-plus`/`vitest` se resuelven vía `catalog:` en `pnpm-workspace.yaml` (no tocar los alias; pnpm los necesita para que el override aplique).
+- Imports: `vite-plus` en config, `vite-plus/test` en tests. Regla `vite-plus/prefer-vite-plus-imports` lo exige (`vp check` falla si importas de `vite`/`vitest`).
+- `.vite-hooks/` (pre-commit `vp staged`) se commitea; `prepare: vp config` lo activa tras instalar.
 
 ## Arquitectura
 
