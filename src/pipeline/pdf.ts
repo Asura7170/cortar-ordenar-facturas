@@ -84,6 +84,19 @@ export interface DocumentoPdf {
   readonly cerrar: () => Promise<void>;
 }
 
+/** Lienzo seguro: un MediaBox extremo (p.ej. 1pt de ancho) daría un lienzo gigante que cuelga la pestaña. */
+// ponytail: umbrales fijos (alto ≤4000, área ≤8M px); afinar si hay facturas legítimas fuera.
+export function vistaSegura(ancho: number, alto: number): boolean {
+  return (
+    Number.isFinite(ancho) &&
+    Number.isFinite(alto) &&
+    ancho >= 1 &&
+    alto >= 1 &&
+    alto <= 4000 &&
+    ancho * alto <= 8_000_000
+  );
+}
+
 /** Apertura real con pdf.js (import dinámico: solo se descarga con PDFs). */
 async function abrirPdfReal(f: File): Promise<DocumentoPdf> {
   const pdfjs = await import("pdfjs-dist");
@@ -95,8 +108,11 @@ async function abrirPdfReal(f: File): Promise<DocumentoPdf> {
     total: doc.numPages,
     renderizar: async (indice: number): Promise<HTMLCanvasElement | null> => {
       const pagina = await doc.getPage(indice);
-      const escala = ANCHO_MINI_PDF / pagina.getViewport({ scale: 1 }).width;
+      const base = pagina.getViewport({ scale: 1 });
+      if (!vistaSegura(base.width, base.height)) return null;
+      const escala = ANCHO_MINI_PDF / base.width;
       const vista = pagina.getViewport({ scale: escala });
+      if (!vistaSegura(vista.width, vista.height)) return null;
       const lienzo = document.createElement("canvas");
       lienzo.width = Math.max(1, Math.round(vista.width));
       lienzo.height = Math.max(1, Math.round(vista.height));

@@ -8,6 +8,7 @@ import {
   esPdf,
   esPaginaBlanca,
   expandirPdf,
+  vistaSegura,
 } from "./pdf";
 import type { DocumentoPdf } from "./pdf";
 
@@ -207,5 +208,15 @@ describe("expandirPdf", () => {
       throw new Error("ilegible");
     };
     await expect(expandirPdf(pdfDe("r.pdf", "application/pdf", 100), abrir)).resolves.toEqual([]);
+  });
+});
+
+describe("vistaSegura", () => {
+  it("normal sí; MediaBox extremo (1pt ancho, NaN, área gigante) no", () => {
+    expect(vistaSegura(720, 1000)).toBe(true);
+    expect(vistaSegura(1, 1000)).toBe(true); // base angosta pero real; el escalado la filtra
+    expect(vistaSegura(720, 720000)).toBe(false); // 518M px colgaría la pestaña
+    expect(vistaSegura(NaN, 100)).toBe(false);
+    expect(vistaSegura(0, 100)).toBe(false);
   });
 });

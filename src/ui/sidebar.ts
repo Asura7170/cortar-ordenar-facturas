@@ -125,7 +125,7 @@ export async function agregarArchivos(
       });
     }
   }
-  if (avisos.length > 0) avisar(avisos);
+  avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
   if (nuevas.length === 0) return;
   const recienIngresados = [...nuevas]; // llenar() vacía `nuevas` con shift()
 

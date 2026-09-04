@@ -197,6 +197,13 @@ describe("gate PDF (tamaño + páginas)", () => {
     expect(m?.innerHTML).toBe("pesa más de 5 MB"); // sin marcado inyectado
   });
 
+  it("lote válido limpia el aviso viejo de otro lote", async () => {
+    aviso.textContent = "«gordo.pdf»: pesa más de 5 MB";
+    await agregarArchivos([archivo("ok.png", "image/png")]);
+    expect(aviso.textContent).toBe("");
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
+  });
+
   it("pdf de 3 páginas (1 blanca) → 2 comprobantes p.1/3 y p.3/3 con thumb", async () => {
     aviso.textContent = "";
     expansionSimulada = [paginaSimulada(1, 3), paginaSimulada(3, 3)];

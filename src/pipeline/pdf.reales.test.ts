@@ -18,6 +18,7 @@ const HAY: boolean = fs.existsSync(DIR);
 
 // pdf.js 6 usa Uint8Array.toHex (V8 reciente); el node que corre vitest
 // puede no traerlo → polyfill local a este archivo (solo tests).
+// No es código muerto: lo usa pdfjs-dist internamente al abrir documentos.
 const proto = Uint8Array.prototype as unknown as Record<string, unknown>;
 if (typeof proto["toHex"] !== "function") {
   proto["toHex"] = function (this: Uint8Array): string {
