@@ -514,8 +514,12 @@ export function initSheets(cb: SheetsCallbacks): void {
         if (!item) return;
         if (!item.textoOcr) return;
         // Sin Promise.try (ausente en Node 22 del CI): writeText ya devuelve promesa.
-        void navigator.clipboard.writeText(item.textoOcr)
-          .catch(() => { btn.title = 'Copiar falló (sin permiso del portapapeles)'; });
+        // clipboard no existe fuera de contexto seguro (http): TypeError antes de la promesa.
+        const fallo = 'Copiar falló (sin permiso del portapapeles)';
+        const portapapeles = navigator.clipboard;
+        if (typeof portapapeles?.writeText !== 'function') { btn.title = fallo; return; }
+        void portapapeles.writeText(item.textoOcr)
+          .catch(() => { btn.title = fallo; });
         return;
       }
       case 'quitar':

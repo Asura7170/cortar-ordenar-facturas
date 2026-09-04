@@ -131,6 +131,23 @@ describe('clic delegado', () => {
     expect(write).not.toHaveBeenCalled();
   });
 
+  it('⧉ sin clipboard API (http): marca fallo sin tirar', () => {
+    state.modoOcr = true;
+    const h = crearHoja();
+    h.slots[0] = comprobante({ textoOcr: 'HOLA' });
+    state.hojas.push(h);
+    renderHojas();
+    const real = navigator.clipboard;
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    try {
+      const btn = boton('copiar-ocr');
+      expect(() => btn.click()).not.toThrow();
+      expect(btn.title).toContain('Copiar falló');
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', { value: real, configurable: true });
+    }
+  });
+
   it('sin modo OCR no hay botón ⧉', () => {
     sembrar('u4x2', [100]);
     expect(document.querySelector('[data-accion="copiar-ocr"]')).toBeNull();
