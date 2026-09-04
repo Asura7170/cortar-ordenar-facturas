@@ -25,9 +25,25 @@ const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>("inputCodigo");
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
 const aviso: HTMLElement = getEl("aviso");
 
-/** Aviso de entrada (rechazos del filtro/gate). Sobrescribe el anterior. */
-function avisar(texto: string): void {
-  aviso.textContent = texto;
+/** Rechazo de entrada: nombre en tono tenue + motivo en rojo sello. */
+interface AvisoRechazo {
+  readonly archivo: string;
+  readonly motivo: string;
+}
+
+/** Aviso de entrada (rechazos del filtro/gate). Sobrescribe el anterior.
+    Sin innerHTML: el nombre va como nodo de texto (a prueba de marcado). */
+function avisar(rechazos: readonly AvisoRechazo[]): void {
+  const nodos: (Text | HTMLSpanElement)[] = [];
+  rechazos.forEach((r, i) => {
+    if (i > 0) nodos.push(document.createTextNode(" · "));
+    nodos.push(document.createTextNode(`«${r.archivo}»: `));
+    const m = document.createElement("span");
+    m.className = "motivo";
+    m.textContent = r.motivo;
+    nodos.push(m);
+  });
+  aviso.replaceChildren(...nodos);
 }
 
 function textoMotivo(m: MotivoRechazo): string {
@@ -53,9 +69,9 @@ export async function agregarArchivos(
   const esImagen = (f: File): boolean => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type);
   const imagenes: File[] = lista.filter(esImagen);
   const pdfs: File[] = lista.filter((f) => !esImagen(f) && esPdf(f));
-  const avisos: string[] = lista
+  const avisos: AvisoRechazo[] = lista
     .filter((f) => !esImagen(f) && !esPdf(f))
-    .map((f) => `«${sanear(f.name)}»: formato no soportado`);
+    .map((f) => ({ archivo: sanear(f.name), motivo: "formato no soportado" }));
   // Gate por archivo (independiente): tamaño sync + páginas async, en orden.
   // Solo lo admitido se vuelve comprobante (sin blob URL para rechazados).
   const veredictos = await Promise.all(pdfs.map((f) => admitirPdf(f, contarPaginasPdf)));
@@ -63,9 +79,9 @@ export async function agregarArchivos(
   pdfs.forEach((f, i) => {
     const v = veredictos[i];
     if (v?.admite === true) pdfOk.add(f);
-    else avisos.push(`«${sanear(f.name)}»: ${textoMotivo(v?.motivo ?? "ilegible")}`);
+    else avisos.push({ archivo: sanear(f.name), motivo: textoMotivo(v?.motivo ?? "ilegible") });
   });
-  if (avisos.length > 0) avisar(avisos.join(" · "));
+  if (avisos.length > 0) avisar(avisos);
   const admitidos = new Set<File>([...imagenes, ...pdfOk]);
   const nuevas: Comprobante[] = lista
     .filter((f) => admitidos.has(f))

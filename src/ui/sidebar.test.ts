@@ -185,6 +185,14 @@ describe("gate PDF (tamaño + páginas)", () => {
     expect(aviso.textContent).toContain("formato no soportado");
   });
 
+  it("el motivo va en .motivo (rojo sello) y el nombre en texto plano", async () => {
+    aviso.textContent = "";
+    await agregarArchivos([pdfTamano("gordo.pdf", 6 * 1024 * 1024)]);
+    const m = aviso.querySelector(".motivo");
+    expect(m?.textContent).toBe("pesa más de 5 MB");
+    expect(m?.innerHTML).toBe("pesa más de 5 MB"); // sin marcado inyectado
+  });
+
   it("pdf admitido recibe miniatura cuando el raster la genera", async () => {
     aviso.textContent = "";
     thumbSimulada = "blob:thumb-pdf";
