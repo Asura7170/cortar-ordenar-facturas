@@ -14,6 +14,7 @@ import { actualizarMiniatura, renderHojas } from "./sheets";
 import { generarMiniatura, procesarCola } from "../pipeline/queue";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
 import type { MotivoRechazo, PaginaPdf } from "../pipeline/pdf";
+import { normalizarImagen } from "../pipeline/imagen";
 import { buscarSlot } from "../state";
 import { getEl, sanear } from "../utils";
 
@@ -89,18 +90,26 @@ export async function agregarArchivos(
   const nuevas: Comprobante[] = [];
   for (const f of lista) {
     if (esImagen(f)) {
-      nuevas.push({
-        id: nextComprobanteId(),
-        nombre: sanear(f.name),
-        file: f,
-        imgUrl: URL.createObjectURL(f),
-        thumbUrl: null,
-        textoOcr: "",
-        montoCents: null,
-        moneda: "USD",
-        estado: "pendiente",
-        posicion: 0,
-      });
+      // Intake normalizado: JPEG único, EXIF derecha, tope 2000px.
+      // Blanca/corrupta → aviso, sin tumbar el lote (igual que PDF).
+      // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
+      try {
+        const blob = await normalizarImagen(f);
+        nuevas.push({
+          id: nextComprobanteId(),
+          nombre: sanear(f.name),
+          file: blob,
+          imgUrl: URL.createObjectURL(blob),
+          thumbUrl: null,
+          textoOcr: "",
+          montoCents: null,
+          moneda: "USD",
+          estado: "pendiente",
+          posicion: 0,
+        });
+      } catch {
+        avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+      }
       continue;
     }
     if (!pdfOk.has(f)) continue;

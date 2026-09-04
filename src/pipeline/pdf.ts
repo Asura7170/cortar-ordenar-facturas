@@ -3,6 +3,7 @@
    (pdf.js vía import dinámico: solo se descarga cuando llega un PDF).
    Todo rechazo se avisa y se descarta sin crear comprobante ni blob URL. */
 import workerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
+import { CALIDAD_JPEG, esPaginaBlanca } from "./imagen";
 
 /** Tope de tamaño por PDF (5 MiB, inclusivo). */
 export const PDF_MAX_BYTES: number = 5 * 1024 * 1024;
@@ -130,42 +131,8 @@ async function abrirPdfReal(f: File): Promise<DocumentoPdf> {
 /** Apertura inyectable: el llamador pasa la real; los tests, un stub. */
 export type AbrirPdf = (f: File) => Promise<DocumentoPdf>;
 
-/** Canal >250 = blanco; píxeles muestreados cada 4px. */
-const BLANCO_UMBRAL = 250;
-const BLANCO_MUESTRA = 4;
-/** ≥99.5% blancos/transparentes → página vacía (se omite). */
-const BLANCO_RATIO = 0.995;
-
-/**
- * Página vacía: casi todo blanco o transparente (el PDF sin fondo se
- * compone sobre blanco). Sin píxeles legibles no se puede juzgar → se conserva.
- */
-// ponytail: umbral fijo 250/99.5%; conteo por texto/OCR si hay falsos positivos en tickets ralos.
-export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
-  const ctx = lienzo.getContext("2d");
-  if (!ctx || lienzo.width < 1 || lienzo.height < 1) return false;
-  let datos: Uint8ClampedArray;
-  try {
-    datos = ctx.getImageData(0, 0, lienzo.width, lienzo.height).data;
-  } catch {
-    return false;
-  }
-  let blancos = 0;
-  let total = 0;
-  for (let i = 0; i + 3 < datos.length; i += 4 * BLANCO_MUESTRA) {
-    total += 1;
-    if ((datos[i + 3] ?? 0) < 128) {
-      blancos += 1;
-    } else if (
-      (datos[i] ?? 0) > BLANCO_UMBRAL &&
-      (datos[i + 1] ?? 0) > BLANCO_UMBRAL &&
-      (datos[i + 2] ?? 0) > BLANCO_UMBRAL
-    ) {
-      blancos += 1;
-    }
-  }
-  return total > 0 && blancos / total >= BLANCO_RATIO;
-}
+// Detección de página vacía (vive en imagen.ts: vale para PDF e intake).
+export { esPaginaBlanca } from "./imagen";
 
 /**
  * Fan-out: cada página no-blanca → una PaginaPdf (un render por página,
@@ -186,7 +153,7 @@ export async function expandirPdf(f: File, abrir: AbrirPdf = abrirPdfReal): Prom
         const lienzo = await doc.renderizar(i);
         if (!lienzo || esPaginaBlanca(lienzo)) continue;
         const blob = await new Promise<Blob | null>((res) =>
-          lienzo.toBlob(res, "image/webp", 0.82),
+          lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
         );
         if (blob) utiles.push({ indice: i, total, blob });
       } catch {

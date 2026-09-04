@@ -7,9 +7,22 @@ import type { PaginaPdf } from "../pipeline/pdf";
 let paginasSimuladas = 5;
 // El raster real necesita Chrome: expansión stub (cada test la ajusta).
 function paginaSimulada(indice: number, total: number): PaginaPdf {
-  return { indice, total, blob: new Blob(["x"], { type: "image/webp" }) };
+  return { indice, total, blob: new Blob(["x"], { type: "image/jpeg" }) };
 }
 let expansionSimulada: PaginaPdf[] = [paginaSimulada(1, 1)];
+// La normalización real necesita Chrome: stub (cada test lo ajusta).
+const fallosImagen = new Map<string, string>();
+vi.mock("../pipeline/imagen", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../pipeline/imagen")>();
+  return {
+    ...real,
+    normalizarImagen: async (f: File): Promise<Blob> => {
+      const motivo = fallosImagen.get(f.name);
+      if (motivo) throw new Error(motivo);
+      return new Blob(["x"], { type: "image/jpeg" });
+    },
+  };
+});
 vi.mock("../pipeline/pdf", async (importOriginal) => {
   const real = await importOriginal<typeof import("../pipeline/pdf")>();
   return {
@@ -38,6 +51,7 @@ beforeEach(() => {
   // La cola MOCK usa sleep(900ms): timers falsos para que nunca avance en tests.
   vi.useFakeTimers();
   paginasSimuladas = 5;
+  fallosImagen.clear();
   expansionSimulada = [paginaSimulada(1, 1)];
 });
 
@@ -219,6 +233,23 @@ describe("gate PDF (tamaño + páginas)", () => {
     aviso.textContent = "";
     expansionSimulada = [];
     await agregarArchivos([archivo("vacio.pdf", "application/pdf")]);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("no se pudo leer");
+  });
+
+  it("imagen blanca avisa sin entrar (el resto del lote sí)", async () => {
+    aviso.textContent = "";
+    fallosImagen.set("b.png", "blanca");
+    await agregarArchivos([archivo("b.png", "image/png"), archivo("ok.png", "image/png")]);
+    const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
+    expect(nombres).toEqual(["ok.png", null, null, null]);
+    expect(aviso.textContent).toContain("no se pudo leer");
+  });
+
+  it("imagen corrupta avisa sin entrar", async () => {
+    aviso.textContent = "";
+    fallosImagen.set("r.png", "ilegible");
+    await agregarArchivos([archivo("r.png", "image/png")]);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(0);
     expect(aviso.textContent).toContain("no se pudo leer");
   });

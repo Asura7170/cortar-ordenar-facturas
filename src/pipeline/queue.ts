@@ -5,11 +5,12 @@ import { buscarSlot, state } from "../state";
 import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear, sleep } from "../utils";
+import { CALIDAD_JPEG } from "./imagen";
 
 const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
 
-/** Miniatura WebP; null si no decodificable (se muestra el original). */
-export async function generarMiniatura(file: File): Promise<string | null> {
+/** Miniatura JPEG; null si no decodificable (se muestra el original). */
+export async function generarMiniatura(file: Blob): Promise<string | null> {
   try {
     const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
     const escala = Math.min(1, THUMB_MAX / Math.max(bmp.width, bmp.height));
@@ -32,7 +33,9 @@ export async function generarMiniatura(file: File): Promise<string | null> {
     }
     ctx.drawImage(red, 0, 0);
     red.close();
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/webp", 0.82));
+    const blob = await new Promise<Blob | null>((res) =>
+      canvas.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+    );
     return blob ? URL.createObjectURL(blob) : null;
   } catch {
     return null;
