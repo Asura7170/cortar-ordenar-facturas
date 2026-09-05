@@ -1,5 +1,5 @@
 /* Tests: imagen — normalización JPEG única, tope 2000px, filtro blancas/corruptas. */
-import { describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { CALIDAD_JPEG, LADO_MAX_IMAGEN, normalizarImagen } from "./imagen";
 import type { CargarBitmap } from "./imagen";
 
@@ -44,8 +44,14 @@ const todoBlanco: number[] = px(16, 255, 255, 255);
 
 const cargar =
   (w: number, h: number): CargarBitmap =>
-  async () =>
-    bitmapFalso(w, h);
+  async (_f, opc) => {
+    ultimaOpc = opc;
+    return bitmapFalso(w, h);
+  };
+let ultimaOpc: ImageBitmapOptions | undefined;
+beforeEach(() => {
+  ultimaOpc = undefined;
+});
 const img = (nombre: string, type: string): File => new File(["x"], nombre, { type });
 
 describe("normalizarImagen", () => {
@@ -55,6 +61,8 @@ describe("normalizarImagen", () => {
     expect(blob.type).toBe("image/jpeg");
     expect(falso.tipo()).toBe("image/jpeg");
     expect(falso.calidad()).toBe(CALIDAD_JPEG);
+    // Guard de regresión: sin from-image el EXIF no se endereza.
+    expect(ultimaOpc).toEqual({ imageOrientation: "from-image" });
   });
 
   it("grande se acota al tope manteniendo proporción", async () => {

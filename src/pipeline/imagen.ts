@@ -58,6 +58,9 @@ export type MotivoImagen = "blanca" | "ilegible";
 
 /** Normaliza un File a JPEG: EXIF enderezada, tope de lado, sin blancas.
     Lanza Error(MotivoImagen) si es corrupta o vacía. */
+// ponytail: se decodifica antes de medir; Chrome rechaza dimensiones absurdas
+// con error (→ "ilegible", el lote sigue). Parser de headers pre-decode solo
+// si aparece un caso real de bomba de descompresión.
 export async function normalizarImagen(
   f: File,
   cargar: CargarBitmap = cargarReal,
