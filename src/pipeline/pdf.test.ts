@@ -109,7 +109,7 @@ describe("esPaginaBlanca", () => {
         getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
       }),
       toBlob: (cb: (b: Blob | null) => void): void => {
-        cb(new Blob(["x"], { type: "image/webp" }));
+        cb(new Blob(["x"], { type: "image/jpeg" }));
       },
     } as unknown as HTMLCanvasElement;
   }
@@ -166,7 +166,7 @@ describe("expandirPdf", () => {
             getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
           }),
           toBlob: (cb: (b: Blob | null) => void): void => {
-            cb(new Blob(["x"], { type: "image/webp" }));
+            cb(new Blob(["x"], { type: "image/jpeg" }));
           },
         } as unknown as HTMLCanvasElement;
       },
