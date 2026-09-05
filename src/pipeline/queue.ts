@@ -1,10 +1,11 @@
-/* Cola secuencial de procesamiento — MOCK de UI.
-   El pipeline real (OpenCV crop → PaddleOCR → LLM extract) vivirá en
-   crop.ts/ocr.ts/pdf.ts/extract.ts; la firma procesarCola() ya es la final. */
+/* Cola secuencial de procesamiento — DocAligner recorta, PaddleOCR/LLM extraen (mock aún).
+   crop.ts vive en docaligner.ts; la firma procesarCola() ya es la final. */
 import { buscarSlot, state } from "../state";
+import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
-import { sanear, sleep } from "../utils";
+import { sanear } from "../utils";
+import { detectarYRecortar } from "./docaligner";
 import { CALIDAD_JPEG } from "./imagen";
 
 const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
@@ -42,6 +43,13 @@ export async function generarMiniatura(file: Blob): Promise<string | null> {
   }
 }
 
+/** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
+async function blobDeItem(sig: Comprobante): Promise<Blob> {
+  if (sig.file) return sig.file;
+  const res = await fetch(sig.imgUrl);
+  return res.blob();
+}
+
 export async function procesarCola(): Promise<void> {
   if (state.colaEnProceso) return;
   state.colaEnProceso = true;
@@ -51,12 +59,23 @@ export async function procesarCola(): Promise<void> {
       // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
       const sig = aplanar().find((c) => c.estado === "pendiente");
       if (!sig) break;
-      // Sin render intermedio: el esqueleto ya comunica la espera (2N+1 → N+1 renders).
       sig.estado = "procesando";
-      // Placeholder: aquí irá el pipeline OpenCV→OCR→LLM.
-      await sleep(900);
+      renderHojas(); // el recorte tarda: que se vea el estado (antes el mock era instantáneo)
+      try {
+        const original = await blobDeItem(sig);
+        const recortada = await detectarYRecortar(original);
+        if (recortada !== original) {
+          URL.revokeObjectURL(sig.imgUrl);
+          if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
+          sig.imgUrl = URL.createObjectURL(recortada);
+          sig.file = recortada;
+          sig.thumbUrl = await generarMiniatura(recortada);
+        }
+      } catch {
+        // ponytail: sin recorte se sigue con el original; la cola no se detiene
+      }
       if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
-      // Valores de ejemplo para validar UI/UX (diseño primero, pipeline después).
+      // Valores de ejemplo para validar UI/UX (diseño primero, OCR/LLM después).
       sig.textoOcr = sanear(`FACTURA ${sig.nombre}\nFecha: 12/08/2026\nTOTAL: US$ 1,234.56`);
       sig.montoCents = 123456;
       sig.estado = "ok";

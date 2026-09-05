@@ -18,6 +18,7 @@ Hay CI (GitHub Actions: `vp check` + typecheck + test + build en cada PR, job `c
 
 - NOTA (`ponytail:` divergencia deliberada del toolchain): `vp test` está roto en vp 0.3.0 con pnpm — su vitest interno no resuelve el peer opcional `jsdom` (`Cannot find package 'jsdom'`, environment de los tests). Por eso `test`/`test:watch` usan el binario `vitest` local (dep explícita) en vez de `vp test`. Revertir a `vp test` cuando upstream lo arregle.
 - `vite`/`vite-plus`/`vitest` se resuelven vía `catalog:` en `pnpm-workspace.yaml` (no tocar los alias; pnpm los necesita para que el override aplique).
+- `onnxruntime-web` 1.29.0 pineado en dependencies (única dep nueva; trae `protobufjs`, permitido en `allowBuilds`). EPs `webgpu`→`wasm` con `numThreads: 1` (los workers pthread los bloquea Chrome bajo COEP; single-thread ~250ms/foto basta); `ort.env.wasm.wasmPaths` apunta a `public/ort/`.
 - Imports: `vite-plus` en config, `vite-plus/test` en tests. Regla `vite-plus/prefer-vite-plus-imports` lo exige (`vp check` falla si importas de `vite`/`vitest`).
 - `.vite-hooks/` (pre-commit `vp staged`) se commitea; `prepare: vp config` lo activa tras instalar.
 
@@ -29,9 +30,11 @@ src/main.ts         # bootstrap: cargar() → init* → renders. Entrada única
 src/types.ts        # tipos de dominio (Comprobante, Hoja, EstadoApp). Solo tipos
 src/state.ts        # estado global + localStorage + ops puras (redistribuir, limpiarHojas)
 src/ui/             # layout, sidebar, sheets, monto, ocrMode, settingsModal
-src/pipeline/       # queue.ts (MOCK con sleep 900ms + valores ejemplo) + pdf.ts (gate PDF ≤10p/≤5MB con aviso + fan-out 1 página=1 comprobante, omite blancas). crop/ocr/extract no existen aún
+src/pipeline/       # docaligner.ts (DocAligner heatmap/lcnet100 + borde negro 100px + warp canvas, fallback completa; EPs con timeout 30s + latch, nunca cuelga la cola) + queue.ts (recorte real, OCR/LLM aún mock) + pdf.ts (gate PDF ≤10p/≤5MB con aviso + fan-out 1 página=1 comprobante, omite blancas). ocr.ts/extract.ts no existen aún
 src/export/docx.ts  # STUB: descarga .txt con nombre final. docx.js real va acá
-spec.md             # spec del pipeline objetivo (OpenCV → PaddleOCR → LLM → docx). Fuente de verdad del diseño
+spec.md             # spec del pipeline objetivo (DocAligner → PaddleOCR → LLM → docx). Fuente de verdad del diseño
+public/models/      # lcnet100_h_e_bifpn_256_fp32.onnx vendoreado (Apache-2.0) + NOTICE.txt. No va por CDN (COEP require-corp)
+public/ort/         # par asyncify onnxruntime-web copiado de node_modules (el build webgpu lo exige; los nombres cambian por minor). Excluido de formato (.prettierignore). En dev lo sirve en crudo el middleware servir-ort-crudo (vite prohíbe import() desde /public)
 ```
 
 - Estado: `state.hojas` (no persiste) + persistido en `localStorage["libro-mayor-state"]` (solo codigoActivo/Longitud/Valor, moneda, configIA). Tema aparte en `libro-mayor-tema`.

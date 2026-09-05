@@ -1,8 +1,34 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { defineConfig } from "vite-plus";
 
-// COOP/COEP: necesarios para WASM con threads (futuro OpenCV/PaddleOCR).
+// COOP/COEP: necesarios para onnxruntime-web WASM con threads (y futuro PaddleOCR).
 // server.open: abre el navegador en `pnpm dev`. build → dist/.
 export default defineConfig({
+  plugins: [
+    {
+      name: "servir-ort-crudo",
+      // ponytail: vite-dev prohíbe import() desde /public y ORT 1.29 carga su
+      // glue .mjs con import(); se sirve en crudo solo en dev (build/preview
+      // sirven public/ verbatim, sin transform).
+      configureServer(servidor) {
+        servidor.middlewares.use((pet, res, sig) => {
+          const url = pet.url ?? "";
+          if (!url.startsWith("/ort/") || !url.includes(".mjs")) {
+            sig();
+            return;
+          }
+          const base = url.split("/").pop()?.split("?")[0] ?? "";
+          readFile(join(process.cwd(), "public", "ort", base))
+            .then((bytes) => {
+              res.setHeader("Content-Type", "text/javascript");
+              res.end(bytes);
+            })
+            .catch(() => sig());
+        });
+      },
+    },
+  ],
   staged: {
     "*": "vp check --fix",
   },
