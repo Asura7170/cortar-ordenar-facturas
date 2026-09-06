@@ -111,7 +111,7 @@ describe("normalizarImagen", () => {
 });
 
 describe("recortarMargenesBlancos", () => {
-  // Foto 40x30 con bloque oscuro amplio (x5-34, y5-24) = foto sobre hoja blanca.
+  /** Foto 40x30 con bloque oscuro amplio (x5-34, y5-24) = foto sobre hoja blanca. */
   function lienzoConMarco(): { src: HTMLCanvasElement; dibujos: unknown[][] } {
     const w = 40;
     const h = 30;
@@ -176,7 +176,7 @@ describe("recortarMargenesBlancos", () => {
     const w = 10;
     const h = 10;
     const datos = new Uint8ClampedArray(w * h * 4).fill(255);
-    // Bloques 2x2 en esquinas opuestas (el paso 2 siempre los ve).
+    // Bloques 2x2 en esquinas opuestas (bbox = lienzo completo).
     for (const [bx, by] of [
       [0, 0],
       [8, 8],
@@ -202,5 +202,42 @@ describe("recortarMargenesBlancos", () => {
         throw new Error("no debe crear lienzo");
       }),
     ).toBe(src);
+  });
+
+  it("tinta en impares → bbox exacto (regresión paso 2)", () => {
+    // L en x=11/y=7 impares: con paso 2 filas y columnas enteras se ven blancas.
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const tinta = (x: number, y: number): void => {
+      const i = (y * w + x) * 4;
+      datos[i] = 0;
+      datos[i + 1] = 0;
+      datos[i + 2] = 0;
+    };
+    for (let y = 5; y <= 24; y += 1) tinta(11, y);
+    for (let x = 5; x <= 34; x += 1) tinta(x, 7);
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    // bbox x5-34/y5-24 sin margen → sx5 sy5 w30 h20
+    expect(out.width).toBe(30);
+    expect(out.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 });

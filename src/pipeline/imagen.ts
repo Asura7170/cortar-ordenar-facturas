@@ -58,8 +58,8 @@ export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
 /** Canal <245 = tinta (250 es blanco hoja; 245 tolera JPEG/sombra mesa). */
 const TINTA_UMBRAL = 245;
-/** Paso de muestreo en el scan de bordes (O(n/4), basta a 720px). */
-const PASO_BORDE = 2;
+/** Paso del scan de bordes (1: exacto; sub-ms a 720px, muy lejos de los ~250ms de ORT). */
+const PASO_BORDE = 1;
 /** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
 const MARGEN_RECORTE = 0;
 /** Bbox <15% del área → no recortar (ticket ralo, evita colapso). */
