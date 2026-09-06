@@ -215,7 +215,7 @@ describe("warpear", () => {
     }
   });
 
-  it("rellena en blanco fuera del quad (el JPEG no tiene alpha)", () => {
+  it("fuera del quad → blanco (parcial o total)", () => {
     const w = 8;
     const h = 8;
     const src: BuferPixeles = {
@@ -243,6 +243,14 @@ describe("warpear", () => {
       grande.datos[c + 2],
       grande.datos[c + 3],
     ]).toEqual([0, 0, 0, 255]);
+    // Todo fuera → todo blanco.
+    const lejos: Quad = [
+      { x: 20, y: 20 },
+      { x: 30, y: 20 },
+      { x: 30, y: 30 },
+      { x: 20, y: 30 },
+    ];
+    expect(Array.from(warpear(src, lejos, 4, 4).datos).every((v) => v === 255)).toBe(true);
   });
 });
 
@@ -303,16 +311,29 @@ describe("detectarYRecortar", () => {
   const original = new Blob(["orig"], { type: "image/jpeg" });
   const cargar = async (): Promise<ImageBitmap> => bitmapFalso(80, 80);
 
-  it("con esquinas devuelve el recorte jpeg", async () => {
+  // Esquinas al borde del heatmap o cortadas por el marco (vía pad 100): ambas recortan.
+  it.each([
+    {
+      celdas: [
+        [0, 0],
+        [7, 0],
+        [7, 7],
+        [0, 7],
+      ],
+    },
+    {
+      celdas: [
+        [2, 2],
+        [5, 2],
+        [5, 5],
+        [2, 5],
+      ],
+    },
+  ])("con picos $celdas devuelve el recorte jpeg", async ({ celdas }) => {
     const L = 8;
     const sesion: SesionDetectora = {
       inferir: async (): Promise<{ datos: Float32Array; dims: readonly number[] }> => ({
-        datos: heatConPicos(L, [
-          [0, 0],
-          [7, 0],
-          [7, 7],
-          [0, 7],
-        ]),
+        datos: heatConPicos(L, celdas as Array<[number, number]>),
         dims: [1, 4, L, L],
       }),
     };
@@ -463,54 +484,5 @@ describe("conBorde/quitarBorde", () => {
       { x: 100, y: 100 },
       { x: 0, y: 100 },
     ]);
-  });
-});
-
-describe("warpear con quad fuera del marco", () => {
-  it("todo fuera → todo blanco", () => {
-    const w = 8;
-    const h = 8;
-    const src: BuferPixeles = {
-      datos: new Uint8ClampedArray(w * h * 4).fill(0),
-      ancho: w,
-      alto: h,
-    };
-    const lejos: Quad = [
-      { x: 20, y: 20 },
-      { x: 30, y: 20 },
-      { x: 30, y: 30 },
-      { x: 20, y: 30 },
-    ];
-    const fuera = warpear(src, lejos, 4, 4);
-    expect(Array.from(fuera.datos).every((v) => v === 255)).toBe(true);
-  });
-});
-
-describe("detectarYRecortar con picos en el borde", () => {
-  it("esquinas cortadas por el marco igual recortan (vía pad)", async () => {
-    const original = new Blob(["orig"], { type: "image/jpeg" });
-    const cargar = async (): Promise<ImageBitmap> => bitmapFalso(80, 80);
-    // Foto 80×80 → con borde 280×280; picos cerca del borde del heatmap 8×8
-    // caen dentro del pad y, tras restar 100, fuera del original.
-    const L = 8;
-    const sesion: SesionDetectora = {
-      inferir: async (): Promise<{ datos: Float32Array; dims: readonly number[] }> => ({
-        datos: heatConPicos(L, [
-          [2, 2],
-          [5, 2],
-          [5, 5],
-          [2, 5],
-        ]),
-        dims: [1, 4, L, L],
-      }),
-    };
-    const falso = lienzoFalso(blanco(80, 80));
-    const fuera = await detectarYRecortar(original, {
-      cargar,
-      crear: falso.crear,
-      sesion: async () => sesion,
-    });
-    expect(fuera).not.toBe(original);
-    expect(fuera.type).toBe("image/jpeg");
   });
 });

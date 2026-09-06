@@ -2,7 +2,7 @@
    Geometría y decode portados de andor83/ml-web-scanner (MIT — ver public/models/NOTICE.txt);
    pesos DocAligner de DocsaidLab (Apache-2.0 — ver public/models/NOTICE.txt).
    Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + blancas). Fallo → blob original. */
-import { CALIDAD_JPEG } from "./imagen";
+import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 /** Punto en píxeles de la imagen original. */
@@ -31,10 +31,7 @@ export const PAD_BORDE: number = 100;
 export const UMBRAL_HEATMAP: number = 0.3;
 
 /** Modelo vendoreado same-origin (COEP require-corp bloquea CDNs sin cabecera CORP). */
-export const RUTA_MODELO: string = `${import.meta.env.BASE_URL}models/lcnet100_h_e_bifpn_256_fp32.onnx`;
-
-/** Arista máxima de salida del warp (heredado; el ticket medio no lo toca). */
-const ARISTA_MAX_SALIDA = 4096;
+const RUTA_MODELO: string = `${import.meta.env.BASE_URL}models/lcnet100_h_e_bifpn_256_fp32.onnx`;
 
 /** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
 export function ordenarQuad(puntos: readonly Punto[]): Quad {
@@ -102,7 +99,7 @@ export function areaQuad(quad: Quad): number {
 }
 
 /** Longitudes [sup, der, inf, izq]. */
-export function ladosQuad(quad: Quad): [number, number, number, number] {
+function ladosQuad(quad: Quad): [number, number, number, number] {
   const [a, b, c, d] = quad;
   const dist = (p: Punto, q: Punto): number => Math.hypot(q.x - p.x, q.y - p.y);
   return [dist(a, b), dist(b, c), dist(c, d), dist(d, a)];
@@ -203,15 +200,19 @@ export function calcularHomografia(
 }
 
 /** Tamaño natural de salida: ancho = media de aristas sup/inf, alto = media de laterales. */
+// ponytail: sin tope ARISTA (normalizarImagen ya acota a 2200px, el clamp a 4096 nunca disparaba).
 export function tamanoSalida(quad: Quad): { width: number; height: number } {
   const [sup, der, inf, izq] = ladosQuad(quad);
-  const fija = (v: number): number => Math.max(1, Math.min(ARISTA_MAX_SALIDA, Math.round(v)));
-  return { width: fija((sup + inf) / 2), height: fija((izq + der) / 2) };
+  return {
+    width: Math.max(1, Math.round((sup + inf) / 2)),
+    height: Math.max(1, Math.round((izq + der) / 2)),
+  };
 }
 
-/** Mapeo inverso rectángulo-destino → quad-origen (lo que el warp necesita). */
-function homografiaDestOrigen(quad: Quad, ancho: number, alto: number): Float64Array {
-  return calcularHomografia(
+/** Warp perspectiva por mapeo inverso + muestreo bilineal. Fuera del quad: blanco (el JPEG no tiene alpha). */
+export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: number): BuferPixeles {
+  // ponytail: homografía inline (un solo llamador).
+  const h = calcularHomografia(
     [
       { x: 0, y: 0 },
       { x: ancho - 1, y: 0 },
@@ -220,11 +221,6 @@ function homografiaDestOrigen(quad: Quad, ancho: number, alto: number): Float64A
     ],
     [...quad],
   );
-}
-
-/** Warp perspectiva por mapeo inverso + muestreo bilineal. Fuera del quad: blanco (el JPEG no tiene alpha). */
-export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: number): BuferPixeles {
-  const h = homografiaDestOrigen(quad, ancho, alto);
   const fuera = new Uint8ClampedArray(ancho * alto * 4);
   fuera.fill(255);
   const ent = src.datos;
@@ -282,11 +278,8 @@ export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: numb
   return { datos: fuera, ancho, alto };
 }
 
-// Búfers reutilizados entre disparos (un disparo a la vez: la cola es secuencial).
-let visitados: Uint8Array | null = null;
-let pila: Int32Array | null = null;
-
 /** Decodifica un heatmap (1,4,H,W) a esquinas en píxeles: por canal, centroide ponderado del blob mayor. */
+// ponytail: búfers locales por llamada (plano ~4K, barato); evita estado global mutable entre disparos.
 export function decodificarHeatmap(
   heat: Float32Array,
   dims: readonly number[],
@@ -298,10 +291,8 @@ export function decodificarHeatmap(
   const w = dims[3] ?? 0;
   const plano = h * w;
   if (plano < 1) return { quad: null, confianzas: [] };
-  if (!visitados || visitados.length < plano) {
-    visitados = new Uint8Array(plano);
-    pila = new Int32Array(plano);
-  }
+  const visitados = new Uint8Array(plano);
+  const pila = new Int32Array(plano);
   const puntos: Punto[] = [];
   const confianzas: number[] = [];
   for (let c = 0; c < 4; c++) {
@@ -316,15 +307,13 @@ export function decodificarHeatmap(
       if (v > pico) pico = v;
       if (v < umbral || (visitados[ini] ?? 0) === 1) continue;
       let cima = 0;
-      const pl = pila;
-      if (!pl) continue;
-      pl[cima++] = ini;
+      pila[cima++] = ini;
       visitados[ini] = 1;
       let masa = 0;
       let sumaX = 0;
       let sumaY = 0;
       while (cima > 0) {
-        const idx = pl[--cima] ?? 0;
+        const idx = pila[--cima] ?? 0;
         const val = heat[base + idx] ?? 0;
         const x = idx % w;
         const y = (idx / w) | 0;
@@ -333,19 +322,19 @@ export function decodificarHeatmap(
         sumaY += y * val;
         if (x > 0 && (visitados[idx - 1] ?? 0) === 0 && (heat[base + idx - 1] ?? 0) >= umbral) {
           visitados[idx - 1] = 1;
-          pl[cima++] = idx - 1;
+          pila[cima++] = idx - 1;
         }
         if (x < w - 1 && (visitados[idx + 1] ?? 0) === 0 && (heat[base + idx + 1] ?? 0) >= umbral) {
           visitados[idx + 1] = 1;
-          pl[cima++] = idx + 1;
+          pila[cima++] = idx + 1;
         }
         if (y > 0 && (visitados[idx - w] ?? 0) === 0 && (heat[base + idx - w] ?? 0) >= umbral) {
           visitados[idx - w] = 1;
-          pl[cima++] = idx - w;
+          pila[cima++] = idx - w;
         }
         if (y < h - 1 && (visitados[idx + w] ?? 0) === 0 && (heat[base + idx + w] ?? 0) >= umbral) {
           visitados[idx + w] = 1;
-          pl[cima++] = idx + w;
+          pila[cima++] = idx + w;
         }
       }
       if (masa > mejorMasa) {
@@ -372,11 +361,8 @@ export interface SesionDetectora {
   ) => Promise<{ datos: Float32Array; dims: readonly number[] }>;
 }
 
-const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
-const crearReal: CrearLienzo = () => document.createElement("canvas");
-
 /** Fuente dibujable: bitmap decodificado o lienzo con borde (ambos exponen width/height). */
-export type FuenteDibujable = ImageBitmap | HTMLCanvasElement;
+type FuenteDibujable = ImageBitmap | HTMLCanvasElement;
 
 /** Bitmap → tensor CHW RGB 0..1 de 256×256 (aspecto achatado, como la referencia). */
 export function bitmapATensor(bmp: FuenteDibujable, crear: CrearLienzo = crearReal): Float32Array {
@@ -464,7 +450,7 @@ export function obtenerSesion(): Promise<SesionDetectora> {
 }
 
 /** Presupuesto por intento de EP: un compile sano tarda ~1s; más es hardware colgado (ORT no siempre rechaza). */
-export const TIMEOUT_EP_MS: number = 30_000;
+const TIMEOUT_EP_MS: number = 30_000;
 
 /** EPs caídos en esta carga (fallo o timeout): el fallo de init es determinista, no se reintentan. */
 const epCaidos = new Set<string>();

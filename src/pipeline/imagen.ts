@@ -51,7 +51,10 @@ export type CargarBitmap = (f: Blob, opc?: ImageBitmapOptions) => Promise<ImageB
 /** Fábrica de lienzo inyectable (los tests usan un falso). */
 export type CrearLienzo = () => HTMLCanvasElement;
 
-const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
+export const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
+
+/** Fábrica real de lienzo (compartida con docaligner para no duplicarla). */
+export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
 /** Por qué se rechazó una imagen (para el aviso; el llamador mapea a texto). */
 export type MotivoImagen = "blanca" | "ilegible";
@@ -64,7 +67,7 @@ export type MotivoImagen = "blanca" | "ilegible";
 export async function normalizarImagen(
   f: File,
   cargar: CargarBitmap = cargarReal,
-  crear: CrearLienzo = () => document.createElement("canvas"),
+  crear: CrearLienzo = crearReal,
 ): Promise<Blob> {
   let bmp: ImageBitmap | null = null;
   try {
