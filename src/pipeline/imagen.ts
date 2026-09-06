@@ -60,8 +60,8 @@ export const crearReal: CrearLienzo = () => document.createElement("canvas");
 const TINTA_UMBRAL = 245;
 /** Paso de muestreo en el scan de bordes (O(n/4), basta a 720px). */
 const PASO_BORDE = 2;
-/** Margen de seguridad alrededor del bbox (no rozar texto al borde). */
-const MARGEN_RECORTE = 8;
+/** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
+const MARGEN_RECORTE = 0;
 /** Bbox <15% del área → no recortar (ticket ralo, evita colapso). */
 const AREA_MINIMA = 0.15;
 

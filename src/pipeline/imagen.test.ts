@@ -111,14 +111,14 @@ describe("normalizarImagen", () => {
 });
 
 describe("recortarMargenesBlancos", () => {
-  // Foto 40x30 con bloque oscuro central (x15-24, y10-19) = foto sobre hoja blanca.
+  // Foto 40x30 con bloque oscuro amplio (x5-34, y5-24) = foto sobre hoja blanca.
   function lienzoConMarco(): { src: HTMLCanvasElement; dibujos: unknown[][] } {
     const w = 40;
     const h = 30;
     const datos = new Uint8ClampedArray(w * h * 4);
     for (let y = 0; y < h; y += 1) {
       for (let x = 0; x < w; x += 1) {
-        const tinta = x >= 15 && x <= 24 && y >= 10 && y <= 19;
+        const tinta = x >= 5 && x <= 34 && y >= 5 && y <= 24;
         const i = (y * w + x) * 4;
         const v = tinta ? 0 : 255;
         datos[i] = v;
@@ -148,12 +148,12 @@ describe("recortarMargenesBlancos", () => {
     return { src: recortarMargenesBlancos(src, crear), dibujos };
   }
 
-  it("marco blanco → recorta al bbox +8px", () => {
+  it("marco blanco → recorta al bbox exacto", () => {
     const { src, dibujos } = lienzoConMarco();
-    // bbox x15-24/y10-19 +8 → sx7 sy2 w26 h26
-    expect(src.width).toBe(26);
-    expect(src.height).toBe(26);
-    expect(dibujos[0]?.slice(1)).toEqual([7, 2, 26, 26, 0, 0, 26, 26]);
+    // bbox x5-34/y5-24 sin margen → sx5 sy5 w30 h20
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
   it("todo blanco → devuelve el mismo lienzo", () => {
