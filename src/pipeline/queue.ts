@@ -65,11 +65,20 @@ export async function procesarCola(): Promise<void> {
         const original = await blobDeItem(sig);
         const recortada = await detectarYRecortar(original);
         if (recortada !== original) {
-          URL.revokeObjectURL(sig.imgUrl);
-          if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
-          sig.imgUrl = URL.createObjectURL(recortada);
-          sig.file = recortada;
-          sig.thumbUrl = await generarMiniatura(recortada);
+          // ponytail: commit tras el await — si se limpió durante la espera, se
+          // revocan las nuevas y el guard de abajo evita resucitar.
+          const imgNueva = URL.createObjectURL(recortada);
+          const thumbNueva = await generarMiniatura(recortada);
+          if (!buscarSlot(sig.id)) {
+            URL.revokeObjectURL(imgNueva);
+            if (thumbNueva) URL.revokeObjectURL(thumbNueva);
+          } else {
+            URL.revokeObjectURL(sig.imgUrl);
+            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
+            sig.imgUrl = imgNueva;
+            sig.file = recortada;
+            sig.thumbUrl = thumbNueva;
+          }
         }
       } catch {
         // ponytail: sin recorte se sigue con el original; la cola no se detiene

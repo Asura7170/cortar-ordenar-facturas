@@ -14,11 +14,16 @@ export default defineConfig({
       configureServer(servidor) {
         servidor.middlewares.use((pet, res, sig) => {
           const url = pet.url ?? "";
-          if (!url.startsWith("/ort/") || !url.includes(".mjs")) {
+          if (!url.startsWith("/ort/")) {
             sig();
             return;
           }
           const base = url.split("/").pop()?.split("?")[0] ?? "";
+          // ponytail: basename estricto — ni `\` (separador Windows) ni query-trucos salen de public/ort.
+          if (!/^[\w.-]+\.mjs$/.test(base)) {
+            sig();
+            return;
+          }
           readFile(join(process.cwd(), "public", "ort", base))
             .then((bytes) => {
               res.setHeader("Content-Type", "text/javascript");

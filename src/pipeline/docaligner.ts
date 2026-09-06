@@ -510,7 +510,8 @@ async function crearSesion(): Promise<SesionDetectora> {
   // ponytail: single-thread a propósito — los workers pthread del build threaded los bloquea
   // Chrome bajo COEP require-corp (y en headless cuelgan sin rechazar); ~250ms/foto bastan.
   ort.env.wasm.numThreads = 1;
-  const res = await fetch(RUTA_MODELO);
+  // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
+  const res = await fetch(RUTA_MODELO, { signal: AbortSignal.timeout(TIMEOUT_EP_MS) });
   if (!res.ok) throw new Error(`modelo DocAligner: HTTP ${res.status}`);
   const pesos = await res.arrayBuffer();
   return iniciarSesion(async (ep: string): Promise<SesionDetectora> => {
@@ -571,7 +572,8 @@ export async function detectarYRecortar(blob: Blob, deps?: DepsRecorte): Promise
     const quad = await detectarEsquinas(base, sesion, crear);
     if (!quad) return blob;
     return await rectificar(bmp, quitarBorde(quad), crear);
-  } catch {
+  } catch (e: unknown) {
+    console.warn(`DocAligner: recorte omitido (${e instanceof Error ? e.message : String(e)})`);
     return blob;
   } finally {
     bmp?.close();
