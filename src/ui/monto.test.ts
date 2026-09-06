@@ -3,8 +3,16 @@ import { describe, expect, it } from "vite-plus/test";
 
 document.body.innerHTML = '<div id="montoTotal"></div>';
 const { state, crearHoja } = await import("../state");
-const { aplanar, cuentaHoja, formatearMoneda, itemsDe, renderMonto, sumaTotal, totalItems } =
-  await import("./monto");
+const {
+  aplanar,
+  cuentaHoja,
+  formatearMoneda,
+  itemsDe,
+  parsearMonto,
+  renderMonto,
+  sumaTotal,
+  totalItems,
+} = await import("./monto");
 const { comprobante } = await import("../test/factoria");
 import type { Hoja } from "../types";
 
@@ -64,5 +72,24 @@ describe("renderMonto", () => {
     hojaCon([123456]);
     renderMonto();
     expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 1,234.56");
+  });
+});
+
+describe("parsearMonto", () => {
+  it("US con miles, plano y coma decimal", () => {
+    expect(parsearMonto("1,234.56")).toBe(123456);
+    expect(parsearMonto("1234.56")).toBe(123456);
+    expect(parsearMonto("1234,56")).toBe(123456);
+    expect(parsearMonto("500")).toBe(50000);
+    expect(parsearMonto("12.5")).toBe(1250);
+    expect(parsearMonto("  $ 1,234.56 ")).toBe(123456);
+  });
+
+  it("inválidos → null", () => {
+    expect(parsearMonto("")).toBeNull();
+    expect(parsearMonto("abc")).toBeNull();
+    expect(parsearMonto("1,234")).toBeNull(); // miles sin decimales: escribir 1234
+    expect(parsearMonto("12.345")).toBeNull();
+    expect(parsearMonto("-5")).toBeNull();
   });
 });

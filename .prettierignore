@@ -1,2 +1,5 @@
 # Vendoreado upstream (onnxruntime-web): no reformatear.
 public/ort/
+# Modelos PP-OCRv6 vendoreados + dict generado desde rec.yml: no reformatear.
+public/models/ocr/
+src/pipeline/ocrDict.ts

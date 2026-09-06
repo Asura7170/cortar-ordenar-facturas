@@ -2,7 +2,14 @@
 import { buscarSlot, hojaPorId, limpiarHojas, redistribuir, state } from "../state";
 import type { Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
-import { aplanar, cuentaHoja, formatearMoneda, renderMonto, totalItems } from "./monto";
+import {
+  aplanar,
+  cuentaHoja,
+  formatearMoneda,
+  parsearMonto,
+  renderMonto,
+  totalItems,
+} from "./monto";
 import { getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
@@ -103,10 +110,24 @@ function pintarCelda(
     div.append(img, btn);
   }
   if (item.montoCents != null) {
-    const badge = document.createElement("span");
+    const badge = document.createElement("button");
+    badge.type = "button";
     badge.className = "cell-badge";
+    badge.dataset["accion"] = "corregir-monto";
+    badge.title = "Total (clic para corregir)";
     badge.textContent = formatearMoneda(item.montoCents);
     div.append(badge);
+  } else if (item.estado === "ok") {
+    // Sin LLM el total siempre es manual (flujo N del spec).
+    const entrada = document.createElement("input");
+    entrada.className = "cell-monto";
+    entrada.type = "text";
+    entrada.inputMode = "decimal";
+    entrada.placeholder = "Total…";
+    entrada.title = "Total del comprobante (ej. 1234.56)";
+    entrada.setAttribute("aria-label", `Total de ${item.nombre}`);
+    entrada.dataset["accion"] = "monto";
+    div.append(entrada);
   }
 }
 
@@ -597,6 +618,13 @@ export function initSheets(cb: SheetsCallbacks): void {
       case "quitar":
         quitarComprobante(id);
         return;
+      case "corregir-monto": {
+        const item = aplanar().find((c) => c.id === id);
+        if (!item) return;
+        item.montoCents = null;
+        renderHojas();
+        return;
+      }
       case "layout":
         cambiarLayoutHoja(btn.dataset["hoja"] ?? "", btn.dataset["layout"] ?? "");
         return;
@@ -604,6 +632,24 @@ export function initSheets(cb: SheetsCallbacks): void {
         aplicarATodas(btn.dataset["hoja"] ?? "");
         return;
     }
+  });
+
+  // Monto manual: un solo change delegado (el render reconstruye la grilla).
+  sheetsEl.addEventListener("change", (e) => {
+    const target = e.target as HTMLElement | null;
+    if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") return;
+    const cell = target.closest(".cell");
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+    const item = aplanar().find((c) => c.id === id);
+    if (!item) return;
+    const cents = parsearMonto(target.value);
+    // Inválido → re-render restaura el input vacío (el title muestra el formato).
+    if (cents === null) {
+      renderHojas();
+      return;
+    }
+    item.montoCents = cents;
+    renderHojas();
   });
 
   // Drag nativo de archivos del explorador (DataTransfer) sobre las hojas.

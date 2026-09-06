@@ -1,5 +1,6 @@
-/* Cola secuencial de procesamiento — DocAligner recorta, PaddleOCR/LLM extraen (mock aún).
-   crop.ts vive en docaligner.ts; la firma procesarCola() ya es la final. */
+/* Cola secuencial de procesamiento — DocAligner recorta, PP-OCRv6_small extrae
+   texto (import dinámico: dict+onnx solo bajan con el primer comprobante).
+   El monto queda manual hasta el LLM (extract.ts futuro). */
 import { buscarSlot, state } from "../state";
 import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
@@ -84,9 +85,14 @@ export async function procesarCola(): Promise<void> {
         // ponytail: sin recorte se sigue con el original; la cola no se detiene
       }
       if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
-      // Valores de ejemplo para validar UI/UX (diseño primero, OCR/LLM después).
-      sig.textoOcr = sanear(`FACTURA ${sig.nombre}\nFecha: 12/08/2026\nTOTAL: US$ 1,234.56`);
-      sig.montoCents = 123456;
+      // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
+      try {
+        const { extraerTexto } = await import("./ocr");
+        sig.textoOcr = sanear(await extraerTexto(await blobDeItem(sig)));
+      } catch {
+        sig.textoOcr = "";
+      }
+      sig.montoCents = null;
       sig.estado = "ok";
       renderHojas();
     }

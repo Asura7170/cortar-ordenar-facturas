@@ -45,7 +45,7 @@ export interface Comprobante {
   imgUrl: string;
   /** Miniatura JPEG o null (→ esqueleto) hasta que se genere (PDF: mismo blob que imgUrl). */
   thumbUrl: string | null;
-  /** Texto OCR (mock de ejemplo hasta integrar PaddleOCR). */
+  /** Texto OCR (PP-OCRv6_small; "" si nada o si falló). */
   textoOcr: string;
   /** Total en cents o null si aún no se extrajo. */
   montoCents: Cents | null;

@@ -799,9 +799,10 @@ body.is-dragging .cell:not(.empty) {
   border-color: var(--verde-tinta);
 }
 
-/* Durante el drag, el botón × y el badge no deben capturar el drop */
+/* Durante el drag, el botón ×, el badge y el input no deben capturar el drop */
 .sheet-grid.dragging .cell-remove,
-.sheet-grid.dragging .cell-badge {
+.sheet-grid.dragging .cell-badge,
+.sheet-grid.dragging .cell-monto {
   pointer-events: none;
 }
 
@@ -815,6 +816,7 @@ body.is-dragging .cell:not(.empty) {
   position: absolute;
   bottom: 6px;
   right: 6px;
+  font: inherit;
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 600;
@@ -825,6 +827,36 @@ body.is-dragging .cell:not(.empty) {
   padding: 2px 7px;
   font-variant-numeric: tabular-nums;
   z-index: 2;
+  cursor: pointer;
+}
+/* Hit-area 44px como el × (el badge visual es bajo). */
+.cell-badge::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+}
+.cell-badge:focus-visible {
+  outline: 2px solid var(--verde-tinta);
+  outline-offset: 2px;
+}
+.cell-monto {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 11ch;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--papel-brillo);
+  color: var(--verde-tinta);
+  border: 1px solid var(--renglon-fuerte);
+  border-radius: 4px;
+  padding: 2px 7px;
+  z-index: 2;
+}
+.cell-monto:focus-visible {
+  outline: 2px solid var(--verde-tinta);
+  outline-offset: 2px;
 }
 .cell-remove {
   position: absolute;
