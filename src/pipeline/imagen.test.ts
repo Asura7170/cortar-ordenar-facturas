@@ -1,7 +1,7 @@
 /* Tests: imagen — normalización JPEG única, tope 2000px, filtro blancas/corruptas. */
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { CALIDAD_JPEG, LADO_MAX_IMAGEN, normalizarImagen } from "./imagen";
-import type { CargarBitmap } from "./imagen";
+import { CALIDAD_JPEG, LADO_MAX_IMAGEN, normalizarImagen, recortarMargenesBlancos } from "./imagen";
+import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 function bitmapFalso(w: number, h: number): ImageBitmap {
   return { width: w, height: h, close: vi.fn() } as unknown as ImageBitmap;
@@ -107,5 +107,137 @@ describe("normalizarImagen", () => {
     await expect(
       normalizarImagen(img("n.png", "image/png"), cargar(10, 10), () => lienzoNulo),
     ).rejects.toThrow("ilegible");
+  });
+});
+
+describe("recortarMargenesBlancos", () => {
+  /** Foto 40x30 con bloque oscuro amplio (x5-34, y5-24) = foto sobre hoja blanca. */
+  function lienzoConMarco(): { src: HTMLCanvasElement; dibujos: unknown[][] } {
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const tinta = x >= 5 && x <= 34 && y >= 5 && y <= 24;
+        const i = (y * w + x) * 4;
+        const v = tinta ? 0 : 255;
+        datos[i] = v;
+        datos[i + 1] = v;
+        datos[i + 2] = v;
+        datos[i + 3] = 255;
+      }
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const crear: CrearLienzo = () => salida;
+    return { src: recortarMargenesBlancos(src, crear), dibujos };
+  }
+
+  it("marco blanco → recorta al bbox exacto", () => {
+    const { src, dibujos } = lienzoConMarco();
+    // bbox x5-34/y5-24 sin margen → sx5 sy5 w30 h20
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("todo blanco → devuelve el mismo lienzo", () => {
+    const datos = new Uint8ClampedArray(10 * 10 * 4).fill(255);
+    const src = {
+      width: 10,
+      height: 10,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    expect(
+      recortarMargenesBlancos(src, () => {
+        throw new Error("no debe crear lienzo");
+      }),
+    ).toBe(src);
+  });
+
+  it("tinta a borde → nada que recortar", () => {
+    const w = 10;
+    const h = 10;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    // Bloques 2x2 en esquinas opuestas (bbox = lienzo completo).
+    for (const [bx, by] of [
+      [0, 0],
+      [8, 8],
+    ] as const) {
+      for (let dy = 0; dy < 2; dy += 1) {
+        for (let dx = 0; dx < 2; dx += 1) {
+          const i = ((by + dy) * w + (bx + dx)) * 4;
+          datos[i] = 0;
+          datos[i + 1] = 0;
+          datos[i + 2] = 0;
+        }
+      }
+    }
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    expect(
+      recortarMargenesBlancos(src, () => {
+        throw new Error("no debe crear lienzo");
+      }),
+    ).toBe(src);
+  });
+
+  it("tinta en impares → bbox exacto (regresión paso 2)", () => {
+    // L en x=11/y=7 impares: con paso 2 filas y columnas enteras se ven blancas.
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const tinta = (x: number, y: number): void => {
+      const i = (y * w + x) * 4;
+      datos[i] = 0;
+      datos[i + 1] = 0;
+      datos[i + 2] = 0;
+    };
+    for (let y = 5; y <= 24; y += 1) tinta(11, y);
+    for (let x = 5; x <= 34; x += 1) tinta(x, 7);
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    // bbox x5-34/y5-24 sin margen → sx5 sy5 w30 h20
+    expect(out.width).toBe(30);
+    expect(out.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 });

@@ -56,6 +56,87 @@ export const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
 /** Fábrica real de lienzo (compartida con docaligner para no duplicarla). */
 export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
+/** Canal <245 = tinta (250 es blanco hoja; 245 tolera JPEG/sombra mesa). */
+const TINTA_UMBRAL = 245;
+/** Paso del scan de bordes (1: exacto; sub-ms a 720px, muy lejos de los ~250ms de ORT). */
+const PASO_BORDE = 1;
+/** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
+const MARGEN_RECORTE = 0;
+/** Bbox <15% del área → no recortar (ticket ralo, evita colapso). */
+const AREA_MINIMA = 0.15;
+
+/**
+ * Recorta franjas blancas laterales (hoja PDF alrededor de la foto).
+ * La sombra de la mesa cuenta como tinta, así que el bbox conserva la
+ * foto + sombra y el ticket blanco interior no se agujerea.
+ */
+// ponytail: bbox por luminancia, no Canny; guarda 15% si ticket ralo.
+export function recortarMargenesBlancos(
+  src: HTMLCanvasElement,
+  crear: CrearLienzo = crearReal,
+): HTMLCanvasElement {
+  const ancho = src.width;
+  const alto = src.height;
+  if (ancho < 1 || alto < 1) return src;
+  const ctx = src.getContext("2d");
+  if (!ctx) return src;
+  let datos: Uint8ClampedArray;
+  try {
+    datos = ctx.getImageData(0, 0, ancho, alto).data;
+  } catch {
+    return src;
+  }
+  const esTinta = (idx: number): boolean => {
+    if ((datos[idx + 3] ?? 0) < 128) return false;
+    return (
+      (datos[idx] ?? 255) < TINTA_UMBRAL ||
+      (datos[idx + 1] ?? 255) < TINTA_UMBRAL ||
+      (datos[idx + 2] ?? 255) < TINTA_UMBRAL
+    );
+  };
+  const filaTinta = (y: number): boolean => {
+    const base = y * ancho;
+    for (let x = 0; x < ancho; x += PASO_BORDE) {
+      if (esTinta((base + x) * 4)) return true;
+    }
+    return false;
+  };
+  const colTinta = (x: number): boolean => {
+    for (let y = 0; y < alto; y += PASO_BORDE) {
+      if (esTinta((y * ancho + x) * 4)) return true;
+    }
+    return false;
+  };
+  let x0 = 0;
+  let y0 = 0;
+  let x1 = ancho - 1;
+  let y1 = alto - 1;
+  while (y0 < y1 && !filaTinta(y0)) y0 += 1;
+  while (y1 > y0 && !filaTinta(y1)) y1 -= 1;
+  while (x0 < x1 && !colTinta(x0)) x0 += 1;
+  while (x1 > x0 && !colTinta(x1)) x1 -= 1;
+  if (!filaTinta(y0) && !colTinta(x0)) return src;
+  const sx = Math.max(0, x0 - MARGEN_RECORTE);
+  const sy = Math.max(0, y0 - MARGEN_RECORTE);
+  const ex = Math.min(ancho - 1, x1 + MARGEN_RECORTE);
+  const ey = Math.min(alto - 1, y1 + MARGEN_RECORTE);
+  const w = ex - sx + 1;
+  const h = ey - sy + 1;
+  if (w * h < ancho * alto * AREA_MINIMA) return src;
+  if (w >= ancho && h >= alto) return src;
+  const out = crear();
+  out.width = Math.max(1, w);
+  out.height = Math.max(1, h);
+  const octx = out.getContext("2d");
+  if (!octx) return src;
+  try {
+    octx.drawImage(src, sx, sy, w, h, 0, 0, w, h);
+  } catch {
+    return src;
+  }
+  return out;
+}
+
 /** Por qué se rechazó una imagen (para el aviso; el llamador mapea a texto). */
 export type MotivoImagen = "blanca" | "ilegible";
 
