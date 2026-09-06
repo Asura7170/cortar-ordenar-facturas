@@ -8,7 +8,7 @@ const { procesarCola } = await import("./queue");
 const { comprobante } = await import("../test/factoria");
 
 beforeEach(() => {
-  // La cola MOCK usa sleep(900ms): se avanza a mano con timers falsos.
+  // Sin file ni imgUrl real el recorte falla al blob y sigue con el original: se avanza igual.
   vi.useFakeTimers();
 });
 

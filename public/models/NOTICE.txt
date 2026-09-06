@@ -1,0 +1,15 @@
+Vendoreado third-party (no modificar)
+=========================================
+
+1. lcnet100_h_e_bifpn_256_fp32.onnx — modelo DocAligner heatmap/lcnet100
+   Origen: DocsaidLab/DocAligner (https://github.com/DocsaidLab/DocAligner)
+   Licencia: Apache-2.0 (ver https://github.com/DocsaidLab/DocAligner/blob/main/LICENSE)
+   Descargado del espejo HuggingFace 7rplus/pagescan-weights (mismo peso, con atribución).
+   Para regenerar: ver scripts/download-models.mjs de andor83/ml-web-scanner
+   (Google Drive de DocsaidLab) o el resolve de HuggingFace indicado en spec.md.
+
+2. Geometría en src/pipeline/docaligner.ts (ordenarQuad, decode heatmap,
+   homografía DLT, warp bilineal) portada de:
+   andor83/ml-web-scanner (https://github.com/andor83/ml-web-scanner)
+   Licencia: MIT. Mejoras locales: relleno blanco fuera del quad (el JPEG no
+   tiene alpha) y clamp de bordes en vez de recorte.

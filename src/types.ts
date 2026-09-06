@@ -41,8 +41,8 @@ export type Cents = number;
 export interface Comprobante {
   readonly id: number;
   readonly nombre: string;
-  /** Blob URL de la imagen normalizada JPEG (revocar con URL.revokeObjectURL al quitar; PDF: render JPEG de la página, no el PDF entero). */
-  readonly imgUrl: string;
+  /** Blob URL de la imagen normalizada JPEG (revocar con URL.revokeObjectURL al quitar; PDF: render JPEG de la página, no el PDF entero). Mutable: el pipeline la reemplaza por el recorte. */
+  imgUrl: string;
   /** Miniatura JPEG o null (→ esqueleto) hasta que se genere (PDF: mismo blob que imgUrl). */
   thumbUrl: string | null;
   /** Texto OCR (mock de ejemplo hasta integrar PaddleOCR). */
@@ -52,7 +52,8 @@ export interface Comprobante {
   readonly moneda: Moneda;
   estado: EstadoComprobante;
   readonly posicion: number;
-  readonly file?: Blob;
+  /** Blob original (imágenes) o recorte DocAligner; ausente en PDF (usar imgUrl). Mutable: el pipeline lo reemplaza por el recorte. */
+  file?: Blob;
 }
 
 /** Hoja carta con casillas fijas (una por posición de la plantilla). */

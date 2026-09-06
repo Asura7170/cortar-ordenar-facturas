@@ -13,6 +13,7 @@
     "prepare": "vp config"
   },
   "dependencies": {
+    "onnxruntime-web": "1.29.0",
     "pdfjs-dist": "^6.3.289"
   },
   "devDependencies": {

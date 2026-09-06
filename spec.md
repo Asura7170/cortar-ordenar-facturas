@@ -4,7 +4,7 @@ App frontend-only, Chrome-only. TypeScript + Vite+ (toolchain VoidZero: Vite 8, 
 
 ## Resumen
 
-Pegar/subir/arrastrar imágenes y PDFs → recorte con OpenCV.js → OCR con PaddleOCR (PP-OCRv6_small) → extracción de TOTAL con LLM openai-compatible (o monto manual) → grilla carta N-up (default 4, arrastre libre tipo Word) → exportar .docx con footer derecho (código de pedido).
+Pegar/subir/arrastrar imágenes y PDFs → recorte DocAligner (heatmap/lcnet100 vía onnxruntime-web + warp en canvas) → OCR con PaddleOCR (PP-OCRv6_small) → extracción de TOTAL con LLM openai-compatible (o monto manual) → grilla carta N-up (default 4, arrastre libre tipo Word) → exportar .docx con footer derecho (código de pedido).
 
 ## Estructura / esqueleto
 
@@ -29,7 +29,7 @@ facturas/
    │  ├─ ocrModal.ts       # ventana flotante texto OCR (solo lectura + copiar)
    │  └─ settingsModal.ts  # endpoint, model, apiKey, moneda
    ├─ pipeline/
-   │  ├─ crop.ts           # OpenCV.js: grayscale→blur→Canny→contours→warp, fallback full
+   │  ├─ docaligner.ts     # DocAligner heatmap/lcnet100 (onnxruntime-web webgpu→wasm) + warp canvas, fallback full
    │  ├─ ocr.ts            # PaddleOCR.create({ocrVersion:'PP-OCRv6', lang:'latin', worker:true})
    │  ├─ pdf.ts            # pdf.js → cada página a ImageBitmap (200dpi, JPEG .85, tope res)
    │  ├─ extract.ts        # LLM openai-compatible: texto OCR → {total, currency}
@@ -44,8 +44,9 @@ facturas/
 - **Código pedido:** check on/off + input N (solo dígitos), ambos persisten en localStorage; footer derecho en todas las hojas del .docx; check activo con < N dígitos → bloquear descarga con mensaje.
 - **Monto:** 1 TOTAL por comprobante; suma exacta en cents (sin float); badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); LLM sin TOTAL → campo manual en tarjeta (sí suma).
 - **Limpiar:** borra comprobantes, montos y textos OCR; conserva check, N, y configuración IA/moneda.
+- **Recorte:** DocAligner heatmap/lcnet100 vendoreado (`public/models/`, Apache-2.0, ver NOTICE.txt); foto con borde negro 100px (receta del demo: extrapola esquinas cortadas), inferencia onnxruntime-web (WebGPU→WASM, `public/ort/`), warp por homografía en canvas con fondo blanco; sin 4 esquinas plausibles (conf ≥0.3, área 5–98%, convexo) → imagen completa, la cola sigue. Sin config de modelo en UI.
 - **Errores:** continuar + estado por item; el monto suma solo los OK; el resto se procesa.
-- **Formato de entrada:** imágenes + PDF multipágina (cada página no-blanca = comprobante; blancas/vacías se omiten); un PDF entra solo si pesa ≤ 5 MB y tiene ≤ 10 páginas (cada archivo se evalúa solo; rechazo → aviso en la entrada, sin entrar a la cola); HEIC → aviso "formato no soportado", no falla la cola.
+- **Formato de entrada:**imágenes + PDF multipágina (cada página no-blanca = comprobante; blancas/vacías se omiten); un PDF entra solo si pesa ≤ 5 MB y tiene ≤ 10 páginas (cada archivo se evalúa solo; rechazo → aviso en la entrada, sin entrar a la cola); HEIC → aviso "formato no soportado", no falla la cola.
 - **EXIF:** createImageBitmap con orientación respetada; redimensionar automática si > 2000px lado mayor.
 - **Grilla:** N por hoja default 4; arrastre libre dentro de la hoja (posiciones % página, z-order), NO cambia el orden de inserción; X elimina comprobante completo; scroll vertical, hojas ajustadas al ancho.
 - **OCR modal:** solo lectura, select por comprobante, botón copiar; texto usado solo por el LLM.
@@ -64,9 +65,9 @@ flowchart TD
     C -- "Imagen" --> E["createImageBitmap + EXIF<br/>resize si > 2000px"]
     D --> F["Cola secuencial FIFO<br/>estado por item: procesando/OK/error"]
     E --> F
-    F --> G["OpenCV.js crop<br/>grayscale → blur → Canny → contours<br/>approxPolyDP 4 pts → warp"]
-    G --> H{"¿Contorno detectado?"}
-    H -- "No (papel llena frame)" --> I["Imagen completa, sin recortar"]
+    F --> G["DocAligner lcnet100 (onnxruntime-web)<br/>tensor 256 → heatmap → 4 esquinas → warp canvas"]
+    G --> H{"¿Quad plausible?<br/>conf ≥0.3 · área 5–98% · convexo"}
+    H -- "No (sin documento / borroso)" --> I["Imagen completa, sin recortar"]
     H -- "Sí" --> J["Imagen recortada"]
     I --> K["PaddleOCR PP-OCRv6_small<br/>worker · lang latin"]
     J --> K

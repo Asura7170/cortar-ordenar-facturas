@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-TypeScript + Vite (dev server `npm run dev --open`, build a `dist/`). Frontend-only, sin backend. Chrome-only. OCR con PaddleOCR PP-OCRv6_small (SDK `@paddleocr/paddleocr-js`), recorte con OpenCV.js, export .docx con docx.js, PDF con pdf.js.
+TypeScript + Vite (dev server `npm run dev --open`, build a `dist/`). Frontend-only, sin backend. Chrome-only. OCR con PaddleOCR PP-OCRv6_small (SDK `@paddleocr/paddleocr-js`), recorte DocAligner heatmap/lcnet100 (ONNX en `onnxruntime-web`), export .docx con docx.js, PDF con pdf.js.
 
 ## Users
 
@@ -29,7 +29,7 @@ Sesiones en escritorio (Chrome), abrir/pegar fotos o PDFs con Ctrl+V desde porta
 ## Capabilities and Constraints
 
 - Entrada: imágenes (jpg/png/webp/bmp/gif) + PDF multipágina (cada página = comprobante); HEIC → aviso formato no soportado, no rompe la cola.
-- Recorte OpenCV.js con fallback a imagen completa si no hay contorno; EXIF respetado; resize automática (>2000px lado mayor).
+- Recorte DocAligner heatmap/lcnet100 con fallback a imagen completa si no hay quad plausible; EXIF respetado; resize automática (>2000px lado mayor).
 - OCR PaddleOCR PP-OCRv6_small (`lang: latin`, worker), cola secuencial FIFO.
 - Monto: 1 TOTAL por comprobante; suma exacta en cents; badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); LLM sin TOTAL → campo manual en tarjeta (sí suma).
 - Código de pedido: check on/off + longitud N (solo dígitos), ambos persisten en localStorage; footer derecho en todas las hojas del .docx; check activo con < N dígitos → bloquea descarga con mensaje.
