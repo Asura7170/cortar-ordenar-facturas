@@ -45,12 +45,20 @@ export async function generarMiniatura(file: Blob): Promise<string | null> {
     return null;
   }
 }
-
 /** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
 async function blobDeItem(sig: Comprobante): Promise<Blob> {
   if (sig.file) return sig.file;
   const res = await fetch(sig.imgUrl);
   return res.blob();
+}
+
+/**
+ * Fija la miniatura final sin revocar el imgUrl: en PDF ambos campos aliasan
+ * la misma URL y revocar el thumb mataba la vista previa. Puro salvo el revoke.
+ */
+export function asignarMiniatura(sig: Comprobante, thumbNueva: string): void {
+  if (sig.thumbUrl && sig.thumbUrl !== sig.imgUrl) URL.revokeObjectURL(sig.thumbUrl);
+  sig.thumbUrl = thumbNueva;
 }
 
 /**
@@ -85,6 +93,8 @@ export async function procesarCola(): Promise<void> {
   state.colaEnProceso = true;
   try {
     // ponytail: drenado por pendiente, no snapshot; token generación si el MOCK se vuelve concurrente.
+    // Fase 1: el "procesando" se pinta por ítem (feedback), el "ok" una vez al drenar.
+    let tocada = false;
     for (;;) {
       // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
       const sig = aplanar().find((c) => c.estado === "pendiente");
@@ -136,7 +146,6 @@ export async function procesarCola(): Promise<void> {
           end = await ocr.enderezar(blob);
           ms.enderezar = performance.now() - t;
           if (end.grados !== 0 && buscarSlot(sig.id)) {
-            console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
             // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
             const imgNueva = URL.createObjectURL(end.blob);
             if (!buscarSlot(sig.id)) {
@@ -177,10 +186,7 @@ export async function procesarCola(): Promise<void> {
         ms.minis += performance.now() - tm;
         if (thumbNueva) {
           if (!buscarSlot(sig.id)) URL.revokeObjectURL(thumbNueva);
-          else {
-            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
-            sig.thumbUrl = thumbNueva;
-          }
+          else asignarMiniatura(sig, thumbNueva);
         }
       }
       if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
@@ -192,8 +198,9 @@ export async function procesarCola(): Promise<void> {
           `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
           `${ms.diag} total=${entero(performance.now() - t0)}`,
       );
-      renderHojas();
+      tocada = true;
     }
+    if (tocada) renderHojas(); // un solo "ok" por lote en vez de uno por ítem
   } finally {
     state.colaEnProceso = false;
   }

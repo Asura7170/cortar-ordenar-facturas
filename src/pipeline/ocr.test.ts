@@ -260,6 +260,8 @@ describe("extraerTexto", () => {
   it("reuse del enderezado: no repite el det (L1)", async () => {
     const { deps, espia } = base();
     const { lienzo } = lienzoFalso(BLANCO32);
+    lienzo.width = 32; // en prod ver() siempre fija dims (mínimo 32)
+    lienzo.height = 32;
     const texto = await extraerTexto(new Blob(["x"]), deps, {
       cajas: [
         {
@@ -282,9 +284,16 @@ describe("extraerTexto", () => {
   it("reuse del enderezado: sin lienzo temporal, solo el del recorte (hilo #4)", async () => {
     const { deps } = base();
     const { lienzo } = lienzoFalso(BLANCO32);
+    lienzo.width = 32; // en prod ver() siempre fija dims (mínimo 32)
+    lienzo.height = 32;
     let creados = 0;
+    let decodes = 0;
     const sinTemporal = {
       ...deps,
+      cargar: (): Promise<ImageBitmap> => {
+        decodes += 1;
+        return Promise.resolve(bitmapFalso(64, 32));
+      },
       crear: (): HTMLCanvasElement => {
         creados += 1;
         return lienzo;
@@ -306,6 +315,7 @@ describe("extraerTexto", () => {
     });
     expect(texto).toBe("AA");
     expect(creados).toBe(1); // solo recorteCaja; antes eran 2 (base temporal + recorte)
+    expect(decodes).toBe(0); // Fase 2: en reuse no se decodifica el blob
   });
 });
 
@@ -707,23 +717,23 @@ describe("enderezar (decisión rec)", () => {
     expect(recLlamadas).toEqual([0]);
   });
 
-  it("0° baja + 90° alta → gira con 2 det (early-exit, sin 270/180)", async () => {
+  it("0° baja + 270° alta → gira con 2 det (early-exit, sin 90/180)", async () => {
     const { blob, deps, detLlamadas, lienzos } = base(
       [mapaUnaLinea(), mapaUnaLinea()],
       [0.3, 0.95],
     );
     const r = await enderezar(blob, deps);
     expect(r.blob).not.toBe(blob);
-    expect(r.grados).toBe(90);
+    expect(r.grados).toBe(270);
     expect(detLlamadas).toEqual([0, 1]);
-    // rot90 del bitmap 64x32: 4º lienzo (rot0, base0, rec0, rot90).
+    // rot270 del bitmap 64x32: 4º lienzo (rot0, base0, rec0, rot270).
     expect([lienzos[3]?.width, lienzos[3]?.height]).toEqual([32, 64]);
   });
 
   it("sin OK → gana el más alto (270) con loop completo", async () => {
     const { deps, detLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
-      [0.3, 0.2, 0.65, 0.1],
+      [0.3, 0.65, 0.2, 0.1],
     );
     const r = await enderezar(new Blob(["foto"]), deps);
     expect(r.grados).toBe(270);
@@ -733,7 +743,7 @@ describe("enderezar (decisión rec)", () => {
   it("todo bajo sin OK → gana el más alto aunque sea bajo (270)", async () => {
     const { blob, deps, detLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
-      [0.3, 0.2, 0.4, 0.1],
+      [0.3, 0.4, 0.2, 0.1],
     );
     const r = await enderezar(blob, deps);
     expect(r.blob).not.toBe(blob);
@@ -762,14 +772,14 @@ describe("enderezar (decisión rec)", () => {
     expect(recLlamadas).toEqual([]);
   });
 
-  it("lote rec falla en 90 → reintenta individual y gana 90 (L2)", async () => {
+  it("lote rec falla en 270 → reintenta individual y gana 270 (L2)", async () => {
     const { deps, detLlamadas, recLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
       [0.3, 0.0, 0.95],
       1,
     );
     const r = await enderezar(new Blob(["foto"]), deps);
-    expect(r.grados).toBe(90);
+    expect(r.grados).toBe(270);
     expect(detLlamadas).toEqual([0, 1]);
     expect(recLlamadas).toEqual([0, 1, 2]);
   });

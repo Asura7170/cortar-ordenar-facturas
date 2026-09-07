@@ -211,7 +211,9 @@ export const UMBRAL_REC_OK: number = 0.9;
 /** Cajas por orientación que puntúa el rec (más es más recs, no más señal). */
 export const TOP_CAJAS_GIRO = 2;
 /** Orden de prueba: lo común primero (bypass inmediato), el revés al final. */
-const GIROS_PRUEBA: readonly Giro[] = [0, 90, 270, 180];
+// Fase 3m: 270 antes que 90 (el material del usuario llega girado a la
+// derecha: necesita 90° antihorario). El rec sigue siendo el único juez.
+const GIROS_PRUEBA: readonly Giro[] = [0, 270, 90, 180];
 
 /** Imagen enderezada + material del giro ganador (el OCR real reutiliza cajas/base). */
 export interface Enderezado {
@@ -343,10 +345,7 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
       } catch {
         continue; // giro fallido: se salta (el externo aún protege ver(0))
       }
-      // P1: puntaje por giro (para ver si el bypass 0.9 es inalcanzable).
-      console.info(
-        `OCR giro ${g}°: conf=${r.c.toFixed(3)} masa=${r.masa.toFixed(5)} cajas=${r.cajas.length}`,
-      );
+      // P1: la telemetría de giros cumplió (ver lote denso); la consola queda limpia.
       if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) return quieto; // sin texto: ni giros
       if (!mejor || r.c > mejor.c) mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
       if (r.c >= UMBRAL_REC_OK) break; // bypass: la primera que convence gana
@@ -533,17 +532,19 @@ export async function extraerTexto(
   const fabrica = deps?.nucleo ?? obtenerNucleo;
   let bmp: ImageBitmap | null = null;
   try {
-    bmp = await cargar(blob, { imageOrientation: "from-image" });
-    if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return "";
     const { det, rec } = await fabrica();
-    // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan
-    // (sin crear lienzo temporal: el decode solo queda para el guard de tamaño).
+    // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan.
     let cajas: CajaDb[];
     let final: HTMLCanvasElement;
     if (reuse?.base && reuse.cajas.length > 0) {
+      // Fase 2: los píxeles ya están en memoria (reuse.base); decodificar el
+      // blob otra vez es CPU regalada (el guard usa las dims del lienzo).
+      if (reuse.base.width < DET_LADO_MIN || reuse.base.height < DET_LADO_MIN) return "";
       cajas = [...reuse.cajas];
       final = reuse.base;
     } else {
+      bmp = await cargar(blob, { imageOrientation: "from-image" });
+      if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return "";
       const tam = tamanoDet(bmp.width, bmp.height);
       const base = crear();
       base.width = tam.w;
