@@ -7,7 +7,7 @@ vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
-const { procesarCola } = await import("./queue");
+const { asignarMiniatura, procesarCola } = await import("./queue");
 const { comprobante } = await import("../test/factoria");
 const { renderHojas } = await import("../ui/sheets");
 
@@ -71,5 +71,22 @@ describe("procesarCola", () => {
     await p;
     // Sin coalescar serían 6 (2 por ítem); con coalescado 3+1.
     expect(vi.mocked(renderHojas).mock.calls.length - antes).toBe(4);
+  });
+
+  it("asignarMiniatura no revoca el imgUrl aliased (PDF, hilo #1 PR9)", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const pdf = comprobante({ imgUrl: "blob:x", thumbUrl: "blob:x" });
+    asignarMiniatura(pdf, "blob:thumb-nueva");
+    expect(revoke).not.toHaveBeenCalled(); // sin el fix revocaba "blob:x"
+    expect(pdf.thumbUrl).toBe("blob:thumb-nueva");
+    expect(pdf.imgUrl).toBe("blob:x");
+  });
+
+  it("asignarMiniatura revoca el thumb viejo distinto", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const img = comprobante({ imgUrl: "blob:img", thumbUrl: "blob:vieja" });
+    asignarMiniatura(img, "blob:thumb-nueva");
+    expect(revoke).toHaveBeenCalledWith("blob:vieja");
+    expect(img.thumbUrl).toBe("blob:thumb-nueva");
   });
 });

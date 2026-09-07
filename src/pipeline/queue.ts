@@ -45,12 +45,20 @@ export async function generarMiniatura(file: Blob): Promise<string | null> {
     return null;
   }
 }
-
 /** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
 async function blobDeItem(sig: Comprobante): Promise<Blob> {
   if (sig.file) return sig.file;
   const res = await fetch(sig.imgUrl);
   return res.blob();
+}
+
+/**
+ * Fija la miniatura final sin revocar el imgUrl: en PDF ambos campos aliasan
+ * la misma URL y revocar el thumb mataba la vista previa. Puro salvo el revoke.
+ */
+export function asignarMiniatura(sig: Comprobante, thumbNueva: string): void {
+  if (sig.thumbUrl && sig.thumbUrl !== sig.imgUrl) URL.revokeObjectURL(sig.thumbUrl);
+  sig.thumbUrl = thumbNueva;
 }
 
 /**
@@ -178,10 +186,7 @@ export async function procesarCola(): Promise<void> {
         ms.minis += performance.now() - tm;
         if (thumbNueva) {
           if (!buscarSlot(sig.id)) URL.revokeObjectURL(thumbNueva);
-          else {
-            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
-            sig.thumbUrl = thumbNueva;
-          }
+          else asignarMiniatura(sig, thumbNueva);
         }
       }
       if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
