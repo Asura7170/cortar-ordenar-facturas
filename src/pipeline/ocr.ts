@@ -211,7 +211,9 @@ export const UMBRAL_REC_OK: number = 0.9;
 /** Cajas por orientación que puntúa el rec (más es más recs, no más señal). */
 export const TOP_CAJAS_GIRO = 2;
 /** Orden de prueba: lo común primero (bypass inmediato), el revés al final. */
-const GIROS_PRUEBA: readonly Giro[] = [0, 90, 270, 180];
+// Fase 3m: 270 antes que 90 (el material del usuario llega girado a la
+// derecha: necesita 90° antihorario). El rec sigue siendo el único juez.
+const GIROS_PRUEBA: readonly Giro[] = [0, 270, 90, 180];
 
 /** Imagen enderezada + material del giro ganador (el OCR real reutiliza cajas/base). */
 export interface Enderezado {
