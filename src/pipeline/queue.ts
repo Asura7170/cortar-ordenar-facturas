@@ -85,17 +85,27 @@ export async function procesarCola(): Promise<void> {
         // ponytail: sin recorte se sigue con el original; la cola no se detiene
       }
       if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
+      // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
+      const ocr = await import("./ocr").catch((): null => null);
+      let blob: Blob | null = null;
+      try {
+        blob = await blobDeItem(sig);
+      } catch {
+        blob = null;
+      }
       // Endereza por confianza del rec (det solo recorta líneas, no vota).
       try {
-        const { enderezar } = await import("./ocr");
-        const end = await enderezar(await blobDeItem(sig));
-        if (end.grados !== 0 && buscarSlot(sig.id)) {
-          console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
-          URL.revokeObjectURL(sig.imgUrl);
-          if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
-          sig.imgUrl = URL.createObjectURL(end.blob);
-          sig.file = end.blob;
-          sig.thumbUrl = await generarMiniatura(end.blob);
+        if (ocr && blob) {
+          const end = await ocr.enderezar(blob);
+          if (end.grados !== 0 && buscarSlot(sig.id)) {
+            console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
+            URL.revokeObjectURL(sig.imgUrl);
+            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
+            sig.imgUrl = URL.createObjectURL(end.blob);
+            sig.file = end.blob;
+            sig.thumbUrl = await generarMiniatura(end.blob);
+            blob = end.blob;
+          }
         }
       } catch {
         // ponytail: sin enderezar se sigue con la imagen tal cual
@@ -103,8 +113,7 @@ export async function procesarCola(): Promise<void> {
       if (!buscarSlot(sig.id)) continue; // limpiado durante el enderezado: no resucita
       // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
       try {
-        const { extraerTexto } = await import("./ocr");
-        sig.textoOcr = sanear(await extraerTexto(await blobDeItem(sig)));
+        sig.textoOcr = ocr && blob ? sanear(await ocr.extraerTexto(blob)) : "";
       } catch {
         sig.textoOcr = "";
       }

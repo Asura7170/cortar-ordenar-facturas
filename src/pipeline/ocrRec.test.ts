@@ -128,6 +128,6 @@ describe("DICT_OCR", () => {
     expect(DICT_OCR[DICT_OCR.length - 1]).toBe(" ");
     expect(DICT_OCR).toContain("€");
     expect(DICT_OCR).toContain("ñ");
-    expect(DICT_OCR).toContain("TOTAL".slice(0, 1));
+    expect(DICT_OCR).toContain("T");
   });
 });

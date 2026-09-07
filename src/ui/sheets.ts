@@ -1,15 +1,15 @@
 /* Hojas carta: render de casillas + drag & drop de comprobantes. */
-import { buscarSlot, hojaPorId, limpiarHojas, redistribuir, state } from "../state";
+import {
+  buscarSlot,
+  hojaPorId,
+  limpiarHojas,
+  obtenerComprobante,
+  redistribuir,
+  state,
+} from "../state";
 import type { Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
-import {
-  aplanar,
-  cuentaHoja,
-  formatearMoneda,
-  parsearMonto,
-  renderMonto,
-  totalItems,
-} from "./monto";
+import { cuentaHoja, formatearMoneda, parsearMonto, renderMonto, totalItems } from "./monto";
 import { getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
@@ -599,7 +599,7 @@ export function initSheets(cb: SheetsCallbacks): void {
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
     switch (accion) {
       case "copiar-ocr": {
-        const item = aplanar().find((c) => c.id === id);
+        const item = obtenerComprobante(id);
         if (!item) return;
         if (!item.textoOcr) return;
         // Sin Promise.try (ausente en Node 22 del CI): writeText ya devuelve promesa.
@@ -619,7 +619,7 @@ export function initSheets(cb: SheetsCallbacks): void {
         quitarComprobante(id);
         return;
       case "corregir-monto": {
-        const item = aplanar().find((c) => c.id === id);
+        const item = obtenerComprobante(id);
         if (!item) return;
         item.montoCents = null;
         renderHojas();
@@ -640,7 +640,7 @@ export function initSheets(cb: SheetsCallbacks): void {
     if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") return;
     const cell = target.closest(".cell");
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
-    const item = aplanar().find((c) => c.id === id);
+    const item = obtenerComprobante(id);
     if (!item) return;
     const cents = parsearMonto(target.value);
     // Inválido → re-render restaura el input vacío (el title muestra el formato).

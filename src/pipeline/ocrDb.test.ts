@@ -143,12 +143,12 @@ describe("puntuarCaja", () => {
     const mapa = new Float32Array([0.1, 0.1, 0.9, 0.9]);
     expect(
       puntuarCaja(mapa, 2, [
-        [0, 1],
-        [0, 1],
-        [0, 1],
+        [0, 0],
+        [1, 0],
+        [1, 1],
         [0, 1],
       ]),
-    ).toBeCloseTo(0.9, 6);
+    ).toBeCloseTo(0.5, 6);
   });
 });
 
