@@ -44,3 +44,18 @@ renderCodigo();
 renderHojas();
 renderOcrToggle();
 initTema();
+
+// Precarga: descarga+compila los 3 modelos en idle tras el primer frame.
+// El primer comprobante no los espera; si el usuario sube antes de que
+// termine, los singletons dedupplican (misma promesa, cero doble trabajo).
+// Si falla (offline), los singletons reintentan en el uso real.
+// Con ahorro de datos no se precarga (son ~60MB la primera visita).
+const conexion = navigator as Navigator & { connection?: { saveData?: boolean } };
+if (!conexion.connection?.saveData) {
+  const precargar = (): void => {
+    void import("./pipeline/docaligner").then((m) => m.obtenerSesion().catch((): null => null));
+    void import("./pipeline/ocr").then((m) => m.obtenerNucleo().catch((): null => null));
+  };
+  if ("requestIdleCallback" in window) window.requestIdleCallback(precargar, { timeout: 3000 });
+  else setTimeout(precargar, 1000);
+}
