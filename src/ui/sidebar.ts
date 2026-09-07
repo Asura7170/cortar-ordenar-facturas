@@ -11,7 +11,7 @@ import type { Comprobante } from "../types";
 import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
 import { actualizarMiniatura, renderHojas } from "./sheets";
-import { generarMiniatura, procesarCola } from "../pipeline/queue";
+import { generarMiniatura, precalentarModelos, procesarCola } from "../pipeline/queue";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
 import type { MotivoRechazo, PaginaPdf } from "../pipeline/pdf";
 import { normalizarImagen } from "../pipeline/imagen";
@@ -66,6 +66,7 @@ export async function agregarArchivos(
   files: FileList | readonly File[] | null | undefined,
   hojaId: number | null = null,
 ): Promise<void> {
+  precalentarModelos(); // warm-up en serie (cubre picker, drop y pegar)
   const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
   const esImagen = (f: File): boolean => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type);
   const pdfs: File[] = lista.filter((f) => !esImagen(f) && esPdf(f));
@@ -203,6 +204,8 @@ export function initSidebar(): void {
     e.preventDefault();
     dropzone.classList.add("dragover");
   });
+  // Head-start: el hover sobre la zona anticipa la intención (una sola vez).
+  dropzone.addEventListener("pointerenter", () => precalentarModelos(), { once: true });
   dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
   dropzone.addEventListener("drop", (e) => {
     e.preventDefault();

@@ -6,7 +6,7 @@ import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
-import { detectarYRecortar } from "./docaligner";
+import { detectarYRecortar, obtenerSesion } from "./docaligner";
 import { CALIDAD_JPEG } from "./imagen";
 import type { Enderezado } from "./ocr";
 import { diagVacio } from "./ocr";
@@ -51,6 +51,33 @@ async function blobDeItem(sig: Comprobante): Promise<Blob> {
   if (sig.file) return sig.file;
   const res = await fetch(sig.imgUrl);
   return res.blob();
+}
+
+/**
+ * Precalienta los modelos en serie ante intención de subida (una sola vez).
+ * Nunca en paralelo ni en el arranque: las sesiones compiten por el mismo
+ * contexto GPU y la precarga concurrente en idle colgó la pestaña. Si falla,
+ * el uso real reintenta (los singletons resetean en fallo).
+ */
+let precalentado = false;
+export function precalentarModelos(): void {
+  if (precalentado) return;
+  precalentado = true;
+  const ceder = (): Promise<void> =>
+    new Promise((res) => {
+      if ("requestIdleCallback" in window) window.requestIdleCallback(() => res());
+      else setTimeout(() => res(), 0);
+    });
+  void (async (): Promise<void> => {
+    try {
+      await obtenerSesion();
+      await ceder(); // que los clics respiren entre compilaciones
+      const ocr = await import("./ocr").catch((): null => null);
+      await ocr?.obtenerNucleo();
+    } catch {
+      // el uso real reintenta; el warm-up es best-effort
+    }
+  })();
 }
 
 export async function procesarCola(): Promise<void> {
