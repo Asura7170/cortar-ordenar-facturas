@@ -62,14 +62,21 @@ export async function procesarCola(): Promise<void> {
       if (!sig) break;
       sig.estado = "procesando";
       renderHojas(); // el recorte tarda: que se vea el estado (antes el mock era instantáneo)
+      // L0: tiempos por etapa (medir antes de optimizar).
+      const t0 = performance.now();
+      const ms = { recorte: 0, minis: 0, enderezar: 0, extraer: 0 };
       try {
+        const t = performance.now();
         const original = await blobDeItem(sig);
         const recortada = await detectarYRecortar(original);
+        ms.recorte = performance.now() - t;
         if (recortada !== original) {
           // ponytail: commit tras el await — si se limpió durante la espera, se
           // revocan las nuevas y el guard de abajo evita resucitar.
           const imgNueva = URL.createObjectURL(recortada);
+          const tm = performance.now();
           const thumbNueva = await generarMiniatura(recortada);
+          ms.minis += performance.now() - tm;
           if (!buscarSlot(sig.id)) {
             URL.revokeObjectURL(imgNueva);
             if (thumbNueva) URL.revokeObjectURL(thumbNueva);
@@ -96,12 +103,16 @@ export async function procesarCola(): Promise<void> {
       // Endereza por confianza del rec (det solo recorta líneas, no vota).
       try {
         if (ocr && blob) {
+          const t = performance.now();
           const end = await ocr.enderezar(blob);
+          ms.enderezar = performance.now() - t;
           if (end.grados !== 0 && buscarSlot(sig.id)) {
             console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
             // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
             const imgNueva = URL.createObjectURL(end.blob);
+            const tm = performance.now();
             const thumbNueva = await generarMiniatura(end.blob);
+            ms.minis += performance.now() - tm;
             if (!buscarSlot(sig.id)) {
               URL.revokeObjectURL(imgNueva);
               if (thumbNueva) URL.revokeObjectURL(thumbNueva);
@@ -121,12 +132,20 @@ export async function procesarCola(): Promise<void> {
       if (!buscarSlot(sig.id)) continue; // limpiado durante el enderezado: no resucita
       // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
       try {
+        const t = performance.now();
         sig.textoOcr = ocr && blob ? sanear(await ocr.extraerTexto(blob)) : "";
+        ms.extraer = performance.now() - t;
       } catch {
         sig.textoOcr = "";
       }
       sig.montoCents = null;
       sig.estado = "ok";
+      const entero = (v: number): number => Math.round(v);
+      console.info(
+        `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} minis=${entero(ms.minis)} ` +
+          `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
+          `total=${entero(performance.now() - t0)}`,
+      );
       renderHojas();
     }
   } finally {

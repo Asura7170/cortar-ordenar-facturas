@@ -40,4 +40,17 @@ describe("procesarCola", () => {
     expect(nuevo.montoCents).toBeNull();
     expect(state.colaEnProceso).toBe(false);
   });
+
+  it("informa tiempos por etapa (L0: recorte/minis/enderezar/extraer/total)", async () => {
+    const h = crearHoja();
+    const c = comprobante({ nombre: "t.png" });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    const linea = info.mock.calls.map((a) => String(a[0])).find((s) => s.startsWith("OCR ms"));
+    expect(linea).toMatch(/recorte=\d+ minis=\d+ enderezar=\d+ extraer=\d+ total=\d+/);
+  });
 });
