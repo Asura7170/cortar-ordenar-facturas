@@ -27,6 +27,7 @@ export const FIXTURE_HTML = `
   <button id="btnResetAjustes" type="button"></button>
 </form>
 <button id="btnDescargar2"></button>
+<button id="btnIA" type="button"></button>
 `;
 
 /** Monta el fixture (llamar antes del import dinámico del módulo bajo test). */

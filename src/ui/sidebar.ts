@@ -12,6 +12,7 @@ import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
 import { renderHojas } from "./sheets";
 import { precalentarModelos, procesarCola } from "../pipeline/queue";
+import { extraerPendientes } from "../pipeline/extract";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
 import type { MotivoRechazo, PaginaPdf } from "../pipeline/pdf";
 import { normalizarImagen } from "../pipeline/imagen";
@@ -24,6 +25,7 @@ const numCodigo: HTMLInputElement = getEl<HTMLInputElement>("numCodigo");
 const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>("inputCodigo");
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
 const aviso: HTMLElement = getEl("aviso");
+const btnIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnIA");
 
 /** Rechazo de entrada: nombre en tono tenue + motivo en rojo sello. */
 interface AvisoRechazo {
@@ -197,6 +199,11 @@ export function initSidebar(): void {
       .map((it) => it.getAsFile())
       .filter((f): f is File => f !== null);
     if (files.length) void agregarArchivos(files);
+  });
+
+  // Reintento manual del lote IA (el auto corre al drenar la cola).
+  btnIA.addEventListener("click", () => {
+    void extraerPendientes({ forzado: true });
   });
 
   // El switch solo arma el guardado de su ventana; ON no escribe, OFF retira lo suyo.
