@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   bgrDesdeRgba,
+  diagVacio,
   enderezar,
   envolver,
   extraerTexto,
@@ -213,12 +214,14 @@ describe("extraerTexto", () => {
 
   it("una línea → texto con formas de tensor exactas", async () => {
     const { deps, espia, transforms } = base();
-    const texto = await extraerTexto(new Blob(["x"]), deps);
+    const diag = diagVacio();
+    const texto = await extraerTexto(new Blob(["x"]), deps, undefined, diag);
     expect(texto).toBe("AA");
     expect(espia.det).toEqual([[[1, 3, 32, 64]]]);
     expect(espia.rec).toHaveLength(1);
     expect((espia.rec[0] as number[][])?.[0]?.slice(0, 3)).toEqual([1, 3, 48]);
     expect(transforms).toHaveLength(1); // warp afín aplicado
+    expect(diag).toEqual({ cajas: 1, lote: 1, anchoMax: 320, fallback: false, recRuns: 1 });
   });
 
   it("mapa vacío → sin texto y sin rec", async () => {
@@ -382,10 +385,18 @@ describe("reconocerLote", () => {
     const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
     const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
     const { lienzo } = lienzoFalso(BLANCO32);
-    const rs = await reconocerLote(nucleo.rec, lienzo, [caja10(0.9), caja10(0.8)], () => lienzo);
+    const diag = diagVacio();
+    const rs = await reconocerLote(
+      nucleo.rec,
+      lienzo,
+      [caja10(0.9), caja10(0.8)],
+      () => lienzo,
+      diag,
+    );
     expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
     expect(espia.rec).toHaveLength(1);
     expect((espia.rec[0] as number[][])?.[0]).toEqual([2, 3, 48, 320]);
+    expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: false, recRuns: 1 });
   });
 
   it("lote rechazado → fallback individual sin lanzar (L2)", async () => {
@@ -403,10 +414,12 @@ describe("reconocerLote", () => {
       },
     };
     const { lienzo } = lienzoFalso(BLANCO32);
-    const rs = await reconocerLote(rec, lienzo, [caja10(0.9), caja10(0.8)], () => lienzo);
+    const diag = diagVacio();
+    const rs = await reconocerLote(rec, lienzo, [caja10(0.9), caja10(0.8)], () => lienzo, diag);
     expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
     expect(llamadas).toHaveLength(3); // 1 lote + 2 individuales
     expect(llamadas[0]?.[0]).toBe(2);
+    expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 2 });
   });
 
   it("sin cajas válidas → vacíos sin run", async () => {

@@ -183,6 +183,20 @@ export function tensorDetDesdeRgba(rgba: Uint8ClampedArray, w: number, h: number
   return t;
 }
 
+/** Diagnóstico del rec (P1: telemetría para decidir la mitigación). */
+export interface DiagRec {
+  cajas: number;
+  lote: number;
+  anchoMax: number;
+  fallback: boolean;
+  recRuns: number;
+}
+
+/** DiagRec en ceros (el llamador lo crea; las funciones lo rellenan). */
+export function diagVacio(): DiagRec {
+  return { cajas: 0, lote: 0, anchoMax: 0, fallback: false, recRuns: 0 };
+}
+
 /** Nombre del tensor de salida en ambos onnx (fetch_name_0). */
 const SALIDA_ONNX = "fetch_name_0";
 
@@ -329,6 +343,10 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
       } catch {
         continue; // giro fallido: se salta (el externo aún protege ver(0))
       }
+      // P1: puntaje por giro (para ver si el bypass 0.9 es inalcanzable).
+      console.info(
+        `OCR giro ${g}°: conf=${r.c.toFixed(3)} masa=${r.masa.toFixed(5)} cajas=${r.cajas.length}`,
+      );
       if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) return quieto; // sin texto: ni giros
       if (!mejor || r.c > mejor.c) mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
       if (r.c >= UMBRAL_REC_OK) break; // bypass: la primera que convence gana
@@ -425,6 +443,7 @@ export async function reconocerLote(
   base: HTMLCanvasElement,
   cajas: readonly CajaDb[],
   crear: CrearLienzo,
+  diag?: DiagRec,
 ): Promise<TextoRec[]> {
   const fuera: TextoRec[] = cajas.map(() => ({ texto: "", puntaje: 0 }));
   const validos: { idx: number; bgr: Uint8Array; w: number; h: number }[] = [];
@@ -451,6 +470,11 @@ export async function reconocerLote(
       validos.forEach((v, b) => {
         fuera[v.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
       });
+      if (diag) {
+        diag.lote = lote.lote;
+        diag.anchoMax = lote.anchoMax;
+        diag.recRuns = 1;
+      }
       return fuera;
     }
     // el lote no cuadra (EP sin batch, formas raras): individual abajo.
@@ -460,6 +484,12 @@ export async function reconocerLote(
     fuera[v.idx] = lin
       ? await ejecutarRec(rec, lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal])
       : { texto: "", puntaje: 0 };
+  }
+  if (diag) {
+    diag.lote = lote?.lote ?? 0;
+    diag.anchoMax = lote?.anchoMax ?? 0;
+    diag.fallback = true;
+    diag.recRuns = validos.length;
   }
   return fuera;
 }
@@ -472,6 +502,7 @@ export async function extraerTexto(
   blob: Blob,
   deps?: DepsOcr,
   reuse?: Pick<Enderezado, "cajas" | "base">,
+  diag?: DiagRec,
 ): Promise<string> {
   const cargar = deps?.cargar ?? cargarReal;
   const crear = deps?.crear ?? crearReal;
@@ -505,7 +536,8 @@ export async function extraerTexto(
     }
     const lineas: string[] = [];
     // L2: un solo run para todas las cajas (con fallback individual dentro).
-    for (const r of await reconocerLote(rec, final, cajas, crear)) {
+    if (diag) diag.cajas = cajas.length;
+    for (const r of await reconocerLote(rec, final, cajas, crear, diag)) {
       // ponytail: líneas vacías fuera (el modal queda limpio para el LLM).
       if (r.texto !== "") lineas.push(r.texto);
     }

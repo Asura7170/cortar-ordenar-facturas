@@ -51,6 +51,7 @@ describe("procesarCola", () => {
     await vi.advanceTimersByTimeAsync(2000);
     await p;
     const linea = info.mock.calls.map((a) => String(a[0])).find((s) => s.startsWith("OCR ms"));
-    expect(linea).toMatch(/recorte=\d+ minis=\d+ enderezar=\d+ extraer=\d+ total=\d+/);
+    expect(linea).toMatch(/recorte=\d+ minis=\d+ enderezar=\d+ extraer=\d+/);
+    expect(linea).toMatch(/cajas=\d+ batch=\[\d+,\d+\] fallback=(sí|no) recRuns=\d+ total=\d+/);
   });
 });

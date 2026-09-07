@@ -9,6 +9,7 @@ import { sanear } from "../utils";
 import { detectarYRecortar } from "./docaligner";
 import { CALIDAD_JPEG } from "./imagen";
 import type { Enderezado } from "./ocr";
+import { diagVacio } from "./ocr";
 
 const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
 
@@ -65,7 +66,7 @@ export async function procesarCola(): Promise<void> {
       renderHojas(); // el recorte tarda: que se vea el estado (antes el mock era instantáneo)
       // L0: tiempos por etapa (medir antes de optimizar).
       const t0 = performance.now();
-      const ms = { recorte: 0, minis: 0, enderezar: 0, extraer: 0 };
+      const ms = { recorte: 0, minis: 0, enderezar: 0, extraer: 0, diag: "" };
       try {
         const t = performance.now();
         const original = await blobDeItem(sig);
@@ -129,9 +130,16 @@ export async function procesarCola(): Promise<void> {
       try {
         const t = performance.now();
         // L1: reuse evita repetir el det del giro ganador (end trae cajas/base).
+        const diag = diagVacio();
         sig.textoOcr =
-          ocr && blob ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined)) : "";
+          ocr && blob
+            ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined, diag))
+            : "";
         ms.extraer = performance.now() - t;
+        // P1: cajas, forma del lote, fallback y nº de runs del rec.
+        ms.diag =
+          `cajas=${diag.cajas} batch=[${diag.lote},${diag.anchoMax}] ` +
+          `fallback=${diag.fallback ? "sí" : "no"} recRuns=${diag.recRuns}`;
       } catch {
         sig.textoOcr = "";
       }
@@ -155,7 +163,7 @@ export async function procesarCola(): Promise<void> {
       console.info(
         `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} minis=${entero(ms.minis)} ` +
           `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
-          `total=${entero(performance.now() - t0)}`,
+          `${ms.diag} total=${entero(performance.now() - t0)}`,
       );
       renderHojas();
     }
