@@ -61,18 +61,16 @@ async function descargarModelo(ruta: string): Promise<ArrayBuffer> {
 }
 
 /** Envuelve una sesión ort real en la interfaz mínima (casts solo aquí). */
-function envolver(
+export function envolver(
   ort: OrtModulo,
   sesion: import("onnxruntime-web").InferenceSession,
   nombre: string,
 ): SubsesionOcr {
   if (nombre === "rec") {
-    // ponytail: en ort-web 1.29 los metadatos son arreglos alineados con los nombres.
+    // ponytail: ValueMetadata de ort-web 1.29 expone shape (nunca dimensions).
     const meta = sesion.outputMetadata[0];
-    const dims = (meta && "dimensions" in meta ? meta.dimensions : undefined) as
-      | ReadonlyArray<number | string>
-      | undefined;
-    const clases = dims?.[dims.length - 1];
+    const forma = meta && meta.isTensor ? meta.shape : undefined;
+    const clases = forma?.[forma.length - 1];
     // ponytail: fallo fuerte en init si el modelo no casa con el dict (no basura silenciosa).
     if (typeof clases === "number" && clases !== DICT_OCR.length) {
       throw new Error(`rec con ${clases} clases, dict con ${DICT_OCR.length}`);
@@ -91,15 +89,13 @@ async function nucleoReal(): Promise<NucleoOcr> {
   const ort: OrtModulo = await import("onnxruntime-web/webgpu");
   ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`;
   ort.env.wasm.numThreads = 1;
-  const crear =
-    (pesos: ArrayBuffer, nombre: string) =>
-    async (ep: string): Promise<SubsesionOcr> => {
-      const sesion = await ort.InferenceSession.create(pesos, {
+  const crearSesion =
+    (pesos: ArrayBuffer) =>
+    async (ep: string): Promise<import("onnxruntime-web").InferenceSession> =>
+      ort.InferenceSession.create(pesos, {
         executionProviders: [ep],
         graphOptimizationLevel: "all",
       });
-      return envolver(ort, sesion, nombre);
-    };
   // ponytail: las bajadas en paralelo (la mitad del tiempo); las sesiones en
   // serie (compiten por el mismo contexto GPU). El latch de EPs caídos sigue
   // compartido con docaligner: si webgpu murió ahí, aquí ni se intenta.
@@ -107,8 +103,8 @@ async function nucleoReal(): Promise<NucleoOcr> {
     descargarModelo(RUTA_DET),
     descargarModelo(RUTA_REC),
   ]);
-  const det = await iniciarSesion(crear(detBuf, "det"));
-  const rec = await iniciarSesion(crear(recBuf, "rec"));
+  const det = envolver(ort, await iniciarSesion(crearSesion(detBuf)), "det");
+  const rec = envolver(ort, await iniciarSesion(crearSesion(recBuf)), "rec");
   return { det, rec };
 }
 
@@ -359,10 +355,10 @@ export async function reconocerCaja(
   crear: CrearLienzo,
 ): Promise<{ texto: string; puntaje: number }> {
   const vacio = { texto: "", puntaje: 0 };
-  const xs = caja.poli.map((p) => p[0]);
-  const ys = caja.poli.map((p) => p[1]);
-  const cw = Math.max(1, Math.ceil(Math.max(...xs) - Math.min(...xs)));
-  const ch = Math.max(1, Math.ceil(Math.max(...ys) - Math.min(...ys)));
+  // ponytail: aristas del quad, no bbox (en líneas inclinadas el bbox estira).
+  const [q0, q1, , q3] = caja.poli;
+  const cw = Math.max(1, Math.ceil(Math.hypot(q1[0] - q0[0], q1[1] - q0[1])));
+  const ch = Math.max(1, Math.ceil(Math.hypot(q3[0] - q0[0], q3[1] - q0[1])));
   const inv = matrizInversa(matrizAfin(caja.poli, cw, ch));
   if (!inv) return vacio;
   const lienzo = crear();

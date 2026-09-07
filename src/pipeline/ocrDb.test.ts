@@ -233,6 +233,27 @@ describe("cajasDesdeMapa", () => {
     expect(Math.max(...ys)).toBeCloseTo(19.8, 0);
   });
 
+  it("diamante rotado 45° no se descarta (área real 8, no 0)", () => {
+    const mapa = new Float32Array(9 * 9).fill(0.05);
+    const pixeles: Array<readonly [number, number]> = [
+      [4, 2],
+      [3, 3],
+      [4, 3],
+      [5, 3],
+      [2, 4],
+      [3, 4],
+      [4, 4],
+      [5, 4],
+      [6, 4],
+      [3, 5],
+      [4, 5],
+      [5, 5],
+      [4, 6],
+    ];
+    for (const [x, y] of pixeles) mapa[y * 9 + x] = 1;
+    expect(cajasDesdeMapa(mapa, 9, 9, { ancho: 9, alto: 9 })).toHaveLength(1);
+  });
+
   it("borde irregular en escalera → bbox completo", () => {
     const mapa = new Float32Array(120 * 30).fill(0.05);
     for (let y = 5; y <= 14; y += 1) {

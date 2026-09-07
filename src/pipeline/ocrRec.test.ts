@@ -1,7 +1,7 @@
 /* Tests: ocrRec — normalización de línea, matriz afín y CTC greedy
    (puros; el lienzo solo lo toca ocr.ts). */
 import { describe, expect, it } from "vite-plus/test";
-import { decodificarCtc, matrizAfin, normalizarLinea, REC_ALTO } from "./ocrRec";
+import { decodificarCtc, matrizAfin, normalizarLinea, REC_ALTO, REC_RATIO_MAXIMA } from "./ocrRec";
 import { DICT_OCR } from "./ocrDict";
 
 describe("normalizarLinea", () => {
@@ -25,15 +25,27 @@ describe("normalizarLinea", () => {
     expect(lin.tensor[0]).toBeCloseTo(-1, 5);
   });
 
-  it("línea ancha: el total crece sin truncar", () => {
-    const lin = normalizarLinea(new Uint8Array(700 * 10 * 3).fill(128), 700, 10);
-    expect(lin?.anchoTotal).toBe(Math.floor(48 * 70));
+  it("línea ancha: el total crece sin truncar (bajo el tope)", () => {
+    const lin = normalizarLinea(new Uint8Array(640 * 30 * 3).fill(128), 640, 30);
+    expect(lin?.anchoTotal).toBe(Math.floor(48 * (640 / 30)));
     expect(lin?.anchoUtil).toBeLessThanOrEqual(lin?.anchoTotal as number);
   });
 
   it("degenerado → null", () => {
     expect(normalizarLinea(new Uint8Array(0), 0, 5)).toBeNull();
     expect(normalizarLinea(new Uint8Array(3), 2, 2)).toBeNull();
+  });
+
+  it("borde izquierdo replica (sin extrapolar fuera de [-1,1])", () => {
+    // 2×1: px0 oscuro, px1 claro. La 1ª columna muestrea x<0 → réplica px0.
+    const lin = normalizarLinea(new Uint8Array([10, 20, 30, 200, 210, 220]), 2, 1);
+    if (!lin) throw new Error("sin línea");
+    expect(lin.tensor[0]).toBeCloseTo((10 / 255 - 0.5) / 0.5, 5);
+  });
+
+  it("hebra 480:1 se topa a ratio 32", () => {
+    const lin = normalizarLinea(new Uint8Array(4800 * 10 * 3).fill(128), 4800, 10);
+    expect(lin?.anchoTotal).toBe(REC_ALTO * REC_RATIO_MAXIMA);
   });
 });
 

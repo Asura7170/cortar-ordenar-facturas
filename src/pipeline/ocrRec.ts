@@ -11,6 +11,8 @@ import type { CajaDb } from "./ocrDb";
 export const REC_ALTO: number = 48;
 /** Ancho base (crece con el aspecto: resize_norm_img_chinese no trunca). */
 export const REC_ANCHO_BASE: number = 320;
+/** Tope del aspecto (una línea de texto nunca es una hebra: guarda memoria/CPU). */
+export const REC_RATIO_MAXIMA: number = 32;
 
 /** Línea lista para el tensor [1,3,48,anchoTotal] (CHW aplanado). */
 export interface LineaNorm {
@@ -34,8 +36,8 @@ function bilineal(
   const y0 = Math.floor(yc);
   const x1 = Math.min(w - 1, x0 + 1);
   const y1 = Math.min(h - 1, y0 + 1);
-  const fx = x - x0;
-  const fy = y - y0;
+  const fx = xc - x0;
+  const fy = yc - y0;
   const p00 = bgr[(y0 * w + x0) * 3 + canal] ?? 0;
   const p10 = bgr[(y0 * w + x1) * 3 + canal] ?? 0;
   const p01 = bgr[(y1 * w + x0) * 3 + canal] ?? 0;
@@ -49,7 +51,7 @@ function bilineal(
  */
 export function normalizarLinea(bgr: Uint8Array, w: number, h: number): LineaNorm | null {
   if (w < 1 || h < 1 || bgr.length < w * h * 3) return null;
-  const ratio = w / h;
+  const ratio = Math.min(w / h, REC_RATIO_MAXIMA);
   // ponytail: sin truncar a 320 (resize_norm_img_chinese ensancha imgW con el aspecto).
   const anchoTotal = Math.max(
     REC_ANCHO_BASE,

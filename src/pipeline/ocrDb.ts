@@ -119,7 +119,7 @@ export function cascoConvexo(puntos: readonly PuntoDb[]): PuntoDb[] {
 }
 
 /** Área con signo (shoelace); negativa = horario. */
-function areaDoble(poli: readonly PuntoDb[]): number {
+export function areaDoble(poli: readonly PuntoDb[]): number {
   let a = 0;
   for (let i = 0; i < poli.length; i += 1) {
     const p = poli[i] ?? [0, 0];
@@ -318,12 +318,8 @@ export function cajasDesdeMapa(
           esc[2] ?? [0, 0],
           esc[3] ?? [0, 0],
         ];
-        const area =
-          Math.abs(
-            (poli[2][0] - poli[0][0]) * (poli[2][1] - poli[0][1]) -
-              (poli[1][0] - poli[3][0]) * (poli[1][1] - poli[3][1]),
-          ) / 2;
-        if (area < AREA_MINIMA_CAJA) continue;
+        // ponytail: shoelace (la fórmula anterior daba 0 en quads rotados).
+        if (Math.abs(areaDoble(poli)) / 2 < AREA_MINIMA_CAJA) continue;
         cajas.push({ poli, puntaje });
       }
     }

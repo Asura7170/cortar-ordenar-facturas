@@ -521,7 +521,12 @@ export function initSheets(cb: SheetsCallbacks): void {
     const target = e.target as HTMLElement | null;
     const cell = target?.closest?.(".cell");
     if (!(cell instanceof HTMLElement) || cell.classList.contains("empty")) return;
-    if (target?.closest?.('[data-accion="quitar"]')) return;
+    if (
+      target?.closest?.(
+        '[data-accion="quitar"],[data-accion="monto"],[data-accion="corregir-monto"]',
+      )
+    )
+      return;
     e.preventDefault();
     if (pointerDrag) {
       pointerDrag = null;

@@ -91,5 +91,8 @@ describe("parsearMonto", () => {
     expect(parsearMonto("1,234")).toBeNull(); // miles sin decimales: escribir 1234
     expect(parsearMonto("12.345")).toBeNull();
     expect(parsearMonto("-5")).toBeNull();
+    expect(parsearMonto("1,,234.56")).toBeNull(); // grupo vacío
+    expect(parsearMonto("1.2.3")).toBeNull(); // grupo de 1
+    expect(parsearMonto("12,34.56")).toBeNull(); // grupo de 2
   });
 });

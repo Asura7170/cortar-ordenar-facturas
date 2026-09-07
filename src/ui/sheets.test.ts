@@ -242,6 +242,37 @@ describe("monto manual", () => {
     expect(c.montoCents).toBeNull();
     expect(document.querySelector("input.cell-monto")).not.toBeNull();
   });
+
+  it("pointerdown en el input no inicia drag (foco intacto)", () => {
+    sembrarOk();
+    inputMonto().dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: 10,
+        clientY: 10,
+      }),
+    );
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+  });
+
+  it("pointerdown en la imagen sí inicia drag (control)", () => {
+    sembrarOk();
+    const img = document.querySelector(".cell img");
+    if (!img) throw new Error("sin imagen");
+    img.dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: 10,
+        clientY: 10,
+      }),
+    );
+    expect(document.querySelector(".sheet-grid.dragging")).not.toBeNull();
+    document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+  });
 });
 
 describe("drop de archivos sobre hojas", () => {

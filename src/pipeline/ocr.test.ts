@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import {
   bgrDesdeRgba,
   enderezar,
+  envolver,
   extraerTexto,
   reconocerCaja,
   tamanoDet,
@@ -145,6 +146,19 @@ describe("tensorDet", () => {
   });
 });
 
+describe("envolver", () => {
+  const sesion = (shape: ReadonlyArray<number | string>) =>
+    ({
+      outputMetadata: [{ name: "x", isTensor: true, type: 1, shape }],
+    }) as unknown as import("onnxruntime-web").InferenceSession;
+  it("rec con clases distintas al dict lanza en init", () => {
+    expect(() => envolver({} as never, sesion([100, 80, 999]), "rec")).toThrow(/999 clases/);
+  });
+  it("rec compatible no lanza", () => {
+    expect(() => envolver({} as never, sesion([100, 80, DICT_OCR.length]), "rec")).not.toThrow();
+  });
+});
+
 describe("matrizInversa", () => {
   it("traslación → traslación opuesta", () => {
     // +0 normaliza el −0 del álgebra (idéntico para canvas).
@@ -266,6 +280,53 @@ describe("reconocerCaja", () => {
     );
     expect(r).toEqual({ texto: "", puntaje: 0 });
     expect(espia.rec).toHaveLength(0);
+  });
+
+  it("quad inclinado: el crop usa aristas, no bbox", async () => {
+    const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
+    const nucleo = nucleoFalso(mapaUnaLinea(), logitsAA(), espia);
+    let w = 0;
+    let h = 0;
+    const crear = (): HTMLCanvasElement =>
+      ({
+        set width(v: number) {
+          w = v;
+        },
+        set height(v: number) {
+          h = v;
+        },
+        getContext: (): unknown => ({
+          drawImage: (): void => {},
+          setTransform: (): void => {},
+          getImageData: (
+            _x: number,
+            _y: number,
+            ww: number,
+            hh: number,
+          ): { data: Uint8ClampedArray } => ({
+            data: new Uint8ClampedArray(ww * hh * 4).fill(255),
+          }),
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: "high",
+        }),
+      }) as unknown as HTMLCanvasElement;
+    const base = lienzoFalso(BLANCO32).lienzo;
+    await reconocerCaja(
+      nucleo.rec,
+      base,
+      {
+        poli: [
+          [0, 0],
+          [200, 17.4],
+          [200, 37.4],
+          [0, 20],
+        ],
+        puntaje: 1,
+      },
+      crear,
+    );
+    // aristas 200.8×20 → 201×20 (el bbox daría 200×38 y estiraría los glifos).
+    expect([w, h]).toEqual([201, 20]);
   });
 });
 

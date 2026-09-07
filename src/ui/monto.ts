@@ -26,6 +26,8 @@ export function parsearMonto(texto: string): Cents | null {
     decimal = s.slice(sep + 1);
     if (!/^\d{1,2}$/.test(decimal)) return null;
   }
+  // ponytail: miles con grupos de 3 y separador único ("1,,234" o "1.2.3" → null).
+  if (/[.,]/.test(entera) && !/^\d{1,3}((,\d{3})+|(\.\d{3})+)$/.test(entera)) return null;
   entera = entera.replace(/[.,]/g, "");
   if (!/^\d{1,12}$/.test(entera)) return null;
   return Number(entera) * 100 + Number(decimal.padEnd(2, "0"));

@@ -99,12 +99,20 @@ export async function procesarCola(): Promise<void> {
           const end = await ocr.enderezar(blob);
           if (end.grados !== 0 && buscarSlot(sig.id)) {
             console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
-            URL.revokeObjectURL(sig.imgUrl);
-            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
-            sig.imgUrl = URL.createObjectURL(end.blob);
-            sig.file = end.blob;
-            sig.thumbUrl = await generarMiniatura(end.blob);
-            blob = end.blob;
+            // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
+            const imgNueva = URL.createObjectURL(end.blob);
+            const thumbNueva = await generarMiniatura(end.blob);
+            if (!buscarSlot(sig.id)) {
+              URL.revokeObjectURL(imgNueva);
+              if (thumbNueva) URL.revokeObjectURL(thumbNueva);
+            } else {
+              URL.revokeObjectURL(sig.imgUrl);
+              if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
+              sig.imgUrl = imgNueva;
+              sig.file = end.blob;
+              sig.thumbUrl = thumbNueva;
+              blob = end.blob;
+            }
           }
         }
       } catch {
