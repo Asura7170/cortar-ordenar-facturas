@@ -166,6 +166,12 @@ export function buscarSlot(id: number): { hoja: Hoja; idx: number } | null {
   return null;
 }
 
+// ponytail: lookup sin allocar el array de aplanar() (handlers click/change).
+export function obtenerComprobante(id: number): Comprobante | undefined {
+  const slot = buscarSlot(id);
+  return slot ? (slot.hoja.slots[slot.idx] ?? undefined) : undefined;
+}
+
 export function limpiarHojas(): void {
   state.hojas = Iterator.from(state.hojas)
     .filter((h) => h.slots.some(Boolean))

@@ -1,5 +1,6 @@
-/* Cola secuencial de procesamiento — DocAligner recorta, PaddleOCR/LLM extraen (mock aún).
-   crop.ts vive en docaligner.ts; la firma procesarCola() ya es la final. */
+/* Cola secuencial de procesamiento — DocAligner recorta, PP-OCRv6_small extrae
+   texto (import dinámico: dict+onnx solo bajan con el primer comprobante).
+   El monto queda manual hasta el LLM (extract.ts futuro). */
 import { buscarSlot, state } from "../state";
 import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
@@ -84,9 +85,47 @@ export async function procesarCola(): Promise<void> {
         // ponytail: sin recorte se sigue con el original; la cola no se detiene
       }
       if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
-      // Valores de ejemplo para validar UI/UX (diseño primero, OCR/LLM después).
-      sig.textoOcr = sanear(`FACTURA ${sig.nombre}\nFecha: 12/08/2026\nTOTAL: US$ 1,234.56`);
-      sig.montoCents = 123456;
+      // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
+      const ocr = await import("./ocr").catch((): null => null);
+      let blob: Blob | null = null;
+      try {
+        blob = await blobDeItem(sig);
+      } catch {
+        blob = null;
+      }
+      // Endereza por confianza del rec (det solo recorta líneas, no vota).
+      try {
+        if (ocr && blob) {
+          const end = await ocr.enderezar(blob);
+          if (end.grados !== 0 && buscarSlot(sig.id)) {
+            console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
+            // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
+            const imgNueva = URL.createObjectURL(end.blob);
+            const thumbNueva = await generarMiniatura(end.blob);
+            if (!buscarSlot(sig.id)) {
+              URL.revokeObjectURL(imgNueva);
+              if (thumbNueva) URL.revokeObjectURL(thumbNueva);
+            } else {
+              URL.revokeObjectURL(sig.imgUrl);
+              if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
+              sig.imgUrl = imgNueva;
+              sig.file = end.blob;
+              sig.thumbUrl = thumbNueva;
+              blob = end.blob;
+            }
+          }
+        }
+      } catch {
+        // ponytail: sin enderezar se sigue con la imagen tal cual
+      }
+      if (!buscarSlot(sig.id)) continue; // limpiado durante el enderezado: no resucita
+      // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
+      try {
+        sig.textoOcr = ocr && blob ? sanear(await ocr.extraerTexto(blob)) : "";
+      } catch {
+        sig.textoOcr = "";
+      }
+      sig.montoCents = null;
       sig.estado = "ok";
       renderHojas();
     }

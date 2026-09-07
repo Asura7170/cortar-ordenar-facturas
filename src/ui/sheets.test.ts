@@ -14,7 +14,7 @@ const {
   renderHojas,
 } = await import("./sheets");
 const { archivo, comprobante } = await import("../test/factoria");
-import type { Hoja, LayoutId } from "../types";
+import type { Comprobante, Hoja, LayoutId } from "../types";
 
 const agregarArchivos = vi.fn();
 initSheets({ agregarArchivos });
@@ -182,6 +182,106 @@ describe("celdas", () => {
   it("actualizarMiniatura con id inexistente no tira", () => {
     sembrar("u4x2", [100]);
     expect(() => actualizarMiniatura(-1)).not.toThrow();
+  });
+});
+
+describe("monto manual", () => {
+  /** Tarjeta ok sin monto (lo que deja la cola sin LLM). */
+  function sembrarOk(): Comprobante {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: null });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    return c;
+  }
+
+  function inputMonto(): HTMLInputElement {
+    const input = document.querySelector<HTMLInputElement>("input.cell-monto");
+    if (!input) throw new Error("sin input de monto");
+    return input;
+  }
+
+  it("tarjeta ok sin monto muestra input con etiqueta", () => {
+    sembrarOk();
+    expect(inputMonto().getAttribute("aria-label")).toContain("factura.png");
+  });
+
+  it("pendiente sin monto no muestra input", () => {
+    sembrar("u1", [null]);
+    expect(document.querySelector("input.cell-monto")).toBeNull();
+  });
+
+  it("change válido fija el monto y pinta badge", () => {
+    state.moneda = "USD";
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "1234.56";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(c.montoCents).toBe(123456);
+    expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,234.56");
+    expect(document.querySelector("input.cell-monto")).toBeNull();
+  });
+
+  it("change inválido restaura el input sin monto", () => {
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "abc";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(c.montoCents).toBeNull();
+    expect(document.querySelector("input.cell-monto")).not.toBeNull();
+  });
+
+  it("clic en badge vuelve a input (corregir-monto)", () => {
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "500";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(c.montoCents).toBe(50000);
+    document.querySelector<HTMLElement>(".cell-badge")?.click();
+    expect(c.montoCents).toBeNull();
+    expect(document.querySelector("input.cell-monto")).not.toBeNull();
+  });
+
+  it("pointerdown en el input no inicia drag (foco intacto)", () => {
+    sembrarOk();
+    const ev = Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    inputMonto().dispatchEvent(ev);
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("pointerdown en la imagen sí inicia drag (control)", () => {
+    sembrarOk();
+    const img = document.querySelector(".cell img");
+    if (!img) throw new Error("sin imagen");
+    img.dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: 10,
+        clientY: 10,
+      }),
+    );
+    expect(document.querySelector(".sheet-grid.dragging")).not.toBeNull();
+    document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+  });
+
+  it("monto entero se muestra con 2 decimales (500 → US$ 500.00)", () => {
+    state.moneda = "USD";
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "500";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(c.montoCents).toBe(50000);
+    expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 500.00");
   });
 });
 

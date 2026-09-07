@@ -450,7 +450,7 @@ export function obtenerSesion(): Promise<SesionDetectora> {
 }
 
 /** Presupuesto por intento de EP: un compile sano tarda ~1s; más es hardware colgado (ORT no siempre rechaza). */
-const TIMEOUT_EP_MS: number = 30_000;
+export const TIMEOUT_EP_MS: number = 30_000;
 
 /** EPs caídos en esta carga (fallo o timeout): el fallo de init es determinista, no se reintentan. */
 const epCaidos = new Set<string>();
@@ -481,11 +481,11 @@ export function conTimeout<T>(promesa: Promise<T>, ms: number): Promise<T> {
 export type IntentarEp = (ep: string) => Promise<SesionDetectora>;
 
 /** Prueba EPs en orden con timeout y latch de caídos; lanza si ninguno sirve. */
-export async function iniciarSesion(
-  intentar: IntentarEp,
+export async function iniciarSesion<T>(
+  intentar: (ep: string) => Promise<T>,
   eps: readonly string[] = ["webgpu", "wasm"],
   timeoutMs: number = TIMEOUT_EP_MS,
-): Promise<SesionDetectora> {
+): Promise<T> {
   let ultimoError: unknown = null;
   for (const ep of eps) {
     if (epCaidos.has(ep)) continue;
