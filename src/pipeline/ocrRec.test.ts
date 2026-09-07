@@ -1,7 +1,14 @@
 /* Tests: ocrRec — normalización de línea, matriz afín y CTC greedy
    (puros; el lienzo solo lo toca ocr.ts). */
 import { describe, expect, it } from "vite-plus/test";
-import { decodificarCtc, matrizAfin, normalizarLinea, REC_ALTO, REC_RATIO_MAXIMA } from "./ocrRec";
+import {
+  decodificarCtc,
+  matrizAfin,
+  normalizarLinea,
+  normalizarLote,
+  REC_ALTO,
+  REC_RATIO_MAXIMA,
+} from "./ocrRec";
 import { DICT_OCR } from "./ocrDict";
 
 describe("normalizarLinea", () => {
@@ -46,6 +53,61 @@ describe("normalizarLinea", () => {
   it("hebra 480:1 se topa a ratio 32", () => {
     const lin = normalizarLinea(new Uint8Array(4800 * 10 * 3).fill(128), 4800, 10);
     expect(lin?.anchoTotal).toBe(REC_ALTO * REC_RATIO_MAXIMA);
+  });
+});
+
+describe("normalizarLote", () => {
+  const bgrA = new Uint8Array(100 * 20 * 3).fill(128);
+  const bgrB = new Uint8Array(640 * 30 * 3).fill(64);
+
+  it("apila con pad de ceros: la ancha intacta, la corta con ceros (L2)", () => {
+    const a = normalizarLinea(bgrA, 100, 20);
+    const b = normalizarLinea(bgrB, 640, 30);
+    if (!a || !b) throw new Error("sin líneas");
+    const lote = normalizarLote([
+      { bgr: bgrA, w: 100, h: 20 },
+      { bgr: bgrB, w: 640, h: 30 },
+    ]);
+    if (!lote) throw new Error("sin lote");
+    expect(lote.lote).toBe(2);
+    const wMax = Math.max(a.anchoTotal, b.anchoTotal);
+    expect(lote.anchoMax).toBe(wMax);
+    expect(lote.tensor.length).toBe(2 * 3 * REC_ALTO * wMax);
+    const plano = REC_ALTO * wMax;
+    // La ancha (sin pad si es la mayor): bloque idéntico al individual.
+    const ancha = b.anchoTotal >= a.anchoTotal ? { n: b, base: 3 } : { n: a, base: 0 };
+    const planoAncha = REC_ALTO * ancha.n.anchoTotal;
+    for (let c = 0; c < 3; c += 1) {
+      for (let y = 0; y < REC_ALTO; y += 1) {
+        expect(
+          lote.tensor.slice(
+            (ancha.base + c) * plano + y * wMax,
+            (ancha.base + c) * plano + (y + 1) * wMax,
+          ),
+        ).toEqual(
+          ancha.n.tensor.slice(
+            c * planoAncha + y * ancha.n.anchoTotal,
+            c * planoAncha + (y + 1) * ancha.n.anchoTotal,
+          ),
+        );
+      }
+    }
+    // La corta: ceros a la derecha de su ancho total.
+    const corta = b.anchoTotal >= a.anchoTotal ? { n: a, base: 0 } : { n: b, base: 3 };
+    for (let c = 0; c < 3; c += 1) {
+      for (let y = 0; y < REC_ALTO; y += 1) {
+        const pad = lote.tensor.slice(
+          (corta.base + c) * plano + y * wMax + corta.n.anchoTotal,
+          (corta.base + c) * plano + (y + 1) * wMax,
+        );
+        expect(pad.every((v) => v === 0)).toBe(true);
+      }
+    }
+  });
+
+  it("vacío o degenerado → null", () => {
+    expect(normalizarLote([])).toBeNull();
+    expect(normalizarLote([{ bgr: new Uint8Array(0), w: 0, h: 5 }])).toBeNull();
   });
 });
 

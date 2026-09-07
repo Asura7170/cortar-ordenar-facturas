@@ -7,11 +7,12 @@ import {
   envolver,
   extraerTexto,
   reconocerCaja,
+  reconocerLote,
   tamanoDet,
   tensorDet,
   tensorDetDesdeRgba,
 } from "./ocr";
-import type { NucleoOcr, SalidaOcr } from "./ocr";
+import type { NucleoOcr, SalidaOcr, SubsesionOcr } from "./ocr";
 import { DICT_OCR } from "./ocrDict";
 import { matrizInversa } from "./ocrRec";
 
@@ -352,6 +353,71 @@ describe("reconocerCaja", () => {
   });
 });
 
+describe("reconocerLote", () => {
+  const caja10 = (
+    puntaje: number,
+  ): { poli: [[0, 0], [10, 0], [10, 10], [0, 10]]; puntaje: number } => ({
+    poli: [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+      [0, 10],
+    ],
+    puntaje,
+  });
+
+  /** Logits bacheados [2,3,n] que deletrean "AA" en cada lote. */
+  function logitsLoteAA(): { data: Float32Array; dims: number[] } {
+    const n = DICT_OCR.length;
+    const idxA = DICT_OCR.indexOf("A");
+    const data = new Float32Array(2 * 3 * n);
+    data[idxA] = 0.9;
+    data[2 * n + idxA] = 0.8;
+    data[3 * n + idxA] = 0.7;
+    data[5 * n + idxA] = 0.6;
+    return { data, dims: [2, 3, n] };
+  }
+
+  it("2 cajas → un solo run con batch [2,3,48,320] (L2)", async () => {
+    const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
+    const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
+    const { lienzo } = lienzoFalso(BLANCO32);
+    const rs = await reconocerLote(nucleo.rec, lienzo, [caja10(0.9), caja10(0.8)], () => lienzo);
+    expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
+    expect(espia.rec).toHaveLength(1);
+    expect((espia.rec[0] as number[][])?.[0]).toEqual([2, 3, 48, 320]);
+  });
+
+  it("lote rechazado → fallback individual sin lanzar (L2)", async () => {
+    const llamadas: number[][] = [];
+    const rec: SubsesionOcr = {
+      tensor: (datos: Float32Array, formas: readonly number[]): unknown => ({
+        datos,
+        formas: [...formas],
+      }),
+      run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
+        const formas = (feeds["x"] as { formas: number[] }).formas;
+        llamadas.push(formas);
+        if ((formas[0] ?? 0) > 1) return Promise.reject(new Error("sin batch"));
+        return Promise.resolve({ fetch_name_0: logitsAA() });
+      },
+    };
+    const { lienzo } = lienzoFalso(BLANCO32);
+    const rs = await reconocerLote(rec, lienzo, [caja10(0.9), caja10(0.8)], () => lienzo);
+    expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
+    expect(llamadas).toHaveLength(3); // 1 lote + 2 individuales
+    expect(llamadas[0]?.[0]).toBe(2);
+  });
+
+  it("sin cajas válidas → vacíos sin run", async () => {
+    const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
+    const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
+    const { lienzo } = lienzoFalso(BLANCO32);
+    expect(await reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).toEqual([]);
+    expect(espia.rec).toHaveLength(0);
+  });
+});
+
 describe("enderezar (decisión rec)", () => {
   /** Lienzo falso con toBlob (registra creaciones en orden). */
   function lienzoConBlob(): {
@@ -549,15 +615,15 @@ describe("enderezar (decisión rec)", () => {
     expect(recLlamadas).toEqual([]);
   });
 
-  it("rec falla en 90 → se salta y gana 270", async () => {
+  it("lote rec falla en 90 → reintenta individual y gana 90 (L2)", async () => {
     const { deps, detLlamadas, recLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
       [0.3, 0.0, 0.95],
       1,
     );
     const r = await enderezar(new Blob(["foto"]), deps);
-    expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1, 2]);
+    expect(r.grados).toBe(90);
+    expect(detLlamadas).toEqual([0, 1]);
     expect(recLlamadas).toEqual([0, 1, 2]);
   });
 

@@ -6,7 +6,15 @@ import { TIMEOUT_EP_MS, iniciarSesion } from "./docaligner";
 import { DICT_OCR } from "./ocrDict";
 import { cajasDesdeMapa } from "./ocrDb";
 import type { CajaDb } from "./ocrDb";
-import { decodificarCtc, matrizAfin, matrizInversa, normalizarLinea, REC_ALTO } from "./ocrRec";
+import {
+  decodificarCtc,
+  matrizAfin,
+  matrizInversa,
+  normalizarLinea,
+  normalizarLote,
+  REC_ALTO,
+} from "./ocrRec";
+import type { TextoRec } from "./ocrRec";
 import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
@@ -288,11 +296,9 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
     // Confianza rec media del top-2 (0 si nada legible).
     const confiar = async (cajas: CajaDb[], base: HTMLCanvasElement): Promise<number> => {
       const top = [...cajas].sort((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
+      const rs = await reconocerLote(rec, base, top, crear);
       const confs: number[] = [];
-      for (const caja of top) {
-        const r = await reconocerCaja(rec, base, caja, crear);
-        if (r.texto !== "") confs.push(r.puntaje);
-      }
+      for (const r of rs) if (r.texto !== "") confs.push(r.puntaje);
       return confs.length > 0 ? confs.reduce((a, b) => a + b, 0) / confs.length : 0;
     };
     const ver = async (
@@ -347,6 +353,53 @@ function datosSalida(sal: SalidaOcr | undefined): Float32Array | null {
   return sal.data instanceof Float32Array ? sal.data : Float32Array.from(sal.data);
 }
 
+/** Crop BGR de una caja (warp afín del quad a sus aristas). Null si degenerada o sin contexto. */
+function recorteCaja(
+  base: HTMLCanvasElement,
+  caja: CajaDb,
+  crear: CrearLienzo,
+): { bgr: Uint8Array; w: number; h: number } | null {
+  // ponytail: aristas del quad, no bbox (en líneas inclinadas el bbox estira).
+  const [q0, q1, , q3] = caja.poli;
+  const cw = Math.max(1, Math.ceil(Math.hypot(q1[0] - q0[0], q1[1] - q0[1])));
+  const ch = Math.max(1, Math.ceil(Math.hypot(q3[0] - q0[0], q3[1] - q0[1])));
+  const inv = matrizInversa(matrizAfin(caja.poli, cw, ch));
+  if (!inv) return null;
+  const lienzo = crear();
+  lienzo.width = cw;
+  lienzo.height = ch;
+  const ctx = lienzo.getContext("2d");
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.setTransform(inv[0], inv[1], inv[2], inv[3], inv[4], inv[5]);
+  try {
+    ctx.drawImage(base, 0, 0);
+    const datos = ctx.getImageData(0, 0, cw, ch).data;
+    return { bgr: bgrDesdeRgba(datos), w: cw, h: ch };
+  } catch {
+    return null;
+  }
+}
+
+/** Un run del rec + CTC (vacío si la salida no cuadra o el run falla). */
+async function ejecutarRec(
+  rec: SubsesionOcr,
+  tensor: Float32Array,
+  formas: readonly [number, number, number, number],
+): Promise<TextoRec> {
+  const vacio: TextoRec = { texto: "", puntaje: 0 };
+  try {
+    const sal = await rec.run({ x: rec.tensor(tensor, [...formas]) });
+    const t = datosSalida(sal[SALIDA_ONNX]);
+    const pasos = Number(sal[SALIDA_ONNX]?.dims?.[1] ?? 0);
+    if (!t || !Number.isInteger(pasos) || pasos < 1) return vacio;
+    return decodificarCtc(t, pasos);
+  } catch {
+    return vacio;
+  }
+}
+
 /** Reconoce una caja: warp afín del quad a su bbox + rec + CTC. */
 export async function reconocerCaja(
   rec: SubsesionOcr,
@@ -355,36 +408,60 @@ export async function reconocerCaja(
   crear: CrearLienzo,
 ): Promise<{ texto: string; puntaje: number }> {
   const vacio = { texto: "", puntaje: 0 };
-  // ponytail: aristas del quad, no bbox (en líneas inclinadas el bbox estira).
-  const [q0, q1, , q3] = caja.poli;
-  const cw = Math.max(1, Math.ceil(Math.hypot(q1[0] - q0[0], q1[1] - q0[1])));
-  const ch = Math.max(1, Math.ceil(Math.hypot(q3[0] - q0[0], q3[1] - q0[1])));
-  const inv = matrizInversa(matrizAfin(caja.poli, cw, ch));
-  if (!inv) return vacio;
-  const lienzo = crear();
-  lienzo.width = cw;
-  lienzo.height = ch;
-  const ctx = lienzo.getContext("2d");
-  if (!ctx) return vacio;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.setTransform(inv[0], inv[1], inv[2], inv[3], inv[4], inv[5]);
-  try {
-    ctx.drawImage(base, 0, 0);
-    const datos = ctx.getImageData(0, 0, cw, ch).data;
-    const lin = normalizarLinea(bgrDesdeRgba(datos), cw, ch);
-    if (!lin) return vacio;
-    const sal = await rec.run({
-      x: rec.tensor(lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal]),
-    });
-    const t = datosSalida(sal[SALIDA_ONNX]);
-    const dims = sal[SALIDA_ONNX]?.dims;
-    const pasos = Number(dims?.[1] ?? 0);
-    if (!t || !Number.isInteger(pasos) || pasos < 1) return vacio;
-    return decodificarCtc(t, pasos);
-  } catch {
-    return vacio;
+  const r = recorteCaja(base, caja, crear);
+  if (!r) return vacio;
+  const lin = normalizarLinea(r.bgr, r.w, r.h);
+  if (!lin) return vacio;
+  return ejecutarRec(rec, lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal]);
+}
+
+/**
+ * Reconoce N cajas con una sola inferencia rec (lote con pad al ancho mayor;
+ * el pad es el mismo del camino individual: se descarta al decodificar). Si el
+ * lote falla o no cuadra, reintenta una por una. Nunca lanza.
+ */
+export async function reconocerLote(
+  rec: SubsesionOcr,
+  base: HTMLCanvasElement,
+  cajas: readonly CajaDb[],
+  crear: CrearLienzo,
+): Promise<TextoRec[]> {
+  const fuera: TextoRec[] = cajas.map(() => ({ texto: "", puntaje: 0 }));
+  const validos: { idx: number; bgr: Uint8Array; w: number; h: number }[] = [];
+  cajas.forEach((caja, idx) => {
+    const r = recorteCaja(base, caja, crear);
+    if (r) validos.push({ idx, ...r });
+  });
+  if (validos.length === 0) return fuera;
+  const lote = normalizarLote(validos);
+  if (lote) {
+    const sal = await rec
+      .run({ x: rec.tensor(lote.tensor, [lote.lote, 3, REC_ALTO, lote.anchoMax]) })
+      .catch((): null => null);
+    const datos = sal ? datosSalida(sal[SALIDA_ONNX]) : null;
+    const pasos = Number(sal?.[SALIDA_ONNX]?.dims?.[1] ?? 0);
+    const porLote = datos ? datos.length / lote.lote : 0;
+    if (
+      datos &&
+      Number.isInteger(pasos) &&
+      pasos > 0 &&
+      Number.isInteger(porLote) &&
+      porLote / pasos === DICT_OCR.length
+    ) {
+      validos.forEach((v, b) => {
+        fuera[v.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
+      });
+      return fuera;
+    }
+    // el lote no cuadra (EP sin batch, formas raras): individual abajo.
   }
+  for (const v of validos) {
+    const lin = normalizarLinea(v.bgr, v.w, v.h);
+    fuera[v.idx] = lin
+      ? await ejecutarRec(rec, lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal])
+      : { texto: "", puntaje: 0 };
+  }
+  return fuera;
 }
 
 /**
@@ -427,9 +504,9 @@ export async function extraerTexto(
       final = base;
     }
     const lineas: string[] = [];
-    for (const caja of cajas) {
+    // L2: un solo run para todas las cajas (con fallback individual dentro).
+    for (const r of await reconocerLote(rec, final, cajas, crear)) {
       // ponytail: líneas vacías fuera (el modal queda limpio para el LLM).
-      const r = await reconocerCaja(rec, final, caja, crear);
       if (r.texto !== "") lineas.push(r.texto);
     }
     return lineas.join("\n");

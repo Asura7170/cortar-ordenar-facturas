@@ -73,6 +73,51 @@ export function normalizarLinea(bgr: Uint8Array, w: number, h: number): LineaNor
   return { tensor, anchoUtil, anchoTotal };
 }
 
+/** Un crop BGR por línea (salida del recorte en ocr.ts). */
+export interface LineaBgr {
+  readonly bgr: Uint8Array;
+  readonly w: number;
+  readonly h: number;
+}
+
+/** Lote [B,3,48,anchoMax] listo para un solo run del rec. */
+export interface LoteNorm {
+  readonly tensor: Float32Array;
+  readonly lote: number;
+  readonly anchoMax: number;
+}
+
+/**
+ * Apila N líneas normalizadas con pad de ceros a la derecha hasta el ancho
+ * mayor (el mismo pad del camino individual: se descarta al decodificar).
+ * Null si vacío o alguna degenerada.
+ */
+export function normalizarLote(lineas: readonly LineaBgr[]): LoteNorm | null {
+  if (lineas.length === 0) return null;
+  const norms: LineaNorm[] = [];
+  let anchoMax = 0;
+  for (const l of lineas) {
+    const n = normalizarLinea(l.bgr, l.w, l.h);
+    if (!n) return null;
+    norms.push(n);
+    if (n.anchoTotal > anchoMax) anchoMax = n.anchoTotal;
+  }
+  const plano = REC_ALTO * anchoMax;
+  const tensor = new Float32Array(lineas.length * 3 * plano);
+  norms.forEach((n, b) => {
+    const planoLin = REC_ALTO * n.anchoTotal;
+    for (let c = 0; c < 3; c += 1) {
+      for (let y = 0; y < REC_ALTO; y += 1) {
+        tensor.set(
+          n.tensor.subarray(c * planoLin + y * n.anchoTotal, c * planoLin + (y + 1) * n.anchoTotal),
+          (b * 3 + c) * plano + y * anchoMax,
+        );
+      }
+    }
+  });
+  return { tensor, lote: norms.length, anchoMax };
+}
+
 /** Matriz afín canvas [a,b,c,d,e,f]. */
 export type MatrizAfin = readonly [number, number, number, number, number, number];
 
