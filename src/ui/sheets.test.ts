@@ -245,16 +245,16 @@ describe("monto manual", () => {
 
   it("pointerdown en el input no inicia drag (foco intacto)", () => {
     sembrarOk();
-    inputMonto().dispatchEvent(
-      Object.assign(new Event("pointerdown", { bubbles: true }), {
-        button: 0,
-        isPrimary: true,
-        pointerId: 1,
-        clientX: 10,
-        clientY: 10,
-      }),
-    );
+    const ev = Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    inputMonto().dispatchEvent(ev);
     expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+    expect(ev.defaultPrevented).toBe(false);
   });
 
   it("pointerdown en la imagen sí inicia drag (control)", () => {
@@ -272,6 +272,16 @@ describe("monto manual", () => {
     );
     expect(document.querySelector(".sheet-grid.dragging")).not.toBeNull();
     document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+  });
+
+  it("monto entero se muestra con 2 decimales (500 → US$ 500.00)", () => {
+    state.moneda = "USD";
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "500";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(c.montoCents).toBe(50000);
+    expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 500.00");
   });
 });
 

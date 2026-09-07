@@ -76,10 +76,10 @@ describe("renderMonto", () => {
 });
 
 describe("parsearMonto", () => {
-  it("US con miles, plano y coma decimal", () => {
+  it("US: miles con coma, decimal con punto, plano", () => {
     expect(parsearMonto("1,234.56")).toBe(123456);
     expect(parsearMonto("1234.56")).toBe(123456);
-    expect(parsearMonto("1234,56")).toBe(123456);
+    expect(parsearMonto("1,234,567.89")).toBe(123456789);
     expect(parsearMonto("500")).toBe(50000);
     expect(parsearMonto("12.5")).toBe(1250);
     expect(parsearMonto("  $ 1,234.56 ")).toBe(123456);
@@ -88,10 +88,13 @@ describe("parsearMonto", () => {
   it("inválidos → null", () => {
     expect(parsearMonto("")).toBeNull();
     expect(parsearMonto("abc")).toBeNull();
+    expect(parsearMonto("1234,56")).toBeNull(); // coma decimal EU: solo vale punto
     expect(parsearMonto("1,234")).toBeNull(); // miles sin decimales: escribir 1234
     expect(parsearMonto("12.345")).toBeNull();
     expect(parsearMonto("-5")).toBeNull();
     expect(parsearMonto("1,,234.56")).toBeNull(); // grupo vacío
+    expect(parsearMonto("1.234.56")).toBeNull(); // mismo separador en miles y decimal
+    expect(parsearMonto("1,234,56")).toBeNull(); // grupo de 2
     expect(parsearMonto("1.2.3")).toBeNull(); // grupo de 1
     expect(parsearMonto("12,34.56")).toBeNull(); // grupo de 2
   });
