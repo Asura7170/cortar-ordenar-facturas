@@ -501,12 +501,18 @@ export async function reconocerLote(
     diag.recRuns = chunks;
   }
   if (ok) return fuera;
+  // Hilo CodeRabbit #3: conserva lo ya decodificado (los chunks exitosos no
+  // se re-ejecutan ni se pisan); solo las líneas sin resultado van a individual.
+  const hechos = new Set(orden.slice(0, chunks * TAMANO_CHUNK_REC).map((t) => t.idx));
+  let runs = chunks; // chunks corridos (el fallido se suma abajo)
   for (const n of norms) {
+    if (hechos.has(n.idx)) continue;
     fuera[n.idx] = await ejecutarRec(rec, n.lin.tensor, [1, 3, REC_ALTO, n.lin.anchoTotal]);
+    runs += 1;
   }
   if (diag) {
     diag.fallback = true;
-    diag.recRuns = norms.length;
+    diag.recRuns = runs + 1; // + el chunk que falló
     diag.anchoMax = Math.max(...norms.map((n) => n.lin.anchoTotal));
   }
   return fuera;
@@ -529,23 +535,24 @@ export async function extraerTexto(
   try {
     bmp = await cargar(blob, { imageOrientation: "from-image" });
     if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return "";
-    const tam = tamanoDet(bmp.width, bmp.height);
-    const base = crear();
-    base.width = tam.w;
-    base.height = tam.h;
-    const bctx = base.getContext("2d");
-    if (!bctx) return "";
-    bctx.imageSmoothingEnabled = true;
-    bctx.imageSmoothingQuality = "high";
-    bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
     const { det, rec } = await fabrica();
-    // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan.
+    // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan
+    // (sin crear lienzo temporal: el decode solo queda para el guard de tamaño).
     let cajas: CajaDb[];
     let final: HTMLCanvasElement;
     if (reuse?.base && reuse.cajas.length > 0) {
       cajas = [...reuse.cajas];
       final = reuse.base;
     } else {
+      const tam = tamanoDet(bmp.width, bmp.height);
+      const base = crear();
+      base.width = tam.w;
+      base.height = tam.h;
+      const bctx = base.getContext("2d");
+      if (!bctx) return "";
+      bctx.imageSmoothingEnabled = true;
+      bctx.imageSmoothingQuality = "high";
+      bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
       const salDet = await pasarDet(det, base);
       if (!salDet) return "";
       const { mapa, mw, mh } = salDet;

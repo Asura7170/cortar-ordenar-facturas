@@ -278,6 +278,35 @@ describe("extraerTexto", () => {
     expect(espia.det).toHaveLength(0);
     expect(espia.rec).toHaveLength(1);
   });
+
+  it("reuse del enderezado: sin lienzo temporal, solo el del recorte (hilo #4)", async () => {
+    const { deps } = base();
+    const { lienzo } = lienzoFalso(BLANCO32);
+    let creados = 0;
+    const sinTemporal = {
+      ...deps,
+      crear: (): HTMLCanvasElement => {
+        creados += 1;
+        return lienzo;
+      },
+    };
+    const texto = await extraerTexto(new Blob(["x"]), sinTemporal, {
+      cajas: [
+        {
+          poli: [
+            [0, 0],
+            [10, 0],
+            [10, 10],
+            [0, 10],
+          ] as const,
+          puntaje: 0.9,
+        },
+      ],
+      base: lienzo,
+    });
+    expect(texto).toBe("AA");
+    expect(creados).toBe(1); // solo recorteCaja; antes eran 2 (base temporal + recorte)
+  });
 });
 
 describe("reconocerCaja", () => {
@@ -419,7 +448,50 @@ describe("reconocerLote", () => {
     expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
     expect(llamadas).toHaveLength(3); // 1 lote + 2 individuales
     expect(llamadas[0]?.[0]).toBe(2);
-    expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 2 });
+    // Hilo #3: el lote fallido también es un run (antes se omitía).
+    expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 3 });
+  });
+
+  it("fallback conserva chunks exitosos y cuenta el chunk fallido (hilo #3)", async () => {
+    const llamadas: number[][] = [];
+    let n = 0;
+    const clases = DICT_OCR.length;
+    const idxA = DICT_OCR.indexOf("A");
+    const rec: SubsesionOcr = {
+      tensor: (datos: Float32Array, formas: readonly number[]): unknown => ({
+        datos,
+        formas: [...formas],
+      }),
+      run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
+        const formas = (feeds["x"] as { formas: number[] }).formas;
+        llamadas.push(formas);
+        n += 1;
+        if (n === 2) return Promise.reject(new Error("chunk caído"));
+        const b = formas[0] ?? 0;
+        const data = new Float32Array(b * 3 * clases);
+        for (let k = 0; k < b; k += 1) {
+          data[k * 3 * clases + idxA] = 0.9;
+          data[(k * 3 + 2) * clases + idxA] = 0.8;
+        }
+        return Promise.resolve({ fetch_name_0: { data, dims: [b, 3, clases] } });
+      },
+    };
+    const { lienzo } = lienzoFalso(BLANCO32);
+    const cajas = Array.from({ length: 20 }, (_, i) => caja10(0.5 + i / 100));
+    const diag = diagVacio();
+    const rs = await reconocerLote(rec, lienzo, cajas, () => lienzo, diag);
+    expect(rs).toHaveLength(20);
+    expect(rs.every((r) => r.texto === "AA")).toBe(true);
+    // 1 chunk ok [16] + 1 chunk fallido [4] + 4 individuales (solo el caído)
+    expect(llamadas).toEqual([
+      [16, 3, 48, 320],
+      [4, 3, 48, 320],
+      [1, 3, 48, 320],
+      [1, 3, 48, 320],
+      [1, 3, 48, 320],
+      [1, 3, 48, 320],
+    ]);
+    expect(diag).toEqual({ cajas: 0, lote: 20, anchoMax: 320, fallback: true, recRuns: 6 });
   });
 
   /** rec stub que deletrea "AA" por lote con la forma que le pidan. */
