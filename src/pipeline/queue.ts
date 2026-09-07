@@ -138,7 +138,6 @@ export async function procesarCola(): Promise<void> {
           end = await ocr.enderezar(blob);
           ms.enderezar = performance.now() - t;
           if (end.grados !== 0 && buscarSlot(sig.id)) {
-            console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
             // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
             const imgNueva = URL.createObjectURL(end.blob);
             if (!buscarSlot(sig.id)) {

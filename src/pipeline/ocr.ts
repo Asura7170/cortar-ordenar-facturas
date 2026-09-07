@@ -343,10 +343,7 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
       } catch {
         continue; // giro fallido: se salta (el externo aún protege ver(0))
       }
-      // P1: puntaje por giro (para ver si el bypass 0.9 es inalcanzable).
-      console.info(
-        `OCR giro ${g}°: conf=${r.c.toFixed(3)} masa=${r.masa.toFixed(5)} cajas=${r.cajas.length}`,
-      );
+      // P1: la telemetría de giros cumplió (ver lote denso); la consola queda limpia.
       if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) return quieto; // sin texto: ni giros
       if (!mejor || r.c > mejor.c) mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
       if (r.c >= UMBRAL_REC_OK) break; // bypass: la primera que convence gana
