@@ -530,17 +530,19 @@ export async function extraerTexto(
   const fabrica = deps?.nucleo ?? obtenerNucleo;
   let bmp: ImageBitmap | null = null;
   try {
-    bmp = await cargar(blob, { imageOrientation: "from-image" });
-    if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return "";
     const { det, rec } = await fabrica();
-    // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan
-    // (sin crear lienzo temporal: el decode solo queda para el guard de tamaño).
+    // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan.
     let cajas: CajaDb[];
     let final: HTMLCanvasElement;
     if (reuse?.base && reuse.cajas.length > 0) {
+      // Fase 2: los píxeles ya están en memoria (reuse.base); decodificar el
+      // blob otra vez es CPU regalada (el guard usa las dims del lienzo).
+      if (reuse.base.width < DET_LADO_MIN || reuse.base.height < DET_LADO_MIN) return "";
       cajas = [...reuse.cajas];
       final = reuse.base;
     } else {
+      bmp = await cargar(blob, { imageOrientation: "from-image" });
+      if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return "";
       const tam = tamanoDet(bmp.width, bmp.height);
       const base = crear();
       base.width = tam.w;

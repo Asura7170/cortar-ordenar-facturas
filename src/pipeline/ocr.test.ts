@@ -260,6 +260,8 @@ describe("extraerTexto", () => {
   it("reuse del enderezado: no repite el det (L1)", async () => {
     const { deps, espia } = base();
     const { lienzo } = lienzoFalso(BLANCO32);
+    lienzo.width = 32; // en prod ver() siempre fija dims (mínimo 32)
+    lienzo.height = 32;
     const texto = await extraerTexto(new Blob(["x"]), deps, {
       cajas: [
         {
@@ -282,9 +284,16 @@ describe("extraerTexto", () => {
   it("reuse del enderezado: sin lienzo temporal, solo el del recorte (hilo #4)", async () => {
     const { deps } = base();
     const { lienzo } = lienzoFalso(BLANCO32);
+    lienzo.width = 32; // en prod ver() siempre fija dims (mínimo 32)
+    lienzo.height = 32;
     let creados = 0;
+    let decodes = 0;
     const sinTemporal = {
       ...deps,
+      cargar: (): Promise<ImageBitmap> => {
+        decodes += 1;
+        return Promise.resolve(bitmapFalso(64, 32));
+      },
       crear: (): HTMLCanvasElement => {
         creados += 1;
         return lienzo;
@@ -306,6 +315,7 @@ describe("extraerTexto", () => {
     });
     expect(texto).toBe("AA");
     expect(creados).toBe(1); // solo recorteCaja; antes eran 2 (base temporal + recorte)
+    expect(decodes).toBe(0); // Fase 2: en reuse no se decodifica el blob
   });
 });
 
