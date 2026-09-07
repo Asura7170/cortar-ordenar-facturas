@@ -6,7 +6,15 @@ import { TIMEOUT_EP_MS, iniciarSesion } from "./docaligner";
 import { DICT_OCR } from "./ocrDict";
 import { cajasDesdeMapa } from "./ocrDb";
 import type { CajaDb } from "./ocrDb";
-import { decodificarCtc, matrizAfin, matrizInversa, normalizarLinea, REC_ALTO } from "./ocrRec";
+import {
+  apilarLineas,
+  decodificarCtc,
+  matrizAfin,
+  matrizInversa,
+  normalizarLinea,
+  REC_ALTO,
+} from "./ocrRec";
+import type { LineaNorm, TextoRec } from "./ocrRec";
 import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
@@ -175,6 +183,20 @@ export function tensorDetDesdeRgba(rgba: Uint8ClampedArray, w: number, h: number
   return t;
 }
 
+/** Diagnóstico del rec (P1: telemetría para decidir la mitigación). */
+export interface DiagRec {
+  cajas: number;
+  lote: number;
+  anchoMax: number;
+  fallback: boolean;
+  recRuns: number;
+}
+
+/** DiagRec en ceros (el llamador lo crea; las funciones lo rellenan). */
+export function diagVacio(): DiagRec {
+  return { cajas: 0, lote: 0, anchoMax: 0, fallback: false, recRuns: 0 };
+}
+
 /** Nombre del tensor de salida en ambos onnx (fetch_name_0). */
 const SALIDA_ONNX = "fetch_name_0";
 
@@ -288,11 +310,9 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
     // Confianza rec media del top-2 (0 si nada legible).
     const confiar = async (cajas: CajaDb[], base: HTMLCanvasElement): Promise<number> => {
       const top = [...cajas].sort((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
+      const rs = await reconocerLote(rec, base, top, crear);
       const confs: number[] = [];
-      for (const caja of top) {
-        const r = await reconocerCaja(rec, base, caja, crear);
-        if (r.texto !== "") confs.push(r.puntaje);
-      }
+      for (const r of rs) if (r.texto !== "") confs.push(r.puntaje);
       return confs.length > 0 ? confs.reduce((a, b) => a + b, 0) / confs.length : 0;
     };
     const ver = async (
@@ -323,6 +343,10 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
       } catch {
         continue; // giro fallido: se salta (el externo aún protege ver(0))
       }
+      // P1: puntaje por giro (para ver si el bypass 0.9 es inalcanzable).
+      console.info(
+        `OCR giro ${g}°: conf=${r.c.toFixed(3)} masa=${r.masa.toFixed(5)} cajas=${r.cajas.length}`,
+      );
       if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) return quieto; // sin texto: ni giros
       if (!mejor || r.c > mejor.c) mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
       if (r.c >= UMBRAL_REC_OK) break; // bypass: la primera que convence gana
@@ -347,6 +371,53 @@ function datosSalida(sal: SalidaOcr | undefined): Float32Array | null {
   return sal.data instanceof Float32Array ? sal.data : Float32Array.from(sal.data);
 }
 
+/** Crop BGR de una caja (warp afín del quad a sus aristas). Null si degenerada o sin contexto. */
+function recorteCaja(
+  base: HTMLCanvasElement,
+  caja: CajaDb,
+  crear: CrearLienzo,
+): { bgr: Uint8Array; w: number; h: number } | null {
+  // ponytail: aristas del quad, no bbox (en líneas inclinadas el bbox estira).
+  const [q0, q1, , q3] = caja.poli;
+  const cw = Math.max(1, Math.ceil(Math.hypot(q1[0] - q0[0], q1[1] - q0[1])));
+  const ch = Math.max(1, Math.ceil(Math.hypot(q3[0] - q0[0], q3[1] - q0[1])));
+  const inv = matrizInversa(matrizAfin(caja.poli, cw, ch));
+  if (!inv) return null;
+  const lienzo = crear();
+  lienzo.width = cw;
+  lienzo.height = ch;
+  const ctx = lienzo.getContext("2d");
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.setTransform(inv[0], inv[1], inv[2], inv[3], inv[4], inv[5]);
+  try {
+    ctx.drawImage(base, 0, 0);
+    const datos = ctx.getImageData(0, 0, cw, ch).data;
+    return { bgr: bgrDesdeRgba(datos), w: cw, h: ch };
+  } catch {
+    return null;
+  }
+}
+
+/** Un run del rec + CTC (vacío si la salida no cuadra o el run falla). */
+async function ejecutarRec(
+  rec: SubsesionOcr,
+  tensor: Float32Array,
+  formas: readonly [number, number, number, number],
+): Promise<TextoRec> {
+  const vacio: TextoRec = { texto: "", puntaje: 0 };
+  try {
+    const sal = await rec.run({ x: rec.tensor(tensor, [...formas]) });
+    const t = datosSalida(sal[SALIDA_ONNX]);
+    const pasos = Number(sal[SALIDA_ONNX]?.dims?.[1] ?? 0);
+    if (!t || !Number.isInteger(pasos) || pasos < 1) return vacio;
+    return decodificarCtc(t, pasos);
+  } catch {
+    return vacio;
+  }
+}
+
 /** Reconoce una caja: warp afín del quad a su bbox + rec + CTC. */
 export async function reconocerCaja(
   rec: SubsesionOcr,
@@ -355,43 +426,108 @@ export async function reconocerCaja(
   crear: CrearLienzo,
 ): Promise<{ texto: string; puntaje: number }> {
   const vacio = { texto: "", puntaje: 0 };
-  // ponytail: aristas del quad, no bbox (en líneas inclinadas el bbox estira).
-  const [q0, q1, , q3] = caja.poli;
-  const cw = Math.max(1, Math.ceil(Math.hypot(q1[0] - q0[0], q1[1] - q0[1])));
-  const ch = Math.max(1, Math.ceil(Math.hypot(q3[0] - q0[0], q3[1] - q0[1])));
-  const inv = matrizInversa(matrizAfin(caja.poli, cw, ch));
-  if (!inv) return vacio;
-  const lienzo = crear();
-  lienzo.width = cw;
-  lienzo.height = ch;
-  const ctx = lienzo.getContext("2d");
-  if (!ctx) return vacio;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.setTransform(inv[0], inv[1], inv[2], inv[3], inv[4], inv[5]);
-  try {
-    ctx.drawImage(base, 0, 0);
-    const datos = ctx.getImageData(0, 0, cw, ch).data;
-    const lin = normalizarLinea(bgrDesdeRgba(datos), cw, ch);
-    if (!lin) return vacio;
-    const sal = await rec.run({
-      x: rec.tensor(lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal]),
-    });
-    const t = datosSalida(sal[SALIDA_ONNX]);
-    const dims = sal[SALIDA_ONNX]?.dims;
-    const pasos = Number(dims?.[1] ?? 0);
-    if (!t || !Number.isInteger(pasos) || pasos < 1) return vacio;
-    return decodificarCtc(t, pasos);
-  } catch {
-    return vacio;
+  const r = recorteCaja(base, caja, crear);
+  if (!r) return vacio;
+  const lin = normalizarLinea(r.bgr, r.w, r.h);
+  if (!lin) return vacio;
+  return ejecutarRec(rec, lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal]);
+}
+
+/** Líneas por chunk del rec (P2: un run [112,1536] tarda ~6s; trozos medianos no). */
+const TAMANO_CHUNK_REC = 16;
+
+/**
+ * Reconoce N cajas en chunks de un solo run (lote con pad al ancho mayor del
+ * grupo; el pad es el mismo del camino individual: se descarta al decodificar).
+ * Las líneas se ordenan por ancho para que la hebra ancha no contamine al resto.
+ * Si un chunk falla o no cuadra, reintenta una por una. Nunca lanza.
+ */
+export async function reconocerLote(
+  rec: SubsesionOcr,
+  base: HTMLCanvasElement,
+  cajas: readonly CajaDb[],
+  crear: CrearLienzo,
+  diag?: DiagRec,
+): Promise<TextoRec[]> {
+  const fuera: TextoRec[] = cajas.map(() => ({ texto: "", puntaje: 0 }));
+  const validos: { idx: number; bgr: Uint8Array; w: number; h: number }[] = [];
+  cajas.forEach((caja, idx) => {
+    const r = recorteCaja(base, caja, crear);
+    if (r) validos.push({ idx, ...r });
+  });
+  if (validos.length === 0) return fuera;
+  // P2: normalizar una vez (el fallback reutiliza, sin renormalizar).
+  const norms: { idx: number; lin: LineaNorm }[] = [];
+  for (const v of validos) {
+    const lin = normalizarLinea(v.bgr, v.w, v.h);
+    if (lin) norms.push({ idx: v.idx, lin });
   }
+  if (norms.length === 0) return fuera;
+  const orden = [...norms].sort((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
+  let anchoMax = 0;
+  let chunks = 0;
+  let ok = true;
+  for (let i = 0; i < orden.length; i += TAMANO_CHUNK_REC) {
+    const trozo = orden.slice(i, i + TAMANO_CHUNK_REC);
+    const lote = apilarLineas(trozo.map((t) => t.lin));
+    const sal = lote
+      ? await rec
+          .run({ x: rec.tensor(lote.tensor, [lote.lote, 3, REC_ALTO, lote.anchoMax]) })
+          .catch((): null => null)
+      : null;
+    const datos = sal ? datosSalida(sal[SALIDA_ONNX]) : null;
+    const pasos = Number(sal?.[SALIDA_ONNX]?.dims?.[1] ?? 0);
+    const porLote = datos && lote ? datos.length / lote.lote : 0;
+    if (
+      !datos ||
+      !lote ||
+      !Number.isInteger(pasos) ||
+      pasos < 1 ||
+      !Number.isInteger(porLote) ||
+      porLote / pasos !== DICT_OCR.length
+    ) {
+      ok = false; // el chunk no cuadra (EP sin batch, formas raras): individual abajo.
+      break;
+    }
+    trozo.forEach((t, b) => {
+      fuera[t.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
+    });
+    chunks += 1;
+    if (lote.anchoMax > anchoMax) anchoMax = lote.anchoMax;
+  }
+  if (diag) {
+    diag.lote = norms.length;
+    diag.anchoMax = anchoMax;
+    diag.recRuns = chunks;
+  }
+  if (ok) return fuera;
+  // Hilo CodeRabbit #3: conserva lo ya decodificado (los chunks exitosos no
+  // se re-ejecutan ni se pisan); solo las líneas sin resultado van a individual.
+  const hechos = new Set(orden.slice(0, chunks * TAMANO_CHUNK_REC).map((t) => t.idx));
+  let runs = chunks; // chunks corridos (el fallido se suma abajo)
+  for (const n of norms) {
+    if (hechos.has(n.idx)) continue;
+    fuera[n.idx] = await ejecutarRec(rec, n.lin.tensor, [1, 3, REC_ALTO, n.lin.anchoTotal]);
+    runs += 1;
+  }
+  if (diag) {
+    diag.fallback = true;
+    diag.recRuns = runs + 1; // + el chunk que falló
+    diag.anchoMax = Math.max(...norms.map((n) => n.lin.anchoTotal));
+  }
+  return fuera;
 }
 
 /**
  * Blob recortado → texto OCR plano por líneas. Nunca lanza: sin texto o con
  * error devuelve "" (la cola sigue y el monto queda manual).
  */
-export async function extraerTexto(blob: Blob, deps?: DepsOcr): Promise<string> {
+export async function extraerTexto(
+  blob: Blob,
+  deps?: DepsOcr,
+  reuse?: Pick<Enderezado, "cajas" | "base">,
+  diag?: DiagRec,
+): Promise<string> {
   const cargar = deps?.cargar ?? cargarReal;
   const crear = deps?.crear ?? crearReal;
   const fabrica = deps?.nucleo ?? obtenerNucleo;
@@ -399,24 +535,35 @@ export async function extraerTexto(blob: Blob, deps?: DepsOcr): Promise<string> 
   try {
     bmp = await cargar(blob, { imageOrientation: "from-image" });
     if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return "";
-    const tam = tamanoDet(bmp.width, bmp.height);
-    const base = crear();
-    base.width = tam.w;
-    base.height = tam.h;
-    const bctx = base.getContext("2d");
-    if (!bctx) return "";
-    bctx.imageSmoothingEnabled = true;
-    bctx.imageSmoothingQuality = "high";
-    bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
     const { det, rec } = await fabrica();
-    const salDet = await pasarDet(det, base);
-    if (!salDet) return "";
-    const { mapa, mw, mh } = salDet;
-    const cajas = cajasDesdeMapa(mapa, mw, mh, { ancho: tam.w, alto: tam.h });
+    // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan
+    // (sin crear lienzo temporal: el decode solo queda para el guard de tamaño).
+    let cajas: CajaDb[];
+    let final: HTMLCanvasElement;
+    if (reuse?.base && reuse.cajas.length > 0) {
+      cajas = [...reuse.cajas];
+      final = reuse.base;
+    } else {
+      const tam = tamanoDet(bmp.width, bmp.height);
+      const base = crear();
+      base.width = tam.w;
+      base.height = tam.h;
+      const bctx = base.getContext("2d");
+      if (!bctx) return "";
+      bctx.imageSmoothingEnabled = true;
+      bctx.imageSmoothingQuality = "high";
+      bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
+      const salDet = await pasarDet(det, base);
+      if (!salDet) return "";
+      const { mapa, mw, mh } = salDet;
+      cajas = cajasDesdeMapa(mapa, mw, mh, { ancho: tam.w, alto: tam.h });
+      final = base;
+    }
     const lineas: string[] = [];
-    for (const caja of cajas) {
+    // L2: un solo run para todas las cajas (con fallback individual dentro).
+    if (diag) diag.cajas = cajas.length;
+    for (const r of await reconocerLote(rec, final, cajas, crear, diag)) {
       // ponytail: líneas vacías fuera (el modal queda limpio para el LLM).
-      const r = await reconocerCaja(rec, base, caja, crear);
       if (r.texto !== "") lineas.push(r.texto);
     }
     return lineas.join("\n");

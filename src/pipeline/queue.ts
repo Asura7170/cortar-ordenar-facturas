@@ -6,8 +6,10 @@ import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
-import { detectarYRecortar } from "./docaligner";
+import { detectarYRecortar, obtenerSesion } from "./docaligner";
 import { CALIDAD_JPEG } from "./imagen";
+import type { Enderezado } from "./ocr";
+import { diagVacio } from "./ocr";
 
 const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
 
@@ -51,6 +53,33 @@ async function blobDeItem(sig: Comprobante): Promise<Blob> {
   return res.blob();
 }
 
+/**
+ * Precalienta los modelos en serie ante intención de subida (una sola vez).
+ * Nunca en paralelo ni en el arranque: las sesiones compiten por el mismo
+ * contexto GPU y la precarga concurrente en idle colgó la pestaña. Si falla,
+ * el uso real reintenta (los singletons resetean en fallo).
+ */
+let precalentado = false;
+export function precalentarModelos(): void {
+  if (precalentado) return;
+  precalentado = true;
+  const ceder = (): Promise<void> =>
+    new Promise((res) => {
+      if ("requestIdleCallback" in window) window.requestIdleCallback(() => res());
+      else setTimeout(() => res(), 0);
+    });
+  void (async (): Promise<void> => {
+    try {
+      await obtenerSesion();
+      await ceder(); // que los clics respiren entre compilaciones
+      const ocr = await import("./ocr").catch((): null => null);
+      await ocr?.obtenerNucleo();
+    } catch {
+      // el uso real reintenta; el warm-up es best-effort
+    }
+  })();
+}
+
 export async function procesarCola(): Promise<void> {
   if (state.colaEnProceso) return;
   state.colaEnProceso = true;
@@ -62,23 +91,25 @@ export async function procesarCola(): Promise<void> {
       if (!sig) break;
       sig.estado = "procesando";
       renderHojas(); // el recorte tarda: que se vea el estado (antes el mock era instantáneo)
+      // L0: tiempos por etapa (medir antes de optimizar).
+      const t0 = performance.now();
+      const ms = { recorte: 0, minis: 0, enderezar: 0, extraer: 0, diag: "" };
       try {
+        const t = performance.now();
         const original = await blobDeItem(sig);
         const recortada = await detectarYRecortar(original);
+        ms.recorte = performance.now() - t;
         if (recortada !== original) {
           // ponytail: commit tras el await — si se limpió durante la espera, se
           // revocan las nuevas y el guard de abajo evita resucitar.
+          // L1: la miniatura se genera una sola vez al final (no aquí).
           const imgNueva = URL.createObjectURL(recortada);
-          const thumbNueva = await generarMiniatura(recortada);
           if (!buscarSlot(sig.id)) {
             URL.revokeObjectURL(imgNueva);
-            if (thumbNueva) URL.revokeObjectURL(thumbNueva);
           } else {
             URL.revokeObjectURL(sig.imgUrl);
-            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
             sig.imgUrl = imgNueva;
             sig.file = recortada;
-            sig.thumbUrl = thumbNueva;
           }
         }
       } catch {
@@ -87,30 +118,33 @@ export async function procesarCola(): Promise<void> {
       if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
       // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
       const ocr = await import("./ocr").catch((): null => null);
-      let blob: Blob | null = null;
-      try {
-        blob = await blobDeItem(sig);
-      } catch {
-        blob = null;
+      // L1: el blob ya está en memoria (recorte) o en sig.file (foto); sin file
+      // se refetchea (PDF). Un solo decode por comprobante.
+      let blob: Blob | null = sig.file ?? null;
+      if (!blob) {
+        try {
+          blob = await blobDeItem(sig);
+        } catch {
+          blob = null;
+        }
       }
       // Endereza por confianza del rec (det solo recorta líneas, no vota).
+      let end: Enderezado | null = null;
       try {
         if (ocr && blob) {
-          const end = await ocr.enderezar(blob);
+          const t = performance.now();
+          end = await ocr.enderezar(blob);
+          ms.enderezar = performance.now() - t;
           if (end.grados !== 0 && buscarSlot(sig.id)) {
             console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
             // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
             const imgNueva = URL.createObjectURL(end.blob);
-            const thumbNueva = await generarMiniatura(end.blob);
             if (!buscarSlot(sig.id)) {
               URL.revokeObjectURL(imgNueva);
-              if (thumbNueva) URL.revokeObjectURL(thumbNueva);
             } else {
               URL.revokeObjectURL(sig.imgUrl);
-              if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
               sig.imgUrl = imgNueva;
               sig.file = end.blob;
-              sig.thumbUrl = thumbNueva;
               blob = end.blob;
             }
           }
@@ -121,12 +155,43 @@ export async function procesarCola(): Promise<void> {
       if (!buscarSlot(sig.id)) continue; // limpiado durante el enderezado: no resucita
       // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
       try {
-        sig.textoOcr = ocr && blob ? sanear(await ocr.extraerTexto(blob)) : "";
+        const t = performance.now();
+        // L1: reuse evita repetir el det del giro ganador (end trae cajas/base).
+        const diag = diagVacio();
+        sig.textoOcr =
+          ocr && blob
+            ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined, diag))
+            : "";
+        ms.extraer = performance.now() - t;
+        // P1: cajas, forma del lote, fallback y nº de runs del rec.
+        ms.diag =
+          `cajas=${diag.cajas} batch=[${diag.lote},${diag.anchoMax}] ` +
+          `fallback=${diag.fallback ? "sí" : "no"} recRuns=${diag.recRuns}`;
       } catch {
         sig.textoOcr = "";
       }
+      // L1: una sola miniatura al final, sobre la imagen definitiva.
+      if (blob) {
+        const tm = performance.now();
+        const thumbNueva = await generarMiniatura(blob);
+        ms.minis += performance.now() - tm;
+        if (thumbNueva) {
+          if (!buscarSlot(sig.id)) URL.revokeObjectURL(thumbNueva);
+          else {
+            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
+            sig.thumbUrl = thumbNueva;
+          }
+        }
+      }
+      if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
       sig.montoCents = null;
       sig.estado = "ok";
+      const entero = (v: number): number => Math.round(v);
+      console.info(
+        `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} minis=${entero(ms.minis)} ` +
+          `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
+          `${ms.diag} total=${entero(performance.now() - t0)}`,
+      );
       renderHojas();
     }
   } finally {
