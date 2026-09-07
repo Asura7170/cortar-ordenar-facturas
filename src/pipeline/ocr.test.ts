@@ -252,6 +252,28 @@ describe("extraerTexto", () => {
     });
     expect(texto).toBe("");
   });
+
+  it("reuse del enderezado: no repite el det (L1)", async () => {
+    const { deps, espia } = base();
+    const { lienzo } = lienzoFalso(BLANCO32);
+    const texto = await extraerTexto(new Blob(["x"]), deps, {
+      cajas: [
+        {
+          poli: [
+            [0, 0],
+            [10, 0],
+            [10, 10],
+            [0, 10],
+          ] as const,
+          puntaje: 0.9,
+        },
+      ],
+      base: lienzo,
+    });
+    expect(texto).toBe("AA");
+    expect(espia.det).toHaveLength(0);
+    expect(espia.rec).toHaveLength(1);
+  });
 });
 
 describe("reconocerCaja", () => {

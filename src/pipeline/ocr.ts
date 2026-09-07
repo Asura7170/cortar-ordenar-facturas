@@ -391,7 +391,11 @@ export async function reconocerCaja(
  * Blob recortado → texto OCR plano por líneas. Nunca lanza: sin texto o con
  * error devuelve "" (la cola sigue y el monto queda manual).
  */
-export async function extraerTexto(blob: Blob, deps?: DepsOcr): Promise<string> {
+export async function extraerTexto(
+  blob: Blob,
+  deps?: DepsOcr,
+  reuse?: Pick<Enderezado, "cajas" | "base">,
+): Promise<string> {
   const cargar = deps?.cargar ?? cargarReal;
   const crear = deps?.crear ?? crearReal;
   const fabrica = deps?.nucleo ?? obtenerNucleo;
@@ -409,14 +413,23 @@ export async function extraerTexto(blob: Blob, deps?: DepsOcr): Promise<string> 
     bctx.imageSmoothingQuality = "high";
     bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
     const { det, rec } = await fabrica();
-    const salDet = await pasarDet(det, base);
-    if (!salDet) return "";
-    const { mapa, mw, mh } = salDet;
-    const cajas = cajasDesdeMapa(mapa, mw, mh, { ancho: tam.w, alto: tam.h });
+    // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan.
+    let cajas: CajaDb[];
+    let final: HTMLCanvasElement;
+    if (reuse?.base && reuse.cajas.length > 0) {
+      cajas = [...reuse.cajas];
+      final = reuse.base;
+    } else {
+      const salDet = await pasarDet(det, base);
+      if (!salDet) return "";
+      const { mapa, mw, mh } = salDet;
+      cajas = cajasDesdeMapa(mapa, mw, mh, { ancho: tam.w, alto: tam.h });
+      final = base;
+    }
     const lineas: string[] = [];
     for (const caja of cajas) {
       // ponytail: líneas vacías fuera (el modal queda limpio para el LLM).
-      const r = await reconocerCaja(rec, base, caja, crear);
+      const r = await reconocerCaja(rec, final, caja, crear);
       if (r.texto !== "") lineas.push(r.texto);
     }
     return lineas.join("\n");

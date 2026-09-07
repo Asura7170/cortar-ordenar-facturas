@@ -8,6 +8,7 @@ import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
 import { detectarYRecortar } from "./docaligner";
 import { CALIDAD_JPEG } from "./imagen";
+import type { Enderezado } from "./ocr";
 
 const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
 
@@ -73,19 +74,14 @@ export async function procesarCola(): Promise<void> {
         if (recortada !== original) {
           // ponytail: commit tras el await — si se limpió durante la espera, se
           // revocan las nuevas y el guard de abajo evita resucitar.
+          // L1: la miniatura se genera una sola vez al final (no aquí).
           const imgNueva = URL.createObjectURL(recortada);
-          const tm = performance.now();
-          const thumbNueva = await generarMiniatura(recortada);
-          ms.minis += performance.now() - tm;
           if (!buscarSlot(sig.id)) {
             URL.revokeObjectURL(imgNueva);
-            if (thumbNueva) URL.revokeObjectURL(thumbNueva);
           } else {
             URL.revokeObjectURL(sig.imgUrl);
-            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
             sig.imgUrl = imgNueva;
             sig.file = recortada;
-            sig.thumbUrl = thumbNueva;
           }
         }
       } catch {
@@ -94,34 +90,33 @@ export async function procesarCola(): Promise<void> {
       if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
       // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
       const ocr = await import("./ocr").catch((): null => null);
-      let blob: Blob | null = null;
-      try {
-        blob = await blobDeItem(sig);
-      } catch {
-        blob = null;
+      // L1: el blob ya está en memoria (recorte) o en sig.file (foto); sin file
+      // se refetchea (PDF). Un solo decode por comprobante.
+      let blob: Blob | null = sig.file ?? null;
+      if (!blob) {
+        try {
+          blob = await blobDeItem(sig);
+        } catch {
+          blob = null;
+        }
       }
       // Endereza por confianza del rec (det solo recorta líneas, no vota).
+      let end: Enderezado | null = null;
       try {
         if (ocr && blob) {
           const t = performance.now();
-          const end = await ocr.enderezar(blob);
+          end = await ocr.enderezar(blob);
           ms.enderezar = performance.now() - t;
           if (end.grados !== 0 && buscarSlot(sig.id)) {
             console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
             // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
             const imgNueva = URL.createObjectURL(end.blob);
-            const tm = performance.now();
-            const thumbNueva = await generarMiniatura(end.blob);
-            ms.minis += performance.now() - tm;
             if (!buscarSlot(sig.id)) {
               URL.revokeObjectURL(imgNueva);
-              if (thumbNueva) URL.revokeObjectURL(thumbNueva);
             } else {
               URL.revokeObjectURL(sig.imgUrl);
-              if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
               sig.imgUrl = imgNueva;
               sig.file = end.blob;
-              sig.thumbUrl = thumbNueva;
               blob = end.blob;
             }
           }
@@ -133,11 +128,27 @@ export async function procesarCola(): Promise<void> {
       // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
       try {
         const t = performance.now();
-        sig.textoOcr = ocr && blob ? sanear(await ocr.extraerTexto(blob)) : "";
+        // L1: reuse evita repetir el det del giro ganador (end trae cajas/base).
+        sig.textoOcr =
+          ocr && blob ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined)) : "";
         ms.extraer = performance.now() - t;
       } catch {
         sig.textoOcr = "";
       }
+      // L1: una sola miniatura al final, sobre la imagen definitiva.
+      if (blob) {
+        const tm = performance.now();
+        const thumbNueva = await generarMiniatura(blob);
+        ms.minis += performance.now() - tm;
+        if (thumbNueva) {
+          if (!buscarSlot(sig.id)) URL.revokeObjectURL(thumbNueva);
+          else {
+            if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
+            sig.thumbUrl = thumbNueva;
+          }
+        }
+      }
+      if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
       sig.montoCents = null;
       sig.estado = "ok";
       const entero = (v: number): number => Math.round(v);
