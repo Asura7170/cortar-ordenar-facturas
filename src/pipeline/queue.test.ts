@@ -4,12 +4,15 @@ import { montarFixture } from "../test/fixture";
 
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
+// El auto IA real haría fetch: stub (cada test lo ajusta).
+vi.mock("./extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
 const { asignarMiniatura, procesarCola } = await import("./queue");
 const { comprobante } = await import("../test/factoria");
 const { renderHojas } = await import("../ui/sheets");
+const { extraerPendientes } = await import("./extract");
 
 beforeEach(() => {
   // Sin file ni imgUrl real el recorte falla al blob y sigue con el original: se avanza igual.
@@ -71,6 +74,40 @@ describe("procesarCola", () => {
     await p;
     // Sin coalescar serían 6 (2 por ítem); con coalescado 3+1.
     expect(vi.mocked(renderHojas).mock.calls.length - antes).toBe(4);
+  });
+
+  it("al drenar dispara el auto IA con desdeCola", async () => {
+    vi.mocked(extraerPendientes).mockClear();
+    const h = crearHoja();
+    h.slots[0] = comprobante({ nombre: "t.png" });
+    state.hojas.push(h);
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledWith({ desdeCola: true });
+  });
+
+  it("pendiente entrado durante la IA también se drena (no huérfano)", async () => {
+    let unaVez = false;
+    vi.mocked(extraerPendientes).mockImplementation(async () => {
+      if (unaVez) return;
+      unaVez = true;
+      const h = crearHoja();
+      h.slots[0] = comprobante({ nombre: "tardio.png" });
+      state.hojas.push(h);
+    });
+    try {
+      const h = crearHoja();
+      h.slots[0] = comprobante({ nombre: "t.png" });
+      state.hojas.push(h);
+      const p = procesarCola();
+      await vi.advanceTimersByTimeAsync(6000);
+      await p;
+      const tardio = state.hojas.flatMap((hh) => hh.slots).find((c) => c?.nombre === "tardio.png");
+      expect(tardio?.estado).toBe("ok");
+    } finally {
+      vi.mocked(extraerPendientes).mockResolvedValue(undefined);
+    }
   });
 
   it("asignarMiniatura no revoca el imgUrl aliased (PDF, hilo #1 PR9)", () => {

@@ -95,117 +95,119 @@ export async function procesarCola(): Promise<void> {
   try {
     // ponytail: drenado por pendiente, no snapshot; token generación si el MOCK se vuelve concurrente.
     // Fase 1: el "procesando" se pinta por ítem (feedback), el "ok" una vez al drenar.
-    let tocada = false;
     for (;;) {
-      // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
-      const sig = aplanar().find((c) => c.estado === "pendiente");
-      if (!sig) break;
-      sig.estado = "procesando";
-      renderHojas(); // el recorte tarda: que se vea el estado (antes el mock era instantáneo)
-      // L0: tiempos por etapa (medir antes de optimizar).
-      const t0 = performance.now();
-      const ms = { recorte: 0, minis: 0, enderezar: 0, extraer: 0, diag: "" };
-      try {
-        const t = performance.now();
-        const original = await blobDeItem(sig);
-        const recortada = await detectarYRecortar(original);
-        ms.recorte = performance.now() - t;
-        if (recortada !== original) {
-          // ponytail: commit tras el await — si se limpió durante la espera, se
-          // revocan las nuevas y el guard de abajo evita resucitar.
-          // L1: la miniatura se genera una sola vez al final (no aquí).
-          const imgNueva = URL.createObjectURL(recortada);
-          if (!buscarSlot(sig.id)) {
-            URL.revokeObjectURL(imgNueva);
-          } else {
-            URL.revokeObjectURL(sig.imgUrl);
-            sig.imgUrl = imgNueva;
-            sig.file = recortada;
-          }
-        }
-      } catch {
-        // ponytail: sin recorte se sigue con el original; la cola no se detiene
-      }
-      if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
-      // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
-      const ocr = await import("./ocr").catch((): null => null);
-      // L1: el blob ya está en memoria (recorte) o en sig.file (foto); sin file
-      // se refetchea (PDF). Un solo decode por comprobante.
-      let blob: Blob | null = sig.file ?? null;
-      if (!blob) {
+      let tocada = false;
+      for (;;) {
+        // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
+        const sig = aplanar().find((c) => c.estado === "pendiente");
+        if (!sig) break;
+        sig.estado = "procesando";
+        renderHojas(); // el recorte tarda: que se vea el estado (antes el mock era instantáneo)
+        // L0: tiempos por etapa (medir antes de optimizar).
+        const t0 = performance.now();
+        const ms = { recorte: 0, minis: 0, enderezar: 0, extraer: 0, diag: "" };
         try {
-          blob = await blobDeItem(sig);
-        } catch {
-          blob = null;
-        }
-      }
-      // Endereza por confianza del rec (det solo recorta líneas, no vota).
-      let end: Enderezado | null = null;
-      try {
-        if (ocr && blob) {
           const t = performance.now();
-          end = await ocr.enderezar(blob);
-          ms.enderezar = performance.now() - t;
-          if (end.grados !== 0 && buscarSlot(sig.id)) {
-            // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
-            const imgNueva = URL.createObjectURL(end.blob);
+          const original = await blobDeItem(sig);
+          const recortada = await detectarYRecortar(original);
+          ms.recorte = performance.now() - t;
+          if (recortada !== original) {
+            // ponytail: commit tras el await — si se limpió durante la espera, se
+            // revocan las nuevas y el guard de abajo evita resucitar.
+            // L1: la miniatura se genera una sola vez al final (no aquí).
+            const imgNueva = URL.createObjectURL(recortada);
             if (!buscarSlot(sig.id)) {
               URL.revokeObjectURL(imgNueva);
             } else {
               URL.revokeObjectURL(sig.imgUrl);
               sig.imgUrl = imgNueva;
-              sig.file = end.blob;
-              blob = end.blob;
+              sig.file = recortada;
             }
           }
+        } catch {
+          // ponytail: sin recorte se sigue con el original; la cola no se detiene
         }
-      } catch {
-        // ponytail: sin enderezar se sigue con la imagen tal cual
-      }
-      if (!buscarSlot(sig.id)) continue; // limpiado durante el enderezado: no resucita
-      // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
-      try {
-        const t = performance.now();
-        // L1: reuse evita repetir el det del giro ganador (end trae cajas/base).
-        const diag = diagVacio();
-        sig.textoOcr =
-          ocr && blob
-            ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined, diag))
-            : "";
-        ms.extraer = performance.now() - t;
-        // P1: cajas, forma del lote, fallback y nº de runs del rec.
-        ms.diag =
-          `cajas=${diag.cajas} batch=[${diag.lote},${diag.anchoMax}] ` +
-          `fallback=${diag.fallback ? "sí" : "no"} recRuns=${diag.recRuns}`;
-      } catch {
-        sig.textoOcr = "";
-      }
-      // L1: una sola miniatura al final, sobre la imagen definitiva.
-      if (blob) {
-        const tm = performance.now();
-        const thumbNueva = await generarMiniatura(blob);
-        ms.minis += performance.now() - tm;
-        if (thumbNueva) {
-          if (!buscarSlot(sig.id)) URL.revokeObjectURL(thumbNueva);
-          else asignarMiniatura(sig, thumbNueva);
+        if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
+        // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
+        const ocr = await import("./ocr").catch((): null => null);
+        // L1: el blob ya está en memoria (recorte) o en sig.file (foto); sin file
+        // se refetchea (PDF). Un solo decode por comprobante.
+        let blob: Blob | null = sig.file ?? null;
+        if (!blob) {
+          try {
+            blob = await blobDeItem(sig);
+          } catch {
+            blob = null;
+          }
         }
+        // Endereza por confianza del rec (det solo recorta líneas, no vota).
+        let end: Enderezado | null = null;
+        try {
+          if (ocr && blob) {
+            const t = performance.now();
+            end = await ocr.enderezar(blob);
+            ms.enderezar = performance.now() - t;
+            if (end.grados !== 0 && buscarSlot(sig.id)) {
+              // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
+              const imgNueva = URL.createObjectURL(end.blob);
+              if (!buscarSlot(sig.id)) {
+                URL.revokeObjectURL(imgNueva);
+              } else {
+                URL.revokeObjectURL(sig.imgUrl);
+                sig.imgUrl = imgNueva;
+                sig.file = end.blob;
+                blob = end.blob;
+              }
+            }
+          }
+        } catch {
+          // ponytail: sin enderezar se sigue con la imagen tal cual
+        }
+        if (!buscarSlot(sig.id)) continue; // limpiado durante el enderezado: no resucita
+        // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
+        try {
+          const t = performance.now();
+          // L1: reuse evita repetir el det del giro ganador (end trae cajas/base).
+          const diag = diagVacio();
+          sig.textoOcr =
+            ocr && blob
+              ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined, diag))
+              : "";
+          ms.extraer = performance.now() - t;
+          // P1: cajas, forma del lote, fallback y nº de runs del rec.
+          ms.diag =
+            `cajas=${diag.cajas} batch=[${diag.lote},${diag.anchoMax}] ` +
+            `fallback=${diag.fallback ? "sí" : "no"} recRuns=${diag.recRuns}`;
+        } catch {
+          sig.textoOcr = "";
+        }
+        // L1: una sola miniatura al final, sobre la imagen definitiva.
+        if (blob) {
+          const tm = performance.now();
+          const thumbNueva = await generarMiniatura(blob);
+          ms.minis += performance.now() - tm;
+          if (thumbNueva) {
+            if (!buscarSlot(sig.id)) URL.revokeObjectURL(thumbNueva);
+            else asignarMiniatura(sig, thumbNueva);
+          }
+        }
+        if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
+        sig.montoCents = null;
+        sig.estado = "ok";
+        const entero = (v: number): number => Math.round(v);
+        console.info(
+          `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} minis=${entero(ms.minis)} ` +
+            `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
+            `${ms.diag} total=${entero(performance.now() - t0)}`,
+        );
+        tocada = true;
       }
-      if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
-      sig.montoCents = null;
-      sig.estado = "ok";
-      const entero = (v: number): number => Math.round(v);
-      console.info(
-        `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} minis=${entero(ms.minis)} ` +
-          `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
-          `${ms.diag} total=${entero(performance.now() - t0)}`,
-      );
-      tocada = true;
-    }
-    if (tocada) {
+      if (!tocada) break;
       // Auto IA en lote (1 llamada): best-effort, nunca tumba la cola.
       const { extraerPendientes } = await import("./extract");
-      await extraerPendientes({ desdeCola: true }).catch(() => {});
-      renderHojas(); // un solo "ok" por lote en vez de uno por ítem
+      await Promise.resolve(extraerPendientes({ desdeCola: true })).catch(() => {});
+      renderHojas(); // estado final del lote (la IA ya pintó si aplicó montos)
+      // Entrados durante la IA: el loop los drena sin soltar el flag (sin huérfanos).
     }
   } finally {
     state.colaEnProceso = false;

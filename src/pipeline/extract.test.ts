@@ -17,6 +17,7 @@ const {
   extraerTotalesLote,
   limpiarTexto,
   partirLote,
+  TIMEOUT_MS,
 } = await import("./extract");
 import type { ItemLote } from "./extract";
 import type { FetchFn } from "./extract";
@@ -115,6 +116,32 @@ describe("extraerTotalesLote", () => {
       extraerTotalesLote([{ idx: 1, id: c1.id, texto: "x" }], state.configIA, fetchFn),
     ).rejects.toThrow("LLM 429");
   });
+
+  it("fetch colgado aborta a TIMEOUT_MS y queda manual (no cuelga la app)", async () => {
+    vi.useFakeTimers();
+    try {
+      const { c1 } = lote2();
+      const fetchFn = vi.fn(
+        (_u: unknown, o?: RequestInit): Promise<Response> =>
+          new Promise<never>((_, rej) => {
+            o?.signal?.addEventListener("abort", () => rej(new Error("aborted")), {
+              once: true,
+            });
+          }),
+      );
+      const p = extraerTotalesLote(
+        [{ idx: 1, id: c1.id, texto: "x" }],
+        state.configIA,
+        fetchFn as FetchFn,
+      );
+      const asercion = expect(p).rejects.toThrow("aborted"); // handler antes del abort
+      await vi.advanceTimersByTimeAsync(TIMEOUT_MS);
+      await asercion;
+      expect(c1.montoCents).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("aplicarTotales", () => {
@@ -182,7 +209,38 @@ describe("extraerPendientes", () => {
       globalThis.fetch = real;
     }
     expect(c1.montoCents).toBeNull();
-    expect(aviso.textContent).toBe("IA: 0/2 totales, resto manual.");
+    expect(aviso.textContent).toBe(
+      "IA: 0/2 totales, resto manual. Revisá Ajustes (URL, clave, CORS).",
+    );
+  });
+
+  it("éxito total conserva el aviso previo del lote (N1)", async () => {
+    const { c1 } = lote2();
+    aviso.textContent = "«gordo.pdf»: pesa más de 5 MB";
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      respuesta('{"1":"12.50","2":"7.00"}')) as typeof fetch;
+    try {
+      await extraerPendientes();
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(c1.montoCents).toBe(1250);
+    expect(aviso.textContent).toBe("«gordo.pdf»: pesa más de 5 MB");
+  });
+
+  it("chunk fallido deja console.warn con la causa (N2)", async () => {
+    lote2();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> => respuesta("x", false, 429)) as typeof fetch;
+    try {
+      await extraerPendientes();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("LLM 429"));
+    } finally {
+      globalThis.fetch = real;
+      warn.mockRestore();
+    }
   });
 
   it("auto bloqueado durante OCR salvo desdeCola (regresión)", async () => {

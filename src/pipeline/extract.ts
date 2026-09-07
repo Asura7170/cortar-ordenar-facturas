@@ -11,6 +11,8 @@ import { sanear } from "../utils";
 export const MAX_TEXTO = 1800;
 export const MAX_CHARS_LOTE = 12000;
 export const MAX_ITEMS_LLAMADA = 25;
+// Sin esto un endpoint colgado deja extrayendo=true y la cola en espera eterna.
+export const TIMEOUT_MS = 60_000;
 
 const SISTEMA =
   'Eres un extractor de totales de facturas. Para cada bloque [#N] devolvé el TOTAL a pagar (total, importe total, total a pagar). Ignorá subtotal, IVA, propina y vuelto. Formato EE.UU. con punto decimal (ej. "1234.56"), sin símbolo de moneda. null si no hay un total claro. Respondé SOLO con un objeto JSON {"1":"12.50","2":null}, sin explicaciones ni bloques de código.';
@@ -94,41 +96,48 @@ export async function extraerTotalesLote(
 ): Promise<Map<number, Cents | null>> {
   const salida = new Map<number, Cents | null>(items.map((it) => [it.idx, null]));
   if (items.length === 0) return salida;
-  const res = await fetchFn(config.baseUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.model,
-      temperature: 0,
-      max_tokens: 1000,
-      messages: [
-        { role: "system", content: SISTEMA },
-        { role: "user", content: construirPrompt(items) },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`LLM ${res.status}`);
-  const data: unknown = await res.json().catch((): null => null);
-  if (typeof data !== "object" || data === null) return salida;
-  const choices = (data as { choices?: unknown }).choices;
-  if (!Array.isArray(choices)) return salida;
-  const primero: unknown = choices[0];
-  if (typeof primero !== "object" || primero === null) return salida;
-  const message = (primero as { message?: unknown }).message;
-  if (typeof message !== "object" || message === null) return salida;
-  const content = (message as { content?: unknown }).content;
-  if (typeof content !== "string") return salida;
-  const obj = extraerJsonContenido(content);
-  if (!obj) return salida;
-  for (const it of items) {
-    const raw = obj[String(it.idx)];
-    if (raw === null || raw === undefined) continue;
-    salida.set(it.idx, parsearMonto(String(raw))); // inválido → null (manual)
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetchFn(config.baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        temperature: 0,
+        max_tokens: 1000,
+        messages: [
+          { role: "system", content: SISTEMA },
+          { role: "user", content: construirPrompt(items) },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`LLM ${res.status}`);
+    const data: unknown = await res.json().catch((): null => null);
+    if (typeof data !== "object" || data === null) return salida;
+    const choices = (data as { choices?: unknown }).choices;
+    if (!Array.isArray(choices)) return salida;
+    const primero: unknown = choices[0];
+    if (typeof primero !== "object" || primero === null) return salida;
+    const message = (primero as { message?: unknown }).message;
+    if (typeof message !== "object" || message === null) return salida;
+    const content = (message as { content?: unknown }).content;
+    if (typeof content !== "string") return salida;
+    const obj = extraerJsonContenido(content);
+    if (!obj) return salida;
+    for (const it of items) {
+      const raw = obj[String(it.idx)];
+      if (raw === null || raw === undefined) continue;
+      salida.set(it.idx, parsearMonto(String(raw))); // inválido → null (manual)
+    }
+    return salida;
+  } finally {
+    clearTimeout(t);
   }
-  return salida;
 }
 
 /** Aplica montos solo a comprobantes vivos que sigan en null. Devuelve aplicados. */
@@ -151,10 +160,6 @@ export function aplicarTotales(
 }
 
 let extrayendo = false;
-
-export function estaExtrayendo(): boolean {
-  return extrayendo;
-}
 
 function avisar(texto: string): void {
   const el = document.getElementById("aviso");
@@ -193,6 +198,7 @@ export async function extraerPendientes(opciones?: {
     if (texto !== "") items.push({ idx: i + 1, id: c.id, texto });
   });
   if (items.length === 0) return;
+  const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
   extrayendo = true;
   refrescarBoton();
   try {
@@ -201,16 +207,20 @@ export async function extraerPendientes(opciones?: {
     for (const chunk of partirLote(items)) {
       try {
         ok += aplicarTotales(chunk, await extraerTotalesLote(chunk, state.configIA));
-      } catch {
+      } catch (e: unknown) {
+        console.warn(`IA: lote omitido (${e instanceof Error ? e.message : String(e)})`);
         continue; // el chunk queda manual; el conteo final lo refleja
       }
     }
     if (ok > 0) renderHojas(); // badges + #montoTotal con suma local exacta
-    avisar(
-      ok === items.length
-        ? `IA: ${ok}/${items.length} totales.`
-        : `IA: ${ok}/${items.length} totales, resto manual.`,
-    );
+    // Éxito total con aviso previo: se conserva (ej. rechazos del gate PDF).
+    if (ok < items.length || avisoPrevio.trim() === "") {
+      avisar(
+        ok === items.length
+          ? `IA: ${ok}/${items.length} totales.`
+          : `IA: ${ok}/${items.length} totales, resto manual. Revisá Ajustes (URL, clave, CORS).`,
+      );
+    }
   } finally {
     extrayendo = false;
     refrescarBoton();
