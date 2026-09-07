@@ -1,6 +1,7 @@
 /* Cola secuencial de procesamiento — DocAligner recorta, PP-OCRv6_small extrae
    texto (import dinámico: dict+onnx solo bajan con el primer comprobante).
-   El monto queda manual hasta el LLM (extract.ts futuro). */
+   Al drenar, el LLM completa los montos en lote (extract.ts); sin TOTAL o sin
+   key el monto queda manual. */
 import { buscarSlot, state } from "../state";
 import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
@@ -200,7 +201,12 @@ export async function procesarCola(): Promise<void> {
       );
       tocada = true;
     }
-    if (tocada) renderHojas(); // un solo "ok" por lote en vez de uno por ítem
+    if (tocada) {
+      // Auto IA en lote (1 llamada): best-effort, nunca tumba la cola.
+      const { extraerPendientes } = await import("./extract");
+      await extraerPendientes({ desdeCola: true }).catch(() => {});
+      renderHojas(); // un solo "ok" por lote en vez de uno por ítem
+    }
   } finally {
     state.colaEnProceso = false;
   }
