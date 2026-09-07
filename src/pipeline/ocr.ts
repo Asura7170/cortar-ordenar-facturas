@@ -165,6 +165,20 @@ export function tensorDet(bgr: Uint8Array, w: number, h: number): Float32Array {
   return t;
 }
 
+/** RGBA de canvas → tensor CHW normalizado en una pasada (sin alloc BGR intermedia). */
+export function tensorDetDesdeRgba(rgba: Uint8ClampedArray, w: number, h: number): Float32Array {
+  const plano = w * h;
+  const t = new Float32Array(3 * plano);
+  for (let i = 0; i < plano; i += 1) {
+    for (let c = 0; c < 3; c += 1) {
+      // ponytail: canal c del BGR = byte 2−c del RGBA; mismos guards que la vía en 2 pasos.
+      t[c * plano + i] =
+        ((rgba[i * 4 + (2 - c)] ?? 0) / 255 - (DET_MEDIA[c] ?? 0)) / (DET_STD[c] ?? 1);
+    }
+  }
+  return t;
+}
+
 /** Nombre del tensor de salida en ambos onnx (fetch_name_0). */
 const SALIDA_ONNX = "fetch_name_0";
 
@@ -198,7 +212,7 @@ async function pasarDet(
   if (!ctx) return null;
   const datos = ctx.getImageData(0, 0, base.width, base.height).data;
   const sal = await det.run({
-    x: det.tensor(tensorDet(bgrDesdeRgba(datos), base.width, base.height), [
+    x: det.tensor(tensorDetDesdeRgba(datos, base.width, base.height), [
       1,
       3,
       base.height,

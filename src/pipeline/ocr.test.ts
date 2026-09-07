@@ -1,7 +1,15 @@
 /* Tests: ocr — orquestación con sesiones y lienzos falsos (sin onnx ni DOM).
    El modelo real se valida en Chrome con image-test/. */
 import { describe, expect, it, vi } from "vite-plus/test";
-import { bgrDesdeRgba, enderezar, extraerTexto, reconocerCaja, tamanoDet, tensorDet } from "./ocr";
+import {
+  bgrDesdeRgba,
+  enderezar,
+  extraerTexto,
+  reconocerCaja,
+  tamanoDet,
+  tensorDet,
+  tensorDetDesdeRgba,
+} from "./ocr";
 import type { NucleoOcr, SalidaOcr } from "./ocr";
 import { DICT_OCR } from "./ocrDict";
 import { matrizInversa } from "./ocrRec";
@@ -129,6 +137,11 @@ describe("tensorDet", () => {
     expect(t[0]).toBeCloseTo((1 - 0.485) / 0.229, 5);
     expect(t[1]).toBeCloseTo((1 - 0.456) / 0.224, 5);
     expect(t[2]).toBeCloseTo((1 - 0.406) / 0.225, 5);
+  });
+
+  it("desde RGBA equivale bit a bit a la vía en 2 pasos", () => {
+    const rgba = new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 128, 10, 20, 30, 255]);
+    expect(tensorDetDesdeRgba(rgba, 3, 1)).toEqual(tensorDet(bgrDesdeRgba(rgba), 3, 1));
   });
 });
 

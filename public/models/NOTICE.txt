@@ -14,10 +14,10 @@ Vendoreado third-party (no modificar)
    Licencia: MIT. Mejoras locales: relleno blanco fuera del quad (el JPEG no
    tiene alpha) y clamp de bordes en vez de recorte.
 
-3. ocr/det.onnx + ocr/det.yml — PP-OCRv6_small_det (detección de líneas)
-   ocr/rec.onnx + ocr/rec.yml — PP-OCRv6_small_rec (reconocimiento, 18710 clases)
+3. ocr/det.onnx + modelos-fuente/det.yml — PP-OCRv6_small_det (detección de líneas)
+   ocr/rec.onnx + modelos-fuente/rec.yml — PP-OCRv6_small_rec (reconocimiento, 18710 clases)
    Origen: PaddlePaddle/PaddleOCR v3.7.0, Hub oficial:
    https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx
    https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx
    Licencia: Apache-2.0. Dict src/pipeline/ocrDict.ts generado del
-   character_dict de rec.yml (+ "blank" y " " según CTCLabelDecode).
+   character_dict de modelos-fuente/rec.yml (+ "blank" y " " según CTCLabelDecode).
