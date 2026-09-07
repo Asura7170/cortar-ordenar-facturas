@@ -85,6 +85,8 @@ export async function procesarCola(): Promise<void> {
   state.colaEnProceso = true;
   try {
     // ponytail: drenado por pendiente, no snapshot; token generación si el MOCK se vuelve concurrente.
+    // Fase 1: el "procesando" se pinta por ítem (feedback), el "ok" una vez al drenar.
+    let tocada = false;
     for (;;) {
       // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
       const sig = aplanar().find((c) => c.estado === "pendiente");
@@ -192,8 +194,9 @@ export async function procesarCola(): Promise<void> {
           `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
           `${ms.diag} total=${entero(performance.now() - t0)}`,
       );
-      renderHojas();
+      tocada = true;
     }
+    if (tocada) renderHojas(); // un solo "ok" por lote en vez de uno por ítem
   } finally {
     state.colaEnProceso = false;
   }

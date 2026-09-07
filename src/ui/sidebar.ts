@@ -10,12 +10,11 @@ import {
 import type { Comprobante } from "../types";
 import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
-import { actualizarMiniatura, renderHojas } from "./sheets";
-import { generarMiniatura, precalentarModelos, procesarCola } from "../pipeline/queue";
+import { renderHojas } from "./sheets";
+import { precalentarModelos, procesarCola } from "../pipeline/queue";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
 import type { MotivoRechazo, PaginaPdf } from "../pipeline/pdf";
 import { normalizarImagen } from "../pipeline/imagen";
-import { buscarSlot } from "../state";
 import { getEl, sanear } from "../utils";
 
 const dropzone: HTMLElement = getEl("dropzone");
@@ -137,7 +136,6 @@ export async function agregarArchivos(
   }
   avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
   if (nuevas.length === 0) return;
-  const recienIngresados = [...nuevas]; // llenar() vacía `nuevas` con shift()
 
   let hoja = hojaId != null ? hojaPorId(hojaId) : undefined;
   if (!hoja) {
@@ -160,27 +158,8 @@ export async function agregarArchivos(
   }
   renderHojas();
   void procesarCola();
-
-  // Miniaturas en segundo plano, de 3 en 3: N createImageBitmap en paralelo
-  // saturan memoria en lotes grandes. Cada casilla se repinta sola al estar
-  // lista (esqueleto → thumb: una sola decodificación por foto).
-  // ponytail: concurrencia fija 3; pool dinámico solo si 3 se queda corto.
-  const pintarMiniatura = async (item: Comprobante): Promise<void> => {
-    if (!item.file) return;
-    const url = await generarMiniatura(item.file);
-    if (!url) return;
-    if (!buscarSlot(item.id)) {
-      URL.revokeObjectURL(url);
-      return;
-    }
-    item.thumbUrl = url;
-    actualizarMiniatura(item.id);
-  };
-  void (async () => {
-    for (let i = 0; i < recienIngresados.length; i += 3) {
-      await Promise.all(recienIngresados.slice(i, i + 3).map(pintarMiniatura));
-    }
-  })();
+  // Fase 1: sin miniaturas tempranas — la cola genera la única (final, sobre
+  // la imagen definitiva post-recorte). Un decode+resize+JPEG menos por foto.
 }
 
 export function renderCodigo(): void {
