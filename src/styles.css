@@ -812,21 +812,23 @@ body.is-dragging .cell:not(.empty) {
   outline-offset: 4px;
 }
 
-.cell-badge {
+.cell-badge,
+.cell-monto {
   position: absolute;
   bottom: 6px;
   right: 6px;
-  font: inherit;
   font-family: var(--mono);
   font-size: 12px;
-  font-weight: 600;
   background: var(--papel-brillo);
   color: var(--verde-tinta);
   border: 1px solid var(--renglon-fuerte);
   border-radius: 4px;
   padding: 2px 7px;
-  font-variant-numeric: tabular-nums;
   z-index: 2;
+}
+.cell-badge {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 /* Hit-area 44px como el × (el badge visual es bajo). */
@@ -840,19 +842,7 @@ body.is-dragging .cell:not(.empty) {
   outline-offset: 2px;
 }
 .cell-monto {
-  position: absolute;
-  bottom: 6px;
-  right: 6px;
   width: 11ch;
-  font: inherit;
-  font-family: var(--mono);
-  font-size: 12px;
-  background: var(--papel-brillo);
-  color: var(--verde-tinta);
-  border: 1px solid var(--renglon-fuerte);
-  border-radius: 4px;
-  padding: 2px 7px;
-  z-index: 2;
 }
 .cell-monto:focus-visible {
   outline: 2px solid var(--verde-tinta);

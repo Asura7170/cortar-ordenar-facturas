@@ -311,12 +311,13 @@ export function cajasDesdeMapa(
               Math.min(origen.alto, Math.max(0, cy * escY)),
             ] as PuntoDb,
         );
-        const poli = ordenarQuad([
+        // ponytail: sin 2º ordenarQuad (el reescalado monótono no reordena).
+        const poli: CajaDb["poli"] = [
           esc[0] ?? [0, 0],
           esc[1] ?? [0, 0],
           esc[2] ?? [0, 0],
           esc[3] ?? [0, 0],
-        ]);
+        ];
         const area =
           Math.abs(
             (poli[2][0] - poli[0][0]) * (poli[2][1] - poli[0][1]) -

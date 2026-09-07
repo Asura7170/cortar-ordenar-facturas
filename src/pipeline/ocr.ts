@@ -54,7 +54,7 @@ export interface DepsOcr {
 type OrtModulo = typeof import("onnxruntime-web/webgpu");
 
 /** Descarga un modelo con el mismo presupuesto que un intento de EP. */
-async function descargarModelo(ort: OrtModulo, ruta: string): Promise<ArrayBuffer> {
+async function descargarModelo(ruta: string): Promise<ArrayBuffer> {
   const res = await fetch(ruta, { signal: AbortSignal.timeout(TIMEOUT_EP_MS) });
   if (!res.ok) throw new Error(`modelo OCR: HTTP ${res.status} en ${ruta}`);
   return res.arrayBuffer();
@@ -92,18 +92,23 @@ async function nucleoReal(): Promise<NucleoOcr> {
   ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`;
   ort.env.wasm.numThreads = 1;
   const crear =
-    (ruta: string, nombre: string) =>
+    (pesos: ArrayBuffer, nombre: string) =>
     async (ep: string): Promise<SubsesionOcr> => {
-      const pesos = await descargarModelo(ort, ruta);
       const sesion = await ort.InferenceSession.create(pesos, {
         executionProviders: [ep],
         graphOptimizationLevel: "all",
       });
       return envolver(ort, sesion, nombre);
     };
-  // ponytail: el latch de EPs caídos es compartido (docaligner): si webgpu murió ahí, aquí ni se intenta.
-  const det = await iniciarSesion(crear(RUTA_DET, "det"));
-  const rec = await iniciarSesion(crear(RUTA_REC, "rec"));
+  // ponytail: las bajadas en paralelo (la mitad del tiempo); las sesiones en
+  // serie (compiten por el mismo contexto GPU). El latch de EPs caídos sigue
+  // compartido con docaligner: si webgpu murió ahí, aquí ni se intenta.
+  const [detBuf, recBuf] = await Promise.all([
+    descargarModelo(RUTA_DET),
+    descargarModelo(RUTA_REC),
+  ]);
+  const det = await iniciarSesion(crear(detBuf, "det"));
+  const rec = await iniciarSesion(crear(recBuf, "rec"));
   return { det, rec };
 }
 
@@ -122,7 +127,7 @@ export function obtenerNucleo(): Promise<NucleoOcr> {
 
 /**
  * Lado mayor→máx con múltiplo de 32 (resize_image_type0 de PaddleOCR).
- * Solo reduce (los recortes ya vienen a ≤2000px del intake).
+ * Reduce lo grande; lo menor al múltiplo sube a 32 (mínimo de la red).
  */
 export function tamanoDet(
   w: number,
