@@ -1,7 +1,7 @@
 /* Tests: ocr — orquestación con sesiones y lienzos falsos (sin onnx ni DOM).
    El modelo real se valida en Chrome con image-test/. */
 import { describe, expect, it, vi } from "vite-plus/test";
-import { bgrDesdeRgba, extraerTexto, reconocerCaja, tamanoDet, tensorDet } from "./ocr";
+import { bgrDesdeRgba, enderezar, extraerTexto, reconocerCaja, tamanoDet, tensorDet } from "./ocr";
 import type { NucleoOcr, SalidaOcr } from "./ocr";
 import { DICT_OCR } from "./ocrDict";
 import { matrizInversa } from "./ocrRec";
@@ -253,5 +253,244 @@ describe("reconocerCaja", () => {
     );
     expect(r).toEqual({ texto: "", puntaje: 0 });
     expect(espia.rec).toHaveLength(0);
+  });
+});
+
+describe("enderezar (decisión rec)", () => {
+  /** Lienzo falso con toBlob (registra creaciones en orden). */
+  function lienzoConBlob(): {
+    crear: () => HTMLCanvasElement;
+    lienzos: HTMLCanvasElement[];
+  } {
+    const lienzos: HTMLCanvasElement[] = [];
+    const crear = (): HTMLCanvasElement => {
+      let w = 0;
+      let h = 0;
+      const lienzo = {
+        get width(): number {
+          return w;
+        },
+        set width(v: number) {
+          w = v;
+        },
+        get height(): number {
+          return h;
+        },
+        set height(v: number) {
+          h = v;
+        },
+        getContext: (): unknown => ({
+          drawImage: (): void => {},
+          setTransform: (): void => {},
+          getImageData: (): { data: Uint8ClampedArray } => ({ data: BLANCO32 }),
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: "high",
+        }),
+        toBlob: (cb: (b: Blob | null) => void): void => {
+          cb(new Blob(["jpg"], { type: "image/jpeg" }));
+        },
+      } as unknown as HTMLCanvasElement;
+      lienzos.push(lienzo);
+      return lienzo;
+    };
+    return { crear, lienzos };
+  }
+
+  /** Logits de 1 paso que deletrean una letra con confianza v. */
+  function logitsConf(letra: string, v: number): { data: Float32Array; dims: number[] } {
+    const n = DICT_OCR.length;
+    const data = new Float32Array(n);
+    data[DICT_OCR.indexOf(letra)] = v;
+    return { data, dims: [1, 1, n] };
+  }
+
+  function mapaTenue(): { data: Float32Array; dims: number[] } {
+    return { data: new Float32Array(16 * 8).fill(0.01), dims: [1, 1, 8, 16] };
+  }
+
+  function mapaCero(): { data: Float32Array; dims: number[] } {
+    return { data: new Float32Array(16 * 8), dims: [1, 1, 8, 16] };
+  }
+
+  /** Núcleo falso: det por nº de llamada det, rec con conf por nº de llamada rec. */
+  function nucleoGiros(
+    mapas: Array<{ data: Float32Array; dims: number[] }>,
+    confs: number[],
+    detLlamadas: number[],
+    recLlamadas: number[],
+    fallaRecEn?: number,
+  ): NucleoOcr {
+    const tensor = (datos: Float32Array, formas: readonly number[]): unknown => ({
+      datos,
+      formas: [...formas],
+    });
+    let di = 0;
+    let ri = 0;
+    return {
+      det: {
+        tensor,
+        run: (): Promise<Record<string, SalidaOcr>> => {
+          detLlamadas.push(di);
+          const m = mapas[Math.min(di, mapas.length - 1)] ?? {
+            data: new Float32Array(0),
+            dims: [1, 1, 0, 0],
+          };
+          di += 1;
+          return Promise.resolve({ fetch_name_0: m });
+        },
+      },
+      rec: {
+        tensor,
+        run: (): Promise<Record<string, SalidaOcr>> => {
+          recLlamadas.push(ri);
+          const n = ri;
+          ri += 1;
+          if (n === fallaRecEn) return Promise.reject(new Error("rec roto"));
+          return Promise.resolve({
+            fetch_name_0: logitsConf("A", confs[Math.min(n, confs.length - 1)] ?? 0),
+          });
+        },
+      },
+    };
+  }
+
+  function base(
+    mapas: Array<{ data: Float32Array; dims: number[] }>,
+    confs: number[],
+    fallaRecEn?: number,
+  ): {
+    blob: Blob;
+    deps: {
+      cargar: () => Promise<ImageBitmap>;
+      crear: () => HTMLCanvasElement;
+      nucleo: () => Promise<NucleoOcr>;
+    };
+    detLlamadas: number[];
+    recLlamadas: number[];
+    lienzos: HTMLCanvasElement[];
+  } {
+    const blob = new Blob(["foto"]);
+    const detLlamadas: number[] = [];
+    const recLlamadas: number[] = [];
+    const { crear, lienzos } = lienzoConBlob();
+    return {
+      blob,
+      deps: {
+        cargar: () => Promise.resolve(bitmapFalso(64, 32)),
+        crear,
+        nucleo: () =>
+          Promise.resolve(nucleoGiros(mapas, confs, detLlamadas, recLlamadas, fallaRecEn)),
+      },
+      detLlamadas,
+      recLlamadas,
+      lienzos,
+    };
+  }
+
+  it("0° confiada → mismo blob con cajas/base, 1 det (bypass)", async () => {
+    const { blob, deps, detLlamadas, recLlamadas } = base([mapaUnaLinea()], [0.95]);
+    const r = await enderezar(blob, deps);
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(r.cajas).toHaveLength(1);
+    expect(r.base).not.toBeNull();
+    expect(detLlamadas).toEqual([0]);
+    expect(recLlamadas).toEqual([0]);
+  });
+
+  it("0° baja + 90° alta → gira con 2 det (early-exit, sin 270/180)", async () => {
+    const { blob, deps, detLlamadas, lienzos } = base(
+      [mapaUnaLinea(), mapaUnaLinea()],
+      [0.3, 0.95],
+    );
+    const r = await enderezar(blob, deps);
+    expect(r.blob).not.toBe(blob);
+    expect(r.grados).toBe(90);
+    expect(detLlamadas).toEqual([0, 1]);
+    // rot90 del bitmap 64x32: 4º lienzo (rot0, base0, rec0, rot90).
+    expect([lienzos[3]?.width, lienzos[3]?.height]).toEqual([32, 64]);
+  });
+
+  it("sin OK → gana el más alto (270) con loop completo", async () => {
+    const { deps, detLlamadas } = base(
+      [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
+      [0.3, 0.2, 0.65, 0.1],
+    );
+    const r = await enderezar(new Blob(["foto"]), deps);
+    expect(r.grados).toBe(270);
+    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+  });
+
+  it("todo bajo sin OK → gana el más alto aunque sea bajo (270)", async () => {
+    const { blob, deps, detLlamadas } = base(
+      [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
+      [0.3, 0.2, 0.4, 0.1],
+    );
+    const r = await enderezar(blob, deps);
+    expect(r.blob).not.toBe(blob);
+    expect(r.grados).toBe(270);
+    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+  });
+
+  it("fondo tenue sin cajas → loop completo y quieta", async () => {
+    const { blob, deps, detLlamadas, recLlamadas } = base(
+      [mapaTenue(), mapaTenue(), mapaTenue(), mapaTenue()],
+      [0.95],
+    );
+    const r = await enderezar(blob, deps);
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+    expect(recLlamadas).toEqual([]);
+  });
+
+  it("mapa cero → quieta con 1 det (sin texto: ni giros)", async () => {
+    const { blob, deps, detLlamadas, recLlamadas } = base([mapaCero()], [0.95]);
+    const r = await enderezar(blob, deps);
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(detLlamadas).toEqual([0]);
+    expect(recLlamadas).toEqual([]);
+  });
+
+  it("rec falla en 90 → se salta y gana 270", async () => {
+    const { deps, detLlamadas, recLlamadas } = base(
+      [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
+      [0.3, 0.0, 0.95],
+      1,
+    );
+    const r = await enderezar(new Blob(["foto"]), deps);
+    expect(r.grados).toBe(270);
+    expect(detLlamadas).toEqual([0, 1, 2]);
+    expect(recLlamadas).toEqual([0, 1, 2]);
+  });
+
+  it("núcleo caído → quieto sin lanzar", async () => {
+    const { crear } = lienzoConBlob();
+    const blob = new Blob(["foto"]);
+    const r = await enderezar(blob, {
+      cargar: () => Promise.resolve(bitmapFalso(64, 32)),
+      crear,
+      nucleo: () => Promise.reject(new Error("sin EP")),
+    });
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+  });
+
+  it("miniatura → quieta sin det ni rec", async () => {
+    const detLlamadas: number[] = [];
+    const recLlamadas: number[] = [];
+    const { crear } = lienzoConBlob();
+    const blob = new Blob(["foto"]);
+    const r = await enderezar(blob, {
+      cargar: () => Promise.resolve(bitmapFalso(4, 4)),
+      crear,
+      nucleo: () =>
+        Promise.resolve(nucleoGiros([mapaUnaLinea()], [0.95], detLlamadas, recLlamadas)),
+    });
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(detLlamadas).toEqual([]);
+    expect(recLlamadas).toEqual([]);
   });
 });

@@ -85,6 +85,22 @@ export async function procesarCola(): Promise<void> {
         // ponytail: sin recorte se sigue con el original; la cola no se detiene
       }
       if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
+      // Endereza por confianza del rec (det solo recorta líneas, no vota).
+      try {
+        const { enderezar } = await import("./ocr");
+        const end = await enderezar(await blobDeItem(sig));
+        if (end.grados !== 0 && buscarSlot(sig.id)) {
+          console.info(`OCR: giro ${end.grados}° en ${sig.nombre}`);
+          URL.revokeObjectURL(sig.imgUrl);
+          if (sig.thumbUrl) URL.revokeObjectURL(sig.thumbUrl);
+          sig.imgUrl = URL.createObjectURL(end.blob);
+          sig.file = end.blob;
+          sig.thumbUrl = await generarMiniatura(end.blob);
+        }
+      } catch {
+        // ponytail: sin enderezar se sigue con la imagen tal cual
+      }
+      if (!buscarSlot(sig.id)) continue; // limpiado durante el enderezado: no resucita
       // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
       try {
         const { extraerTexto } = await import("./ocr");

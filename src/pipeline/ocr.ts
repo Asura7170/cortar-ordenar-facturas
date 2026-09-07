@@ -7,7 +7,7 @@ import { DICT_OCR } from "./ocrDict";
 import { cajasDesdeMapa } from "./ocrDb";
 import type { CajaDb } from "./ocrDb";
 import { decodificarCtc, matrizAfin, matrizInversa, normalizarLinea, REC_ALTO } from "./ocrRec";
-import { cargarReal, crearReal } from "./imagen";
+import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 const RUTA_DET = `${import.meta.env.BASE_URL}models/ocr/det.onnx`;
@@ -168,6 +168,169 @@ export function tensorDet(bgr: Uint8Array, w: number, h: number): Float32Array {
 /** Nombre del tensor de salida en ambos onnx (fetch_name_0). */
 const SALIDA_ONNX = "fetch_name_0";
 
+/** Giros candidatos (0 = tal cual). El orden es el fast-path: derecha, costados, revés. */
+export type Giro = 0 | 90 | 180 | 270;
+/** Masa mínima del mapa para intentar giros (bajo esto no hay texto). */
+export const UMBRAL_MAPA_VACIO: number = 0.0005;
+/* Calibración Chrome (iriarte de costado; conf rec top-2 por giro):
+   0° costado 0.24, 90° cabeza 0.61, 270° derecho 0.99, 180° costado 0.26.
+   OK acepta al instante el pico; sin OK gana el más alto (sin suelo). */
+export const UMBRAL_REC_OK: number = 0.9;
+/** Cajas por orientación que puntúa el rec (más es más recs, no más señal). */
+export const TOP_CAJAS_GIRO = 2;
+/** Orden de prueba: lo común primero (bypass inmediato), el revés al final. */
+const GIROS_PRUEBA: readonly Giro[] = [0, 90, 270, 180];
+
+/** Imagen enderezada + material del giro ganador (el OCR real reutiliza cajas/base). */
+export interface Enderezado {
+  readonly blob: Blob;
+  readonly grados: Giro;
+  readonly cajas: CajaDb[];
+  readonly base: HTMLCanvasElement | null;
+}
+
+/** Mapa de probabilidad del det sobre un lienzo ya a tamaño det. Null sin salida válida. */
+async function pasarDet(
+  det: SubsesionOcr,
+  base: HTMLCanvasElement,
+): Promise<{ mapa: Float32Array; mw: number; mh: number } | null> {
+  const ctx = base.getContext("2d");
+  if (!ctx) return null;
+  const datos = ctx.getImageData(0, 0, base.width, base.height).data;
+  const sal = await det.run({
+    x: det.tensor(tensorDet(bgrDesdeRgba(datos), base.width, base.height), [
+      1,
+      3,
+      base.height,
+      base.width,
+    ]),
+  });
+  const mapa = datosSalida(sal[SALIDA_ONNX]);
+  const dims = sal[SALIDA_ONNX]?.dims;
+  const mh = Number(dims?.[2] ?? 0);
+  const mw = Number(dims?.[3] ?? 0);
+  if (!mapa || !Number.isInteger(mh) || !Number.isInteger(mw) || mh < 1 || mw < 1) return null;
+  return { mapa, mw, mh };
+}
+
+/** Media del mapa (presencia de texto); 0 si vacío. */
+function masaMapa(mapa: Float32Array): number {
+  if (mapa.length === 0) return 0;
+  let suma = 0;
+  for (let i = 0; i < mapa.length; i += 1) suma += mapa[i] ?? 0;
+  return suma / mapa.length;
+}
+
+/** Bitmap rotado en un lienzo (setTransform directo: testeable sin DOM). Null sin contexto. */
+function lienzoGirado(
+  bmp: ImageBitmap,
+  grados: Giro,
+  crear: CrearLienzo,
+): HTMLCanvasElement | null {
+  const vertical = grados === 90 || grados === 270;
+  const lienzo = crear();
+  lienzo.width = vertical ? bmp.height : bmp.width;
+  lienzo.height = vertical ? bmp.width : bmp.height;
+  const ctx = lienzo.getContext("2d");
+  if (!ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  const w = lienzo.width;
+  const h = lienzo.height;
+  if (grados === 180) ctx.setTransform(-1, 0, 0, -1, w, h);
+  else if (grados === 90) ctx.setTransform(0, 1, -1, 0, w, 0);
+  else if (grados === 270) ctx.setTransform(0, -1, 1, 0, 0, h);
+  try {
+    ctx.drawImage(bmp, 0, 0);
+  } catch {
+    return null;
+  }
+  return lienzo;
+}
+
+/** Lienzo → JPEG (misma calidad que el intake). Null si no codifica. */
+function blobDeLienzo(lienzo: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise((res) => {
+    try {
+      lienzo.toBlob((b) => res(b), "image/jpeg", CALIDAD_JPEG);
+    } catch {
+      res(null);
+    }
+  });
+}
+
+/**
+ * Endereza por confianza del REC (el det solo recorta líneas, no vota):
+ * primera orientación con conf ≥ OK gana al instante (bypass); si ninguna
+ * llega, gana la más alta. Nunca lanza.
+ */
+export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado> {
+  const quieto: Enderezado = { blob, grados: 0, cajas: [], base: null };
+  const cargar = deps?.cargar ?? cargarReal;
+  const crear = deps?.crear ?? crearReal;
+  const fabrica = deps?.nucleo ?? obtenerNucleo;
+  let bmp: ImageBitmap | null = null;
+  try {
+    bmp = await cargar(blob, { imageOrientation: "from-image" });
+    if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return quieto;
+    const foto: ImageBitmap = bmp; // copia estrechada para el closure ver()
+    const { det, rec } = await fabrica();
+    // Confianza rec media del top-2 (0 si nada legible).
+    const confiar = async (cajas: CajaDb[], base: HTMLCanvasElement): Promise<number> => {
+      const top = [...cajas].sort((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
+      const confs: number[] = [];
+      for (const caja of top) {
+        const r = await reconocerCaja(rec, base, caja, crear);
+        if (r.texto !== "") confs.push(r.puntaje);
+      }
+      return confs.length > 0 ? confs.reduce((a, b) => a + b, 0) / confs.length : 0;
+    };
+    const ver = async (
+      grados: Giro,
+    ): Promise<{ c: number; masa: number; cajas: CajaDb[]; base: HTMLCanvasElement | null }> => {
+      const vacio = { c: 0, masa: 0, cajas: [], base: null };
+      const rot = lienzoGirado(foto, grados, crear);
+      if (!rot) return vacio;
+      const tam = tamanoDet(rot.width, rot.height);
+      const base = crear();
+      base.width = tam.w;
+      base.height = tam.h;
+      const ctx = base.getContext("2d");
+      if (!ctx) return vacio;
+      ctx.drawImage(rot, 0, 0, tam.w, tam.h);
+      const sal = await pasarDet(det, base);
+      if (!sal) return vacio;
+      const masa = masaMapa(sal.mapa);
+      const cajas = cajasDesdeMapa(sal.mapa, sal.mw, sal.mh, { ancho: tam.w, alto: tam.h });
+      return { c: await confiar(cajas, base), masa, cajas, base };
+    };
+    let mejor: { g: Giro; c: number; cajas: CajaDb[]; base: HTMLCanvasElement | null } | null =
+      null;
+    for (const g of GIROS_PRUEBA) {
+      let r;
+      try {
+        r = await ver(g);
+      } catch {
+        continue; // giro fallido: se salta (el externo aún protege ver(0))
+      }
+      if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) return quieto; // sin texto: ni giros
+      if (!mejor || r.c > mejor.c) mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
+      if (r.c >= UMBRAL_REC_OK) break; // bypass: la primera que convence gana
+    }
+    if (!mejor) return quieto; // todos los giros fallaron
+    // ponytail: sin OK gana el más alto (aunque sea bajo); solo el vacío no gira.
+    if (mejor.g === 0) return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
+    const rot = lienzoGirado(foto, mejor.g, crear);
+    const fuera = rot ? await blobDeLienzo(rot) : null;
+    if (!fuera) return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
+    return { blob: fuera, grados: mejor.g, cajas: mejor.cajas, base: mejor.base };
+  } catch {
+    return quieto;
+  } finally {
+    bmp?.close();
+  }
+}
+
 /** Datos Float32 de una salida (sin copiar si ya lo es). */
 function datosSalida(sal: SalidaOcr | undefined): Float32Array | null {
   if (!sal) return null;
@@ -235,16 +398,10 @@ export async function extraerTexto(blob: Blob, deps?: DepsOcr): Promise<string> 
     bctx.imageSmoothingEnabled = true;
     bctx.imageSmoothingQuality = "high";
     bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
-    const bdatos = bctx.getImageData(0, 0, tam.w, tam.h).data;
     const { det, rec } = await fabrica();
-    const salDet = await det.run({
-      x: det.tensor(tensorDet(bgrDesdeRgba(bdatos), tam.w, tam.h), [1, 3, tam.h, tam.w]),
-    });
-    const mapa = datosSalida(salDet[SALIDA_ONNX]);
-    const dims = salDet[SALIDA_ONNX]?.dims;
-    const mh = Number(dims?.[2] ?? 0);
-    const mw = Number(dims?.[3] ?? 0);
-    if (!mapa || !Number.isInteger(mh) || !Number.isInteger(mw) || mh < 1 || mw < 1) return "";
+    const salDet = await pasarDet(det, base);
+    if (!salDet) return "";
+    const { mapa, mw, mh } = salDet;
     const cajas = cajasDesdeMapa(mapa, mw, mh, { ancho: tam.w, alto: tam.h });
     const lineas: string[] = [];
     for (const caja of cajas) {
