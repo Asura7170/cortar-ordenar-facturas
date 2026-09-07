@@ -88,22 +88,17 @@ export interface LoteNorm {
 }
 
 /**
- * Apila N líneas normalizadas con pad de ceros a la derecha hasta el ancho
- * mayor (el mismo pad del camino individual: se descarta al decodificar).
- * Null si vacío o alguna degenerada.
+ * Apila líneas ya normalizadas con pad de ceros a la derecha hasta el ancho
+ * mayor del grupo. Núcleo de normalizarLote (y de los chunks en ocr.ts).
  */
-export function normalizarLote(lineas: readonly LineaBgr[]): LoteNorm | null {
-  if (lineas.length === 0) return null;
-  const norms: LineaNorm[] = [];
+export function apilarLineas(norms: readonly LineaNorm[]): LoteNorm | null {
+  if (norms.length === 0) return null;
   let anchoMax = 0;
-  for (const l of lineas) {
-    const n = normalizarLinea(l.bgr, l.w, l.h);
-    if (!n) return null;
-    norms.push(n);
+  for (const n of norms) {
     if (n.anchoTotal > anchoMax) anchoMax = n.anchoTotal;
   }
   const plano = REC_ALTO * anchoMax;
-  const tensor = new Float32Array(lineas.length * 3 * plano);
+  const tensor = new Float32Array(norms.length * 3 * plano);
   norms.forEach((n, b) => {
     const planoLin = REC_ALTO * n.anchoTotal;
     for (let c = 0; c < 3; c += 1) {
@@ -116,6 +111,22 @@ export function normalizarLote(lineas: readonly LineaBgr[]): LoteNorm | null {
     }
   });
   return { tensor, lote: norms.length, anchoMax };
+}
+
+/**
+ * Apila N líneas normalizadas con pad de ceros a la derecha hasta el ancho
+ * mayor (el mismo pad del camino individual: se descarta al decodificar).
+ * Null si vacío o alguna degenerada.
+ */
+export function normalizarLote(lineas: readonly LineaBgr[]): LoteNorm | null {
+  if (lineas.length === 0) return null;
+  const norms: LineaNorm[] = [];
+  for (const l of lineas) {
+    const n = normalizarLinea(l.bgr, l.w, l.h);
+    if (!n) return null;
+    norms.push(n);
+  }
+  return apilarLineas(norms);
 }
 
 /** Matriz afín canvas [a,b,c,d,e,f]. */

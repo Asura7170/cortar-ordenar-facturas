@@ -422,6 +422,68 @@ describe("reconocerLote", () => {
     expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 2 });
   });
 
+  /** rec stub que deletrea "AA" por lote con la forma que le pidan. */
+  function recLotes(formasRun: number[][]): SubsesionOcr {
+    const n = DICT_OCR.length;
+    const idxA = DICT_OCR.indexOf("A");
+    return {
+      tensor: (datos: Float32Array, formas: readonly number[]): unknown => ({
+        datos,
+        formas: [...formas],
+      }),
+      run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
+        const formas = (feeds["x"] as { formas: number[] }).formas;
+        formasRun.push(formas);
+        const b = formas[0] ?? 0;
+        const data = new Float32Array(b * 3 * n);
+        for (let k = 0; k < b; k += 1) {
+          data[k * 3 * n + idxA] = 0.9;
+          data[(k * 3 + 2) * n + idxA] = 0.8;
+        }
+        return Promise.resolve({ fetch_name_0: { data, dims: [b, 3, n] } });
+      },
+    };
+  }
+
+  it("20 cajas → 2 chunks de 16+4 con el mismo texto (P2)", async () => {
+    const formasRun: number[][] = [];
+    const { lienzo } = lienzoFalso(BLANCO32);
+    const cajas = Array.from({ length: 20 }, (_, i) => caja10(0.5 + i / 100));
+    const diag = diagVacio();
+    const rs = await reconocerLote(recLotes(formasRun), lienzo, cajas, () => lienzo, diag);
+    expect(rs).toHaveLength(20);
+    expect(rs.every((r) => r.texto === "AA")).toBe(true);
+    expect(formasRun).toEqual([
+      [16, 3, 48, 320],
+      [4, 3, 48, 320],
+    ]);
+    expect(diag.recRuns).toBe(2);
+    expect(diag.fallback).toBe(false);
+  });
+
+  it("la hebra ancha no contamina al resto (P2)", async () => {
+    const formasRun: number[][] = [];
+    // Búfer que cubre el crop mayor (600×10): el falso ignora el tamaño pedido.
+    const { lienzo } = lienzoFalso(new Uint8ClampedArray(600 * 10 * 4).fill(255));
+    const ancha = {
+      poli: [
+        [0, 0],
+        [600, 0],
+        [600, 10],
+        [0, 10],
+      ] as const,
+      puntaje: 0.9,
+    };
+    const cajas = [...Array.from({ length: 17 }, () => caja10(0.9)), ancha];
+    const rs = await reconocerLote(recLotes(formasRun), lienzo, cajas, () => lienzo);
+    expect(rs).toHaveLength(18);
+    // 16 angostas con W=320; la ancha (W=1536) queda aislada en el 2º chunk.
+    expect(formasRun).toEqual([
+      [16, 3, 48, 320],
+      [2, 3, 48, 1536],
+    ]);
+  });
+
   it("sin cajas válidas → vacíos sin run", async () => {
     const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
     const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);

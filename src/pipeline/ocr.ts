@@ -7,14 +7,14 @@ import { DICT_OCR } from "./ocrDict";
 import { cajasDesdeMapa } from "./ocrDb";
 import type { CajaDb } from "./ocrDb";
 import {
+  apilarLineas,
   decodificarCtc,
   matrizAfin,
   matrizInversa,
   normalizarLinea,
-  normalizarLote,
   REC_ALTO,
 } from "./ocrRec";
-import type { TextoRec } from "./ocrRec";
+import type { LineaNorm, TextoRec } from "./ocrRec";
 import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
@@ -433,10 +433,14 @@ export async function reconocerCaja(
   return ejecutarRec(rec, lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal]);
 }
 
+/** Líneas por chunk del rec (P2: un run [112,1536] tarda ~6s; trozos medianos no). */
+const TAMANO_CHUNK_REC = 16;
+
 /**
- * Reconoce N cajas con una sola inferencia rec (lote con pad al ancho mayor;
- * el pad es el mismo del camino individual: se descarta al decodificar). Si el
- * lote falla o no cuadra, reintenta una por una. Nunca lanza.
+ * Reconoce N cajas en chunks de un solo run (lote con pad al ancho mayor del
+ * grupo; el pad es el mismo del camino individual: se descarta al decodificar).
+ * Las líneas se ordenan por ancho para que la hebra ancha no contamine al resto.
+ * Si un chunk falla o no cuadra, reintenta una por una. Nunca lanza.
  */
 export async function reconocerLote(
   rec: SubsesionOcr,
@@ -452,44 +456,58 @@ export async function reconocerLote(
     if (r) validos.push({ idx, ...r });
   });
   if (validos.length === 0) return fuera;
-  const lote = normalizarLote(validos);
-  if (lote) {
-    const sal = await rec
-      .run({ x: rec.tensor(lote.tensor, [lote.lote, 3, REC_ALTO, lote.anchoMax]) })
-      .catch((): null => null);
-    const datos = sal ? datosSalida(sal[SALIDA_ONNX]) : null;
-    const pasos = Number(sal?.[SALIDA_ONNX]?.dims?.[1] ?? 0);
-    const porLote = datos ? datos.length / lote.lote : 0;
-    if (
-      datos &&
-      Number.isInteger(pasos) &&
-      pasos > 0 &&
-      Number.isInteger(porLote) &&
-      porLote / pasos === DICT_OCR.length
-    ) {
-      validos.forEach((v, b) => {
-        fuera[v.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
-      });
-      if (diag) {
-        diag.lote = lote.lote;
-        diag.anchoMax = lote.anchoMax;
-        diag.recRuns = 1;
-      }
-      return fuera;
-    }
-    // el lote no cuadra (EP sin batch, formas raras): individual abajo.
-  }
+  // P2: normalizar una vez (el fallback reutiliza, sin renormalizar).
+  const norms: { idx: number; lin: LineaNorm }[] = [];
   for (const v of validos) {
     const lin = normalizarLinea(v.bgr, v.w, v.h);
-    fuera[v.idx] = lin
-      ? await ejecutarRec(rec, lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal])
-      : { texto: "", puntaje: 0 };
+    if (lin) norms.push({ idx: v.idx, lin });
+  }
+  if (norms.length === 0) return fuera;
+  const orden = [...norms].sort((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
+  let anchoMax = 0;
+  let chunks = 0;
+  let ok = true;
+  for (let i = 0; i < orden.length; i += TAMANO_CHUNK_REC) {
+    const trozo = orden.slice(i, i + TAMANO_CHUNK_REC);
+    const lote = apilarLineas(trozo.map((t) => t.lin));
+    const sal = lote
+      ? await rec
+          .run({ x: rec.tensor(lote.tensor, [lote.lote, 3, REC_ALTO, lote.anchoMax]) })
+          .catch((): null => null)
+      : null;
+    const datos = sal ? datosSalida(sal[SALIDA_ONNX]) : null;
+    const pasos = Number(sal?.[SALIDA_ONNX]?.dims?.[1] ?? 0);
+    const porLote = datos && lote ? datos.length / lote.lote : 0;
+    if (
+      !datos ||
+      !lote ||
+      !Number.isInteger(pasos) ||
+      pasos < 1 ||
+      !Number.isInteger(porLote) ||
+      porLote / pasos !== DICT_OCR.length
+    ) {
+      ok = false; // el chunk no cuadra (EP sin batch, formas raras): individual abajo.
+      break;
+    }
+    trozo.forEach((t, b) => {
+      fuera[t.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
+    });
+    chunks += 1;
+    if (lote.anchoMax > anchoMax) anchoMax = lote.anchoMax;
   }
   if (diag) {
-    diag.lote = lote?.lote ?? 0;
-    diag.anchoMax = lote?.anchoMax ?? 0;
+    diag.lote = norms.length;
+    diag.anchoMax = anchoMax;
+    diag.recRuns = chunks;
+  }
+  if (ok) return fuera;
+  for (const n of norms) {
+    fuera[n.idx] = await ejecutarRec(rec, n.lin.tensor, [1, 3, REC_ALTO, n.lin.anchoTotal]);
+  }
+  if (diag) {
     diag.fallback = true;
-    diag.recRuns = validos.length;
+    diag.recRuns = norms.length;
+    diag.anchoMax = Math.max(...norms.map((n) => n.lin.anchoTotal));
   }
   return fuera;
 }
