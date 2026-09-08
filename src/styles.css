@@ -698,12 +698,19 @@ input::placeholder {
   scrollbar-width: thin;
   scrollbar-color: var(--texto-panel-suave) transparent;
   position: relative;
+  anchor-name: --canvas;
 }
-/* Overlay de arrastre: velo + marco discontinuo sobre todo el canvas. */
+/* Overlay de arrastre: velo + marco discontinuo sobre el canvas visible.
+   ponytail: fixed + anchor sigue scroll/resize sin JS (absolute se anclaba al scrollHeight). */
 .canvas.arrastrando::after {
   content: "Soltá los archivos para subirlos";
-  position: absolute;
-  inset: 12px;
+  position: fixed;
+  position-anchor: --canvas;
+  top: anchor(top);
+  left: anchor(left);
+  right: anchor(right);
+  bottom: anchor(bottom);
+  margin: 12px;
   display: grid;
   place-items: center;
   text-align: center;
