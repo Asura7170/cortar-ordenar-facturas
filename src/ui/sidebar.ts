@@ -22,6 +22,7 @@ import { getEl, sanear } from "../utils";
 
 const canvas: HTMLElement = getEl("canvas");
 const fileInput: HTMLInputElement = getEl<HTMLInputElement>("fileInput");
+const dropzone: HTMLElement = getEl("dropzone");
 const chkCodigo: HTMLInputElement = getEl<HTMLInputElement>("chkCodigo");
 const numCodigo: HTMLInputElement = getEl<HTMLInputElement>("numCodigo");
 const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>("inputCodigo");
@@ -202,7 +203,14 @@ export function elegirArchivos(hojaId: number): void {
 }
 
 export function initSidebar(): void {
-  // ponytail: label[for] nativo ya abre el diálogo con Enter/Espacio; sin keydown manual.
+  // El label solo reenvía clics: Enter/Espacio sobre él no abren el picker
+  // (sin activation behavior propio), por eso el keydown es manual.
+  dropzone.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    if (typeof fileInput.showPicker === "function") fileInput.showPicker();
+    else fileInput.click();
+  });
   fileInput.addEventListener("change", () => {
     void agregarArchivos(fileInput.files, hojaPedida);
     hojaPedida = null;

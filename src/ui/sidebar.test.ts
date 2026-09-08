@@ -205,6 +205,21 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     expect(click).toHaveBeenCalled();
   });
 
+  it("Enter/Espacio en la tarjeta abren el picker (el label solo no lo hace)", () => {
+    const dropzone = el("dropzone");
+    const show = vi.fn();
+    Object.defineProperty(fileInput, "showPicker", { value: show, configurable: true });
+    try {
+      dropzone.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      dropzone.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+      expect(show).toHaveBeenCalledTimes(2);
+      dropzone.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+      expect(show).toHaveBeenCalledTimes(2);
+    } finally {
+      Object.defineProperty(fileInput, "showPicker", { value: undefined, configurable: true });
+    }
+  });
+
   it("el change sube a la hoja pedida y resetea la pendiente", async () => {
     const a = crearHoja();
     const b = crearHoja();

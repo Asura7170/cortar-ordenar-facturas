@@ -178,6 +178,8 @@ export async function extraerPendientes(opciones?: {
   forzado?: boolean;
   desdeCola?: boolean;
 }): Promise<void> {
+  // ponytail: sin coalescing (un pedido durante el batch se pierde y su celda
+  // queda manual hasta el próximo disparo; ventana rara y autorecuperable).
   if (extrayendo) return;
   // ponytail: la cola es continuación secuencial del mismo trabajo (no concurrencia),
   // por eso solo ella salta este guard con desdeCola.
