@@ -422,12 +422,12 @@ select {
 /* El código solo pide atención cuando su switch está activo (el JS lo
    refleja en disabled); apagado conserva el fondo neutro. */
 #inputCodigo:enabled {
-  background: #1a281a;
-  color: #e9f1e5;
+  background: light-dark(var(--verde-claro), #1a281a);
+  color: light-dark(var(--verde-tinta), #e9f1e5);
   border-color: var(--verde-tinta);
 }
 #inputCodigo:enabled::placeholder {
-  color: #9db894;
+  color: light-dark(var(--tinta-suave), #9db894);
 }
 
 /* Selector de esquina: radios nativos (teclado gratis) con mini-hoja visual.
@@ -717,7 +717,7 @@ input::placeholder {
   padding: 24px;
   font-size: 28px;
   font-weight: 700;
-  color: var(--texto-panel);
+  color: light-dark(var(--texto-panel), var(--verde-tinta));
   background: color-mix(in srgb, var(--renglon-fuerte) 18%, transparent);
   border: 4px dashed var(--renglon-fuerte);
   border-radius: var(--radio);
