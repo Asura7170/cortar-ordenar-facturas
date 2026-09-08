@@ -95,19 +95,53 @@
                 <span class="switch-track"></span>
               </label>
             </header>
+            <button
+              class="btn btn-ia btn-block"
+              id="btnIA"
+              type="button"
+              title="La IA lee el total de los comprobantes sin monto"
+            >
+              Extraer montos
+            </button>
+            <p class="hint">Completa con IA los comprobantes sin monto.</p>
           </section>
 
-          <section class="panel panel-acciones">
+          <section class="panel panel-exportar" aria-labelledby="tituloExportar">
+            <header class="panel-head">
+              <h2 class="panel-title" id="tituloExportar">Exportar</h2>
+            </header>
+            <div class="export-doble">
+              <button class="btn btn-word btn-block" id="btnDescargar2" title="Descargar Word">
+                ⤓ Word
+              </button>
+              <button
+                class="btn btn-pdf btn-block"
+                id="btnPdf"
+                type="button"
+                title="Descargar PDF · Próximamente"
+              >
+                ⤓ PDF
+              </button>
+            </div>
             <button
-              class="btn btn-mini btn-danger"
+              class="btn btn-block btn-imprimir"
+              id="btnImprimir"
+              type="button"
+              title="Imprimir · Próximamente"
+            >
+              Imprimir
+            </button>
+          </section>
+
+          <section class="panel panel-limpiar" aria-label="Vaciar lote">
+            <button
+              class="btn btn-block btn-danger"
               id="btnLimpiar"
               command="show-modal"
               commandfor="modalLimpiar"
             >
               Limpiar
             </button>
-            <button class="btn btn-ghost btn-block" id="btnIA" type="button">Reintentar IA</button>
-            <button class="btn btn-primary btn-block" id="btnDescargar2">Descargar Word</button>
           </section>
         </aside>
 

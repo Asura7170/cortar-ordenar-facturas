@@ -28,6 +28,8 @@ export const FIXTURE_HTML = `
   <button id="btnResetAjustes" type="button"></button>
 </form>
 <button id="btnDescargar2"></button>
+<button id="btnPdf" type="button"></button>
+<button id="btnImprimir" type="button"></button>
 <button id="btnIA" type="button"></button>
 `;
 

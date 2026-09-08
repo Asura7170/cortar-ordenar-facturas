@@ -419,6 +419,16 @@ select {
   flex: 1;
   min-width: 0;
 }
+/* El código solo pide atención cuando su switch está activo (el JS lo
+   refleja en disabled); apagado conserva el fondo neutro. */
+#inputCodigo:enabled {
+  background: #1a281a;
+  color: #e9f1e5;
+  border-color: var(--verde-tinta);
+}
+#inputCodigo:enabled::placeholder {
+  color: #9db894;
+}
 
 input,
 select {
@@ -499,10 +509,6 @@ input::placeholder {
   background: color-mix(in srgb, var(--sello), #000 12%);
 }
 
-.btn-mini {
-  font-size: 12px;
-  padding: 7px 10px;
-}
 .btn-block {
   width: 100%;
 }
@@ -545,10 +551,60 @@ input::placeholder {
   color: light-dark(var(--sello), tan);
 }
 
-.panel-acciones {
-  display: flex;
-  flex-direction: column;
+/* El head del panel OCR no deja margen: lo aporta el botón de abajo. */
+.panel-ocr .btn-block {
+  margin-top: 10px;
+}
+.panel-ocr .hint {
+  margin: 8px 0 0;
+}
+/* Extraer montos: fantasma tan como Word/PDF/Imprimir. En claro el tan
+   puro no llega a AA, así que va un marrón tostado (tan queda en oscuro,
+   igual que .ocr-estado). */
+.btn-ia {
+  background: transparent;
+  color: light-dark(#7a5c2e, tan);
+  border: 1px solid currentColor;
+}
+.btn-ia:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son
+   fantasma con color de marca solo en texto y borde (fondo transparente
+   para no romper el estilo del sitio); Imprimir va sólido en verde. */
+.export-doble {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+.btn-word {
+  background: transparent;
+  /* Azul Word en claro; aclarado en oscuro (el puro sobre panel oscuro ≈ 2:1). */
+  color: light-dark(#0e4ae2, #8fb0ff);
+  border: 1px solid currentColor;
+}
+.btn-word:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.btn-pdf {
+  background: transparent;
+  color: #fe5721;
+  border: 1px solid currentColor;
+}
+.btn-pdf:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.btn-imprimir {
+  min-height: 52px;
+  margin-top: 8px;
+  font-size: 14px;
+  background: transparent;
+  color: light-dark(var(--verde-tinta), var(--monto-valor));
+  border: 1px solid currentColor;
+}
+.btn-imprimir:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 /* ============ CANVAS / HOJAS ============ */
