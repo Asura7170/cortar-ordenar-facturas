@@ -26,6 +26,7 @@ import { getEl } from "../utils";
 const btnDescargar: HTMLButtonElement = getEl<HTMLButtonElement>("btnDescargar2");
 const btnPdf: HTMLButtonElement = getEl<HTMLButtonElement>("btnPdf");
 const btnImprimir: HTMLButtonElement = getEl<HTMLButtonElement>("btnImprimir");
+const zonaPrint: HTMLElement = getEl<HTMLElement>("zonaPrint");
 
 /** Carta 8.5×11"; margen 0.3" + banda 0.3" del lado del código (nunca se pisan). */
 const ANCHO_CARTA = 8.5;
@@ -217,9 +218,117 @@ export function initExport(): void {
   btnDescargar.addEventListener("click", () => {
     void descargarWord();
   });
-  // ponytail: placeholders habilitados que avisan en vez de callar (sin funcionalidad real).
-  btnPdf.addEventListener("click", () => avisar("PDF: próximamente."));
-  btnImprimir.addEventListener("click", () => avisar("Imprimir: próximamente."));
+  btnPdf.addEventListener("click", () => {
+    void descargarPdf();
+  });
+  btnImprimir.addEventListener("click", () => {
+    void imprimir();
+  });
+}
+
+/* ---- PDF / Imprimir: una zona oculta con la misma fuente que Word ---- */
+
+/** Banda del código (null si no hay código que mostrar). */
+function codigoPrint(codigo: string, posicion: PosicionCodigo): HTMLElement | null {
+  if (codigo === "") return null;
+  const el = document.createElement("div");
+  el.className = "codigo-print";
+  el.textContent = codigo;
+  el.style.textAlign = posicion.endsWith("der") ? "right" : "left";
+  return el;
+}
+
+/** Una hoja lógica como <section> carta: misma Plantilla que geometria(), en CSS. */
+export function hojaPrint(hoja: Hoja, codigo: string, posicion: PosicionCodigo): HTMLElement {
+  const p = layoutDe(hoja.layout);
+  const supra = posicion.startsWith("sup");
+  const seccion = document.createElement("section");
+  seccion.className = "hoja-print";
+  seccion.style.paddingTop = supra ? "0.6in" : "0.3in";
+  seccion.style.paddingBottom = supra ? "0.3in" : "0.6in";
+  const banda = codigoPrint(codigo, posicion);
+  if (supra && banda) seccion.append(banda);
+  const rejilla = document.createElement("div");
+  rejilla.className = "rejilla-print";
+  rejilla.style.gridTemplateColumns = `repeat(${p.cols}, 1fr)`;
+  rejilla.style.gridTemplateRows = `repeat(${p.filas}, 1fr)`;
+  p.pos.forEach(([fila, col, span], i) => {
+    const item = hoja.slots[i];
+    if (!item) return;
+    const celda = document.createElement("div");
+    celda.className = "celda-print";
+    celda.style.gridRow = `${fila}`;
+    celda.style.gridColumn = `${col} / span ${span}`;
+    const img = document.createElement("img");
+    // ponytail: imgUrl directo (ya es full-res y vive en la sesión); sin object URLs que revocar.
+    img.src = item.imgUrl;
+    img.alt = item.nombre;
+    celda.append(img);
+    rejilla.append(celda);
+  });
+  seccion.append(rejilla);
+  if (!supra && banda) seccion.append(banda);
+  return seccion;
+}
+
+/** Hojas con al menos un comprobante (mismo filtro que descargarWord). */
+function hojasNoVacias(): Hoja[] {
+  return state.hojas.filter((h) => h.slots.some((c) => c !== null));
+}
+
+/** Arma #zonaPrint si el gate pasa; false = no imprimir. */
+function montarZona(): boolean {
+  if (!codigoValido() || totalItems() === 0) return false;
+  const hojas = hojasNoVacias();
+  if (hojas.length === 0) return false;
+  const codigo = state.codigoActivo ? state.codigoValor : "";
+  zonaPrint.replaceChildren(...hojas.map((h) => hojaPrint(h, codigo, state.codigoPosicion)));
+  zonaPrint.removeAttribute("hidden");
+  return true;
+}
+
+/** Vacía #zonaPrint y la vuelve a ocultar (tras el diálogo). */
+function limpiarZona(): void {
+  zonaPrint.replaceChildren();
+  zonaPrint.setAttribute("hidden", "");
+}
+
+/** Espera a que las imgs de la zona decodifiquen (las de display:none cargan tarde). */
+async function esperarImagenes(): Promise<void> {
+  const imgs = [...zonaPrint.querySelectorAll("img")];
+  // ponytail: decode fuerza carga+decode aun oculta; rota → hueco, nunca cuelga el diálogo.
+  await Promise.all(imgs.map((img) => img.decode?.().catch(() => {})));
+}
+
+/** Imprime la zona y la limpia al cerrarse el diálogo (OK o cancelar). */
+async function imprimirZona(): Promise<void> {
+  await esperarImagenes();
+  const limpiar = (): void => {
+    limpiarZona();
+    window.removeEventListener("afterprint", limpiar);
+  };
+  window.addEventListener("afterprint", limpiar);
+  window.print();
+}
+
+export async function descargarPdf(): Promise<void> {
+  if (!montarZona()) return;
+  // ponytail: Chrome propone document.title como nombre del PDF; sin API real de filename.
+  const titulo = document.title;
+  document.title = nombreArchivo("pdf").replace(/\.pdf$/, "");
+  await esperarImagenes();
+  const limpiar = (): void => {
+    document.title = titulo;
+    limpiarZona();
+    window.removeEventListener("afterprint", limpiar);
+  };
+  window.addEventListener("afterprint", limpiar);
+  window.print();
+}
+
+export async function imprimir(): Promise<void> {
+  if (!montarZona()) return;
+  await imprimirZona();
 }
 
 function avisar(texto: string): void {

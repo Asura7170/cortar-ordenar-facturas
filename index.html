@@ -134,12 +134,7 @@
               <button class="btn btn-word btn-block" id="btnDescargar2" title="Descargar Word">
                 ⤓ Word
               </button>
-              <button
-                class="btn btn-pdf btn-block"
-                id="btnPdf"
-                type="button"
-                title="Descargar PDF · Próximamente"
-              >
+              <button class="btn btn-pdf btn-block" id="btnPdf" type="button" title="Descargar PDF">
                 ⤓ PDF
               </button>
             </div>
@@ -147,7 +142,7 @@
               class="btn btn-block btn-imprimir"
               id="btnImprimir"
               type="button"
-              title="Imprimir · Próximamente"
+              title="Imprimir"
             >
               Imprimir
             </button>
@@ -188,6 +183,9 @@
         </main>
       </div>
     </div>
+
+    <!-- Zona de impresión: la arma salidas.ts al pedir PDF/Imprimir (oculta en pantalla). -->
+    <div id="zonaPrint" hidden aria-hidden="true"></div>
 
     <!-- Modal Ajustes -->
     <dialog class="modal" id="modalAjustes" closedby="any" aria-labelledby="tituloAjustes">

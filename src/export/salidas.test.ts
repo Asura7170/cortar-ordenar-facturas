@@ -68,15 +68,18 @@ const bitmapFalso = (async (): Promise<ImageBitmap> =>
 globalThis.createImageBitmap = bitmapFalso;
 
 document.body.innerHTML =
-  '<div id="montoTotal"></div><p id="aviso"></p><button id="btnDescargar2"></button><button id="btnPdf"></button><button id="btnImprimir"></button>';
+  '<div id="montoTotal"></div><p id="aviso"></p><button id="btnDescargar2"></button><button id="btnPdf"></button><button id="btnImprimir"></button><div id="zonaPrint" hidden></div>';
 const { state, crearHoja } = await import("../state");
 const {
   GUTTER,
   codigoValido,
   construirDocumento,
+  descargarPdf,
   descargarWord,
   encajar,
   geometria,
+  hojaPrint,
+  imprimir,
   initExport,
   nombreArchivo,
 } = await import("./salidas");
@@ -379,13 +382,158 @@ describe("initExport", () => {
     await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
   });
 
-  // ponytail: placeholders habilitados que avisan (sin funcionalidad real).
-  it.each([
-    ["btnPdf", "PDF: próximamente."],
-    ["btnImprimir", "Imprimir: próximamente."],
-  ])("%s avisa sin descargar", (id, mensaje) => {
-    initExport();
-    document.getElementById(id)?.click();
-    expect(document.getElementById("aviso")?.textContent).toBe(mensaje);
+  it.each(["btnPdf", "btnImprimir"])("%s imprime la zona (no avisa)", async (id) => {
+    state.hojas.length = 0;
+    state.codigoActivo = false;
+    sembrar();
+    const aviso = document.getElementById("aviso");
+    if (aviso) aviso.textContent = "";
+    const print = vi.fn();
+    vi.stubGlobal("print", print);
+    try {
+      initExport();
+      document.getElementById(id)?.click();
+      // Handlers async (esperan el decode): el print llega después.
+      await vi.waitFor(() => expect(print).toHaveBeenCalled());
+      expect(document.getElementById("aviso")?.textContent).toBe("");
+    } finally {
+      vi.unstubAllGlobals();
+      window.dispatchEvent(new Event("afterprint"));
+    }
+  });
+});
+
+describe("hojaPrint", () => {
+  function hojaLlena(n: number, layout: LayoutId = "u4x2") {
+    const h = crearHoja(layout);
+    for (let i = 0; i < n; i++) h.slots[i] = comprobante();
+    return h;
+  }
+
+  it("u4x2 ×4: rejilla 2×2, 4 celdas con img full-res y footer inf-der", () => {
+    const sec = hojaPrint(hojaLlena(4), "123456", "inf-der");
+    expect(sec.className).toBe("hoja-print");
+    const rejilla = sec.querySelector(":scope > .rejilla-print") as HTMLElement;
+    expect(rejilla.style.gridTemplateColumns).toBe("repeat(2, 1fr)");
+    expect(rejilla.style.gridTemplateRows).toBe("repeat(2, 1fr)");
+    const imgs = rejilla.querySelectorAll(".celda-print > img");
+    expect(imgs).toHaveLength(4);
+    for (const img of imgs) {
+      expect((img as HTMLImageElement).src).toBe("blob:mock-1");
+      expect((img as HTMLImageElement).alt).toBe("factura.png");
+    }
+    const banda = sec.querySelector(":scope > .codigo-print") as HTMLElement;
+    expect(banda.textContent).toBe("123456");
+    expect(banda.style.textAlign).toBe("right");
+    expect(sec.lastElementChild).toBe(banda);
+  });
+
+  it("nulos se saltan, spans se respetan (u3m)", () => {
+    const sec = hojaPrint(hojaLlena(3, "u3m"), "1", "inf-izq");
+    const celdas = sec.querySelectorAll(".celda-print");
+    expect(celdas).toHaveLength(3);
+    expect((celdas[2] as HTMLElement).style.gridColumn).toBe("1 / span 2");
+  });
+
+  it("sup-izq: banda primera a la izquierda y padding 0.6 arriba", () => {
+    const sec = hojaPrint(hojaLlena(1), "99", "sup-izq");
+    expect(sec.style.paddingTop).toBe("0.6in");
+    expect(sec.style.paddingBottom).toBe("0.3in");
+    const banda = sec.querySelector(":scope > .codigo-print") as HTMLElement;
+    expect(sec.firstElementChild).toBe(banda);
+    expect(banda.style.textAlign).toBe("left");
+  });
+
+  it("sin código: sin banda", () => {
+    const sec = hojaPrint(hojaLlena(1), "", "inf-der");
+    expect(sec.querySelector(".codigo-print")).toBeNull();
+  });
+});
+
+describe("descargarPdf / imprimir", () => {
+  function zona(): HTMLElement {
+    const z = document.getElementById("zonaPrint");
+    if (!z) throw new Error("zona ausente");
+    return z;
+  }
+
+  beforeEach(() => {
+    state.hojas.length = 0;
+    state.codigoActivo = false;
+    document.title = "";
+    zona().replaceChildren();
+    vi.stubGlobal("print", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function impresiones(): number {
+    return (globalThis.print as ReturnType<typeof vi.fn>).mock.calls.length;
+  }
+
+  it("gate código inválido: no imprime ni monta", async () => {
+    state.codigoActivo = true;
+    state.codigoValor = "corto";
+    sembrar();
+    await descargarPdf();
+    await imprimir();
+    expect(impresiones()).toBe(0);
+    expect(zona().childElementCount).toBe(0);
+    expect(document.title).toBe("");
+  });
+
+  it("sin comprobantes: no imprime", async () => {
+    await descargarPdf();
+    await imprimir();
+    expect(impresiones()).toBe(0);
+  });
+
+  it("descargarPdf válido: monta N hojas, título temporal, imprime y limpia", async () => {
+    sembrar();
+    sembrar();
+    await descargarPdf();
+    const hojas = zona().querySelectorAll(":scope > .hoja-print");
+    expect(hojas).toHaveLength(2);
+    expect(zona().querySelectorAll(".celda-print > img")).toHaveLength(2);
+    expect(document.title).toBe("sincodigo-comprobante");
+    expect(impresiones()).toBe(1);
+    window.dispatchEvent(new Event("afterprint"));
+    expect(zona().childElementCount).toBe(0);
+    expect(document.title).toBe("");
+  });
+
+  it("imprimir válido: no toca el título y limpia al cerrar", async () => {
+    document.title = "App";
+    sembrar();
+    await imprimir();
+    expect(impresiones()).toBe(1);
+    expect(document.title).toBe("App");
+    expect(zona().querySelectorAll(":scope > .hoja-print")).toHaveLength(1);
+    window.dispatchEvent(new Event("afterprint"));
+    expect(zona().childElementCount).toBe(0);
+  });
+
+  it("espera al decode de las imgs antes de print", async () => {
+    let resolver: () => void = () => {};
+    const puerta = new Promise<void>((res) => {
+      resolver = res;
+    });
+    const original = HTMLImageElement.prototype.decode;
+    HTMLImageElement.prototype.decode = (() => puerta) as typeof original;
+    try {
+      sembrar();
+      const vuelto = descargarPdf();
+      // Zona montada pero diálogo aún no abierto: las imgs no decodificaron.
+      expect(zona().querySelectorAll(":scope > .hoja-print")).toHaveLength(1);
+      expect(impresiones()).toBe(0);
+      resolver();
+      await vuelto;
+      expect(impresiones()).toBe(1);
+    } finally {
+      HTMLImageElement.prototype.decode = original;
+      window.dispatchEvent(new Event("afterprint"));
+    }
   });
 });
