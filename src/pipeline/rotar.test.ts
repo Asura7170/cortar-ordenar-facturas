@@ -14,7 +14,7 @@ vi.mock("./extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
 // Thumb controlable por test (asignarMiniatura sigue real).
 vi.mock("./queue", async (importOriginal) => {
   const real = await importOriginal<typeof import("./queue")>();
-  return { ...real, generarMiniatura: vi.fn(async () => new Blob(["thumb"])) };
+  return { ...real, generarMiniatura: vi.fn(async () => "blob:thumb") };
 });
 
 montarFixture();

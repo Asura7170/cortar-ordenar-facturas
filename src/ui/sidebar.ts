@@ -198,8 +198,8 @@ let hojaPedida: number | null = null;
 /** Abre el diálogo para subir directo a una hoja (la consume cualquier intake). */
 export function elegirArchivos(hojaId: number): void {
   hojaPedida = hojaId;
-  if (typeof fileInput.showPicker === "function") fileInput.showPicker();
-  else fileInput.click();
+  // ponytail: sin fallback click (Chrome latest tiene showPicker; el repo los prohíbe).
+  fileInput.showPicker();
 }
 
 export function initSidebar(): void {
@@ -208,8 +208,7 @@ export function initSidebar(): void {
   dropzone.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault();
-    if (typeof fileInput.showPicker === "function") fileInput.showPicker();
-    else fileInput.click();
+    fileInput.showPicker();
   });
   fileInput.addEventListener("change", () => {
     void agregarArchivos(fileInput.files, hojaPedida);

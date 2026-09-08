@@ -198,13 +198,6 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     }
   });
 
-  it("sin showPicker usa click", () => {
-    Object.defineProperty(fileInput, "showPicker", { value: undefined, configurable: true });
-    const click = vi.spyOn(fileInput, "click").mockImplementation(() => {});
-    elegirArchivos(7);
-    expect(click).toHaveBeenCalled();
-  });
-
   it("Enter/Espacio en la tarjeta abren el picker (el label solo no lo hace)", () => {
     const dropzone = el("dropzone");
     const show = vi.fn();
@@ -224,7 +217,8 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
-    elegirArchivos(b.id); // sin showPicker en jsdom: click sin diálogo
+    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
+    elegirArchivos(b.id); // jsdom sin picker: noop simulado
     Object.defineProperty(fileInput, "files", {
       value: [archivo("h.png", "image/png")],
       configurable: true,
@@ -247,6 +241,7 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
+    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
     elegirArchivos(b.id);
     fileInput.dispatchEvent(new Event("cancel", { bubbles: true }));
     Object.defineProperty(fileInput, "files", {
@@ -263,6 +258,7 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
+    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
     elegirArchivos(b.id);
     await agregarArchivos([archivo("d.png", "image/png")], a.id); // drop sobre A
     expect(a.slots.some((c) => c?.nombre === "d.png")).toBe(true);
