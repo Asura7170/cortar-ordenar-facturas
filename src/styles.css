@@ -1447,6 +1447,7 @@ body.is-dragging .cell:not(.empty) {
   #zonaPrint,
   #zonaPrint * {
     print-color-adjust: exact;
+    /* ponytail: prefijo exigido por Chrome para print-color-adjust (ver -webkit-user-drag). */
     -webkit-print-color-adjust: exact;
   }
 

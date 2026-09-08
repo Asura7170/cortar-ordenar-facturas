@@ -325,23 +325,27 @@ describe("construirDocumento (docx mockeado)", () => {
 });
 
 describe("descargarWord", () => {
-  it("código inválido: no dispara descarga", async () => {
+  it("código inválido: no dispara descarga y avisa", async () => {
     state.codigoActivo = true;
     state.codigoValor = "corto";
     sembrar();
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     await descargarWord();
     expect(click).not.toHaveBeenCalled();
+    expect(document.getElementById("aviso")?.textContent).toBe(
+      "Código inválido: revisá los dígitos.",
+    );
   });
 
-  it("sin comprobantes: no dispara descarga", async () => {
+  it("sin comprobantes: no dispara descarga y avisa", async () => {
     state.codigoActivo = false;
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     await descargarWord();
     expect(click).not.toHaveBeenCalled();
+    expect(document.getElementById("aviso")?.textContent).toBe("Sin comprobantes para exportar.");
   });
 
-  it("válido: clic con nombre y blob, y revoca a los 2s", async () => {
+  it("válido: clic con nombre y blob, y revoca a los 30s", async () => {
     vi.useFakeTimers();
     state.codigoActivo = false;
     sembrar();
@@ -352,8 +356,9 @@ describe("descargarWord", () => {
     const a = click.mock.instances[0] as HTMLAnchorElement;
     expect(a.download).toBe("sincodigo-comprobante.docx");
     expect(a.href).toContain("blob:mock-");
-    expect(revoke).not.toHaveBeenCalled();
     vi.advanceTimersByTime(2000);
+    expect(revoke).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(28000);
     expect(revoke).toHaveBeenCalledTimes(1);
   });
 
@@ -380,6 +385,23 @@ describe("initExport", () => {
     document.getElementById("btnDescargar2")?.click();
     // descargarWord es async (mide + empaca): el clic del anchor llega después.
     await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+  });
+
+  it("idempotente: recablear no duplica el print", async () => {
+    state.hojas.length = 0;
+    state.codigoActivo = false;
+    sembrar();
+    const print = vi.fn();
+    vi.stubGlobal("print", print);
+    try {
+      initExport();
+      initExport();
+      document.getElementById("btnImprimir")?.click();
+      await vi.waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+    } finally {
+      vi.unstubAllGlobals();
+      window.dispatchEvent(new Event("afterprint"));
+    }
   });
 
   it.each(["btnPdf", "btnImprimir"])("%s imprime la zona (no avisa)", async (id) => {
@@ -473,19 +495,23 @@ describe("descargarPdf / imprimir", () => {
     return (globalThis.print as ReturnType<typeof vi.fn>).mock.calls.length;
   }
 
-  it("gate código inválido: no imprime ni monta", async () => {
+  it("gate código inválido: no imprime ni monta, y avisa", async () => {
     state.codigoActivo = true;
     state.codigoValor = "corto";
     sembrar();
     await descargarPdf();
+    expect(document.getElementById("aviso")?.textContent).toBe(
+      "Código inválido: revisá los dígitos.",
+    );
     await imprimir();
     expect(impresiones()).toBe(0);
     expect(zona().childElementCount).toBe(0);
     expect(document.title).toBe("");
   });
 
-  it("sin comprobantes: no imprime", async () => {
+  it("sin comprobantes: no imprime y avisa", async () => {
     await descargarPdf();
+    expect(document.getElementById("aviso")?.textContent).toBe("Sin comprobantes para exportar.");
     await imprimir();
     expect(impresiones()).toBe(0);
   });
@@ -535,5 +561,28 @@ describe("descargarPdf / imprimir", () => {
       HTMLImageElement.prototype.decode = original;
       window.dispatchEvent(new Event("afterprint"));
     }
+  });
+
+  it("doble llamado en vuelo: un solo print y título intacto", async () => {
+    let resolver: () => void = () => {};
+    const puerta = new Promise<void>((res) => {
+      resolver = res;
+    });
+    const original = HTMLImageElement.prototype.decode;
+    HTMLImageElement.prototype.decode = (() => puerta) as typeof original;
+    try {
+      document.title = "App";
+      sembrar();
+      const primero = descargarPdf();
+      const segundo = descargarPdf();
+      resolver();
+      await primero;
+      await segundo;
+      expect(impresiones()).toBe(1);
+    } finally {
+      HTMLImageElement.prototype.decode = original;
+      window.dispatchEvent(new Event("afterprint"));
+    }
+    expect(document.title).toBe("App");
   });
 });

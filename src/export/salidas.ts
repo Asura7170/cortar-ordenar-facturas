@@ -1,4 +1,4 @@
-/* Salidas Word (.docx real vía docx) + PDF/Imprimir (avisan: espec, sin implementar).
+/* Salidas Word (.docx vía docx) + PDF/Imprimir (zonaPrint + window.print).
    Una sola fuente (state.hojas + layout + codigoPosicion) y un solo gate. */
 import {
   AlignmentType,
@@ -27,6 +27,8 @@ const btnDescargar: HTMLButtonElement = getEl<HTMLButtonElement>("btnDescargar2"
 const btnPdf: HTMLButtonElement = getEl<HTMLButtonElement>("btnPdf");
 const btnImprimir: HTMLButtonElement = getEl<HTMLButtonElement>("btnImprimir");
 const zonaPrint: HTMLElement = getEl<HTMLElement>("zonaPrint");
+let initListo = false;
+let printEnVuelo = false;
 
 /** Carta 8.5×11"; margen 0.3" + banda 0.3" del lado del código (nunca se pisan). */
 const ANCHO_CARTA = 8.5;
@@ -88,7 +90,7 @@ export function encajar(
 }
 
 /** Dimensiones del blob sin mostrarlo (cierra el bitmap). */
-export async function medirImagen(blob: Blob): Promise<{ readonly w: number; readonly h: number }> {
+async function medirImagen(blob: Blob): Promise<{ readonly w: number; readonly h: number }> {
   const bmp = await createImageBitmap(blob);
   const dims = { w: bmp.width, h: bmp.height };
   bmp.close();
@@ -191,10 +193,19 @@ export async function construirDocumento(
 }
 
 export async function descargarWord(): Promise<void> {
-  if (!codigoValido()) return;
-  if (totalItems() === 0) return;
+  if (!codigoValido()) {
+    avisar("Código inválido: revisá los dígitos.");
+    return;
+  }
+  if (totalItems() === 0) {
+    avisar("Sin comprobantes para exportar.");
+    return;
+  }
   const hojas = state.hojas.filter((h) => h.slots.some((c) => c !== null));
-  if (hojas.length === 0) return;
+  if (hojas.length === 0) {
+    avisar("Sin comprobantes para exportar.");
+    return;
+  }
   let blob: Blob;
   try {
     const doc = await construirDocumento(
@@ -211,18 +222,22 @@ export async function descargarWord(): Promise<void> {
   a.href = URL.createObjectURL(blob);
   a.download = nombreArchivo();
   a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  // ponytail: 30s de gracia; revocar antes trunca la descarga en lotes grandes.
+  setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
 }
 
 export function initExport(): void {
+  // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
+  if (initListo) return;
+  initListo = true;
   btnDescargar.addEventListener("click", () => {
-    void descargarWord();
+    void descargarWord().catch(() => {});
   });
   btnPdf.addEventListener("click", () => {
-    void descargarPdf();
+    void descargarPdf().catch(() => {});
   });
   btnImprimir.addEventListener("click", () => {
-    void imprimir();
+    void imprimir().catch(() => {});
   });
 }
 
@@ -276,11 +291,17 @@ function hojasNoVacias(): Hoja[] {
   return state.hojas.filter((h) => h.slots.some((c) => c !== null));
 }
 
-/** Arma #zonaPrint si el gate pasa; false = no imprimir. */
+/** Arma #zonaPrint si el gate pasa; false = no imprimir (con aviso). */
 function montarZona(): boolean {
-  if (!codigoValido() || totalItems() === 0) return false;
+  if (!codigoValido()) {
+    avisar("Código inválido: revisá los dígitos.");
+    return false;
+  }
   const hojas = hojasNoVacias();
-  if (hojas.length === 0) return false;
+  if (hojas.length === 0) {
+    avisar("Sin comprobantes para exportar.");
+    return false;
+  }
   const codigo = state.codigoActivo ? state.codigoValor : "";
   zonaPrint.replaceChildren(...hojas.map((h) => hojaPrint(h, codigo, state.codigoPosicion)));
   zonaPrint.removeAttribute("hidden");
@@ -300,35 +321,44 @@ async function esperarImagenes(): Promise<void> {
   await Promise.all(imgs.map((img) => img.decode?.().catch(() => {})));
 }
 
-/** Imprime la zona y la limpia al cerrarse el diálogo (OK o cancelar). */
-async function imprimirZona(): Promise<void> {
-  await esperarImagenes();
-  const limpiar = (): void => {
+/** Imprime la zona ya montada; conTitulo = truco filename PDF vía document.title. */
+async function imprimirZona(conTitulo: boolean): Promise<void> {
+  // ponytail: sin re-entrada (doble clic apilaba diálogos y ensuciaba el título).
+  if (printEnVuelo) return;
+  printEnVuelo = true;
+  const titulo = document.title;
+  try {
+    await esperarImagenes();
+    // ponytail: título DESPUÉS del await: un 2.º clic nunca captura el temporal.
+    if (conTitulo) document.title = nombreArchivo("pdf").replace(/\.pdf$/, "");
+    let listo = false;
+    const limpiar = (): void => {
+      if (listo) return;
+      listo = true;
+      if (conTitulo) document.title = titulo;
+      limpiarZona();
+      window.removeEventListener("afterprint", limpiar);
+    };
+    window.addEventListener("afterprint", limpiar);
+    window.print();
+    // ponytail: fallback si afterprint no dispara (headless/crash); la preview ya se generó.
+    setTimeout(limpiar, 60_000);
+  } catch {
+    if (conTitulo) document.title = titulo;
     limpiarZona();
-    window.removeEventListener("afterprint", limpiar);
-  };
-  window.addEventListener("afterprint", limpiar);
-  window.print();
+  } finally {
+    printEnVuelo = false;
+  }
 }
 
 export async function descargarPdf(): Promise<void> {
   if (!montarZona()) return;
-  // ponytail: Chrome propone document.title como nombre del PDF; sin API real de filename.
-  const titulo = document.title;
-  document.title = nombreArchivo("pdf").replace(/\.pdf$/, "");
-  await esperarImagenes();
-  const limpiar = (): void => {
-    document.title = titulo;
-    limpiarZona();
-    window.removeEventListener("afterprint", limpiar);
-  };
-  window.addEventListener("afterprint", limpiar);
-  window.print();
+  await imprimirZona(true);
 }
 
 export async function imprimir(): Promise<void> {
   if (!montarZona()) return;
-  await imprimirZona();
+  await imprimirZona(false);
 }
 
 function avisar(texto: string): void {
