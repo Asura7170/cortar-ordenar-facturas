@@ -5,6 +5,7 @@ import {
   crearHoja,
   guardarCodigo,
   hojaPorId,
+  isPosicionCodigo,
   nextComprobanteId,
   state,
 } from "../state";
@@ -24,6 +25,10 @@ const fileInput: HTMLInputElement = getEl<HTMLInputElement>("fileInput");
 const chkCodigo: HTMLInputElement = getEl<HTMLInputElement>("chkCodigo");
 const numCodigo: HTMLInputElement = getEl<HTMLInputElement>("numCodigo");
 const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>("inputCodigo");
+// ponytail: por name (no getEl): si el fieldset falta, lista vacía sin reventar.
+function radiosPosicion(): NodeListOf<HTMLInputElement> {
+  return document.querySelectorAll<HTMLInputElement>('input[name="posCodigo"]');
+}
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
 const aviso: HTMLElement = getEl("aviso");
 const btnIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnIA");
@@ -174,6 +179,10 @@ export function renderCodigo(): void {
   inputCodigo.placeholder = state.codigoActivo
     ? `Código (${state.codigoLongitud} dígitos)`
     : "Código";
+  radiosPosicion().forEach((r) => {
+    r.checked = r.value === state.codigoPosicion;
+    r.disabled = !state.codigoActivo;
+  });
 }
 
 /** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
@@ -260,6 +269,14 @@ export function initSidebar(): void {
     if (chkCodigo.checked) guardarCodigo();
     renderCodigo();
   });
+  // La esquina es otro dato de la ventana Código: cambiarla persiste igual.
+  radiosPosicion().forEach((r) =>
+    r.addEventListener("change", () => {
+      if (!r.checked || !isPosicionCodigo(r.value)) return;
+      state.codigoPosicion = r.value;
+      if (chkCodigo.checked) guardarCodigo();
+    }),
+  );
   inputCodigo.addEventListener("input", () => {
     state.codigoValor = inputCodigo.value.replace(/\D/g, "").slice(0, state.codigoLongitud);
     inputCodigo.value = state.codigoValor;

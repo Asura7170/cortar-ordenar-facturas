@@ -7,6 +7,7 @@ import type {
   LayoutId,
   Moneda,
   PersistedState,
+  PosicionCodigo,
 } from "./types";
 import { layoutDe } from "./ui/layout";
 
@@ -25,12 +26,14 @@ export const CONFIG_IA_DEFAULT: ConfigIA = {
   apiKey: "",
 };
 export const MONEDA_DEFAULT: Moneda = "USD";
+export const POSICION_DEFAULT: PosicionCodigo = "inf-der";
 
 export const state: EstadoApp = {
   hojas: [],
   codigoActivo: false,
   codigoLongitud: 6,
   codigoValor: "",
+  codigoPosicion: POSICION_DEFAULT,
   configIA: { ...CONFIG_IA_DEFAULT },
   moneda: MONEDA_DEFAULT,
   colaEnProceso: false,
@@ -68,6 +71,7 @@ export function guardarCodigo(): void {
       codigoActivo: state.codigoActivo,
       codigoLongitud: state.codigoLongitud,
       codigoValor: state.codigoValor,
+      codigoPosicion: state.codigoPosicion,
     }),
   );
 }
@@ -90,6 +94,7 @@ export function borrarCodigo(): void {
   delete blob["codigoActivo"];
   delete blob["codigoLongitud"];
   delete blob["codigoValor"];
+  delete blob["codigoPosicion"];
   if (Object.keys(blob).length === 0) localStorage.removeItem(LS_KEY);
   else localStorage.setItem(LS_KEY, JSON.stringify(blob));
 }
@@ -105,6 +110,10 @@ export function restablecerAjustes(): void {
   guardarAjustes();
 }
 
+export function isPosicionCodigo(v: unknown): v is PosicionCodigo {
+  return v === "sup-izq" || v === "sup-der" || v === "inf-izq" || v === "inf-der";
+}
+
 function isPersistedState(v: unknown): v is PersistedState {
   if (typeof v !== "object" || v === null) return false;
   const p = v as Record<string, unknown>;
@@ -115,6 +124,7 @@ function isPersistedState(v: unknown): v is PersistedState {
     typeof p["codigoActivo"] === "boolean" ||
     typeof p["codigoLongitud"] === "number" ||
     typeof p["codigoValor"] === "string" ||
+    typeof p["codigoPosicion"] === "string" ||
     isMoneda(p["moneda"]) ||
     typeof p["configIA"] === "object"
   );
@@ -132,6 +142,10 @@ export function cargar(): void {
     state.codigoLongitud =
       typeof lon === "number" ? Math.max(1, Math.min(12, Math.floor(lon) || 6)) : 6;
     state.codigoValor = typeof r["codigoValor"] === "string" ? r["codigoValor"] : "";
+    // Blobs legacy o basura: la esquina cae al default (inferior derecha).
+    state.codigoPosicion = isPosicionCodigo(r["codigoPosicion"])
+      ? r["codigoPosicion"]
+      : POSICION_DEFAULT;
     if (isMoneda(r["moneda"])) state.moneda = r["moneda"]; // ausente en blobs legacy: se conserva
     const ia = (p as { configIA?: unknown }).configIA;
     if (typeof ia === "object" && ia !== null) {

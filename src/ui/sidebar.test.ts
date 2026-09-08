@@ -382,6 +382,49 @@ describe("código de pedido", () => {
     expect(state.codigoValor).toBe("123456");
     expect(inputCodigo.value).toBe("123456");
   });
+
+  function radios(): NodeListOf<HTMLInputElement> {
+    return document.querySelectorAll<HTMLInputElement>('input[name="posCodigo"]');
+  }
+
+  function radio(valor: string): HTMLInputElement {
+    const r = document.querySelector<HTMLInputElement>(`input[name="posCodigo"][value="${valor}"]`);
+    if (!r) throw new Error(`sin radio ${valor}`);
+    return r;
+  }
+
+  it("render marca la esquina del estado y la apaga con el switch", () => {
+    state.codigoPosicion = "sup-izq";
+    state.codigoActivo = true;
+    renderCodigo();
+    expect(radio("sup-izq").checked).toBe(true);
+    expect(radio("inf-der").checked).toBe(false);
+    radios().forEach((r) => expect(r.disabled).toBe(false));
+
+    state.codigoActivo = false;
+    renderCodigo();
+    radios().forEach((r) => expect(r.disabled).toBe(true));
+  });
+
+  it("cambiar de esquina actualiza el estado y persiste solo armado", () => {
+    armar();
+    const r = radio("inf-izq");
+    r.checked = true;
+    r.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(state.codigoPosicion).toBe("inf-izq");
+    expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toMatchObject({
+      codigoPosicion: "inf-izq",
+    });
+
+    localStorage.clear();
+    chkCodigo.checked = false;
+    chkCodigo.dispatchEvent(new Event("change", { bubbles: true }));
+    const r2 = radio("sup-der");
+    r2.checked = true;
+    r2.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(state.codigoPosicion).toBe("sup-der");
+    expect(localStorage.getItem("libro-mayor-state")).toBeNull();
+  });
 });
 
 describe("modalLimpiar", () => {

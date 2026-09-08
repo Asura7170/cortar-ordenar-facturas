@@ -12,6 +12,12 @@ export const FIXTURE_HTML = `
 <input id="chkCodigo" type="checkbox">
 <input id="numCodigo" type="number" value="6">
 <input id="inputCodigo" type="text">
+<fieldset>
+  <input type="radio" name="posCodigo" value="sup-izq">
+  <input type="radio" name="posCodigo" value="sup-der">
+  <input type="radio" name="posCodigo" value="inf-izq">
+  <input type="radio" name="posCodigo" value="inf-der">
+</fieldset>
 <dialog id="modalLimpiar"></dialog>
 <input id="chkOcr" type="checkbox">
 <span id="ocrEstado"></span>

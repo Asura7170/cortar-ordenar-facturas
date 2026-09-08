@@ -41,7 +41,7 @@ facturas/
 
 ## Decisiones (AC)
 
-- **Código pedido:** check on/off + input N (solo dígitos), ambos persisten en localStorage; footer derecho en todas las hojas del .docx; check activo con < N dígitos → bloquear descarga con mensaje.
+- **Código pedido:** check on/off + input N (solo dígitos), ambos persisten en localStorage; esquina elegida (default inferior derecha) en todas las hojas del .docx; check activo con < N dígitos → bloquear descarga con mensaje.
 - **Monto:** 1 TOTAL por comprobante; suma exacta en cents (sin float); badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); LLM sin TOTAL → campo manual en tarjeta (sí suma).
 - **Limpiar:** borra comprobantes, montos y textos OCR; conserva check, N, y configuración IA/moneda.
 - **Recorte:** DocAligner heatmap/lcnet100 vendoreado (`public/models/`, Apache-2.0, ver NOTICE.txt); foto con borde negro 100px (receta del demo: extrapola esquinas cortadas), inferencia onnxruntime-web (WebGPU→WASM, `public/ort/`), warp por homografía en canvas con fondo blanco; sin 4 esquinas plausibles (conf ≥0.3, área 5–98%, convexo) → imagen completa, la cola sigue. Sin config de modelo en UI.

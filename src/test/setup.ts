@@ -1,6 +1,6 @@
 /* Stubs que jsdom no trae + reset del estado global antes de cada test. */
 import { beforeEach } from "vite-plus/test";
-import { CONFIG_IA_DEFAULT, MONEDA_DEFAULT, state } from "../state";
+import { CONFIG_IA_DEFAULT, MONEDA_DEFAULT, POSICION_DEFAULT, state } from "../state";
 
 // jsdom sin origen expone localStorage como undefined: fallback en memoria.
 if (typeof localStorage === "undefined") {
@@ -53,6 +53,7 @@ export function resetEstado(): void {
   state.codigoActivo = false;
   state.codigoLongitud = 6;
   state.codigoValor = "";
+  state.codigoPosicion = POSICION_DEFAULT;
   state.configIA = { ...CONFIG_IA_DEFAULT };
   state.moneda = MONEDA_DEFAULT;
   state.colaEnProceso = false;
