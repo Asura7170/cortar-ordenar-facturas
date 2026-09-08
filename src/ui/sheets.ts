@@ -191,7 +191,6 @@ export function renderHojas(): void {
     sheetsEl.innerHTML = "";
 
     if (n === 0) {
-      sheetsEl.innerHTML = "";
       tarjetaVacia.hidden = false;
       renderMonto();
       return;
@@ -672,6 +671,8 @@ export function initSheets(cb: SheetsCallbacks): void {
         item.montoCents = null;
         item.montoManual = false; // se reabre al automático (null = candidata)
         renderHojas();
+        // ponytail: disparo pelado (con la cola idle nadie más la relee).
+        void import("../pipeline/extract").then((m) => m.extraerPendientes()).catch(() => {});
         return;
       }
       case "layout":

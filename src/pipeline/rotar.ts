@@ -61,11 +61,14 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
       if (!girado) throw new Error("sin blob girado");
       // ponytail: commit tras los awaits (igual que la cola: sin dueño no se guarda).
       if (!buscarSlot(id)) return;
-      URL.revokeObjectURL(item.imgUrl);
+      const vieja = item.imgUrl;
+      URL.revokeObjectURL(vieja);
       item.imgUrl = URL.createObjectURL(girado);
       item.file = girado;
       const thumb = await generarMiniatura(girado);
       if (thumb && buscarSlot(id)) asignarMiniatura(item, thumb);
+      // ponytail: sin thumb el alias al blob revocado (PDF) mira al nuevo.
+      else if (item.thumbUrl === vieja && buscarSlot(id)) item.thumbUrl = item.imgUrl;
       renderHojas();
       clearTimeout(relecturas.get(id));
       relecturas.set(

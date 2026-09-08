@@ -4,6 +4,8 @@ import { montarFixture, el, eventoDrop, eventoDragover } from "../test/fixture";
 
 // El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
 vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
+// El lote post-corregir no debe pegar a la red en tests.
+vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -18,6 +20,7 @@ const {
 } = await import("./sheets");
 const { archivo, comprobante } = await import("../test/factoria");
 const { girarYReleer } = await import("../pipeline/rotar");
+const { extraerPendientes } = await import("../pipeline/extract");
 import type { Comprobante, Hoja, LayoutId } from "../types";
 
 const agregarArchivos = vi.fn();
@@ -28,6 +31,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   agregarArchivos.mockClear();
   pedirArchivos.mockClear();
+  vi.mocked(extraerPendientes).mockClear();
 });
 
 /** Siembra una hoja con montos (null = casilla vacía) y la pinta. */
@@ -388,6 +392,20 @@ describe("giro manual", () => {
     expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 270);
     botonGiro("girar-der").click();
     expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 90);
+  });
+
+  it("corregir-monto reabre el automático y dispara el lote", async () => {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: 500, montoManual: true });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    const badge = document.querySelector<HTMLButtonElement>('[data-accion="corregir-monto"]');
+    if (!badge) throw new Error("sin badge corregir-monto");
+    badge.click();
+    expect(c.montoCents).toBeNull();
+    expect(c.montoManual).toBe(false);
+    await vi.waitFor(() => expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1));
   });
 
   it("pointerdown en girar no inicia drag", () => {
