@@ -92,6 +92,20 @@ describe("girarYReleer", () => {
     expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
   });
 
+  it("OCR fallido en la relectura: vuelve a ok con aviso, sin rejection muda", async () => {
+    vi.useFakeTimers();
+    const { deps } = depsGiro();
+    const c = sembrar();
+    await girarYReleer(c.id, 90, deps);
+    vi.mocked(extraerTexto).mockRejectedValueOnce(new Error("ocr caído"));
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(c.estado).toBe("ok"); // no queda atascada en procesando
+    expect(c.textoOcr).toBe("VIEJO");
+    expect(document.getElementById("aviso")?.textContent).toBe(
+      "No se pudo releer el texto girado.",
+    );
+  });
+
   it("doble giro rápido: 2 giros al instante + 1 solo OCR", async () => {
     vi.useFakeTimers();
     const { creados, deps } = depsGiro();

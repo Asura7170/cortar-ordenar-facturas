@@ -29,9 +29,9 @@ function avisar(texto: string): void {
 export async function girarYReleer(id: number, grados: GiroManual, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
   if (!item || item.estado !== "ok") return;
-  // ponytail: cadena por item (sin carreras entre pulsaciones rápidas).
+  // ponytail: cadena tolerante (un turno fallido no envenena los siguientes).
   const anterior = girosEnCurso.get(id) ?? Promise.resolve();
-  const turno = anterior.then(() => girar(id, grados, deps));
+  const turno = anterior.catch(() => {}).then(() => girar(id, grados, deps));
   girosEnCurso.set(id, turno);
   try {
     await turno;
@@ -44,9 +44,10 @@ export async function girarYReleer(id: number, grados: GiroManual, deps?: DepsOc
 async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
   if (!item || item.estado !== "ok") return;
-  // ponytail: render dinámico (sheets importa este módulo: estático sería ciclo).
-  const { renderHojas } = await import("../ui/sheets");
+  // ponytail: render dinámico dentro del try (sheets importa este módulo:
+  // estático sería ciclo; fuera del try un chunk fallido era rejection muda).
   try {
+    const { renderHojas } = await import("../ui/sheets");
     const cargar = deps?.cargar ?? cargarReal;
     const crear = deps?.crear ?? crearReal;
     const original = item.file ?? (await (await fetch(item.imgUrl)).blob());
@@ -86,22 +87,31 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
 async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
   if (!item || !buscarSlot(id)) return;
-  const { renderHojas } = await import("../ui/sheets");
-  item.estado = "procesando";
-  renderHojas();
-  const ocr = await import("./ocr").catch((): null => null);
-  if (buscarSlot(id)) item.textoOcr = sanear(ocr ? await ocr.extraerTexto(blob, deps) : "");
-  // ponytail: ok ANTES del lote (candidatos exige ok: en procesando se autoexcluía).
-  if (buscarSlot(id)) {
-    item.estado = "ok";
+  try {
+    const { renderHojas } = await import("../ui/sheets");
+    item.estado = "procesando";
     renderHojas();
-  }
-  // No-manual: el total se reabre y el lote lo relee (pelado: silencioso y
-  // respeta la cola activa; el drenado lo levanta si aquella trabaja).
-  // El lote pinta solo si aplica (el ok + texto ya quedaron pintados arriba).
-  if (!item.montoManual && buscarSlot(id)) {
-    item.montoCents = null;
-    const mod = await import("./extract").catch((): null => null);
-    await Promise.resolve(mod?.extraerPendientes()).catch(() => {});
+    const ocr = await import("./ocr").catch((): null => null);
+    if (buscarSlot(id)) item.textoOcr = sanear(ocr ? await ocr.extraerTexto(blob, deps) : "");
+    // ponytail: ok ANTES del lote (candidatos exige ok: en procesando se autoexcluía).
+    if (buscarSlot(id)) {
+      item.estado = "ok";
+      renderHojas();
+    }
+    // No-manual: el total se reabre y el lote lo relee (pelado: silencioso y
+    // respeta la cola activa; el drenado lo levanta si aquella trabaja).
+    // El lote pinta solo si aplica (el ok + texto ya quedaron pintados arriba).
+    if (!item.montoManual && buscarSlot(id)) {
+      item.montoCents = null;
+      const mod = await import("./extract").catch((): null => null);
+      await Promise.resolve(mod?.extraerPendientes()).catch(() => {});
+    }
+  } catch {
+    // ponytail: sin relectura la celda vuelve a ok (el giro ya quedó pintado).
+    if (buscarSlot(id)) {
+      item.estado = "ok";
+      await import("../ui/sheets").then((m) => m.renderHojas()).catch(() => {});
+    }
+    avisar("No se pudo releer el texto girado.");
   }
 }

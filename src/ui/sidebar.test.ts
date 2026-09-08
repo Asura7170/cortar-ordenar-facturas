@@ -227,6 +227,22 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(a.slots.some((c) => c?.nombre === "a.png")).toBe(true);
   });
+
+  it("cancelar el diálogo limpia la hoja pedida (el próximo intake es automático)", async () => {
+    const a = crearHoja();
+    const b = crearHoja();
+    state.hojas.push(a, b);
+    elegirArchivos(b.id);
+    fileInput.dispatchEvent(new Event("cancel", { bubbles: true }));
+    Object.defineProperty(fileInput, "files", {
+      value: [archivo("c.png", "image/png")],
+      configurable: true,
+    });
+    fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(a.slots.some((c) => c?.nombre === "c.png")).toBe(true);
+    expect(b.slots.every((c) => c === null)).toBe(true);
+  });
 });
 
 describe("gate PDF (tamaño + páginas)", () => {

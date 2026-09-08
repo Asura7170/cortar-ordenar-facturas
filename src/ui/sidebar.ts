@@ -204,6 +204,11 @@ export function initSidebar(): void {
     hojaPedida = null;
     fileInput.value = "";
   });
+  // Cancelar el diálogo no dispara change: sin esto la hoja pedida queda
+  // rancia y el próximo intake (tarjeta, drop, paste) cae en la hoja vieja.
+  fileInput.addEventListener("cancel", () => {
+    hojaPedida = null;
+  });
   // Entrada a nivel canvas: cualquier punto del área (fondo, tarjeta, botón)
   // acepta archivos; sobre una hoja manda sheets.ts con su hojaId.
   // La entrada nunca se bloquea por el modo OCR (solo el reordenamiento).
@@ -289,6 +294,7 @@ export function initSidebar(): void {
   // ejecuta el vaciado si se confirmó. Esc/backdrop/Cancelar → returnValue ''.
   modalLimpiar.addEventListener("close", () => {
     if (modalLimpiar.returnValue !== "ok") return;
+    hojaPedida = null; // la hoja destino pudo dejar de existir
     for (const h of state.hojas)
       for (const c of itemsDe(h)) {
         URL.revokeObjectURL(c.imgUrl);
