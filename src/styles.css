@@ -124,6 +124,11 @@
   padding: 0;
 }
 
+/* El display de componentes (flex/block) pisa el [hidden] del UA: guardia global. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -287,9 +292,49 @@ select {
   background: color-mix(in srgb, var(--sello) 8%, transparent);
   box-shadow: var(--anillo);
 }
-.dropzone.dragover {
+/* Tarjeta grande de subida: la dropzone del sidebar, agrandada al canvas.
+   Mismo lenguaje (papel + renglones de hoja), centrada en el área vacía. */
+.dropzone-grande {
+  max-width: 560px;
+  margin: 9vh auto;
+  padding: 52px 36px;
+  background: var(--papel);
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--renglon-fuerte) 16%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 100% 34px;
+  box-shadow: var(--sombra-hoja);
+  color: var(--tinta);
+}
+.dropzone-grande:hover,
+.dropzone-grande:focus-visible {
   border-color: var(--renglon-fuerte);
-  background: color-mix(in srgb, var(--renglon-fuerte) 12%, transparent);
+  background-color: var(--papel-brillo);
+  box-shadow: var(--sombra-hoja), var(--anillo);
+}
+.dropzone-grande .dz-ico {
+  font-size: 64px;
+  color: var(--verde-tinta);
+}
+.dropzone-grande .dz-titulo {
+  display: block;
+  margin-top: 12px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--tinta);
+  text-wrap: balance;
+}
+.dropzone-grande .dz-txt {
+  font-size: 14px;
+  color: var(--tinta-suave);
+  max-width: 40ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+.dropzone-grande .dz-fmt {
+  color: var(--tinta-suave);
+  border-color: var(--renglon);
 }
 .dz-ico {
   font-size: 26px;
@@ -301,11 +346,6 @@ select {
   font-size: 13px;
   color: var(--texto-panel);
   text-wrap: pretty;
-}
-.dz-sub {
-  font-size: 11px;
-  color: var(--texto-panel-suave);
-  margin-top: 2px;
 }
 .dz-fmt {
   display: inline-block;
@@ -519,6 +559,25 @@ input::placeholder {
   background: var(--mesa-oscura);
   scrollbar-width: thin;
   scrollbar-color: var(--texto-panel-suave) transparent;
+  position: relative;
+}
+/* Overlay de arrastre: velo + marco discontinuo sobre todo el canvas. */
+.canvas.arrastrando::after {
+  content: "Soltá los archivos para subirlos";
+  position: absolute;
+  inset: 12px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 24px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--texto-panel);
+  background: color-mix(in srgb, var(--renglon-fuerte) 18%, transparent);
+  border: 4px dashed var(--renglon-fuerte);
+  border-radius: var(--radio);
+  pointer-events: none;
+  z-index: 5;
 }
 .canvas-head {
   display: flex;
@@ -543,6 +602,13 @@ input::placeholder {
   flex-direction: column;
   align-items: center;
   gap: 30px;
+}
+/* Avisos de entrada bajo el head del canvas; vacío no ocupa lugar. */
+.hint-canvas {
+  margin: 0 0 12px;
+}
+.hint-canvas:empty {
+  display: none;
 }
 
 .sheet {
@@ -583,8 +649,6 @@ input::placeholder {
   width: min(1054px, 100%);
 }
 .sheet-panel {
-  width: 224px;
-  flex-shrink: 0;
   background: var(--panel-claro);
   border: 1px solid var(--borde-panel);
   border-radius: var(--radio);
@@ -597,6 +661,48 @@ input::placeholder {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--texto-panel-suave) transparent;
+}
+/* Columna derecha de la hoja: panel arriba, botón de agregar debajo. */
+.sheet-side {
+  width: 224px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Botón ＋ por hoja: sólido en reposo; en hover se vuelve fantasma
+   discontinuo (mismo lenguaje que el overlay de arrastre del canvas). */
+.btn-sumar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--verde-tinta);
+  background: var(--papel);
+  border: 2px solid var(--verde-tinta);
+  border-radius: var(--radio);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-style 0.15s;
+}
+.btn-sumar:hover,
+.btn-sumar:focus-visible {
+  color: light-dark(var(--verde-tinta), var(--monto-valor));
+  background: transparent;
+  border-style: dashed;
+  border-color: light-dark(var(--verde-tinta), var(--monto-valor));
+}
+.btn-sumar-mas {
+  font-size: 20px;
+  line-height: 1;
 }
 .sheet-panel-head {
   display: flex;
@@ -1122,25 +1228,6 @@ body.is-dragging .cell:not(.empty) {
   .modal::backdrop {
     transition: none;
   }
-}
-
-/* ============ EMPTY STATE ============ */
-.empty-state {
-  text-align: center;
-  color: var(--texto-panel-suave);
-  padding: 60px 20px;
-  max-width: 420px;
-  margin: 0 auto;
-}
-.empty-state h2 {
-  font-size: 20px;
-  color: var(--texto-panel);
-  margin-bottom: 8px;
-}
-.empty-state p {
-  font-size: 14px;
-  line-height: 1.6;
-  text-wrap: pretty;
 }
 
 /* ============ MOVIMIENTO REDUCIDO ============ */

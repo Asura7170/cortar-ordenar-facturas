@@ -1,6 +1,6 @@
 /* Tests P1: hojas — layouts, quitar, clic delegado, drop y celdas (DOM aislado). */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { montarFixture, eventoDrop, eventoDragover } from "../test/fixture";
+import { montarFixture, el, eventoDrop, eventoDragover } from "../test/fixture";
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -17,11 +17,13 @@ const { archivo, comprobante } = await import("../test/factoria");
 import type { Comprobante, Hoja, LayoutId } from "../types";
 
 const agregarArchivos = vi.fn();
-initSheets({ agregarArchivos });
+const pedirArchivos = vi.fn();
+initSheets({ agregarArchivos, pedirArchivos });
 
 afterEach(() => {
   vi.restoreAllMocks();
   agregarArchivos.mockClear();
+  pedirArchivos.mockClear();
 });
 
 /** Siembra una hoja con montos (null = casilla vacía) y la pinta. */
@@ -95,7 +97,17 @@ describe("clic delegado", () => {
     sembrar("u4x2", [100]);
     boton("quitar").click();
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(0);
-    expect(document.querySelector(".empty-state")).not.toBeNull();
+    expect(el("dropzone").hidden).toBe(false);
+  });
+
+  it("cada hoja tiene su ＋ debajo del panel y pide archivos para esa hoja", () => {
+    const h = sembrar("u4x2", [100]);
+    const btn = document.querySelector<HTMLButtonElement>('.btn-sumar[data-accion="agregar"]');
+    expect(btn?.dataset["hoja"]).toBe(String(h.id));
+    expect(btn?.closest(".sheet-side")).not.toBeNull();
+    expect(btn?.previousElementSibling?.classList.contains("sheet-panel")).toBe(true);
+    btn?.click();
+    expect(pedirArchivos).toHaveBeenCalledWith(h.id);
   });
 
   it("tarjeta de layout cambia la plantilla", () => {
@@ -302,13 +314,16 @@ describe("drop de archivos sobre hojas", () => {
     expect(agregarArchivos).toHaveBeenCalledWith(files, h.id);
   });
 
-  it("en modo OCR el drop se bloquea", () => {
+  it("en modo OCR el drop sigue activo (la entrada nunca se bloquea)", () => {
     state.modoOcr = true;
-    sembrar("u4x2", [100]);
-    document
-      .querySelector(".sheet")
-      ?.dispatchEvent(eventoDrop([new File(["x"], "d.png", { type: "image/png" })]));
-    expect(agregarArchivos).not.toHaveBeenCalled();
+    try {
+      const h = sembrar("u4x2", [100]);
+      const files = [new File(["x"], "d.png", { type: "image/png" })];
+      document.querySelector(".sheet")?.dispatchEvent(eventoDrop(files));
+      expect(agregarArchivos).toHaveBeenCalledWith(files, h.id);
+    } finally {
+      state.modoOcr = false;
+    }
   });
 
   it("dragover con Files resalta la hoja; sin Files no", () => {

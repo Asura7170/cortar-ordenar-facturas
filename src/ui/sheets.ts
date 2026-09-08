@@ -14,6 +14,8 @@ import { getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
 const metaHojas: HTMLElement = getEl("metaHojas");
+// Tarjeta de subida: visible solo con cero comprobantes.
+const tarjetaVacia: HTMLElement = getEl("dropzone");
 const canvasEl: HTMLElement | null = document.querySelector(".canvas");
 
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
@@ -172,11 +174,8 @@ export function renderHojas(): void {
     sheetsEl.innerHTML = "";
 
     if (n === 0) {
-      sheetsEl.innerHTML = `
-        <div class="empty-state">
-          <h2>Comenzá pegando tus comprobantes</h2>
-          <p>Usá <strong>Ctrl+V</strong>, arrastrá imágenes o hacé clic en el cuadro de entrada. Cada comprobante se recorta, se lee su texto y se suma su total.</p>
-        </div>`;
+      sheetsEl.innerHTML = "";
+      tarjetaVacia.hidden = false;
       renderMonto();
       return;
     }
@@ -200,8 +199,28 @@ export function renderHojas(): void {
       row.dataset["hoja"] = String(hoja.id);
       row.innerHTML = panelHoja(hoja, idx);
       row.insertBefore(sheet, row.firstChild);
+      // Columna derecha: panel arriba, botón de agregar debajo (misma columna).
+      const lado = document.createElement("div");
+      lado.className = "sheet-side";
+      const panel = row.querySelector(".sheet-panel");
+      if (panel) lado.append(panel);
+      const mas = document.createElement("button");
+      mas.type = "button";
+      mas.className = "btn-sumar";
+      mas.dataset["accion"] = "agregar";
+      mas.dataset["hoja"] = String(hoja.id);
+      mas.title = `Agregar comprobantes a la hoja ${idx + 1}`;
+      mas.setAttribute("aria-label", `Agregar comprobantes a la hoja ${idx + 1}`);
+      const ico = document.createElement("span");
+      ico.className = "btn-sumar-mas";
+      ico.setAttribute("aria-hidden", "true");
+      ico.textContent = "＋";
+      mas.append(ico, " Agregar factura");
+      lado.append(mas);
+      row.append(lado);
       sheetsEl.append(row);
     });
+    tarjetaVacia.hidden = true;
     renderMonto();
   };
   // ponytail: sin ViewTransition con reduced-motion ni durante la carga
@@ -512,6 +531,7 @@ function finalizarDrag(x: number, y: number): void {
 
 export interface SheetsCallbacks {
   agregarArchivos: (files: FileList | File[] | null | undefined, hojaId?: number | null) => void;
+  pedirArchivos: (hojaId: number) => void;
 }
 
 export function initSheets(cb: SheetsCallbacks): void {
@@ -636,6 +656,11 @@ export function initSheets(cb: SheetsCallbacks): void {
       case "apply-all":
         aplicarATodas(btn.dataset["hoja"] ?? "");
         return;
+      case "agregar": {
+        const destino = Number(btn.dataset["hoja"]);
+        if (Number.isInteger(destino)) cb.pedirArchivos(destino);
+        return;
+      }
     }
   });
 
@@ -658,8 +683,9 @@ export function initSheets(cb: SheetsCallbacks): void {
   });
 
   // Drag nativo de archivos del explorador (DataTransfer) sobre las hojas.
+  // La entrada nunca se bloquea por el modo OCR (solo el reordenamiento).
   sheetsEl.addEventListener("dragover", (e) => {
-    if (!esDragDeArchivos(e) || state.modoOcr) return;
+    if (!esDragDeArchivos(e)) return;
     e.preventDefault();
     autoScroll(e.clientX, e.clientY);
     const target = e.target as HTMLElement | null;
@@ -684,7 +710,6 @@ export function initSheets(cb: SheetsCallbacks): void {
   sheetsEl.addEventListener("drop", (e) => {
     if (!esDragDeArchivos(e)) return;
     e.preventDefault();
-    if (state.modoOcr) return;
     const target = e.target as HTMLElement | null;
     const sheet = target?.closest?.(".sheet");
     cancelarDragVisual();

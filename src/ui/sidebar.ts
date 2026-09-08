@@ -1,4 +1,5 @@
-/* Sidebar: entrada (dropzone/pegar/subir), código de pedido y limpiar. */
+/* Sidebar: código de pedido, limpiar y reintento IA. La entrada vive en el
+   canvas (tarjeta grande + drop en el área): acá solo se cablea. */
 import {
   borrarCodigo,
   crearHoja,
@@ -10,7 +11,7 @@ import {
 import type { Comprobante } from "../types";
 import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
-import { renderHojas } from "./sheets";
+import { esDragDeArchivos, renderHojas } from "./sheets";
 import { precalentarModelos, procesarCola } from "../pipeline/queue";
 import { extraerPendientes } from "../pipeline/extract";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
@@ -18,7 +19,7 @@ import type { MotivoRechazo, PaginaPdf } from "../pipeline/pdf";
 import { normalizarImagen } from "../pipeline/imagen";
 import { getEl, sanear } from "../utils";
 
-const dropzone: HTMLElement = getEl("dropzone");
+const canvas: HTMLElement = getEl("canvas");
 const fileInput: HTMLInputElement = getEl<HTMLInputElement>("fileInput");
 const chkCodigo: HTMLInputElement = getEl<HTMLInputElement>("chkCodigo");
 const numCodigo: HTMLInputElement = getEl<HTMLInputElement>("numCodigo");
@@ -175,23 +176,65 @@ export function renderCodigo(): void {
     : "Código";
 }
 
+/** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
+let hojaPedida: number | null = null;
+
+/** Abre el diálogo para subir directo a una hoja (la consume el change). */
+export function elegirArchivos(hojaId: number): void {
+  hojaPedida = hojaId;
+  if (typeof fileInput.showPicker === "function") fileInput.showPicker();
+  else fileInput.click();
+}
+
 export function initSidebar(): void {
   // ponytail: label[for] nativo ya abre el diálogo con Enter/Espacio; sin keydown manual.
   fileInput.addEventListener("change", () => {
-    void agregarArchivos(fileInput.files);
+    void agregarArchivos(fileInput.files, hojaPedida);
+    hojaPedida = null;
     fileInput.value = "";
   });
-  dropzone.addEventListener("dragover", (e) => {
+  // Entrada a nivel canvas: cualquier punto del área (fondo, tarjeta, botón)
+  // acepta archivos; sobre una hoja manda sheets.ts con su hojaId.
+  // La entrada nunca se bloquea por el modo OCR (solo el reordenamiento).
+  // Contador dragenter/dragleave: sin esto el overlay parpadea por cada hijo.
+  let arrastres = 0;
+  const marcar = (n: number): void => {
+    arrastres = Math.max(0, n);
+    canvas.classList.toggle("arrastrando", arrastres > 0);
+  };
+  // Head-start: entrar al canvas anticipa la intención (una sola vez).
+  canvas.addEventListener("pointerenter", () => precalentarModelos(), { once: true });
+  canvas.addEventListener("dragenter", (e) => {
+    if (!esDragDeArchivos(e)) return;
     e.preventDefault();
-    dropzone.classList.add("dragover");
+    marcar(arrastres + 1);
   });
-  // Head-start: el hover sobre la zona anticipa la intención (una sola vez).
-  dropzone.addEventListener("pointerenter", () => precalentarModelos(), { once: true });
-  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
-  dropzone.addEventListener("drop", (e) => {
+  canvas.addEventListener("dragover", (e) => {
+    if (!esDragDeArchivos(e)) return;
     e.preventDefault();
-    dropzone.classList.remove("dragover");
+  });
+  canvas.addEventListener("dragleave", (e) => {
+    if (!esDragDeArchivos(e)) return;
+    marcar(arrastres - 1);
+  });
+  canvas.addEventListener("drop", (e) => {
+    marcar(0);
+    if (!esDragDeArchivos(e)) return;
+    e.preventDefault();
+    if ((e.target as HTMLElement | null)?.closest?.(".sheet")) return;
     void agregarArchivos(e.dataTransfer?.files);
+  });
+  // Red de seguridad: un drop fallado fuera del canvas no navega el navegador
+  // (perdería el lote en memoria). Fuera del canvas no se sube nada.
+  window.addEventListener("dragover", (e) => {
+    if (esDragDeArchivos(e)) e.preventDefault();
+  });
+  window.addEventListener("drop", (e) => {
+    marcar(0);
+    if (esDragDeArchivos(e)) e.preventDefault();
+  });
+  document.addEventListener("dragleave", (e) => {
+    if (e.relatedTarget === null) marcar(0); // el arrastre salió de la ventana
   });
   document.addEventListener("paste", (e) => {
     const files = Array.from(e.clipboardData?.items ?? [])

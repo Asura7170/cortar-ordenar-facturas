@@ -1,6 +1,13 @@
 /* Tests P1: sidebar — entrada de archivos, código de pedido y limpiar (DOM aislado). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { montarFixture, el, eventoDrop, eventoDragover, eventoPaste } from "../test/fixture";
+import {
+  montarFixture,
+  el,
+  eventoDrop,
+  eventoDragenter,
+  eventoDragleave,
+  eventoPaste,
+} from "../test/fixture";
 import type { PaginaPdf } from "../pipeline/pdf";
 
 // El conteo real abre el PDF con pdf.js: stub fijo (cada test lo ajusta).
@@ -34,10 +41,10 @@ vi.mock("../pipeline/pdf", async (importOriginal) => {
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
-const { agregarArchivos, initSidebar, renderCodigo } = await import("./sidebar");
+const { agregarArchivos, elegirArchivos, initSidebar, renderCodigo } = await import("./sidebar");
 const { archivo, comprobante } = await import("../test/factoria");
 
-const dropzone = el("dropzone");
+const canvas = el("canvas");
 const aviso = el("aviso");
 const fileInput = el<HTMLInputElement>("fileInput");
 const chkCodigo = el<HTMLInputElement>("chkCodigo");
@@ -119,7 +126,7 @@ describe("agregarArchivos", () => {
   });
 });
 
-describe("fileInput / dropzone / paste", () => {
+describe("fileInput / canvas / paste", () => {
   it("change del input agrega y resetea el value", async () => {
     Object.defineProperty(fileInput, "files", {
       value: [archivo("in.png", "image/png")],
@@ -131,18 +138,42 @@ describe("fileInput / dropzone / paste", () => {
     expect(fileInput.value).toBe("");
   });
 
-  it("dragover marca la zona y previene el default; dragleave limpia", () => {
-    dropzone.dispatchEvent(eventoDragover());
-    expect(dropzone.classList.contains("dragover")).toBe(true);
-    dropzone.dispatchEvent(new Event("dragleave", { bubbles: true }));
-    expect(dropzone.classList.contains("dragover")).toBe(false);
+  it("dragenter con Files marca el canvas; dragleave limpia (contador)", () => {
+    canvas.dispatchEvent(eventoDragenter());
+    canvas.dispatchEvent(eventoDragenter()); // anidado: sigue marcado
+    expect(canvas.classList.contains("arrastrando")).toBe(true);
+    canvas.dispatchEvent(eventoDragleave());
+    expect(canvas.classList.contains("arrastrando")).toBe(true);
+    canvas.dispatchEvent(eventoDragleave());
+    expect(canvas.classList.contains("arrastrando")).toBe(false);
   });
 
-  it("drop agrega los archivos y limpia la marca", async () => {
-    dropzone.classList.add("dragover");
-    dropzone.dispatchEvent(eventoDrop([archivo("d.png", "image/png")]));
+  it("sin Files no hay overlay ni preventDefault", () => {
+    const e = eventoDragenter(["text/plain"]);
+    canvas.dispatchEvent(e);
+    expect(canvas.classList.contains("arrastrando")).toBe(false);
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  it("en modo OCR la entrada sigue activa (overlay y subida)", async () => {
+    state.modoOcr = true;
+    try {
+      canvas.dispatchEvent(eventoDragenter());
+      expect(canvas.classList.contains("arrastrando")).toBe(true);
+      canvas.dispatchEvent(eventoDrop([archivo("o.png", "image/png")]));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
+    } finally {
+      state.modoOcr = false;
+    }
+  });
+
+  it("drop en el canvas agrega y limpia la marca", async () => {
+    canvas.classList.add("arrastrando");
+    // La tarjeta burbujea al canvas (igual que el fondo del área).
+    el("dropzone").dispatchEvent(eventoDrop([archivo("d.png", "image/png")]));
     await vi.advanceTimersByTimeAsync(0); // el intake ahora es async
-    expect(dropzone.classList.contains("dragover")).toBe(false);
+    expect(canvas.classList.contains("arrastrando")).toBe(false);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
   });
 
@@ -152,6 +183,49 @@ describe("fileInput / dropzone / paste", () => {
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
     document.dispatchEvent(new Event("paste", { bubbles: true }));
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
+  });
+});
+
+describe("elegirArchivos (botón ＋ por hoja)", () => {
+  it("usa showPicker si existe", () => {
+    const show = vi.fn();
+    Object.defineProperty(fileInput, "showPicker", { value: show, configurable: true });
+    try {
+      elegirArchivos(7);
+      expect(show).toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(fileInput, "showPicker", { value: undefined, configurable: true });
+    }
+  });
+
+  it("sin showPicker usa click", () => {
+    Object.defineProperty(fileInput, "showPicker", { value: undefined, configurable: true });
+    const click = vi.spyOn(fileInput, "click").mockImplementation(() => {});
+    elegirArchivos(7);
+    expect(click).toHaveBeenCalled();
+  });
+
+  it("el change sube a la hoja pedida y resetea la pendiente", async () => {
+    const a = crearHoja();
+    const b = crearHoja();
+    state.hojas.push(a, b);
+    elegirArchivos(b.id); // sin showPicker en jsdom: click sin diálogo
+    Object.defineProperty(fileInput, "files", {
+      value: [archivo("h.png", "image/png")],
+      configurable: true,
+    });
+    fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(b.slots.some((c) => c?.nombre === "h.png")).toBe(true);
+    expect(a.slots.every((c) => c === null)).toBe(true);
+    // Pendiente consumida: el siguiente change vuelve a automático.
+    Object.defineProperty(fileInput, "files", {
+      value: [archivo("a.png", "image/png")],
+      configurable: true,
+    });
+    fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(a.slots.some((c) => c?.nombre === "a.png")).toBe(true);
   });
 });
 

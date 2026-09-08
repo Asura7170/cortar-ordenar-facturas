@@ -56,20 +56,6 @@
       <div class="workspace">
         <!-- Sidebar -->
         <aside class="sidebar">
-          <section class="panel panel-entrada" aria-labelledby="tituloEntrada">
-            <header class="panel-head">
-              <h2 class="panel-title" id="tituloEntrada">Entrada</h2>
-            </header>
-            <label class="dropzone" id="dropzone" for="fileInput" tabindex="0">
-              <span class="dz-ico">＋</span>
-              <p class="dz-txt"><strong>Pegar / Subir / Arrastrar</strong></p>
-              <p class="dz-sub">Ctrl+V · clic · arrastrar</p>
-              <span class="dz-fmt">JPG · PNG · WEBP · PDF</span>
-            </label>
-            <input type="file" id="fileInput" multiple accept="image/*,.pdf" hidden />
-            <p class="hint" id="aviso" role="status"></p>
-          </section>
-
           <section class="panel panel-codigo" aria-labelledby="tituloCodigo">
             <header class="panel-head">
               <h2 class="panel-title" id="tituloCodigo">Código de pedido</h2>
@@ -125,15 +111,26 @@
           </section>
         </aside>
 
-        <!-- Área principal -->
-        <main class="canvas">
+        <!-- Área principal: también zona de subida (drop en el canvas) -->
+        <main class="canvas" id="canvas">
           <div class="canvas-head">
             <h2 class="canvas-titulo">Hojas</h2>
             <span class="canvas-meta" id="metaHojas">0 hojas</span>
           </div>
+          <p class="hint hint-canvas" id="aviso" role="status"></p>
           <div class="sheets" id="sheets">
             <!-- <article class="sheet">... generado por JS ...</article> -->
           </div>
+          <label class="dropzone dropzone-grande" id="dropzone" for="fileInput" tabindex="0">
+            <span class="dz-ico" aria-hidden="true">＋</span>
+            <span class="dz-titulo">Subí tus comprobantes</span>
+            <span class="dz-txt"
+              >Arrastrá archivos a esta área, pegalos con <strong>Ctrl+V</strong> o hacé clic para
+              buscarlos</span
+            >
+            <span class="dz-fmt">JPG · PNG · WEBP · PDF</span>
+          </label>
+          <input type="file" id="fileInput" multiple accept="image/*,.pdf" hidden />
         </main>
       </div>
     </div>
