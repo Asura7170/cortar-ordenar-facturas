@@ -555,9 +555,6 @@ input::placeholder {
 .panel-ocr .btn-block {
   margin-top: 10px;
 }
-.panel-ocr .hint {
-  margin: 8px 0 0;
-}
 /* Extraer montos: fantasma tan como Word/PDF/Imprimir. En claro el tan
    puro no llega a AA, así que va un marrón tostado (tan queda en oscuro,
    igual que .ocr-estado). */
