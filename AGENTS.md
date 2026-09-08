@@ -31,7 +31,7 @@ src/types.ts        # tipos de dominio (Comprobante, Hoja, EstadoApp). Solo tipo
 src/state.ts        # estado global + localStorage + ops puras (redistribuir, limpiarHojas)
 src/ui/             # layout, sidebar, sheets, monto, ocrMode, settingsModal
 src/pipeline/       # docaligner.ts (DocAligner heatmap/lcnet100 + borde negro 100px + warp canvas, fallback completa; EPs con timeout 30s + latch, nunca cuelga la cola) + queue.ts (recorte real + OCR real, auto IA en lote al drenar) + pdf.ts (gate PDF ≤10p/≤5MB con aviso + fan-out 1 página=1 comprobante, omite blancas) + ocr.ts (det+rec+enderezar reales) + extract.ts (LLM lote único texto→cents, solo null; sin key/monto manual)
-src/export/docx.ts  # STUB: descarga .txt con nombre final. docx.js real va acá
+src/export/salidas.ts  # Word real (docx: N-up flotante + footer) + PDF/Imprimir pendientes; gate y nombre comunes
 spec.md             # spec del pipeline objetivo (DocAligner → PaddleOCR → LLM → docx). Fuente de verdad del diseño
 public/models/      # lcnet100_h_e_bifpn_256_fp32.onnx vendoreado (Apache-2.0) + NOTICE.txt. No va por CDN (COEP require-corp)
 public/ort/         # par asyncify onnxruntime-web copiado de node_modules (el build webgpu lo exige; los nombres cambian por minor). Excluido de formato (.prettierignore). En dev lo sirve en crudo el middleware servir-ort-crudo (vite prohíbe import() desde /public)

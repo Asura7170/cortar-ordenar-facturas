@@ -5,13 +5,11 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import { PDF_MAX_BYTES, admitirPdf, admiteTamanoPdf, contarPaginasPdf, expandirPdf } from "./pdf";
 
-/** Mínimo de node:fs usado (sin @types/node a propósito: cero deps nuevas). */
+/** Mínimo de node:fs usado (tipos vía @types/node, transitivo de docx). */
 const fs: { existsSync: (ruta: string) => boolean; readFileSync: (ruta: string) => Uint8Array } =
-  // @ts-expect-error sin tipos de node en el proyecto; vitest sí trae el runtime.
   await import("node:fs");
 
 // import.meta.url bajo vite-node no es file://; dirname sí trae ruta real.
-// @ts-expect-error sin @types/node en el proyecto; en runtime existe.
 const DIRNAME: string = import.meta.dirname;
 const DIR = `${DIRNAME}/../../archivos-test/pdf-test`;
 const HAY: boolean = fs.existsSync(DIR);

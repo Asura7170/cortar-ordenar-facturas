@@ -4,7 +4,7 @@ import { initSheets } from "./ui/sheets";
 import { agregarArchivos, elegirArchivos, initSidebar, renderCodigo } from "./ui/sidebar";
 import { initOcrMode, renderOcrToggle } from "./ui/ocrMode";
 import { initSettings } from "./ui/settingsModal";
-import { initExport } from "./export/docx";
+import { initExport } from "./export/salidas";
 import { renderHojas } from "./ui/sheets";
 import { getEl } from "./utils";
 
