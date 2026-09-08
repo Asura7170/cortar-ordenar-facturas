@@ -4,7 +4,7 @@ App frontend-only, Chrome-only. TypeScript + Vite+ (toolchain VoidZero: Vite 8, 
 
 ## Resumen
 
-Pegar/subir/arrastrar imágenes y PDFs → recorte DocAligner (heatmap/lcnet100 vía onnxruntime-web + warp en canvas) → OCR con PaddleOCR (PP-OCRv6_small) → extracción de TOTAL con LLM openai-compatible (o monto manual) → grilla carta N-up (default 4, arrastre libre tipo Word) → exportar .docx con footer derecho (código de pedido).
+Pegar/subir/arrastrar imágenes y PDFs → recorte DocAligner (heatmap/lcnet100 vía onnxruntime-web + warp en canvas) → OCR con PaddleOCR (PP-OCRv6_small) → extracción de TOTAL con LLM openai-compatible (o monto manual) → grilla carta N-up (default 4, arrastre libre tipo Word) → salidas Word (.docx) / PDF (print-to-PDF) / Imprimir, con footer (código de pedido).
 
 ## Estructura / esqueleto
 
@@ -35,13 +35,12 @@ facturas/
    │  ├─ extract.ts        # LLM openai-compatible: texto OCR → {total, currency}
    │  └─ queue.ts          # cola secuencial FIFO, estado por item (procesando/OK/error)
    └─ export/
-      ├─ docx.ts           # docx.js: N hojas, imágenes flotantes (EMU página, wrap SQUARE), footer
-      └─ filename.ts       # {codigo}-comprobante.docx
+      └─ salidas.ts        # Word (.docx vía docx: EMU + wrap SQUARE + footer) + PDF (print-to-PDF) + Imprimir (window.print); gate y nombre comunes
 ```
 
 ## Decisiones (AC)
 
-- **Código pedido:** check on/off + input N (solo dígitos), ambos persisten en localStorage; esquina elegida (default inferior derecha) en todas las hojas del .docx; check activo con < N dígitos → bloquear descarga con mensaje.
+- **Código pedido:** check on/off + input N (solo dígitos), ambos persisten en localStorage; esquina elegida (default inferior derecha) en todas las hojas de cada salida; check activo con < N dígitos → bloquear la salida con mensaje.
 - **Monto:** 1 TOTAL por comprobante; suma exacta en cents (sin float); badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); LLM sin TOTAL → campo manual en tarjeta (sí suma).
 - **Limpiar:** borra comprobantes, montos y textos OCR; conserva check, N, y configuración IA/moneda.
 - **Recorte:** DocAligner heatmap/lcnet100 vendoreado (`public/models/`, Apache-2.0, ver NOTICE.txt); foto con borde negro 100px (receta del demo: extrapola esquinas cortadas), inferencia onnxruntime-web (WebGPU→WASM, `public/ort/`), warp por homografía en canvas con fondo blanco; sin 4 esquinas plausibles (conf ≥0.3, área 5–98%, convexo) → imagen completa, la cola sigue. Sin config de modelo en UI.
@@ -51,8 +50,11 @@ facturas/
 - **Grilla:** N por hoja default 4; arrastre libre dentro de la hoja (posiciones % página, z-order), NO cambia el orden de inserción; X elimina comprobante completo; scroll vertical, hojas ajustadas al ancho.
 - **OCR modal:** solo lectura, select por comprobante, botón copiar; texto usado solo por el LLM.
 - **IA:** modal ajustes (baseURL, apiKey en localStorage, model por defecto gpt-4o-mini); sin config → monto manual; nunca expone la key en el repo.
-- **Word:** docx.js estándar OOXML; imágenes flotantes con posición absoluta en EMU relativa a página + wrap SQUARE; footer derecho en todas las hojas; un solo archivo `{codigo}-comprobante.docx`; validar en Word y LibreOffice.
-- **Dev/Prod:** `pnpm dev` (vp dev --open, COOP/COEP en vite.config para WASM threads); `pnpm build` (vp build) → `dist/` para producción; `vp check` (lint+formato+tipos), tests con binario `vitest` local (ver AGENTS.md: `vp test` roto en vp 0.3.0 con pnpm/jsdom).
+- **Salidas (Word / PDF / Imprimir):** una sola fuente (`state.hojas` + layout + `codigoPosicion`: la vista previa carta es lo que sale); gate común (`codigoValido()` + ≥1 comprobante, si no → bloquear + mensaje); nombre `{codigo}-comprobante.{docx|pdf}` (`sincodigo-` sin código).
+- **Word:** `docx` (npm, dep aprobada) OOXML estándar; imágenes flotantes con posición absoluta en EMU relativa a página + wrap SQUARE; footer en `codigoPosicion` en todas las hojas; validar en Word y LibreOffice. (STUB actual descarga `.txt`: la implementación real va en `salidas.ts`.)
+- **PDF:** sin deps: print-to-PDF del diálogo de impresión sobre la misma vista; carta, imágenes full-res (no thumbs), footer en `codigoPosicion`.
+- **Imprimir:** sin deps: `window.print()` + `@media print` (oculta sidebar/paneles/botones) + `@page carta`; una `.sheet` = una página.
+- **Dev/Prod:** `pnpm dev` (vp dev --open, COOP/COEP en vite.config para WASM threads); `pnpm build` (vp build) → `dist/` para producción; `vp check` (lint+formato+tipos), tests con binario `vitest` local (ver AGENTS.md: `vp test` roto en vp 0.3.0 con pnpm/jsdom); salidas: `docx` (npm) aprobada como única dep nueva (Word real), PDF/Imprimir sin deps (plataforma).
 
 ## Diagrama de flujo (mermaid)
 
@@ -80,9 +82,11 @@ flowchart TD
     N --> Q["Inserción en hoja carta N-up<br/>default 4 por hoja · scroll vertical"]
     P --> Q
     Q --> R["Arrastre libre por hoja<br/>posiciones % página · orden estable"]
-    R --> S["Botón Descargar Word"]
+    R --> S{"¿Salida?<br/>Word · PDF · Imprimir"}
     S --> T{"Check activo y<br/>N dígitos completos?"}
-    T -- "No" --> T1["Bloquear descarga + mensaje"]
-    T -- "Sí" --> U["docx.js: N hojas · imágenes flotantes<br/>EMU página + wrap SQUARE · footer derecho<br/>todas las hojas · {codigo}-comprobante.docx"]
+    T -- "No" --> T1["Bloquear salida + mensaje"]
+    T -- "Sí" --> U["Word: docx N hojas · flotantes EMU<br/>wrap SQUARE · footer en esquina<br/>{codigo}-comprobante.docx"]
+    T -- "Sí" --> V["PDF: print-to-PDF misma vista<br/>carta · full-res · {codigo}-comprobante.pdf"]
+    T -- "Sí" --> W["Imprimir: window.print<br/>@media print · @page carta<br/>1 sheet = 1 página"]
     B1 --> F
 ```

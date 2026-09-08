@@ -37,6 +37,7 @@ export const FIXTURE_HTML = `
 <button id="btnPdf" type="button"></button>
 <button id="btnImprimir" type="button"></button>
 <button id="btnIA" type="button"></button>
+<div id="zonaPrint" hidden></div>
 `;
 
 /** Monta el fixture (llamar antes del import dinámico del módulo bajo test). */

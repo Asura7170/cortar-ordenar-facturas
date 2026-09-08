@@ -1423,3 +1423,73 @@ body.is-dragging .cell:not(.empty) {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ============ SALIDAS PDF / IMPRIMIR ============ */
+/* La arma salidas.ts en #zonaPrint solo para imprimir: 1 hoja lógica = 1 carta. */
+#zonaPrint {
+  display: none;
+}
+
+@page {
+  size: letter portrait;
+  margin: 0;
+}
+
+@media print {
+  .app {
+    display: none !important;
+  }
+
+  #zonaPrint {
+    display: block;
+  }
+
+  #zonaPrint,
+  #zonaPrint * {
+    print-color-adjust: exact;
+    /* ponytail: prefijo exigido por Chrome para print-color-adjust (ver -webkit-user-drag). */
+    -webkit-print-color-adjust: exact;
+  }
+
+  .hoja-print {
+    display: flex;
+    flex-direction: column;
+    width: 8.5in;
+    height: 11in;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding-left: 0.3in;
+    padding-right: 0.3in;
+    break-inside: avoid;
+    break-after: page;
+  }
+
+  .hoja-print:last-child {
+    break-after: auto;
+  }
+
+  .codigo-print {
+    flex: none;
+    height: 0.3in;
+    line-height: 0.3in;
+    font-size: 10pt;
+  }
+
+  .rejilla-print {
+    flex: 1;
+    display: grid;
+    gap: 0.15in;
+    min-height: 0;
+  }
+
+  .celda-print {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .celda-print img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
