@@ -1,6 +1,11 @@
 /* Tests P1: hojas — layouts, quitar, clic delegado, drop y celdas (DOM aislado). */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { montarFixture, eventoDrop, eventoDragover } from "../test/fixture";
+import { montarFixture, el, eventoDrop, eventoDragover } from "../test/fixture";
+
+// El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
+vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
+// El lote post-corregir no debe pegar a la red en tests.
+vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -14,14 +19,19 @@ const {
   renderHojas,
 } = await import("./sheets");
 const { archivo, comprobante } = await import("../test/factoria");
+const { girarYReleer } = await import("../pipeline/rotar");
+const { extraerPendientes } = await import("../pipeline/extract");
 import type { Comprobante, Hoja, LayoutId } from "../types";
 
 const agregarArchivos = vi.fn();
-initSheets({ agregarArchivos });
+const pedirArchivos = vi.fn();
+initSheets({ agregarArchivos, pedirArchivos });
 
 afterEach(() => {
   vi.restoreAllMocks();
   agregarArchivos.mockClear();
+  pedirArchivos.mockClear();
+  vi.mocked(extraerPendientes).mockClear();
 });
 
 /** Siembra una hoja con montos (null = casilla vacía) y la pinta. */
@@ -95,7 +105,17 @@ describe("clic delegado", () => {
     sembrar("u4x2", [100]);
     boton("quitar").click();
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(0);
-    expect(document.querySelector(".empty-state")).not.toBeNull();
+    expect(el("dropzone").hidden).toBe(false);
+  });
+
+  it("cada hoja tiene su ＋ debajo del panel y pide archivos para esa hoja", () => {
+    const h = sembrar("u4x2", [100]);
+    const btn = document.querySelector<HTMLButtonElement>('.btn-sumar[data-accion="agregar"]');
+    expect(btn?.dataset["hoja"]).toBe(String(h.id));
+    expect(btn?.closest(".sheet-side")).not.toBeNull();
+    expect(btn?.previousElementSibling?.classList.contains("sheet-panel")).toBe(true);
+    btn?.click();
+    expect(pedirArchivos).toHaveBeenCalledWith(h.id);
   });
 
   it("tarjeta de layout cambia la plantilla", () => {
@@ -212,13 +232,14 @@ describe("monto manual", () => {
     expect(document.querySelector("input.cell-monto")).toBeNull();
   });
 
-  it("change válido fija el monto y pinta badge", () => {
+  it("change válido fija el monto, lo marca manual y pinta badge", () => {
     state.moneda = "USD";
     const c = sembrarOk();
     const input = inputMonto();
     input.value = "1234.56";
     input.dispatchEvent(new Event("change", { bubbles: true }));
     expect(c.montoCents).toBe(123456);
+    expect(c.montoManual).toBe(true);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,234.56");
     expect(document.querySelector("input.cell-monto")).toBeNull();
   });
@@ -232,14 +253,16 @@ describe("monto manual", () => {
     expect(document.querySelector("input.cell-monto")).not.toBeNull();
   });
 
-  it("clic en badge vuelve a input (corregir-monto)", () => {
+  it("clic en badge vuelve a input y reabre el automático", () => {
     const c = sembrarOk();
     const input = inputMonto();
     input.value = "500";
     input.dispatchEvent(new Event("change", { bubbles: true }));
     expect(c.montoCents).toBe(50000);
+    expect(c.montoManual).toBe(true);
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     expect(c.montoCents).toBeNull();
+    expect(c.montoManual).toBe(false);
     expect(document.querySelector("input.cell-monto")).not.toBeNull();
   });
 
@@ -302,13 +325,16 @@ describe("drop de archivos sobre hojas", () => {
     expect(agregarArchivos).toHaveBeenCalledWith(files, h.id);
   });
 
-  it("en modo OCR el drop se bloquea", () => {
+  it("en modo OCR el drop sigue activo (la entrada nunca se bloquea)", () => {
     state.modoOcr = true;
-    sembrar("u4x2", [100]);
-    document
-      .querySelector(".sheet")
-      ?.dispatchEvent(eventoDrop([new File(["x"], "d.png", { type: "image/png" })]));
-    expect(agregarArchivos).not.toHaveBeenCalled();
+    try {
+      const h = sembrar("u4x2", [100]);
+      const files = [new File(["x"], "d.png", { type: "image/png" })];
+      document.querySelector(".sheet")?.dispatchEvent(eventoDrop(files));
+      expect(agregarArchivos).toHaveBeenCalledWith(files, h.id);
+    } finally {
+      state.modoOcr = false;
+    }
   });
 
   it("dragover con Files resalta la hoja; sin Files no", () => {
@@ -322,5 +348,78 @@ describe("drop de archivos sobre hojas", () => {
     sheet.dispatchEvent(e);
     expect(sheet.classList.contains("file-drop")).toBe(false);
     expect(e.defaultPrevented).toBe(false);
+  });
+});
+
+describe("giro manual", () => {
+  /** Tarjeta ok en modo imagen (thumb falso: no se decodifica en el test). */
+  function sembrarGirable(): Comprobante {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", thumbUrl: "blob:thumb" });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    return c;
+  }
+
+  function botonGiro(accion: "girar-izq" | "girar-der"): HTMLButtonElement {
+    const b = document.querySelector<HTMLButtonElement>(`[data-accion="${accion}"]`);
+    if (!b) throw new Error(`sin botón ${accion}`);
+    return b;
+  }
+
+  it("botones ⟲⟳ solo en celda ok en modo imagen", () => {
+    sembrar("u1", [100]); // pendiente: sin botones
+    expect(document.querySelector('[data-accion="girar-izq"]')).toBeNull();
+    sembrarGirable();
+    expect(botonGiro("girar-izq").getAttribute("aria-label")).toBe("Girar a la izquierda");
+    expect(botonGiro("girar-der").getAttribute("aria-label")).toBe("Girar a la derecha");
+  });
+
+  it("en modo OCR no hay botones de giro", () => {
+    state.modoOcr = true;
+    try {
+      sembrarGirable();
+      expect(document.querySelector('[data-accion="girar-izq"]')).toBeNull();
+    } finally {
+      state.modoOcr = false;
+    }
+  });
+
+  it("clic delega a girarYReleer con el id y los grados", () => {
+    const c = sembrarGirable();
+    botonGiro("girar-izq").click();
+    expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 270);
+    botonGiro("girar-der").click();
+    expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 90);
+  });
+
+  it("corregir-monto reabre el automático y dispara el lote", async () => {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: 500, montoManual: true });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    const badge = document.querySelector<HTMLButtonElement>('[data-accion="corregir-monto"]');
+    if (!badge) throw new Error("sin badge corregir-monto");
+    badge.click();
+    expect(c.montoCents).toBeNull();
+    expect(c.montoManual).toBe(false);
+    await vi.waitFor(() => expect(vi.mocked(extraerPendientes)).toHaveBeenCalledWith());
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+  });
+
+  it("pointerdown en girar no inicia drag", () => {
+    sembrarGirable();
+    const ev = Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    botonGiro("girar-izq").dispatchEvent(ev);
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+    expect(ev.defaultPrevented).toBe(false);
   });
 });

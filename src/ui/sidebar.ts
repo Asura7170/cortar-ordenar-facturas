@@ -1,16 +1,18 @@
-/* Sidebar: entrada (dropzone/pegar/subir), código de pedido y limpiar. */
+/* Sidebar: código de pedido, limpiar y reintento IA. La entrada vive en el
+   canvas (tarjeta grande + drop en el área): acá solo se cablea. */
 import {
   borrarCodigo,
   crearHoja,
   guardarCodigo,
   hojaPorId,
+  isPosicionCodigo,
   nextComprobanteId,
   state,
 } from "../state";
 import type { Comprobante } from "../types";
 import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
-import { renderHojas } from "./sheets";
+import { esDragDeArchivos, renderHojas } from "./sheets";
 import { precalentarModelos, procesarCola } from "../pipeline/queue";
 import { extraerPendientes } from "../pipeline/extract";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
@@ -18,11 +20,16 @@ import type { MotivoRechazo, PaginaPdf } from "../pipeline/pdf";
 import { normalizarImagen } from "../pipeline/imagen";
 import { getEl, sanear } from "../utils";
 
-const dropzone: HTMLElement = getEl("dropzone");
+const canvas: HTMLElement = getEl("canvas");
 const fileInput: HTMLInputElement = getEl<HTMLInputElement>("fileInput");
+const dropzone: HTMLElement = getEl("dropzone");
 const chkCodigo: HTMLInputElement = getEl<HTMLInputElement>("chkCodigo");
 const numCodigo: HTMLInputElement = getEl<HTMLInputElement>("numCodigo");
 const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>("inputCodigo");
+// ponytail: por name (no getEl): si el fieldset falta, lista vacía sin reventar.
+function radiosPosicion(): NodeListOf<HTMLInputElement> {
+  return document.querySelectorAll<HTMLInputElement>('input[name="posCodigo"]');
+}
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
 const aviso: HTMLElement = getEl("aviso");
 const btnIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnIA");
@@ -68,6 +75,10 @@ export async function agregarArchivos(
   hojaId: number | null = null,
 ): Promise<void> {
   precalentarModelos(); // warm-up en serie (cubre picker, drop y pegar)
+  // Cualquier intake consume la hoja pedida (picker, drop, paste): si no, la
+  // pendiente sobrevive y el próximo picker cae en una hoja abandonada.
+  const destino = hojaId ?? hojaPedida;
+  hojaPedida = null;
   const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
   const esImagen = (f: File): boolean => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type);
   const pdfs: File[] = lista.filter((f) => !esImagen(f) && esPdf(f));
@@ -105,6 +116,7 @@ export async function agregarArchivos(
           thumbUrl: null,
           textoOcr: "",
           montoCents: null,
+          montoManual: false,
           moneda: "USD",
           estado: "pendiente",
           posicion: 0,
@@ -130,6 +142,7 @@ export async function agregarArchivos(
         thumbUrl: url,
         textoOcr: "",
         montoCents: null,
+        montoManual: false,
         moneda: "USD",
         estado: "pendiente",
         posicion: 0,
@@ -139,7 +152,7 @@ export async function agregarArchivos(
   avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
   if (nuevas.length === 0) return;
 
-  let hoja = hojaId != null ? hojaPorId(hojaId) : undefined;
+  let hoja = destino != null ? hojaPorId(destino) : undefined;
   if (!hoja) {
     hoja =
       state.hojas.find((h) => cuentaHoja(h) < layoutDe(h.layout).total) ??
@@ -173,25 +186,82 @@ export function renderCodigo(): void {
   inputCodigo.placeholder = state.codigoActivo
     ? `Código (${state.codigoLongitud} dígitos)`
     : "Código";
+  radiosPosicion().forEach((r) => {
+    r.checked = r.value === state.codigoPosicion;
+    r.disabled = !state.codigoActivo;
+  });
+}
+
+/** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
+let hojaPedida: number | null = null;
+
+/** Abre el diálogo para subir directo a una hoja (la consume cualquier intake). */
+export function elegirArchivos(hojaId: number): void {
+  hojaPedida = hojaId;
+  // ponytail: sin fallback click (Chrome latest tiene showPicker; el repo los prohíbe).
+  fileInput.showPicker();
 }
 
 export function initSidebar(): void {
-  // ponytail: label[for] nativo ya abre el diálogo con Enter/Espacio; sin keydown manual.
+  // El label solo reenvía clics: Enter/Espacio sobre él no abren el picker
+  // (sin activation behavior propio), por eso el keydown es manual.
+  dropzone.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    fileInput.showPicker();
+  });
   fileInput.addEventListener("change", () => {
-    void agregarArchivos(fileInput.files);
+    void agregarArchivos(fileInput.files, hojaPedida);
+    hojaPedida = null;
     fileInput.value = "";
   });
-  dropzone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    dropzone.classList.add("dragover");
+  // Cancelar el diálogo no dispara change: sin esto la hoja pedida queda
+  // rancia y el próximo intake (tarjeta, drop, paste) cae en la hoja vieja.
+  fileInput.addEventListener("cancel", () => {
+    hojaPedida = null;
   });
-  // Head-start: el hover sobre la zona anticipa la intención (una sola vez).
-  dropzone.addEventListener("pointerenter", () => precalentarModelos(), { once: true });
-  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
-  dropzone.addEventListener("drop", (e) => {
+  // Entrada a nivel canvas: cualquier punto del área (fondo, tarjeta, botón)
+  // acepta archivos; sobre una hoja manda sheets.ts con su hojaId.
+  // La entrada nunca se bloquea por el modo OCR (solo el reordenamiento).
+  // Contador dragenter/dragleave: sin esto el overlay parpadea por cada hijo.
+  let arrastres = 0;
+  const marcar = (n: number): void => {
+    arrastres = Math.max(0, n);
+    canvas.classList.toggle("arrastrando", arrastres > 0);
+  };
+  // Head-start: entrar al canvas anticipa la intención (una sola vez).
+  canvas.addEventListener("pointerenter", () => precalentarModelos(), { once: true });
+  canvas.addEventListener("dragenter", (e) => {
+    if (!esDragDeArchivos(e)) return;
     e.preventDefault();
-    dropzone.classList.remove("dragover");
+    marcar(arrastres + 1);
+  });
+  canvas.addEventListener("dragover", (e) => {
+    if (!esDragDeArchivos(e)) return;
+    e.preventDefault();
+  });
+  canvas.addEventListener("dragleave", (e) => {
+    if (!esDragDeArchivos(e)) return;
+    marcar(arrastres - 1);
+  });
+  canvas.addEventListener("drop", (e) => {
+    marcar(0);
+    if (!esDragDeArchivos(e)) return;
+    e.preventDefault();
+    if ((e.target as HTMLElement | null)?.closest?.(".sheet")) return;
     void agregarArchivos(e.dataTransfer?.files);
+  });
+  // Red de seguridad: un drop fallado fuera del canvas no navega el navegador
+  // (perdería el lote en memoria). Fuera del canvas no se sube nada.
+  window.addEventListener("dragover", (e) => {
+    if (esDragDeArchivos(e)) e.preventDefault();
+  });
+  window.addEventListener("drop", (e) => {
+    marcar(0);
+    if (esDragDeArchivos(e)) e.preventDefault();
+  });
+  document.addEventListener("dragleave", (e) => {
+    if (e.relatedTarget === null) marcar(0); // el arrastre salió de la ventana
   });
   document.addEventListener("paste", (e) => {
     const files = Array.from(e.clipboardData?.items ?? [])
@@ -217,6 +287,14 @@ export function initSidebar(): void {
     if (chkCodigo.checked) guardarCodigo();
     renderCodigo();
   });
+  // La esquina es otro dato de la ventana Código: cambiarla persiste igual.
+  radiosPosicion().forEach((r) =>
+    r.addEventListener("change", () => {
+      if (!r.checked || !isPosicionCodigo(r.value)) return;
+      state.codigoPosicion = r.value;
+      if (chkCodigo.checked) guardarCodigo();
+    }),
+  );
   inputCodigo.addEventListener("input", () => {
     state.codigoValor = inputCodigo.value.replace(/\D/g, "").slice(0, state.codigoLongitud);
     inputCodigo.value = state.codigoValor;
@@ -227,6 +305,7 @@ export function initSidebar(): void {
   // ejecuta el vaciado si se confirmó. Esc/backdrop/Cancelar → returnValue ''.
   modalLimpiar.addEventListener("close", () => {
     if (modalLimpiar.returnValue !== "ok") return;
+    hojaPedida = null; // la hoja destino pudo dejar de existir
     for (const h of state.hojas)
       for (const c of itemsDe(h)) {
         URL.revokeObjectURL(c.imgUrl);

@@ -49,6 +49,8 @@ export interface Comprobante {
   textoOcr: string;
   /** Total en cents o null si aún no se extrajo. */
   montoCents: Cents | null;
+  /** True si el total lo escribió el usuario (el lote IA y el giro nunca lo pisan). */
+  montoManual: boolean;
   readonly moneda: Moneda;
   estado: EstadoComprobante;
   readonly posicion: number;
@@ -70,12 +72,16 @@ export interface ConfigIA {
   apiKey: string;
 }
 
+/** Esquina de la hoja donde va el código de pedido en el Word. */
+export type PosicionCodigo = "sup-izq" | "sup-der" | "inf-izq" | "inf-der";
+
 /** Estado global mutable de la app (ver src/state.ts). */
 export interface EstadoApp {
   hojas: Hoja[];
   codigoActivo: boolean;
   codigoLongitud: number;
   codigoValor: string;
+  codigoPosicion: PosicionCodigo;
   configIA: ConfigIA;
   moneda: Moneda;
   colaEnProceso: boolean;
@@ -84,7 +90,10 @@ export interface EstadoApp {
 
 /** Subset persistido en localStorage (clave `libro-mayor-state`); cada ventana guarda solo lo suyo. */
 export type PersistedState = Partial<
-  Pick<EstadoApp, "codigoActivo" | "codigoLongitud" | "codigoValor" | "moneda" | "configIA">
+  Pick<
+    EstadoApp,
+    "codigoActivo" | "codigoLongitud" | "codigoValor" | "codigoPosicion" | "moneda" | "configIA"
+  >
 >;
 
 // ponytail: OcrResult/ExtractResult borrados (0 usos); vuelven con el pipeline real.

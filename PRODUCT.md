@@ -32,7 +32,7 @@ Sesiones en escritorio (Chrome), abrir/pegar fotos o PDFs con Ctrl+V desde porta
 - Recorte DocAligner heatmap/lcnet100 con fallback a imagen completa si no hay quad plausible; EXIF respetado; resize automática (>2000px lado mayor).
 - OCR PaddleOCR PP-OCRv6_small (`lang: latin`, worker), cola secuencial FIFO.
 - Monto: 1 TOTAL por comprobante; suma exacta en cents; badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); LLM sin TOTAL → campo manual en tarjeta (sí suma).
-- Código de pedido: check on/off + longitud N (solo dígitos), ambos persisten en localStorage; footer derecho en todas las hojas del .docx; check activo con < N dígitos → bloquea descarga con mensaje.
+- Código de pedido: check on/off + longitud N (solo dígitos), ambos persisten en localStorage; esquina elegida (default inferior derecha) en todas las hojas del .docx; check activo con < N dígitos → bloquea descarga con mensaje.
 - Grilla: carta N-up default 4 (1–6), hojas blancas sobre fondo gris, scroll vertical, ajuste al ancho; arrastre libre por hoja; X elimina comprobante completo.
 - Limpiar borra comprobantes/montos/OCR; conserva check, N y configuración IA/moneda.
 - OCR modal: solo lectura + copiar, select por comprobante.

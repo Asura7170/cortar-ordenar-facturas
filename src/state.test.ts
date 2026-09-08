@@ -10,6 +10,7 @@ import {
   guardarCodigo,
   hojaPorId,
   isMoneda,
+  isPosicionCodigo,
   limpiarHojas,
   nextComprobanteId,
   nextHojaId,
@@ -52,6 +53,7 @@ describe("guardar/cargar por ventana", () => {
     state.codigoActivo = true;
     state.codigoLongitud = 8;
     state.codigoValor = "12345678";
+    state.codigoPosicion = "sup-izq";
     guardarCodigo();
     state.moneda = "BOB";
     state.configIA = { baseUrl: "http://test", model: "m", apiKey: "k" };
@@ -60,6 +62,7 @@ describe("guardar/cargar por ventana", () => {
     state.codigoActivo = false;
     state.codigoLongitud = 6;
     state.codigoValor = "";
+    state.codigoPosicion = "inf-der";
     state.moneda = "USD";
     state.configIA = { baseUrl: "", model: "", apiKey: "" };
     cargar();
@@ -67,6 +70,7 @@ describe("guardar/cargar por ventana", () => {
     expect(state.codigoActivo).toBe(true);
     expect(state.codigoLongitud).toBe(8);
     expect(state.codigoValor).toBe("12345678");
+    expect(state.codigoPosicion).toBe("sup-izq");
     expect(state.moneda).toBe("BOB");
     expect(state.configIA).toEqual({ baseUrl: "http://test", model: "m", apiKey: "k" });
   });
@@ -97,6 +101,7 @@ describe("guardar/cargar por ventana", () => {
     expect(Object.keys(raw).sort()).toEqual([
       "codigoActivo",
       "codigoLongitud",
+      "codigoPosicion",
       "codigoValor",
       "configIA",
       "moneda",
@@ -129,7 +134,7 @@ describe("guardar/cargar por ventana", () => {
     expect(state.moneda).toBe("ARS");
   });
 
-  it("blob legacy solo-código (sin moneda): restaura el código y conserva la moneda", () => {
+  it("blob legacy solo-código (sin moneda ni posición): restaura el código y usa defaults", () => {
     state.moneda = "EUR";
     localStorage.setItem(
       LS_KEY,
@@ -139,7 +144,14 @@ describe("guardar/cargar por ventana", () => {
     expect(state.codigoActivo).toBe(true);
     expect(state.codigoLongitud).toBe(8);
     expect(state.codigoValor).toBe("12345678");
+    expect(state.codigoPosicion).toBe("inf-der");
     expect(state.moneda).toBe("EUR");
+  });
+
+  it("posición inválida: cae a inferior derecha", () => {
+    localStorage.setItem(LS_KEY, JSON.stringify({ codigoPosicion: "centro" }));
+    cargar();
+    expect(state.codigoPosicion).toBe("inf-der");
   });
 
   it("JSON corrupto: no tira y conserva el estado", () => {
@@ -193,6 +205,16 @@ describe("isMoneda", () => {
 
   it.each(["XXX", "", null, undefined, 5])("rechaza %s", (v) => {
     expect(isMoneda(v)).toBe(false);
+  });
+});
+
+describe("isPosicionCodigo", () => {
+  it.each(["sup-izq", "sup-der", "inf-izq", "inf-der"] as const)("acepta %s", (p) => {
+    expect(isPosicionCodigo(p)).toBe(true);
+  });
+
+  it.each(["centro", "", null, undefined, 5])("rechaza %s", (v) => {
+    expect(isPosicionCodigo(v)).toBe(false);
   });
 });
 

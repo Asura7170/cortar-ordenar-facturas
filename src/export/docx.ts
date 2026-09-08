@@ -6,6 +6,8 @@ import { aplanar, formatearMoneda, totalItems } from "../ui/monto";
 import { getEl } from "../utils";
 
 const btnDescargar: HTMLButtonElement = getEl<HTMLButtonElement>("btnDescargar2");
+const btnPdf: HTMLButtonElement = getEl<HTMLButtonElement>("btnPdf");
+const btnImprimir: HTMLButtonElement = getEl<HTMLButtonElement>("btnImprimir");
 
 export function codigoValido(): boolean {
   if (!state.codigoActivo) return true;
@@ -39,4 +41,12 @@ export function initExport(): void {
   btnDescargar.addEventListener("click", () => {
     void descargarWord();
   });
+  // ponytail: placeholders habilitados que avisan en vez de callar (sin funcionalidad real).
+  btnPdf.addEventListener("click", () => avisar("PDF: próximamente."));
+  btnImprimir.addEventListener("click", () => avisar("Imprimir: próximamente."));
+}
+
+function avisar(texto: string): void {
+  const el = document.getElementById("aviso");
+  if (el) el.textContent = texto;
 }

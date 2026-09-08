@@ -1,6 +1,6 @@
 /* Extracción del TOTAL con LLM openai-compatible — 1 llamada por lote.
    Auto al drenar la cola + botón Reintentar IA. Solo completa montos en
-   null: lo manual/corregido siempre gana (incluso si se escribe durante el fetch).
+   null no-manuales: lo manual siempre gana (incluso si se escribe durante el fetch).
    La suma total la hace el código (sumaTotal); al LLM nunca se le pide sumar. */
 import { buscarSlot, state } from "../state";
 import type { Cents, Comprobante, ConfigIA } from "../types";
@@ -25,10 +25,10 @@ export interface ItemLote {
 
 export type FetchFn = typeof fetch;
 
-/** Candidatos: OK con OCR pero sin monto (lo manual ya fijado no se toca). */
+/** Candidatos: OK con OCR, sin monto y sin marca manual. */
 export function candidatos(): Comprobante[] {
   return aplanar().filter(
-    (c) => c.estado === "ok" && c.montoCents === null && c.textoOcr.trim() !== "",
+    (c) => c.estado === "ok" && c.montoCents === null && !c.montoManual && c.textoOcr.trim() !== "",
   );
 }
 
@@ -153,6 +153,8 @@ export function aplicarTotales(
     if (!slot) continue; // limpiado/quitado durante el fetch: no resucita
     const actual = slot.hoja.slots[slot.idx];
     if (!actual || actual.montoCents !== null) continue; // manual ganó durante el fetch
+    // it.texto va limpio (limpiarTexto): se compara en el mismo espacio.
+    if (limpiarTexto(actual.textoOcr) !== it.texto) continue; // girado durante el fetch: rancio
     actual.montoCents = cents;
     aplicados++;
   }
@@ -176,6 +178,8 @@ export async function extraerPendientes(opciones?: {
   forzado?: boolean;
   desdeCola?: boolean;
 }): Promise<void> {
+  // ponytail: sin coalescing (un pedido durante el batch se pierde y su celda
+  // queda manual hasta el próximo disparo; ventana rara y autorecuperable).
   if (extrayendo) return;
   // ponytail: la cola es continuación secuencial del mismo trabajo (no concurrencia),
   // por eso solo ella salta este guard con desdeCola.

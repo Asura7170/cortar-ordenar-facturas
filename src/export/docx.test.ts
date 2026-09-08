@@ -1,7 +1,9 @@
-/* Tests P0/P1: export STUB (docx.ts necesita #montoTotal y #btnDescargar2 al importar). */
+/* Tests P0/P1: export STUB (docx.ts necesita #montoTotal, #btnDescargar2, #btnPdf y
+   #btnImprimir al importar). */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-document.body.innerHTML = '<div id="montoTotal"></div><button id="btnDescargar2"></button>';
+document.body.innerHTML =
+  '<div id="montoTotal"></div><p id="aviso"></p><button id="btnDescargar2"></button><button id="btnPdf"></button><button id="btnImprimir"></button>';
 const { state, crearHoja } = await import("../state");
 const { codigoValido, descargarWord, initExport, nombreArchivo } = await import("./docx");
 const { comprobante } = await import("../test/factoria");
@@ -90,5 +92,15 @@ describe("initExport", () => {
     initExport();
     document.getElementById("btnDescargar2")?.click();
     expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  // ponytail: placeholders habilitados que avisan (sin funcionalidad real).
+  it.each([
+    ["btnPdf", "PDF: próximamente."],
+    ["btnImprimir", "Imprimir: próximamente."],
+  ])("%s avisa sin descargar", (id, mensaje) => {
+    initExport();
+    document.getElementById(id)?.click();
+    expect(document.getElementById("aviso")?.textContent).toBe(mensaje);
   });
 });

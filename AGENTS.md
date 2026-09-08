@@ -37,7 +37,7 @@ public/models/      # lcnet100_h_e_bifpn_256_fp32.onnx vendoreado (Apache-2.0) +
 public/ort/         # par asyncify onnxruntime-web copiado de node_modules (el build webgpu lo exige; los nombres cambian por minor). Excluido de formato (.prettierignore). En dev lo sirve en crudo el middleware servir-ort-crudo (vite prohíbe import() desde /public)
 ```
 
-- Estado: `state.hojas` (no persiste) + persistido en `localStorage["libro-mayor-state"]` (solo codigoActivo/Longitud/Valor, moneda, configIA). Tema aparte en `libro-mayor-tema`.
+- Estado: `state.hojas` (no persiste) + persistido en `localStorage["libro-mayor-state"]` (solo codigoActivo/Longitud/Valor/Posicion, moneda, configIA). Tema aparte en `libro-mayor-tema`.
 - Montos siempre en **cents enteros** (`Cents`), nunca float. Suma/formato en `src/ui/monto.ts`.
 - `getEl(id)` en `src/utils.ts` falla fuerte si falta el id: si agregas un id en JS, créalo en `index.html`.
 - `vite.config.ts` envía COOP/COEP (necesarios para WASM con threads). No quitar los headers ni servir con `python -m http.server` (no los envía).

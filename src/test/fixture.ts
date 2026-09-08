@@ -2,15 +2,22 @@
    HTML debe estar montado ANTES del import dinámico del módulo bajo test. */
 export const FIXTURE_HTML = `
 <div id="montoTotal"></div>
-<div id="metaHojas"></div>
-<div id="sheets"></div>
-<div class="canvas"></div>
-<div id="dropzone"></div>
-<input id="fileInput" type="file" multiple>
-<p id="aviso" role="status"></p>
+<main class="canvas" id="canvas">
+  <div class="canvas-head"><span id="metaHojas"></span></div>
+  <p id="aviso" role="status"></p>
+  <div id="sheets"></div>
+  <label id="dropzone" for="fileInput" tabindex="0"></label>
+  <input id="fileInput" type="file" multiple>
+</main>
 <input id="chkCodigo" type="checkbox">
 <input id="numCodigo" type="number" value="6">
 <input id="inputCodigo" type="text">
+<fieldset>
+  <input type="radio" name="posCodigo" value="sup-izq">
+  <input type="radio" name="posCodigo" value="sup-der">
+  <input type="radio" name="posCodigo" value="inf-izq">
+  <input type="radio" name="posCodigo" value="inf-der">
+</fieldset>
 <dialog id="modalLimpiar"></dialog>
 <input id="chkOcr" type="checkbox">
 <span id="ocrEstado"></span>
@@ -27,6 +34,8 @@ export const FIXTURE_HTML = `
   <button id="btnResetAjustes" type="button"></button>
 </form>
 <button id="btnDescargar2"></button>
+<button id="btnPdf" type="button"></button>
+<button id="btnImprimir" type="button"></button>
 <button id="btnIA" type="button"></button>
 `;
 
@@ -55,6 +64,19 @@ export function eventoDragover(types: string[] = ["Files"]): Event {
   Object.defineProperty(e, "dataTransfer", { value: { files: [], types } });
   Object.defineProperty(e, "clientX", { value: 10 });
   Object.defineProperty(e, "clientY", { value: 10 });
+  return e;
+}
+
+/** Dragenter/dragleave sintéticos (llevan types como los DragEvent reales). */
+export function eventoDragenter(types: string[] = ["Files"]): Event {
+  const e = new Event("dragenter", { bubbles: true, cancelable: true });
+  Object.defineProperty(e, "dataTransfer", { value: { files: [], types } });
+  return e;
+}
+
+export function eventoDragleave(types: string[] = ["Files"]): Event {
+  const e = new Event("dragleave", { bubbles: true, cancelable: true });
+  Object.defineProperty(e, "dataTransfer", { value: { files: [], types } });
   return e;
 }
 
