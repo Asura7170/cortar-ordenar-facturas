@@ -62,6 +62,13 @@ describe("candidatos", () => {
     state.hojas.push(h);
     expect(candidatos()).toEqual([ok]);
   });
+
+  it("marca manual: fuera aunque esté en null", () => {
+    const h = crearHoja();
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoManual: true });
+    state.hojas.push(h);
+    expect(candidatos()).toEqual([]);
+  });
 });
 
 describe("extraerTotalesLote", () => {
@@ -161,6 +168,14 @@ describe("aplicarTotales", () => {
     state.hojas = [crearHoja()];
     const n = aplicarTotales([{ idx: 1, id: c.id, texto: "x" }], new Map([[1, 100]]));
     expect(n).toBe(0);
+  });
+
+  it("texto cambiado durante el fetch (giro manual): no aplica el rancio", () => {
+    const { c1 } = lote2();
+    const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
+    c1.textoOcr = "TOTAL 99.99"; // girado a mitad del fetch
+    expect(aplicarTotales(items, new Map([[1, 1250]]))).toBe(0);
+    expect(c1.montoCents).toBeNull();
   });
 });
 

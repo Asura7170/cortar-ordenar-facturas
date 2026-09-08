@@ -10,6 +10,7 @@ import {
 import type { Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
 import { cuentaHoja, formatearMoneda, parsearMonto, renderMonto, totalItems } from "./monto";
+import { girarYReleer } from "../pipeline/rotar";
 import { getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
@@ -87,6 +88,22 @@ function pintarCelda(
   btn.title = "Quitar";
   btn.setAttribute("aria-label", "Quitar comprobante");
   btn.textContent = "×";
+  if (item.estado === "ok") {
+    // Giro manual (fallback del auto-enderezado): arriba-izquierda, espejo del ×.
+    for (const [accion, glifo, lado] of [
+      ["girar-izq", "⟲", "izquierda"],
+      ["girar-der", "⟳", "derecha"],
+    ] as const) {
+      const g = document.createElement("button");
+      g.type = "button";
+      g.className = `cell-girar cell-${accion}`;
+      g.dataset["accion"] = accion;
+      g.title = `Girar a la ${lado}`;
+      g.setAttribute("aria-label", `Girar a la ${lado}`);
+      g.textContent = glifo;
+      div.append(g);
+    }
+  }
   if (item.thumbUrl) {
     const img = document.createElement("img");
     img.src = item.thumbUrl; // solo el thumb: el full-res nunca se decodifica en la grilla
@@ -543,7 +560,7 @@ export function initSheets(cb: SheetsCallbacks): void {
     if (!(cell instanceof HTMLElement) || cell.classList.contains("empty")) return;
     if (
       target?.closest?.(
-        '[data-accion="quitar"],[data-accion="monto"],[data-accion="corregir-monto"]',
+        '[data-accion="quitar"],[data-accion="girar-izq"],[data-accion="girar-der"],[data-accion="monto"],[data-accion="corregir-monto"]',
       )
     )
       return;
@@ -643,10 +660,17 @@ export function initSheets(cb: SheetsCallbacks): void {
       case "quitar":
         quitarComprobante(id);
         return;
+      case "girar-izq":
+        void girarYReleer(id, 270);
+        return;
+      case "girar-der":
+        void girarYReleer(id, 90);
+        return;
       case "corregir-monto": {
         const item = obtenerComprobante(id);
         if (!item) return;
         item.montoCents = null;
+        item.montoManual = false; // se reabre al automático (null = candidata)
         renderHojas();
         return;
       }
@@ -678,7 +702,9 @@ export function initSheets(cb: SheetsCallbacks): void {
       renderHojas();
       return;
     }
+    // change en text input = escribió + blur/enter: el total pasa a manual.
     item.montoCents = cents;
+    item.montoManual = true;
     renderHojas();
   });
 

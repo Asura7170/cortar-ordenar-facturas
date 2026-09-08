@@ -256,7 +256,7 @@ function masaMapa(mapa: Float32Array): number {
 }
 
 /** Bitmap rotado en un lienzo (setTransform directo: testeable sin DOM). Null sin contexto. */
-function lienzoGirado(
+export function lienzoGirado(
   bmp: ImageBitmap,
   grados: Giro,
   crear: CrearLienzo,

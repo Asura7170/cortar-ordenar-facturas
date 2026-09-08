@@ -2,6 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture, el, eventoDrop, eventoDragover } from "../test/fixture";
 
+// El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
+vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
+
 montarFixture();
 const { state, crearHoja } = await import("../state");
 const {
@@ -14,6 +17,7 @@ const {
   renderHojas,
 } = await import("./sheets");
 const { archivo, comprobante } = await import("../test/factoria");
+const { girarYReleer } = await import("../pipeline/rotar");
 import type { Comprobante, Hoja, LayoutId } from "../types";
 
 const agregarArchivos = vi.fn();
@@ -224,13 +228,14 @@ describe("monto manual", () => {
     expect(document.querySelector("input.cell-monto")).toBeNull();
   });
 
-  it("change válido fija el monto y pinta badge", () => {
+  it("change válido fija el monto, lo marca manual y pinta badge", () => {
     state.moneda = "USD";
     const c = sembrarOk();
     const input = inputMonto();
     input.value = "1234.56";
     input.dispatchEvent(new Event("change", { bubbles: true }));
     expect(c.montoCents).toBe(123456);
+    expect(c.montoManual).toBe(true);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,234.56");
     expect(document.querySelector("input.cell-monto")).toBeNull();
   });
@@ -244,14 +249,16 @@ describe("monto manual", () => {
     expect(document.querySelector("input.cell-monto")).not.toBeNull();
   });
 
-  it("clic en badge vuelve a input (corregir-monto)", () => {
+  it("clic en badge vuelve a input y reabre el automático", () => {
     const c = sembrarOk();
     const input = inputMonto();
     input.value = "500";
     input.dispatchEvent(new Event("change", { bubbles: true }));
     expect(c.montoCents).toBe(50000);
+    expect(c.montoManual).toBe(true);
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     expect(c.montoCents).toBeNull();
+    expect(c.montoManual).toBe(false);
     expect(document.querySelector("input.cell-monto")).not.toBeNull();
   });
 
@@ -337,5 +344,63 @@ describe("drop de archivos sobre hojas", () => {
     sheet.dispatchEvent(e);
     expect(sheet.classList.contains("file-drop")).toBe(false);
     expect(e.defaultPrevented).toBe(false);
+  });
+});
+
+describe("giro manual", () => {
+  /** Tarjeta ok en modo imagen (thumb falso: no se decodifica en el test). */
+  function sembrarGirable(): Comprobante {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", thumbUrl: "blob:thumb" });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    return c;
+  }
+
+  function botonGiro(accion: "girar-izq" | "girar-der"): HTMLButtonElement {
+    const b = document.querySelector<HTMLButtonElement>(`[data-accion="${accion}"]`);
+    if (!b) throw new Error(`sin botón ${accion}`);
+    return b;
+  }
+
+  it("botones ⟲⟳ solo en celda ok en modo imagen", () => {
+    sembrar("u1", [100]); // pendiente: sin botones
+    expect(document.querySelector('[data-accion="girar-izq"]')).toBeNull();
+    sembrarGirable();
+    expect(botonGiro("girar-izq").getAttribute("aria-label")).toBe("Girar a la izquierda");
+    expect(botonGiro("girar-der").getAttribute("aria-label")).toBe("Girar a la derecha");
+  });
+
+  it("en modo OCR no hay botones de giro", () => {
+    state.modoOcr = true;
+    try {
+      sembrarGirable();
+      expect(document.querySelector('[data-accion="girar-izq"]')).toBeNull();
+    } finally {
+      state.modoOcr = false;
+    }
+  });
+
+  it("clic delega a girarYReleer con el id y los grados", () => {
+    const c = sembrarGirable();
+    botonGiro("girar-izq").click();
+    expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 270);
+    botonGiro("girar-der").click();
+    expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 90);
+  });
+
+  it("pointerdown en girar no inicia drag", () => {
+    sembrarGirable();
+    const ev = Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+    botonGiro("girar-izq").dispatchEvent(ev);
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+    expect(ev.defaultPrevented).toBe(false);
   });
 });

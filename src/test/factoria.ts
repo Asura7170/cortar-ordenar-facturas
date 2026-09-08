@@ -10,6 +10,7 @@ export function comprobante(parc?: Partial<Comprobante>): Comprobante {
     thumbUrl: null,
     textoOcr: "",
     montoCents: null,
+    montoManual: false,
     moneda: "USD",
     estado: "pendiente",
     posicion: 0,

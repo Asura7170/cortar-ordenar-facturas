@@ -49,6 +49,8 @@ export interface Comprobante {
   textoOcr: string;
   /** Total en cents o null si aún no se extrajo. */
   montoCents: Cents | null;
+  /** True si el total lo escribió el usuario (el lote IA y el giro nunca lo pisan). */
+  montoManual: boolean;
   readonly moneda: Moneda;
   estado: EstadoComprobante;
   readonly posicion: number;

@@ -1045,6 +1045,7 @@ body.is-dragging .cell:not(.empty) {
 
 /* Durante el drag, el botón ×, el badge y el input no deben capturar el drop */
 .sheet-grid.dragging .cell-remove,
+.sheet-grid.dragging .cell-girar,
 .sheet-grid.dragging .cell-badge,
 .sheet-grid.dragging .cell-monto {
   pointer-events: none;
@@ -1129,6 +1130,51 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell-remove:hover {
   background: var(--sello);
+}
+
+/* Giro manual: espejo del × pero arriba-izquierda y en verde (no es destructivo). */
+.cell-girar {
+  position: absolute;
+  top: 6px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(20, 25, 20, 0.72);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  display: none;
+  z-index: 3;
+}
+.cell-girar-izq {
+  left: 6px;
+}
+.cell-girar-der {
+  left: 40px;
+}
+/* Hit-area 44px: el visual queda en 28px, el ::after recibe el tap. */
+.cell-girar::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.cell:hover .cell-girar,
+.cell:focus-within .cell-girar {
+  display: block;
+}
+/* Sin hover (táctil) no hay revelado: siempre visible. Es capacidad, no breakpoint. */
+@media (hover: none) {
+  .cell .cell-girar {
+    display: block;
+  }
+}
+.cell-girar:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.cell-girar:hover {
+  background: var(--verde-tinta);
 }
 
 /* Modo OCR: la casilla muestra el texto del comprobante */
