@@ -243,6 +243,23 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     expect(a.slots.some((c) => c?.nombre === "c.png")).toBe(true);
     expect(b.slots.every((c) => c === null)).toBe(true);
   });
+
+  it("un intake con hoja propia consume la pedida (el próximo picker es automático)", async () => {
+    const a = crearHoja();
+    const b = crearHoja();
+    state.hojas.push(a, b);
+    elegirArchivos(b.id);
+    await agregarArchivos([archivo("d.png", "image/png")], a.id); // drop sobre A
+    expect(a.slots.some((c) => c?.nombre === "d.png")).toBe(true);
+    Object.defineProperty(fileInput, "files", {
+      value: [archivo("e.png", "image/png")],
+      configurable: true,
+    });
+    fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(a.slots.some((c) => c?.nombre === "e.png")).toBe(true);
+    expect(b.slots.every((c) => c === null)).toBe(true);
+  });
 });
 
 describe("gate PDF (tamaño + páginas)", () => {

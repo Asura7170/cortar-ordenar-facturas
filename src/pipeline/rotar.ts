@@ -61,14 +61,13 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
       if (!girado) throw new Error("sin blob girado");
       // ponytail: commit tras los awaits (igual que la cola: sin dueño no se guarda).
       if (!buscarSlot(id)) return;
-      const vieja = item.imgUrl;
-      URL.revokeObjectURL(vieja);
+      URL.revokeObjectURL(item.imgUrl);
       item.imgUrl = URL.createObjectURL(girado);
       item.file = girado;
       const thumb = await generarMiniatura(girado);
       if (thumb && buscarSlot(id)) asignarMiniatura(item, thumb);
-      // ponytail: sin thumb el alias al blob revocado (PDF) mira al nuevo.
-      else if (item.thumbUrl === vieja && buscarSlot(id)) item.thumbUrl = item.imgUrl;
+      // ponytail: sin thumb se muestra el giro nuevo (alias revocado o esqueleto mienten).
+      else if (buscarSlot(id)) item.thumbUrl = item.imgUrl;
       renderHojas();
       clearTimeout(relecturas.get(id));
       relecturas.set(
@@ -106,12 +105,15 @@ async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
     // El lote pinta solo si aplica (el ok + texto ya quedaron pintados arriba).
     if (!item.montoManual && buscarSlot(id)) {
       item.montoCents = null;
+      renderHojas(); // el lote puede ser no-op: sin esto el badge viejo miente
       const mod = await import("./extract").catch((): null => null);
       await Promise.resolve(mod?.extraerPendientes()).catch(() => {});
     }
   } catch {
-    // ponytail: sin relectura la celda vuelve a ok (el giro ya quedó pintado).
+    // ponytail: sin relectura no vale el texto viejo (es de otra orientación).
     if (buscarSlot(id)) {
+      item.textoOcr = "";
+      if (!item.montoManual) item.montoCents = null;
       item.estado = "ok";
       await import("../ui/sheets").then((m) => m.renderHojas()).catch(() => {});
     }

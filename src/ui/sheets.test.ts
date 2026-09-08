@@ -405,7 +405,8 @@ describe("giro manual", () => {
     badge.click();
     expect(c.montoCents).toBeNull();
     expect(c.montoManual).toBe(false);
-    await vi.waitFor(() => expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(vi.mocked(extraerPendientes)).toHaveBeenCalledWith());
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
   });
 
   it("pointerdown en girar no inicia drag", () => {

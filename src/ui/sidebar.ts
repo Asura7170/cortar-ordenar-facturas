@@ -74,6 +74,10 @@ export async function agregarArchivos(
   hojaId: number | null = null,
 ): Promise<void> {
   precalentarModelos(); // warm-up en serie (cubre picker, drop y pegar)
+  // Cualquier intake consume la hoja pedida (picker, drop, paste): si no, la
+  // pendiente sobrevive y el próximo picker cae en una hoja abandonada.
+  const destino = hojaId ?? hojaPedida;
+  hojaPedida = null;
   const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
   const esImagen = (f: File): boolean => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type);
   const pdfs: File[] = lista.filter((f) => !esImagen(f) && esPdf(f));
@@ -147,7 +151,7 @@ export async function agregarArchivos(
   avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
   if (nuevas.length === 0) return;
 
-  let hoja = hojaId != null ? hojaPorId(hojaId) : undefined;
+  let hoja = destino != null ? hojaPorId(destino) : undefined;
   if (!hoja) {
     hoja =
       state.hojas.find((h) => cuentaHoja(h) < layoutDe(h.layout).total) ??
@@ -190,7 +194,7 @@ export function renderCodigo(): void {
 /** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
 let hojaPedida: number | null = null;
 
-/** Abre el diálogo para subir directo a una hoja (la consume el change). */
+/** Abre el diálogo para subir directo a una hoja (la consume cualquier intake). */
 export function elegirArchivos(hojaId: number): void {
   hojaPedida = hojaId;
   if (typeof fileInput.showPicker === "function") fileInput.showPicker();

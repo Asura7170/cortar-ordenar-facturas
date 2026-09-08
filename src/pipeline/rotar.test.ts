@@ -11,6 +11,11 @@ vi.mock("./ocr", async (importOriginal) => {
 });
 // El lote post-giro no debe pegar a la red en tests.
 vi.mock("./extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
+// Thumb controlable por test (asignarMiniatura sigue real).
+vi.mock("./queue", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./queue")>();
+  return { ...real, generarMiniatura: vi.fn(async () => new Blob(["thumb"])) };
+});
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
@@ -18,11 +23,15 @@ const { girarYReleer } = await import("./rotar");
 const { extraerTexto } = await import("./ocr");
 const { extraerPendientes } = await import("./extract");
 const { comprobante } = await import("../test/factoria");
+const { generarMiniatura } = await import("./queue");
+const { renderHojas } = await import("../ui/sheets");
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.mocked(extraerPendientes).mockClear();
   vi.mocked(extraerTexto).mockClear();
+  vi.mocked(generarMiniatura).mockClear();
+  vi.mocked(renderHojas).mockClear();
   vi.useRealTimers();
 });
 
@@ -90,9 +99,11 @@ describe("girarYReleer", () => {
     expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
     expect(c.montoCents).toBeNull(); // el lote lo relee (mock: queda manual)
     expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+    // giro + procesando + ok + reapertura (el null se pinta aunque el lote sea no-op)
+    expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(4);
   });
 
-  it("OCR fallido en la relectura: vuelve a ok con aviso, sin rejection muda", async () => {
+  it("OCR fallido en la relectura: ok sin texto rancio, con aviso", async () => {
     vi.useFakeTimers();
     const { deps } = depsGiro();
     const c = sembrar();
@@ -100,10 +111,24 @@ describe("girarYReleer", () => {
     vi.mocked(extraerTexto).mockRejectedValueOnce(new Error("ocr caído"));
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.estado).toBe("ok"); // no queda atascada en procesando
-    expect(c.textoOcr).toBe("VIEJO");
+    expect(c.textoOcr).toBe(""); // el viejo es de otra orientación: no vale
+    expect(c.montoCents).toBeNull();
     expect(document.getElementById("aviso")?.textContent).toBe(
       "No se pudo releer el texto girado.",
     );
+  });
+
+  it("sin thumb muestra el giro nuevo (sin esqueleto permanente)", async () => {
+    vi.useFakeTimers();
+    const { deps } = depsGiro();
+    vi.mocked(generarMiniatura).mockResolvedValueOnce(null);
+    const h = crearHoja();
+    const c = comprobante({ estado: "ok", file: new Blob(["foto"]) });
+    c.thumbUrl = null; // imagen sin thumb (falló en la cola)
+    h.slots[0] = c;
+    state.hojas.push(h);
+    await girarYReleer(c.id, 90, deps);
+    expect(c.thumbUrl).toBe(c.imgUrl);
   });
 
   it("doble giro rápido: 2 giros al instante + 1 solo OCR", async () => {
