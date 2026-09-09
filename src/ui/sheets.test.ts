@@ -327,6 +327,18 @@ describe("monto manual", () => {
     expect(editando.isConnected).toBe(false);
   });
 
+  it("borrador inválido sin foco sobrevive a un render de fondo", () => {
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "abc";
+    input.blur();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    renderHojas(); // cola/mini pintando de fondo sin foco en el input
+    expect(inputMonto().value).toBe("abc");
+    expect(c.montoCents).toBeNull();
+    expect(document.activeElement).not.toBe(inputMonto());
+  });
+
   it("Enter con prefill de miles sin cambios conserva el valor exacto", () => {
     state.moneda = "USD";
     const c = sembrarOk();

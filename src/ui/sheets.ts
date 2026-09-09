@@ -256,11 +256,15 @@ export function renderHojas(): void {
   }
   // ponytail: el borrador manual sobrevive a los renders de fondo (cola/IA/giro).
   const borrador = borradorEnEdicion();
+  // ponytail: los borradores sin foco también (inválidos tras blur): se derivan
+  // del DOM, sin estado extra que limpiar o que se vuelva rancio.
+  const sucios = borradoresVisibles();
   // ponytail: todo change que llegue durante el swap es eco de remoción.
   const render = (): void => {
     bajoMutandoHojas(() => {
       renderCuerpo(borrador);
     });
+    restaurarSucios(sucios);
   };
   // ponytail: sin ViewTransition con reduced-motion ni durante la carga
   // inicial (los snapshots compiten con el drag/scroll); es solo un adorno.
@@ -352,6 +356,27 @@ function borradorEnEdicion(): BorradorMonto | null {
   const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
   if (!Number.isInteger(id)) return null;
   return { id, valor: a.value, inicio: a.selectionStart, fin: a.selectionEnd };
+}
+
+/** Borradores visibles sin foco (inválidos tras blur): se capturan del DOM. */
+function borradoresVisibles(): Map<number, string> {
+  const sucios = new Map<number, string>();
+  const a = document.activeElement;
+  sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto").forEach((input) => {
+    if (input === a || input.value === "") return;
+    const cell = input.closest(".cell");
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+    if (Number.isInteger(id)) sucios.set(id, input.value);
+  });
+  return sucios;
+}
+
+/** Restaura borradores sin foco tras el render (solo valor, nunca foco: B2). */
+function restaurarSucios(sucios: Map<number, string>): void {
+  sucios.forEach((valor, id) => {
+    const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
+    if (input && document.activeElement !== input) input.value = valor;
+  });
 }
 
 /** Restaura un borrador tras el render (la celda puede haber cambiado a badge). */
