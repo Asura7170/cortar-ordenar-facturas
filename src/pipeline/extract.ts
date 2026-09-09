@@ -131,7 +131,8 @@ export async function extraerTotalesLote(
     if (!obj) return salida;
     for (const it of items) {
       const raw = obj[String(it.idx)];
-      if (raw === null || raw === undefined) continue;
+      // ponytail: solo string/number del LLM llegan a parsearMonto; objetos → null (manual).
+      if (typeof raw !== "string" && typeof raw !== "number") continue;
       salida.set(it.idx, parsearMonto(String(raw))); // inválido → null (manual)
     }
     return salida;

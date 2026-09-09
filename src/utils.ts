@@ -9,7 +9,8 @@ export function getEl<T extends HTMLElement>(id: string): T {
 
 /** Sanea entrada del usuario (nombres de archivo, texto OCR) antes del DOM. */
 export function sanear(s: unknown): string {
-  return String(s ?? "").toWellFormed();
+  // ponytail: solo string/number llegan al DOM; objetos → "" (nunca "[object Object]").
+  return (typeof s === "string" ? s : typeof s === "number" ? String(s) : "").toWellFormed();
 }
 
 /** sleep cancelable por AbortSignal (Chrome 119+). */

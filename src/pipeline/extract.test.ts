@@ -116,6 +116,20 @@ describe("extraerTotalesLote", () => {
     expect(mapa.get(2)).toBe(700);
   });
 
+  it("objeto/array del LLM → null (manual), no se parsea", async () => {
+    const { c1, c2 } = lote2();
+    const fetchFn = vi.fn(async (): Promise<Response> =>
+      respuesta('{"1":{"total":"12.50"},"2":[7]}'),
+    );
+    const items: ItemLote[] = [
+      { idx: 1, id: c1.id, texto: "x" },
+      { idx: 2, id: c2.id, texto: "y" },
+    ];
+    const mapa = await extraerTotalesLote(items, state.configIA, fetchFn);
+    expect(mapa.get(1)).toBeNull();
+    expect(mapa.get(2)).toBeNull(); // sin el guard, String([7])="7" → 700
+  });
+
   it("HTTP error lanza (el orquestador lo deja manual)", async () => {
     const { c1 } = lote2();
     const fetchFn = vi.fn(async (): Promise<Response> => respuesta("x", false, 429));

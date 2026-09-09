@@ -39,6 +39,8 @@ export default defineConfig({
   },
   fmt: {},
   lint: {
+    // ponytail: glue asyncify vendoreado (upstream) — fuera del lint, como del formato.
+    ignorePatterns: ["public/ort/**"],
     jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
     rules: { "vite-plus/prefer-vite-plus-imports": "error" },
     options: { typeAware: true, typeCheck: true },
