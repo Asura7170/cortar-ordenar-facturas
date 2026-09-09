@@ -11,7 +11,8 @@ Vendoreado third-party (no modificar)
 2. Geometría en src/pipeline/docaligner.ts (ordenarQuad, decode heatmap,
    homografía DLT, warp bilineal) portada de:
    andor83/ml-web-scanner (https://github.com/andor83/ml-web-scanner)
-   Licencia: MIT. Mejoras locales: relleno blanco fuera del quad (el JPEG no
+   Licencia: MIT (ver https://github.com/andor83/ml-web-scanner/blob/main/LICENSE).
+   Mejoras locales: relleno blanco fuera del quad (el JPEG no
    tiene alpha) y clamp de bordes en vez de recorte.
 
 3. ocr/det.onnx + modelos-fuente/det.yml — PP-OCRv6_small_det (detección de líneas)
@@ -19,5 +20,6 @@ Vendoreado third-party (no modificar)
    Origen: PaddlePaddle/PaddleOCR v3.7.0, Hub oficial:
    https://huggingface.co/PaddlePaddle/PP-OCRv6_small_det_onnx
    https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx
-   Licencia: Apache-2.0. Dict src/pipeline/ocrDict.ts generado del
+   Licencia: Apache-2.0 (https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE).
+   Dict src/pipeline/ocrDict.ts generado del
    character_dict de modelos-fuente/rec.yml (+ "blank" y " " según CTCLabelDecode).
