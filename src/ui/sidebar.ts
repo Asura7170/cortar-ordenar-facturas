@@ -302,7 +302,7 @@ export function initSidebar(): void {
     state.codigoValor = inputCodigo.value.replace(/\D/g, "").slice(0, state.codigoLongitud);
     inputCodigo.value = state.codigoValor;
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
-    inputCodigo.classList.remove("codigo-error");
+    inputCodigo.classList.remove("codigo-error", "sacudir");
     inputCodigo.removeAttribute("aria-invalid");
     if (chkCodigo.checked) guardarCodigo();
   });

@@ -327,6 +327,20 @@ describe("monto manual", () => {
     expect(editando.isConnected).toBe(false);
   });
 
+  it("Enter con prefill de miles sin cambios conserva el valor exacto", () => {
+    state.moneda = "USD";
+    const c = sembrarOk();
+    inputMonto().value = "1111";
+    inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
+    expect(c.montoCents).toBe(111100);
+    document.querySelector<HTMLElement>(".cell-badge")?.click();
+    // ponytail: el prefill con coma de miles debe hacer roundtrip por parsearMonto.
+    expect(inputMonto().value).toBe("1,111.00");
+    inputMonto().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(c.montoCents).toBe(111100);
+    expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,111.00");
+  });
+
   it("Enter con edición confirma el nuevo valor en el badge", () => {
     state.moneda = "USD";
     const c = sembrarOk();

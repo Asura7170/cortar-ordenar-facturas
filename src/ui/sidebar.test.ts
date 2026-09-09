@@ -433,6 +433,7 @@ describe("código de pedido", () => {
     inputCodigo.value = "123";
     inputCodigo.dispatchEvent(new Event("input", { bubbles: true }));
     expect(inputCodigo.classList.contains("codigo-error")).toBe(false);
+    expect(inputCodigo.classList.contains("sacudir")).toBe(false);
     expect(inputCodigo.hasAttribute("aria-invalid")).toBe(false);
   });
 
