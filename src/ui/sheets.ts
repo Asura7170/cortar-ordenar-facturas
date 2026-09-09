@@ -7,7 +7,7 @@ import {
   redistribuir,
   state,
 } from "../state";
-import type { Comprobante, Hoja, Plantilla } from "../types";
+import type { Cents, Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
 import { cuentaHoja, formatearMoneda, parsearMonto, renderMonto, totalItems } from "./monto";
 import { girarYReleer } from "../pipeline/rotar";
@@ -135,7 +135,9 @@ function pintarCelda(
     img.decoding = "async";
     div.append(img, btn);
   }
-  if (item.montoCents != null) {
+  // En corrección se edita el valor previo (apertura no destructiva); fuera de
+  // ok no hay input que mostrar y el badge queda como estaba.
+  if (item.montoCents != null && item.id !== editandoMonto) {
     const badge = document.createElement("button");
     badge.type = "button";
     badge.className = "cell-badge";
@@ -153,6 +155,9 @@ function pintarCelda(
     entrada.title = "Total del comprobante (ej. 1234.56)";
     entrada.setAttribute("aria-label", `Total de ${item.nombre}`);
     entrada.dataset["accion"] = "monto";
+    if (item.id === editandoMonto && item.montoCents != null) {
+      entrada.value = textoEditable(item.montoCents);
+    }
     div.append(entrada);
   }
 }
@@ -185,71 +190,95 @@ function panelHoja(hoja: Hoja, idx: number): string {
     </aside>`;
 }
 
+/** Cuerpo del render (siempre bajo `mutandoHojas`: el swap destruye el foco). */
+function renderCuerpo(borrador: BorradorMonto | null): void {
+  rectsCache = null;
+  const n = totalItems();
+  metaHojas.textContent = `${state.hojas.length} hoja${state.hojas.length === 1 ? "" : "s"} · ${n} comprobante${n === 1 ? "" : "s"}`;
+  sheetsEl.innerHTML = "";
+
+  if (n === 0) {
+    tarjetaVacia.hidden = false;
+    renderMonto();
+    return;
+  }
+
+  state.hojas.forEach((hoja, idx) => {
+    const l = layoutDe(hoja.layout);
+    const sheet = document.createElement("article");
+    sheet.className = "sheet";
+    sheet.dataset["hoja"] = String(hoja.id);
+    const grid = document.createElement("div");
+    grid.className = "sheet-grid";
+    grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
+    l.pos.forEach((p, i) => grid.append(celda(hoja.slots[i] ?? null, p, i, hoja.id)));
+    const tag = document.createElement("span");
+    tag.className = "sheet-tag";
+    tag.textContent = `HOJA ${idx + 1}`;
+    sheet.append(tag, grid);
+
+    const row = document.createElement("div");
+    row.className = "sheet-row";
+    row.dataset["hoja"] = String(hoja.id);
+    row.innerHTML = panelHoja(hoja, idx);
+    row.insertBefore(sheet, row.firstChild);
+    // Columna derecha: panel arriba, botón de agregar debajo (misma columna).
+    const lado = document.createElement("div");
+    lado.className = "sheet-side";
+    const panel = row.querySelector(".sheet-panel");
+    if (panel) lado.append(panel);
+    const mas = document.createElement("button");
+    mas.type = "button";
+    mas.className = "btn-sumar";
+    mas.dataset["accion"] = "agregar";
+    mas.dataset["hoja"] = String(hoja.id);
+    mas.title = `Agregar comprobantes a la hoja ${idx + 1}`;
+    mas.setAttribute("aria-label", `Agregar comprobantes a la hoja ${idx + 1}`);
+    const ico = document.createElement("span");
+    ico.className = "btn-sumar-mas";
+    ico.setAttribute("aria-hidden", "true");
+    ico.textContent = "＋";
+    mas.append(ico, " Agregar factura");
+    lado.append(mas);
+    row.append(lado);
+    sheetsEl.append(row);
+  });
+  tarjetaVacia.hidden = true;
+  renderMonto();
+  if (borrador) restaurarBorrador(borrador);
+}
+
 export function renderHojas(): void {
   // Durante un arrastre nunca se reconstruye la grilla: el render se pospone.
   if (pointerDrag) {
     renderPendiente = true;
     return;
   }
+  // ponytail: el borrador manual sobrevive a los renders de fondo (cola/IA/giro).
+  const borrador = borradorEnEdicion();
+  // ponytail: los borradores sin foco también (inválidos tras blur): se derivan
+  // del DOM, sin estado extra que limpiar o que se vuelva rancio.
+  const sucios = borradoresVisibles();
+  // ponytail: todo change que llegue durante el swap es eco de remoción.
   const render = (): void => {
-    rectsCache = null;
-    const n = totalItems();
-    metaHojas.textContent = `${state.hojas.length} hoja${state.hojas.length === 1 ? "" : "s"} · ${n} comprobante${n === 1 ? "" : "s"}`;
-    sheetsEl.innerHTML = "";
-
-    if (n === 0) {
-      tarjetaVacia.hidden = false;
-      renderMonto();
-      return;
-    }
-
-    state.hojas.forEach((hoja, idx) => {
-      const l = layoutDe(hoja.layout);
-      const sheet = document.createElement("article");
-      sheet.className = "sheet";
-      sheet.dataset["hoja"] = String(hoja.id);
-      const grid = document.createElement("div");
-      grid.className = "sheet-grid";
-      grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
-      l.pos.forEach((p, i) => grid.append(celda(hoja.slots[i] ?? null, p, i, hoja.id)));
-      const tag = document.createElement("span");
-      tag.className = "sheet-tag";
-      tag.textContent = `HOJA ${idx + 1}`;
-      sheet.append(tag, grid);
-
-      const row = document.createElement("div");
-      row.className = "sheet-row";
-      row.dataset["hoja"] = String(hoja.id);
-      row.innerHTML = panelHoja(hoja, idx);
-      row.insertBefore(sheet, row.firstChild);
-      // Columna derecha: panel arriba, botón de agregar debajo (misma columna).
-      const lado = document.createElement("div");
-      lado.className = "sheet-side";
-      const panel = row.querySelector(".sheet-panel");
-      if (panel) lado.append(panel);
-      const mas = document.createElement("button");
-      mas.type = "button";
-      mas.className = "btn-sumar";
-      mas.dataset["accion"] = "agregar";
-      mas.dataset["hoja"] = String(hoja.id);
-      mas.title = `Agregar comprobantes a la hoja ${idx + 1}`;
-      mas.setAttribute("aria-label", `Agregar comprobantes a la hoja ${idx + 1}`);
-      const ico = document.createElement("span");
-      ico.className = "btn-sumar-mas";
-      ico.setAttribute("aria-hidden", "true");
-      ico.textContent = "＋";
-      mas.append(ico, " Agregar factura");
-      lado.append(mas);
-      row.append(lado);
-      sheetsEl.append(row);
+    bajoMutandoHojas(() => {
+      renderCuerpo(borrador);
     });
-    tarjetaVacia.hidden = true;
-    renderMonto();
+    restaurarSucios(sucios);
   };
   // ponytail: sin ViewTransition con reduced-motion ni durante la carga
   // inicial (los snapshots compiten con el drag/scroll); es solo un adorno.
   const reduceMovimiento = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-  if (!reduceMovimiento && !state.colaEnProceso && document.startViewTransition) {
+  // ponytail: con foco dentro de las hojas el render es síncrono (el swap
+  // async pierde el foco y rompe la edición en curso).
+  const focoDentro = sheetsEl.contains(document.activeElement);
+  if (
+    !borrador &&
+    !focoDentro &&
+    !reduceMovimiento &&
+    !state.colaEnProceso &&
+    document.startViewTransition
+  ) {
     const t = document.startViewTransition(render);
     t.ready?.catch(() => {});
     t.finished?.catch(() => {});
@@ -304,13 +333,118 @@ function cellById(id: number): HTMLElement | null {
   return sheetsEl.querySelector<HTMLElement>(`.cell[data-id="${id}"]`);
 }
 
+// ponytail: Escape descarta el borrador (el render no lo preserva ni lo commitea).
+let descartarBorrador = false;
+
+// ponytail: corrección abierta (apertura no destructiva: el estado vale hasta
+// el commit; los ids monótonos hacen inofensivo un flag rancio).
+let editandoMonto: number | null = null;
+
+interface BorradorMonto {
+  readonly id: number;
+  readonly valor: string;
+  readonly inicio: number | null;
+  readonly fin: number | null;
+}
+
+/** Borrador en curso (input de monto con foco): sobrevive a los renders de fondo. */
+function borradorEnEdicion(): BorradorMonto | null {
+  if (descartarBorrador) return null;
+  const a = document.activeElement;
+  if (!(a instanceof HTMLInputElement) || a.dataset["accion"] !== "monto") return null;
+  const cell = a.closest(".cell");
+  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+  if (!Number.isInteger(id)) return null;
+  return { id, valor: a.value, inicio: a.selectionStart, fin: a.selectionEnd };
+}
+
+/** Borradores visibles sin foco (inválidos tras blur): se capturan del DOM. */
+function borradoresVisibles(): Map<number, string> {
+  const sucios = new Map<number, string>();
+  const a = document.activeElement;
+  sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto").forEach((input) => {
+    if (input === a || input.value === "") return;
+    const cell = input.closest(".cell");
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+    if (Number.isInteger(id)) sucios.set(id, input.value);
+  });
+  return sucios;
+}
+
+/** Restaura borradores sin foco tras el render (solo valor, nunca foco: B2). */
+function restaurarSucios(sucios: Map<number, string>): void {
+  sucios.forEach((valor, id) => {
+    const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
+    if (input && document.activeElement !== input) input.value = valor;
+  });
+}
+
+/** Restaura un borrador tras el render (la celda puede haber cambiado a badge). */
+function restaurarBorrador(b: BorradorMonto): void {
+  const input = cellById(b.id)?.querySelector<HTMLInputElement>("input.cell-monto");
+  if (!input) return;
+  input.value = b.valor;
+  input.focus();
+  if (b.inicio !== null && b.fin !== null) input.setSelectionRange(b.inicio, b.fin);
+}
+
+// ponytail: foco al input de monto (select-all al abrir corrección, caret al final si no).
+function enfocarMonto(id: number, seleccionar = false): void {
+  const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
+  if (!input) return;
+  input.focus();
+  if (seleccionar) input.select();
+  else input.setSelectionRange(input.value.length, input.value.length);
+}
+
+/** cents → texto editable con redondez exacta por parsearMonto ("500" → "500.00"). */
+function textoEditable(cents: Cents): string {
+  return (cents / 100).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/** Valida y guarda el input (change o Enter). Id del comprobante o null si no hubo monto. */
+function commitearMonto(input: HTMLInputElement, reenfocar = false): number | null {
+  const cell = input.closest(".cell");
+  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+  const item = obtenerComprobante(id);
+  if (!item) return null;
+  const cents = parsearMonto(input.value);
+  // Inválido → se conserva el borrador para corregirlo (el title muestra el formato).
+  // ponytail: el blur (change) no roba el foco: solo Enter reenfoca.
+  if (cents === null) {
+    const typed = input.value;
+    renderHojas();
+    const deNuevo = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
+    if (deNuevo) deNuevo.value = typed;
+    if (reenfocar) enfocarMonto(id);
+    return null;
+  }
+  // change en text input = escribió + blur/enter: el total pasa a manual.
+  // ponytail: abrir y salir sin cambios también lo vuelve manual (queda
+  // protegido de futuros auto-rellenos: el usuario lo validó).
+  editandoMonto = null;
+  item.montoCents = cents;
+  item.montoManual = true;
+  renderHojas();
+  return id;
+}
+
 // Repinta UNA celda (llegó su miniatura) sin reconstruir la grilla.
 export function actualizarMiniatura(id: number): void {
   const cell = cellById(id);
   if (!cell) return;
   const slot = buscarSlot(id);
   if (!slot) return;
-  pintarCelda(cell, slot.hoja.slots[slot.idx] ?? null, slot.idx, slot.hoja.id);
+  // ponytail: la mini no pisa el borrador en curso de esa celda (y el
+  // replaceChildren bajo el flag no commitea el borrador vía change).
+  const b = borradorEnEdicion();
+  bajoMutandoHojas(() => {
+    pintarCelda(cell, slot.hoja.slots[slot.idx] ?? null, slot.idx, slot.hoja.id);
+  });
+  if (b && b.id === id) restaurarBorrador(b);
 }
 
 /* ---------- Drag entre casillas (Pointer Events: mover/swap) ---------- */
@@ -637,8 +771,11 @@ function moverSlot(
     return;
   }
 
-  pintarCelda(nodoOrigen, origen.slots[idxOrigen] ?? null, idxOrigen, origen.id);
-  pintarCelda(nodoDestino, hojaDestino.slots[slotDestino] ?? null, slotDestino, hojaDestino.id);
+  // ponytail: el parche de 2 celdas también destruye inputs con foco.
+  bajoMutandoHojas(() => {
+    pintarCelda(nodoOrigen, origen.slots[idxOrigen] ?? null, idxOrigen, origen.id);
+    pintarCelda(nodoDestino, hojaDestino.slots[slotDestino] ?? null, slotDestino, hojaDestino.id);
+  });
 
   const imgA = nodoDestino.querySelector("img");
   if (imgA) animarFlipDesde(imgA, centroA.x, centroA.y);
@@ -674,7 +811,29 @@ export interface SheetsCallbacks {
   pedirArchivos: (hojaId: number) => void;
 }
 
+// ponytail: swap destructivo en curso (un change que llegue ahora es eco de
+// remoción, no edición del usuario: se ignora en el handler change).
+let mutandoHojas = false;
+
+/** Corre una mutación destructiva del DOM bajo el flag anti-eco. */
+function bajoMutandoHojas(fn: () => void): void {
+  mutandoHojas = true;
+  try {
+    fn();
+  } finally {
+    mutandoHojas = false;
+  }
+}
+
+/** Predicado del guard anti-eco (exportado para regresionarlo en tests). */
+export function esEcoDeRemocion(target: HTMLInputElement): boolean {
+  return mutandoHojas || !target.isConnected;
+}
+
 export function initSheets(cb: SheetsCallbacks): void {
+  // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
+  if (sheetsEl.dataset["init"] === "1") return;
+  sheetsEl.dataset["init"] = "1";
   sheetsEl.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !e.isPrimary) return;
     if (state.modoOcr) return;
@@ -820,12 +979,13 @@ export function initSheets(cb: SheetsCallbacks): void {
         return;
       case "corregir-monto": {
         const item = obtenerComprobante(id);
-        if (!item) return;
-        item.montoCents = null;
-        item.montoManual = false; // se reabre al automático (null = candidata)
+        // ponytail: apertura no destructiva (el valor previo se edita, no se
+        // borra); fuera de ok no hay input que mostrar. Sin reintento IA: la
+        // IA solo entra por subida/botón/giro.
+        if (!item || item.estado !== "ok") return;
+        editandoMonto = id;
         renderHojas();
-        // ponytail: disparo pelado (con la cola idle nadie más la relee).
-        void import("../pipeline/extract").then((m) => m.extraerPendientes()).catch(() => {});
+        enfocarMonto(id, true);
         return;
       }
       case "layout":
@@ -846,20 +1006,49 @@ export function initSheets(cb: SheetsCallbacks): void {
   sheetsEl.addEventListener("change", (e) => {
     const target = e.target as HTMLElement | null;
     if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") return;
+    // ponytail: eco de remoción (el swap destruyó el input enfocado): nunca es edición.
+    if (esEcoDeRemocion(target)) return;
+    commitearMonto(target);
+  });
+
+  // Monto manual por teclado: Enter confirma, Escape cancela el borrador.
+  sheetsEl.addEventListener("keydown", (e) => {
+    const target = e.target as HTMLElement | null;
+    if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") return;
     const cell = target.closest(".cell");
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
-    const item = obtenerComprobante(id);
-    if (!item) return;
-    const cents = parsearMonto(target.value);
-    // Inválido → re-render restaura el input vacío (el title muestra el formato).
-    if (cents === null) {
-      renderHojas();
+    if (!Number.isInteger(id)) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // ponytail: commit directo (sin blur): el foco sigue en el input y el
+      // render sale síncrono, así el badge ya existe al enfocarlo.
+      const confirmado = commitearMonto(target, true);
+      if (confirmado !== null) {
+        cellById(confirmado)?.querySelector<HTMLElement>(".cell-badge")?.focus();
+      }
       return;
     }
-    // change en text input = escribió + blur/enter: el total pasa a manual.
-    item.montoCents = cents;
-    item.montoManual = true;
-    renderHojas();
+    if (e.key === "Escape") {
+      e.preventDefault();
+      // ponytail: cancelar es no tocar el estado (sigue el valor previo) y el
+      // flag fresco cubre el input sin valor previo; sin change en el camino.
+      // ponytail: primero se baja el drag (este handler corre antes que el de
+      // document): con drag activo el render se difiere y el foco a la celda
+      // commitearía el borrador vía change.
+      if (pointerDrag) {
+        pointerDrag = null;
+        cancelarDragVisual();
+        renderPendiente = false;
+      }
+      editandoMonto = null;
+      descartarBorrador = true;
+      try {
+        renderHojas(); // descarta el borrador sin disparar change
+      } finally {
+        descartarBorrador = false;
+      }
+      cellById(id)?.focus();
+    }
   });
 
   // Drag nativo de archivos del explorador (DataTransfer) sobre las hojas.

@@ -14,6 +14,7 @@ const {
   aplicarATodas,
   cambiarLayoutHoja,
   esDragDeArchivos,
+  esEcoDeRemocion,
   initSheets,
   quitarComprobante,
   renderHojas,
@@ -244,26 +245,199 @@ describe("monto manual", () => {
     expect(document.querySelector("input.cell-monto")).toBeNull();
   });
 
-  it("change inválido restaura el input sin monto", () => {
+  it("change inválido conserva el borrador sin robar el foco", () => {
     const c = sembrarOk();
     const input = inputMonto();
     input.value = "abc";
     input.dispatchEvent(new Event("change", { bubbles: true }));
     expect(c.montoCents).toBeNull();
-    expect(document.querySelector("input.cell-monto")).not.toBeNull();
+    const deNuevo = inputMonto();
+    expect(deNuevo.value).toBe("abc");
+    // ponytail: el blur no reenfoca (solo Enter); el foco sigue donde lo dejó el usuario.
+    expect(document.activeElement).toBe(document.body);
+    expect(document.activeElement).not.toBe(deNuevo);
   });
 
-  it("clic en badge vuelve a input y reabre el automático", () => {
+  it("esEcoDeRemocion: desatachado es eco, atachado con foco no", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "777";
+    input.focus();
+    expect(esEcoDeRemocion(input)).toBe(false);
+    input.remove();
+    // ponytail: jsdom no dispara change por remoción (el guard real se cubre
+    // en E2E Chrome); acá se regresiona el predicado, que es lo testeable.
+    expect(esEcoDeRemocion(input)).toBe(true);
+  });
+
+  it("miniatura en vuelo no commitea ni pisa el borrador enfocado", () => {
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "45";
+    input.focus();
+    c.thumbUrl = "blob:thumb-nueva";
+    actualizarMiniatura(c.id);
+    expect(c.montoCents).toBeNull();
+    expect(c.montoManual).toBe(false);
+    const deNuevo = inputMonto();
+    expect(deNuevo.value).toBe("45");
+    expect(document.activeElement).toBe(deNuevo);
+  });
+
+  it("clic en badge abre edición con el valor previo, foco y sin reintento IA", () => {
+    state.moneda = "USD";
     const c = sembrarOk();
     const input = inputMonto();
     input.value = "500";
     input.dispatchEvent(new Event("change", { bubbles: true }));
     expect(c.montoCents).toBe(50000);
-    expect(c.montoManual).toBe(true);
     document.querySelector<HTMLElement>(".cell-badge")?.click();
+    // ponytail: apertura no destructiva (el null al abrir era el bug del Escape).
+    expect(c.montoCents).toBe(50000);
+    const deNuevo = document.querySelector<HTMLInputElement>("input.cell-monto");
+    expect(deNuevo?.value).toBe("500.00");
+    expect(document.activeElement).toBe(deNuevo);
+    expect(deNuevo?.selectionStart).toBe(0);
+    expect(deNuevo?.selectionEnd).toBe(deNuevo?.value.length);
+    // ponytail: la IA solo entra por subida/botón/giro, nunca por corregir.
+    expect(vi.mocked(extraerPendientes)).not.toHaveBeenCalled();
+  });
+
+  it("Escape sin escribir restaura el badge con el valor previo", () => {
+    state.moneda = "USD";
+    const c = sembrarOk();
+    inputMonto().value = "500";
+    inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector<HTMLElement>(".cell-badge")?.click();
+    inputMonto().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(c.montoCents).toBe(50000);
+    expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 500.00");
+    expect(document.querySelector("input.cell-monto")).toBeNull();
+  });
+
+  it("Escape tras escribir descarta el borrador y conserva el previo", () => {
+    const c = sembrarOk();
+    inputMonto().value = "500";
+    inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector<HTMLElement>(".cell-badge")?.click();
+    const editando = inputMonto();
+    editando.value = "510.5";
+    editando.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(c.montoCents).toBe(50000);
+    expect(editando.isConnected).toBe(false);
+  });
+
+  it("borrador inválido sin foco sobrevive a un render de fondo", () => {
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "abc";
+    input.blur();
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    renderHojas(); // cola/mini pintando de fondo sin foco en el input
+    expect(inputMonto().value).toBe("abc");
     expect(c.montoCents).toBeNull();
-    expect(c.montoManual).toBe(false);
-    expect(document.querySelector("input.cell-monto")).not.toBeNull();
+    expect(document.activeElement).not.toBe(inputMonto());
+  });
+
+  it("Enter con prefill de miles sin cambios conserva el valor exacto", () => {
+    state.moneda = "USD";
+    const c = sembrarOk();
+    inputMonto().value = "1111";
+    inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
+    expect(c.montoCents).toBe(111100);
+    document.querySelector<HTMLElement>(".cell-badge")?.click();
+    // ponytail: el prefill con coma de miles debe hacer roundtrip por parsearMonto.
+    expect(inputMonto().value).toBe("1,111.00");
+    inputMonto().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(c.montoCents).toBe(111100);
+    expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,111.00");
+  });
+
+  it("Enter con edición confirma el nuevo valor en el badge", () => {
+    state.moneda = "USD";
+    const c = sembrarOk();
+    inputMonto().value = "500";
+    inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector<HTMLElement>(".cell-badge")?.click();
+    const editando = inputMonto();
+    editando.value = "510.5";
+    editando.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(c.montoCents).toBe(51050);
+    expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 510.50");
+    expect(document.activeElement).toBe(document.querySelector(".cell-badge"));
+  });
+
+  it("inválido en corrección conserva el tipeado sin tocar el previo ni reenfocar", () => {
+    const c = sembrarOk();
+    inputMonto().value = "500";
+    inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector<HTMLElement>(".cell-badge")?.click();
+    const editando = inputMonto();
+    editando.value = "abc";
+    editando.blur(); // el foco ya salió (clic fuera): el change no lo trae de vuelta
+    editando.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(c.montoCents).toBe(50000);
+    const deNuevo = inputMonto();
+    expect(deNuevo.value).toBe("abc");
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("render de fondo preserva borrador, foco y caret", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "12.5";
+    input.focus();
+    input.setSelectionRange(2, 2);
+    renderHojas(); // p. ej. la cola pintando otro ítem
+    const deNuevo = inputMonto();
+    expect(deNuevo.value).toBe("12.5");
+    expect(document.activeElement).toBe(deNuevo);
+    expect(deNuevo.selectionStart).toBe(2);
+  });
+
+  it("Enter confirma y deja el foco en el badge", () => {
+    state.moneda = "USD";
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "99.99";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 99.99");
+    expect(document.activeElement).toBe(document.querySelector(".cell-badge"));
+  });
+
+  it("Escape descarta el borrador y enfoca la celda", () => {
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "12.5";
+    input.focus();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(c.montoCents).toBeNull();
+    const deNuevo = inputMonto();
+    expect(deNuevo.value).toBe("");
+    expect(document.activeElement).toBe(deNuevo.closest(".cell"));
+  });
+
+  it("Escape con drag abierto cancela sin commitear", () => {
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "12.5";
+    input.focus();
+    document.querySelector(".cell img")?.dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: 10,
+        clientY: 10,
+      }),
+    );
+    expect(document.querySelector(".sheet-grid.dragging")).not.toBeNull();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    // ponytail: con drag activo el render se difería y el foco a la celda
+    // commiteaba el borrador vía change (el Esc confirmaba en vez de cancelar).
+    expect(c.montoCents).toBeNull();
+    expect(inputMonto().value).toBe("");
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
   });
 
   it("pointerdown en el input no inicia drag (foco intacto)", () => {
@@ -602,7 +776,7 @@ describe("giro manual", () => {
     expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 90);
   });
 
-  it("corregir-monto reabre el automático y dispara el lote", async () => {
+  it("corregir-monto abre edición con el valor previo y sin reintento IA", () => {
     const h = crearHoja("u1");
     const c = comprobante({ estado: "ok", montoCents: 500, montoManual: true });
     h.slots[0] = c;
@@ -611,10 +785,25 @@ describe("giro manual", () => {
     const badge = document.querySelector<HTMLButtonElement>('[data-accion="corregir-monto"]');
     if (!badge) throw new Error("sin badge corregir-monto");
     badge.click();
-    expect(c.montoCents).toBeNull();
-    expect(c.montoManual).toBe(false);
-    await vi.waitFor(() => expect(vi.mocked(extraerPendientes)).toHaveBeenCalledWith());
-    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+    // ponytail: apertura no destructiva (el null al abrir era el bug del Escape).
+    expect(c.montoCents).toBe(500);
+    const input = document.querySelector<HTMLInputElement>("input.cell-monto");
+    expect(input?.value).toBe("5.00");
+    expect(document.activeElement).toBe(input);
+    // ponytail: la IA solo entra por subida/botón/giro, nunca por corregir.
+    expect(vi.mocked(extraerPendientes)).not.toHaveBeenCalled();
+  });
+
+  it("corregir-monto fuera de ok no hace nada", () => {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "procesando", montoCents: 500 });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    document.querySelector<HTMLButtonElement>('[data-accion="corregir-monto"]')?.click();
+    expect(c.montoCents).toBe(500);
+    expect(document.querySelector('[data-accion="corregir-monto"]')).not.toBeNull();
+    expect(document.querySelector("input.cell-monto")).toBeNull();
   });
 
   it("pointerdown en girar no inicia drag", () => {

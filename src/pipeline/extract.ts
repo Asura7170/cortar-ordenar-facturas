@@ -142,6 +142,21 @@ export async function extraerTotalesLote(
 }
 
 /** Aplica montos solo a comprobantes vivos que sigan en null. Devuelve aplicados. */
+// ponytail: el borrador en curso gana al lote en vuelo (igual que lo manual confirmado).
+// Sin foco también vale: el change válido commitea en el acto, así que un input no
+// vacío en celda null es borrador inválido tras blur. Sin estado extra: se lee del DOM.
+function montoEnEdicion(id: number): boolean {
+  const a = document.activeElement;
+  if (
+    a instanceof HTMLInputElement &&
+    a.dataset["accion"] === "monto" &&
+    a.closest(".cell")?.getAttribute("data-id") === String(id)
+  )
+    return true;
+  const input = document.querySelector(`.cell[data-id="${id}"] input.cell-monto`);
+  return input instanceof HTMLInputElement && input.value !== "";
+}
+
 export function aplicarTotales(
   items: readonly ItemLote[],
   montos: ReadonlyMap<number, Cents | null>,
@@ -150,6 +165,7 @@ export function aplicarTotales(
   for (const it of items) {
     const cents = montos.get(it.idx) ?? null;
     if (cents === null) continue;
+    if (montoEnEdicion(it.id)) continue; // el borrador en curso gana al lote en vuelo
     const slot = buscarSlot(it.id);
     if (!slot) continue; // limpiado/quitado durante el fetch: no resucita
     const actual = slot.hoja.slots[slot.idx];

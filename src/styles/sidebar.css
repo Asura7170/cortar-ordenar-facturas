@@ -124,6 +124,26 @@
 #inputCodigo:enabled::placeholder {
   color: light-dark(var(--tinta-suave), #9db894);
 }
+/* Error de código: borde sello + vibración al bloquear una salida con el
+   código activo e incompleto. Solo transform (respeta reduced-motion global). */
+#inputCodigo.codigo-error:enabled {
+  border-color: var(--sello);
+  background: color-mix(in srgb, var(--sello) 10%, var(--input-bg));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sello) 25%, transparent);
+}
+#inputCodigo.sacudir:enabled {
+  animation: sacudir 0.3s;
+}
+@keyframes sacudir {
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
 
 /* Selector de esquina: radios nativos (teclado gratis) con mini-hoja visual.
    El seleccionado se pinta con :has(), sin clases por JS. */
