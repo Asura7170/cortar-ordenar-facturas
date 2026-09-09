@@ -100,9 +100,9 @@
   --ficha-activa: light-dark(var(--verde-claro), var(--monto-valor));
   --layout-activo: light-dark(var(--verde-tinta), var(--monto-valor));
 
-  /* Tipografía */
-  --serif: "Libre Baskerville", Georgia, serif;
-  --mono: "IBM Plex Mono", "Courier New", monospace;
+  /* Tipografía (vendoreada en public/fonts: sin CDN por COEP require-corp) */
+  --serif: "Public Sans", "Segoe UI", Verdana, sans-serif;
+  --mono: "Public Sans", "Segoe UI", Verdana, sans-serif;
 
   /* Medidas */
   --radio: 10px;
@@ -111,6 +111,113 @@
   --anillo: 0 0 0 3px color-mix(in srgb, var(--renglon-fuerte) 50%, transparent);
 
   color-scheme: dark;
+}
+
+/* ============ PUBLIC SANS VENDOREADA (OFL, ver public/fonts/OFL.txt) ============ */
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-400.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-ext-400.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-400italic.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-ext-400italic.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-600.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-ext-600.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-700.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-ext-700.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-800.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/public-sans-latin-ext-800.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
 }
 
 /* ============ TEMA CLARO (Libro Mayor en papel) ============ */
@@ -196,7 +303,7 @@ select {
   text-wrap: balance;
 }
 .brand-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--texto-panel-suave);
   letter-spacing: 0.04em;
 }
@@ -213,7 +320,7 @@ select {
   border-radius: var(--radio-s);
 }
 .monto-label {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--texto-panel-suave);
   text-transform: uppercase;
@@ -223,6 +330,13 @@ select {
   font-size: 22px;
   font-weight: 600;
   color: var(--monto-valor);
+  font-variant-numeric: tabular-nums;
+}
+/* Números densos con la misma tabulación del monto (montos/badges/contadores). */
+.sheet-panel-count,
+.canvas-meta,
+.cell-monto,
+.dz-fmt {
   font-variant-numeric: tabular-nums;
 }
 
@@ -351,7 +465,7 @@ select {
   display: inline-block;
   margin-top: 10px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--texto-panel-suave);
   border: 1px solid var(--borde-panel);
   border-radius: 20px;
@@ -408,7 +522,7 @@ select {
   gap: 8px;
 }
 .field-mini {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--texto-panel-suave);
   white-space: nowrap;
 }
@@ -535,7 +649,7 @@ input::placeholder {
 }
 
 .hint {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--texto-panel-suave);
   margin-top: 10px;
   line-height: 1.5;
@@ -777,7 +891,7 @@ input::placeholder {
   top: 10px;
   left: 10px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tinta-fina);
   background: var(--fondo-sheet-tag);
   border: 1px solid var(--borde-sheet-tag);
@@ -855,7 +969,7 @@ input::placeholder {
   justify-content: space-between;
 }
 .sheet-panel-title {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--texto-panel-suave);
@@ -920,7 +1034,7 @@ input::placeholder {
   border: 1px solid var(--verde-tinta);
 }
 .layout-name {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.2;
   color: var(--texto-panel-suave);
   text-align: center;
@@ -1202,7 +1316,7 @@ body.is-dragging .cell:not(.empty) {
   margin: 0;
   padding: 8px 8px 34px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--tinta);
   white-space: pre-wrap;
@@ -1224,7 +1338,7 @@ body.is-dragging .cell:not(.empty) {
   border-radius: 4px;
   background: var(--verde-claro);
   color: var(--verde-tinta);
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--mono);
   line-height: 1.2;
   z-index: 2;
@@ -1241,7 +1355,7 @@ body.is-dragging .cell:not(.empty) {
   bottom: 6px;
   left: 6px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--tinta-fina);
   background: var(--procesando-bg);
   border: 1px solid var(--renglon);
@@ -1260,7 +1374,7 @@ body.is-dragging .cell:not(.empty) {
   bottom: 6px;
   left: 6px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--sello);
   background: var(--error-bg);
   border: 1px solid var(--sello);
