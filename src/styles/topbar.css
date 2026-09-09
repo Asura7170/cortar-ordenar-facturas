@@ -1,0 +1,136 @@
+/* TOPBAR — header, brand, monto, zoom, lupa. Carga 2/4 tras base. */
+/* ============ TOPBAR ============ */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 22px;
+  background: var(--topbar-grad);
+  border-bottom: 1px solid var(--borde-panel);
+  color: var(--texto-panel);
+  position: relative;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  background: var(--papel);
+  color: var(--tinta);
+  border-radius: var(--radio-s);
+  box-shadow:
+    inset 0 0 0 1px var(--renglon),
+    0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+.brand-sub {
+  font-size: 12px;
+  color: var(--texto-panel-suave);
+  letter-spacing: 0.04em;
+}
+
+.monto-box {
+  margin-left: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--monto-bg);
+  border: 1px solid var(--borde-panel);
+  border-radius: var(--radio-s);
+}
+.monto-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--texto-panel-suave);
+  text-transform: uppercase;
+}
+.monto-valor {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--monto-valor);
+  font-variant-numeric: tabular-nums;
+}
+.topbar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Grupo de zoom: centrado absoluto (+/− siempre; reset solo con zoom).
+   ponytail: `translate`, no `transform`: así no choca con .btn:active. */
+.zoom-grupo {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.zoom-grupo .btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+#btnZoom {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lupa: cuadrado fijo con zoom alrededor del puntero (el JS lo mueve con
+   transform y lo muestra con opacity: solo compositor). */
+#lupa {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 200px;
+  height: 200px;
+  overflow: hidden;
+  border: 1px solid var(--borde-panel);
+  border-radius: 8px;
+  box-shadow: var(--sombra-hoja);
+  background: var(--papel);
+  pointer-events: none;
+  opacity: 0;
+  content-visibility: hidden;
+  will-change: transform, opacity;
+  z-index: 60;
+}
+#lupaCanvas {
+  display: block;
+}
+
+/* Lupa activa: la lente reemplaza al puntero solo dentro del canvas (donde
+   opera). Topbar/sidebar/modales conservan su cursor. El !important es
+   intencional: gana a .cell grab, botones e inputs. */
+.lupa-activa .canvas,
+.lupa-activa .canvas * {
+  cursor: none !important;
+}
+
+/* ponytail: #btnTema vive en topbar (su DOM), aunque estaba junto a sidebar. */
+/* Botón de tema (topbar) */
+#btnTema {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  font-size: 16px;
+}
+.tema-ico {
+  line-height: 1;
+}

@@ -20,7 +20,11 @@
       crossorigin
       href="./fonts/public-sans-latin-400.woff2"
     />
-    <link rel="stylesheet" href="./src/styles.css" />
+    <!-- Orden fijo: base → topbar → sidebar → canvas (preserva cascada del monolito). -->
+    <link rel="stylesheet" href="./src/styles/base.css" />
+    <link rel="stylesheet" href="./src/styles/topbar.css" />
+    <link rel="stylesheet" href="./src/styles/sidebar.css" />
+    <link rel="stylesheet" href="./src/styles/canvas.css" />
   </head>
   <body>
     <div class="app">
