@@ -377,6 +377,7 @@ let lupaActiva = false;
 let lupaRaf: number | null = null;
 let lupaX = 0;
 let lupaY = 0;
+let lupaTieneMuestra = false;
 let lupaSuprimirClic = false;
 
 function setLupa(v: boolean): void {
@@ -384,7 +385,10 @@ function setLupa(v: boolean): void {
   btnLupa.setAttribute("aria-pressed", String(v));
   // ponytail: la lente reemplaza al puntero (centrada): sin cursor nativo.
   document.body.classList.toggle("lupa-activa", v);
-  lupaEl.style.opacity = v ? "1" : "0";
+  // ponytail: oculta hasta la primera muestra (activar con el puntero fuera
+  // no debe plantar un cuadrado vacío en la esquina).
+  lupaTieneMuestra = false;
+  lupaEl.style.opacity = "0";
   lupaEl.style.contentVisibility = v ? "visible" : "hidden";
   if (v) {
     const dpr = window.devicePixelRatio || 1;
@@ -404,7 +408,7 @@ function setLupa(v: boolean): void {
 
 function dibujarLupa(): void {
   lupaRaf = null;
-  if (!lupaActiva) return;
+  if (!lupaActiva || !lupaTieneMuestra) return;
   // Solo transform/opacity: el cuadrado reemplaza al puntero (centrado), sin layout.
   const pad = 16;
   const centra = (p: number, max: number): number =>
@@ -951,6 +955,19 @@ export function initSheets(cb: SheetsCallbacks): void {
     },
     true,
   );
+  // ponytail: el clic de teclado (Enter/Espacio) no lleva pointerdown previo:
+  // si purgara por press, un flag rancio se lo tragaría. Los gestos
+  // abortados tampoco dejan clic en vuelo.
+  document.addEventListener(
+    "keydown",
+    () => {
+      lupaSuprimirClic = false;
+    },
+    true,
+  );
+  document.addEventListener("pointercancel", () => {
+    lupaSuprimirClic = false;
+  });
 
   // ponytail: la lupa no consume wheel (el ctrl+rueda sigue al zoom) ni clics.
   const zonaLupa = canvasEl ?? sheetsEl;
@@ -958,12 +975,20 @@ export function initSheets(cb: SheetsCallbacks): void {
     if (!lupaActiva) return;
     lupaX = e.clientX;
     lupaY = e.clientY;
+    lupaTieneMuestra = true;
+    lupaEl.style.opacity = "1";
     if (lupaRaf === null) lupaRaf = requestAnimationFrame(dibujarLupa);
   });
   zonaLupa.addEventListener("pointerleave", () => {
+    lupaTieneMuestra = false;
     lupaEl.style.opacity = "0";
   });
-  zonaLupa.addEventListener("pointerenter", () => {
-    if (lupaActiva) lupaEl.style.opacity = "1";
+  zonaLupa.addEventListener("pointerenter", (e) => {
+    if (!lupaActiva) return;
+    lupaX = e.clientX;
+    lupaY = e.clientY;
+    lupaTieneMuestra = true;
+    lupaEl.style.opacity = "1";
+    if (lupaRaf === null) lupaRaf = requestAnimationFrame(dibujarLupa);
   });
 }

@@ -352,6 +352,11 @@ describe("drop de archivos sobre hojas", () => {
 });
 
 describe("zoom ctrl+rueda (layout, scroll sincronizado)", () => {
+  // Red ante asserts que fallen a mitad: cada test parte sin zoom.
+  afterEach(() => {
+    el<HTMLButtonElement>("btnZoom").click();
+  });
+
   function rueda(ctrl: boolean): boolean {
     const e = new WheelEvent("wheel", {
       bubbles: true,
@@ -409,13 +414,26 @@ describe("zoom ctrl+rueda (layout, scroll sincronizado)", () => {
 });
 
 describe("lupa", () => {
+  // Red ante asserts que fallen a mitad: cada test parte con la lupa apagada.
+  afterEach(() => {
+    const apagado = el<HTMLButtonElement>("btnLupa");
+    if (apagado.getAttribute("aria-pressed") === "true") apagado.click();
+  });
+
   it("el botón alterna y Escape la cierra", () => {
     const btn = el<HTMLButtonElement>("btnLupa");
     const lupa = el("lupa");
     expect(btn.getAttribute("aria-pressed")).toBe("false");
     btn.click();
     expect(btn.getAttribute("aria-pressed")).toBe("true");
-    expect(lupa.style.opacity).toBe("1");
+    // Sin muestra aún: oculta hasta que el puntero entre al canvas.
+    expect(lupa.style.opacity).toBe("0");
+    el("canvas").dispatchEvent(
+      Object.assign(new Event("pointermove", { bubbles: true }), {
+        clientX: 200,
+        clientY: 200,
+      }),
+    );
     document.dispatchEvent(
       new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" }),
     );
@@ -508,6 +526,36 @@ describe("lupa", () => {
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     tecla("m");
     expect(btn.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("keydown y pointercancel purgan la supresión (click posterior pasa)", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const press = (): void => {
+      document.dispatchEvent(
+        Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+          button: 0,
+          isPrimary: true,
+          pointerType: "mouse",
+        }),
+      );
+    };
+    const clicPasa = (): boolean => {
+      const c = new Event("click", { bubbles: true, cancelable: true });
+      document.dispatchEvent(c);
+      return !c.defaultPrevented;
+    };
+    btn.click();
+    press(); // apaga y arma la supresión…
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    // …pero un keydown (click de teclado en camino) la purga:
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+    );
+    expect(clicPasa()).toBe(true);
+    btn.click();
+    press(); // rearma…
+    document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    expect(clicPasa()).toBe(true); // …gesto abortado: nada que tragar
   });
 });
 
