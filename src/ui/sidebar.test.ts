@@ -523,11 +523,18 @@ describe("modalLimpiar", () => {
     h.slots[0] = comprobante();
     state.hojas.push(h);
     state.codigoValor = "123456";
+    const blob = {
+      codigoActivo: true,
+      codigoLongitud: 6,
+      codigoValor: "123456",
+      codigoPosicion: "inf-der",
+    };
+    localStorage.setItem("libro-mayor-state", JSON.stringify(blob));
     modalLimpiar.returnValue = "";
     modalLimpiar.close();
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]).toBe(h);
     expect(state.codigoValor).toBe("123456");
-    expect(localStorage.getItem("libro-mayor-state")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toEqual(blob);
   });
 });
