@@ -12,8 +12,8 @@ Pegar/subir/arrastrar imágenes y PDFs → normalizar (`imagen.ts`) → recorte 
 
 ```
 facturas/
-├─ index.html            # DOM = contrato (39 ids, getEl falla fuerte si falta)
-├─ package.json          # scripts vp + deps pineadas (ver §6)
+├─ index.html            # DOM = contrato (42 ids, getEl falla fuerte si falta)
+├─ package.json          # scripts vp + deps declaradas (pdfjs-dist ^ flotante, ver §6)
 ├─ pnpm-workspace.yaml   # catalog vite/vite-plus + overrides + allowBuilds (no tocar alias)
 ├─ vite.config.ts        # servir-ort-crudo + COOP/COEP + staged + lint prefer-vite-plus-imports
 ├─ vitest.config.ts      # jsdom + src/**/*.test.ts + setup.ts
@@ -64,13 +64,13 @@ facturas/
 
 ## 4. UI / Estado
 
-- **Código pedido:** check on/off + N solo dígitos + esquina (`sup-izq/sup-der/inf-izq/inf-der`, default `inf-der`), persisten por ventana (`guardarCodigo/guardarAjustes/borrarCodigo`, `LS_KEY=libro-mayor-state`); tema aparte `libro-mayor-tema`. Check activo con < N dígitos → bloquea salida + mensaje. Limpiar vacía lote y código, conserva ajustes (`modalLimpiar closedby=any`).
-- **Monto `monto.ts:8,18`:** `Cents` plano, suma exacta sin float, `formatearMoneda` en-US, `parsearMonto` `/^(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/`. Badge por comprobante + total + `totalItems`. Monedas `USD/ARS/EUR/BOB`, default `USD`.
+- **Código pedido:** check on/off + N solo dígitos + esquina (`sup-izq/sup-der/inf-izq/inf-der`, default `inf-der`), cada panel guarda lo suyo en `localStorage` (`guardarCodigo/guardarAjustes/borrarCodigo`, `LS_KEY=libro-mayor-state`, compartido entre ventanas, sobrevive al cierre); `borrarCodigo` solo retira lo de código. tema aparte `libro-mayor-tema`. Check activo con < N dígitos → bloquea salida + mensaje. Limpiar vacía lote y código, conserva ajustes (`modalLimpiar closedby=any`).
+- **Monto `monto.ts:8,18`:** `Cents` plano, suma exacta sin float, `formatearMoneda` en-US, `parsearMonto` `/^(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/` (miles con coma exigen decimal, `monto.ts:21`). Badge por comprobante + total + `totalItems`. Monedas `USD/ARS/EUR/BOB`, default `USD`.
 - **Grilla `layout.ts:4-103,136`:** 10 plantillas `u1,u2h,u2v,u3h,u3v,u3m,u4x2,u5m,u6x2,u6m`, `crearHoja` default `u4x2`, `redistribuir/limpiarHojas/buscarSlot`. Arrastre libre % + z-order, NO cambia orden inserción; X elimina comprobante; scroll vertical, hojas al ancho.
 - **OCR vista `ocrMode.ts:7`:** `modoOcr` no persiste; toggle muestra texto por celda + lupa (`lupaCanvas`), copiar por comprobante. Texto solo alimenta LLM.
 - **IA `state.ts:23-27`:** default Groq `https://api.groq.com/openai/v1/chat/completions` + `qwen/qwen3.8-27b`, `apiKey` en localStorage, nunca al repo. Sin config → monto manual.
 - **Sheets `sheets.ts:341-342,760,773`:** zoom efímero `0.25–4`, `M`=lupa, `Esc`=soltar, `Ctrl++/−/0`=zoom, `data-accion=girar-izq/der`.
-- **Contrato DOM `utils.ts:4`:** `getEl(id)` hace throw si falta `#id` en `index.html`. Ids: `btnZoomMenos/btnZoom/btnZoomMas/btnLupa/montoTotal/btnAjustes/chkCodigo/numCodigo/inputCodigo/posCodigo/chkOcr/ocrEstado/btnIA/btnDescargar2/btnPdf/btnImprimir/canvas/aviso/sheets/dropzone/fileInput/zonaPrint/lupa/modalAjustes/cfgBaseUrl/cfgModel/cfgApiKey/cfgMoneda/modalLimpiar`.
+- **Contrato DOM `utils.ts:4`:** `getEl(id)` hace throw si falta `#id` en `index.html`. Ids: `btnZoomMenos/btnZoom/btnZoomMas/btnLupa/montoTotal/btnAjustes/btnTema/temaIcono/chkCodigo/numCodigo/inputCodigo/chkOcr/ocrEstado/btnIA/btnDescargar2/btnPdf/btnImprimir/btnLimpiar/canvas/metaHojas/aviso/sheets/dropzone/fileInput/zonaPrint/lupa/lupaCanvas/modalAjustes/formAjustes/cfgBaseUrl/cfgModel/cfgApiKey/cfgMoneda/btnResetAjustes/btnGuardarAjustes/modalLimpiar/descLimpiar/tituloCodigo/tituloOcrToggle/tituloExportar/tituloAjustes/tituloLimpiar` (`posCodigo` es `name=` de radios, no id).
 
 ## 5. Salidas
 
@@ -85,7 +85,7 @@ Una fuente (`state.hojas` + layout + `codigoPosicion`): la vista carta es lo que
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `vp install`     | instala (pnpm 11 fijado en devEngines) + `prepare: vp config` activa `.vite-hooks/`                                                     |
 | `pnpm dev`       | `vp dev --open`, COOP/COEP para WASM threads                                                                                            |
-| `pnpm test`      | `vitest run` local (~319 `it` / 18 files). `ponytail: vp test` roto en vp 0.3.0 con pnpm/jsdom → usar binario                           |
+| `pnpm test`      | `vitest run` local. `ponytail: vp test` roto en vp 0.3.0 con pnpm/jsdom → usar binario                                                  |
 | `pnpm typecheck` | `tsc --noEmit` (estricto: `verbatimModuleSyntax/import type`, `erasableSyntaxOnly`, `isolatedDeclarations`, `noUncheckedIndexedAccess`) |
 | `vp check`       | lint + formato + tipos (`prefer-vite-plus-imports` exige `vite-plus`, no `vite`)                                                        |
 | `pnpm build`     | `vp build` → `dist/`, `target esnext`, solo-webgpu <1MB                                                                                 |
@@ -125,5 +125,4 @@ flowchart TD
     U -- "No" --> U1["Bloquear salida + mensaje"]
     U -- "Sí" --> V["Word: docx flotantes EMU SQUARE<br/>header/footer en esquina"]
     U -- "Sí" --> W["PDF/print: misma vista carta<br/>full-res · 1 sheet=1 página"]
-    B1 --> F
 ```
