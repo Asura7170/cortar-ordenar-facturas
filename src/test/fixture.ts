@@ -2,6 +2,12 @@
    HTML debe estar montado ANTES del import dinámico del módulo bajo test. */
 export const FIXTURE_HTML = `
 <div id="montoTotal"></div>
+<div class="zoom-grupo">
+<button id="btnZoomMenos"></button>
+<button id="btnZoom" hidden></button>
+<button id="btnZoomMas"></button>
+<button id="btnLupa" aria-pressed="false"></button>
+</div>
 <main class="canvas" id="canvas">
   <div class="canvas-head"><span id="metaHojas"></span></div>
   <p id="aviso" role="status"></p>
@@ -9,6 +15,7 @@ export const FIXTURE_HTML = `
   <label id="dropzone" for="fileInput" tabindex="0"></label>
   <input id="fileInput" type="file" multiple>
 </main>
+<div id="lupa" aria-hidden="true"><canvas id="lupaCanvas"></canvas></div>
 <input id="chkCodigo" type="checkbox">
 <input id="numCodigo" type="number" value="6">
 <input id="inputCodigo" type="text">

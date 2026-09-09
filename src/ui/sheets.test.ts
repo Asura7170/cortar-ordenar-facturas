@@ -351,6 +351,214 @@ describe("drop de archivos sobre hojas", () => {
   });
 });
 
+describe("zoom ctrl+rueda (layout, scroll sincronizado)", () => {
+  // Red ante asserts que fallen a mitad: cada test parte sin zoom.
+  afterEach(() => {
+    el<HTMLButtonElement>("btnZoom").click();
+  });
+
+  function rueda(ctrl: boolean): boolean {
+    const e = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: ctrl,
+      deltaY: -100,
+      clientX: 50,
+      clientY: 50,
+    });
+    el("canvas").dispatchEvent(e);
+    return e.defaultPrevented;
+  }
+
+  it("sin ctrl no toca el zoom (scroll nativo intacto)", () => {
+    rueda(false);
+    expect(el("sheets").style.getPropertyValue("zoom")).toBe("");
+    expect(el<HTMLButtonElement>("btnZoom").hidden).toBe(true);
+  });
+
+  it("con ctrl aplica zoom, muestra el % y el botón restaura", () => {
+    expect(rueda(true)).toBe(true);
+    const sheets = el("sheets");
+    const btn = el<HTMLButtonElement>("btnZoom");
+    expect(sheets.style.getPropertyValue("zoom")).not.toBe("");
+    expect(btn.hidden).toBe(false);
+    btn.click();
+    expect(sheets.style.getPropertyValue("zoom")).toBe("");
+    expect(btn.hidden).toBe(true);
+  });
+
+  it("botones +/− siempre visibles y aplican zoom centrado", () => {
+    const mas = el<HTMLButtonElement>("btnZoomMas");
+    const menos = el<HTMLButtonElement>("btnZoomMenos");
+    const sheets = el("sheets");
+    const btn = el<HTMLButtonElement>("btnZoom");
+    expect(mas.hidden).toBe(false);
+    expect(menos.hidden).toBe(false);
+    mas.click();
+    expect(sheets.style.getPropertyValue("zoom")).not.toBe("");
+    expect(btn.hidden).toBe(false);
+    btn.click();
+    expect(sheets.style.getPropertyValue("zoom")).toBe("");
+    expect(btn.hidden).toBe(true);
+  });
+
+  it("Ctrl+0 restaura el zoom por teclado", () => {
+    rueda(true);
+    expect(el("sheets").style.getPropertyValue("zoom")).not.toBe("");
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key: "0" }),
+    );
+    expect(el("sheets").style.getPropertyValue("zoom")).toBe("");
+    expect(el<HTMLButtonElement>("btnZoom").hidden).toBe(true);
+  });
+});
+
+describe("lupa", () => {
+  // Red ante asserts que fallen a mitad: cada test parte con la lupa apagada.
+  afterEach(() => {
+    const apagado = el<HTMLButtonElement>("btnLupa");
+    if (apagado.getAttribute("aria-pressed") === "true") apagado.click();
+  });
+
+  it("el botón alterna y Escape la cierra", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const lupa = el("lupa");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    btn.click();
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    // Sin muestra aún: oculta hasta que el puntero entre al canvas.
+    expect(lupa.style.opacity).toBe("0");
+    el("canvas").dispatchEvent(
+      Object.assign(new Event("pointermove", { bubbles: true }), {
+        clientX: 200,
+        clientY: 200,
+      }),
+    );
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" }),
+    );
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    expect(lupa.style.opacity).toBe("0");
+  });
+
+  it("la lente se centra en el puntero (lo reemplaza)", async () => {
+    el<HTMLButtonElement>("btnLupa").click();
+    el("canvas").dispatchEvent(
+      Object.assign(new Event("pointermove", { bubbles: true }), {
+        clientX: 200,
+        clientY: 200,
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    expect(el("lupa").style.transform).toBe("translate(100px, 100px)");
+    el<HTMLButtonElement>("btnLupa").click();
+  });
+
+  it("el primer clic izquierdo la apaga y traga ese clic", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    btn.click();
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    document.dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerType: "mouse",
+      }),
+    );
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    const tragado = new Event("click", { bubbles: true, cancelable: true });
+    document.dispatchEvent(tragado);
+    expect(tragado.defaultPrevented).toBe(true);
+    const libre = new Event("click", { bubbles: true, cancelable: true });
+    document.dispatchEvent(libre);
+    expect(libre.defaultPrevented).toBe(false);
+  });
+
+  it("el grupo zoom no apaga la lupa (coexiste con ella)", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const mas = el<HTMLButtonElement>("btnZoomMas");
+    btn.click();
+    mas.dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerType: "mouse",
+      }),
+    );
+    mas.click();
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    expect(el("sheets").style.getPropertyValue("zoom")).not.toBe("");
+    btn.click();
+    el<HTMLButtonElement>("btnZoom").click();
+    expect(el("sheets").style.getPropertyValue("zoom")).toBe("");
+  });
+
+  it("un press sin clic no envenena el próximo clic", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    btn.click();
+    const press = (x: number): void => {
+      document.dispatchEvent(
+        Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+          button: 0,
+          isPrimary: true,
+          pointerType: "mouse",
+          clientX: x,
+          clientY: 10,
+        }),
+      );
+    };
+    press(10); // apaga la lupa y arma la supresión…
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    press(20); // …pero el clic nunca llega (soltar fuera): se purga
+    const libre = new Event("click", { bubbles: true, cancelable: true });
+    document.dispatchEvent(libre);
+    expect(libre.defaultPrevented).toBe(false);
+  });
+
+  it("M alterna la lupa", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const tecla = (key: string): void => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key }),
+      );
+    };
+    tecla("m");
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    tecla("m");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("keydown y pointercancel purgan la supresión (click posterior pasa)", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const press = (): void => {
+      document.dispatchEvent(
+        Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+          button: 0,
+          isPrimary: true,
+          pointerType: "mouse",
+        }),
+      );
+    };
+    const clicPasa = (): boolean => {
+      const c = new Event("click", { bubbles: true, cancelable: true });
+      document.dispatchEvent(c);
+      return !c.defaultPrevented;
+    };
+    btn.click();
+    press(); // apaga y arma la supresión…
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    // …pero un keydown (click de teclado en camino) la purga:
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+    );
+    expect(clicPasa()).toBe(true);
+    btn.click();
+    press(); // rearma…
+    document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    expect(clicPasa()).toBe(true); // …gesto abortado: nada que tragar
+  });
+});
+
 describe("giro manual", () => {
   /** Tarjeta ok en modo imagen (thumb falso: no se decodifica en el test). */
   function sembrarGirable(): Comprobante {

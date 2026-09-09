@@ -252,6 +252,7 @@ select {
   background: var(--topbar-grad);
   border-bottom: 1px solid var(--borde-panel);
   color: var(--texto-panel);
+  position: relative;
 }
 
 .brand {
@@ -322,6 +323,55 @@ select {
 .topbar-actions {
   display: flex;
   gap: 10px;
+}
+
+/* Grupo de zoom: centrado absoluto (+/− siempre; reset solo con zoom).
+   ponytail: `translate`, no `transform`: así no choca con .btn:active. */
+.zoom-grupo {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.zoom-grupo .btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+#btnZoom {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lupa: cuadrado fijo con zoom alrededor del puntero (el JS lo mueve con
+   transform y lo muestra con opacity: solo compositor). */
+#lupa {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 200px;
+  height: 200px;
+  overflow: hidden;
+  border: 1px solid var(--borde-panel);
+  border-radius: 8px;
+  box-shadow: var(--sombra-hoja);
+  background: var(--papel);
+  pointer-events: none;
+  opacity: 0;
+  content-visibility: hidden;
+  will-change: transform, opacity;
+  z-index: 60;
+}
+#lupaCanvas {
+  display: block;
+}
+
+/* Lupa activa: la lente reemplaza al puntero solo dentro del canvas (donde
+   opera). Topbar/sidebar/modales conservan su cursor. El !important es
+   intencional: gana a .cell grab, botones e inputs. */
+.lupa-activa .canvas,
+.lupa-activa .canvas * {
+  cursor: none !important;
 }
 
 /* ============ WORKSPACE ============ */
@@ -838,7 +888,7 @@ input::placeholder {
 .sheets {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: safe center;
   gap: 30px;
 }
 /* Avisos de entrada bajo el head del canvas; vacío no ocupa lugar. */
