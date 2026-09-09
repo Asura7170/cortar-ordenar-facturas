@@ -1,0 +1,646 @@
+/* CANVAS — hojas, celdas, drag, OCR, overlay arrastre. Carga 4/4 tras sidebar. */
+/* ponytail: .dropzone-grande vive aquí (su DOM está en main.canvas, no en sidebar). */
+/* Tarjeta grande de subida: la dropzone del sidebar, agrandada al canvas.
+   Mismo lenguaje (papel + renglones de hoja), centrada en el área vacía. */
+.dropzone-grande {
+  max-width: 560px;
+  margin: 9vh auto;
+  padding: 52px 36px;
+  background: var(--papel);
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--renglon-fuerte) 16%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 100% 34px;
+  box-shadow: var(--sombra-hoja);
+  color: var(--tinta);
+}
+.dropzone-grande:hover,
+.dropzone-grande:focus-visible {
+  border-color: var(--renglon-fuerte);
+  background-color: var(--papel-brillo);
+  box-shadow: var(--sombra-hoja), var(--anillo);
+}
+.dropzone-grande .dz-ico {
+  font-size: 64px;
+  color: var(--verde-tinta);
+}
+.dropzone-grande .dz-titulo {
+  display: block;
+  margin-top: 12px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--tinta);
+  text-wrap: balance;
+}
+.dropzone-grande .dz-txt {
+  font-size: 14px;
+  color: var(--tinta-suave);
+  max-width: 40ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+.dropzone-grande .dz-fmt {
+  color: var(--tinta-suave);
+  border-color: var(--renglon);
+}
+.dz-ico {
+  font-size: 26px;
+  color: var(--texto-panel);
+  line-height: 1;
+}
+.dz-txt {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--texto-panel);
+  text-wrap: pretty;
+}
+.dz-fmt {
+  display: inline-block;
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--texto-panel-suave);
+  border: 1px solid var(--borde-panel);
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+/* ============ CANVAS / HOJAS ============ */
+.canvas {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 30px 60px;
+  background: var(--mesa-oscura);
+  scrollbar-width: thin;
+  scrollbar-color: var(--texto-panel-suave) transparent;
+  position: relative;
+  anchor-name: --canvas;
+}
+/* Overlay de arrastre: velo + marco discontinuo sobre el canvas visible.
+   ponytail: fixed + anchor sigue scroll/resize sin JS (absolute se anclaba al scrollHeight). */
+.canvas.arrastrando::after {
+  content: "Soltá los archivos para subirlos";
+  position: fixed;
+  position-anchor: --canvas;
+  top: anchor(top);
+  left: anchor(left);
+  right: anchor(right);
+  bottom: anchor(bottom);
+  margin: 12px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 24px;
+  font-size: 28px;
+  font-weight: 700;
+  color: light-dark(var(--texto-panel), var(--verde-tinta));
+  background: color-mix(in srgb, var(--renglon-fuerte) 18%, transparent);
+  border: 4px dashed var(--renglon-fuerte);
+  border-radius: var(--radio);
+  pointer-events: none;
+  z-index: 5;
+}
+.canvas-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  color: var(--texto-panel-suave);
+}
+.canvas-titulo {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.canvas-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.sheets {
+  display: flex;
+  flex-direction: column;
+  align-items: safe center;
+  gap: 30px;
+}
+/* Avisos de entrada bajo el head del canvas; vacío no ocupa lugar. */
+.hint-canvas {
+  margin: 0 0 12px;
+}
+.hint-canvas:empty {
+  display: none;
+}
+
+.sheet {
+  width: min(816px, 100%);
+  aspect-ratio: 8.5 / 11;
+  background: var(--papel);
+  border-radius: 4px;
+  box-shadow: var(--sombra-hoja);
+  position: relative;
+  overflow: hidden;
+  /* renglones contables suaves */
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--renglon-fuerte) 16%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 100% 34px;
+  background-position: 0 0;
+}
+.sheet-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--tinta-fina);
+  background: var(--fondo-sheet-tag);
+  border: 1px solid var(--borde-sheet-tag);
+  border-radius: 4px;
+  padding: 2px 8px;
+  z-index: 2;
+}
+
+/* Fila hoja + panel de distribución (siempre visible, a la derecha) */
+.sheet-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: min(1054px, 100%);
+}
+.sheet-panel {
+  background: var(--panel-claro);
+  border: 1px solid var(--borde-panel);
+  border-radius: var(--radio);
+  padding: 12px;
+  color: var(--texto-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--texto-panel-suave) transparent;
+}
+/* Columna derecha de la hoja: panel arriba, botón de agregar debajo. */
+.sheet-side {
+  width: 224px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Botón ＋ por hoja: sólido en reposo; en hover se vuelve fantasma
+   discontinuo (mismo lenguaje que el overlay de arrastre del canvas). */
+.btn-sumar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--verde-tinta);
+  background: var(--papel);
+  border: 2px solid var(--verde-tinta);
+  border-radius: var(--radio);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-style 0.15s;
+}
+.btn-sumar:hover,
+.btn-sumar:focus-visible {
+  color: light-dark(var(--verde-tinta), var(--monto-valor));
+  background: transparent;
+  border-style: dashed;
+  border-color: light-dark(var(--verde-tinta), var(--monto-valor));
+}
+.btn-sumar-mas {
+  font-size: 20px;
+  line-height: 1;
+}
+.sheet-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sheet-panel-title {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--texto-panel-suave);
+  text-wrap: balance;
+}
+.sheet-panel-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--texto-panel);
+}
+.sheet-panel .grid-opts {
+  grid-template-columns: repeat(3, 1fr);
+}
+.sheet-panel .apply-all {
+  width: 100%;
+}
+
+.grid-opts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.grid-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 3px;
+  border: 1px solid var(--gridopt-borde);
+  border-radius: 8px;
+  background: var(--gridopt-bg);
+  color: var(--texto-panel);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.grid-opt:hover {
+  border-color: var(--renglon-fuerte);
+  background: var(--gridopt-hover);
+}
+.grid-opt.active {
+  border-color: var(--verde-tinta);
+  background: var(--gridopt-activo);
+}
+
+/* Mini-vista de la distribución (fichas en grilla real) */
+.layout-mini {
+  display: grid;
+  gap: 2px;
+  width: 52px;
+  height: 34px;
+}
+.layout-mini .ficha {
+  background: var(--verde-tinta);
+  border-radius: 2px;
+  min-width: 0;
+  min-height: 0;
+}
+.grid-opt.active .ficha {
+  background: var(--ficha-activa);
+  border: 1px solid var(--verde-tinta);
+}
+.layout-name {
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--texto-panel-suave);
+  text-align: center;
+  text-wrap: balance;
+}
+.grid-opt.active .layout-name {
+  color: var(--layout-activo);
+  font-weight: 600;
+}
+
+.apply-all {
+  border: 1px solid var(--gridopt-borde);
+  border-radius: 8px;
+  padding: 6px;
+  font-size: 12px;
+  background: var(--gridopt-activo);
+  color: var(--texto-panel);
+  cursor: pointer;
+}
+.apply-all:hover {
+  border-color: var(--verde-tinta);
+}
+.sheet-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  padding: 48px 40px 40px;
+  gap: 16px;
+}
+
+.cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  user-select: none; /* nada de texto seleccionable en la casilla: ni el monto ni el × */
+}
+.cell.cell-ocr,
+.cell.cell-ocr * {
+  user-select: text;
+} /* en modo OCR el texto sí se puede seleccionar */
+.cell:not(.empty):not(.cell-ocr) {
+  cursor: grab;
+} /* en OCR no hay drag: flecha normal */
+.cell.empty {
+  border: 1px dashed var(--renglon-fuerte);
+  border-radius: 4px;
+  color: var(--tinta-fina);
+  font-size: 12px;
+}
+.cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* entera y lo más grande posible; bandas solo si difiere el ratio */
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  pointer-events: none; /* el pointerdown cae en la celda, no en la imagen */
+  -webkit-user-drag: none;
+  transition: box-shadow 0.15s;
+}
+.cell:hover img {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+/* Esqueleto mientras llega el thumb: mismo hueco que la foto, cero decodificación. */
+.cell-skel {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(
+    100deg,
+    var(--papel-sombra) 30%,
+    var(--papel-brillo) 50%,
+    var(--papel-sombra) 70%
+  );
+  background-size: 200% 100%;
+  animation: skel-sweep 1.2s linear infinite;
+}
+@keyframes skel-sweep {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Fantasma del comprobante mientras se arrastra (Pointer Events).
+   JS lo mueve únicamente con transform (compositor): left/top quedan en 0. */
+.drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 9999;
+  object-fit: contain;
+  opacity: 0.9;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+  will-change: transform;
+  transform-origin: center;
+}
+
+/* Cursor coherente y selección bloqueada durante todo el arrastre */
+body.is-dragging {
+  user-select: none;
+}
+body.is-dragging,
+body.is-dragging .cell:not(.empty) {
+  cursor: grabbing;
+}
+.cell.pickup img {
+  opacity: 0.3;
+}
+.cell.pickup {
+  cursor: grabbing;
+}
+
+/* Celda destino durante el arrastre de un comprobante */
+.cell.drop-target {
+  box-shadow: inset 0 0 0 2px var(--verde-tinta);
+  background: var(--verde-claro);
+  border-radius: 4px;
+}
+.cell.empty.drop-target {
+  border-style: solid;
+  border-color: var(--verde-tinta);
+}
+
+/* Durante el drag, el botón ×, el badge y el input no deben capturar el drop */
+.sheet-grid.dragging .cell-remove,
+.sheet-grid.dragging .cell-girar,
+.sheet-grid.dragging .cell-badge,
+.sheet-grid.dragging .cell-monto {
+  pointer-events: none;
+}
+
+/* Hoja como destino al soltar archivos desde el explorador */
+.sheet.file-drop {
+  outline: 2px dashed var(--verde-tinta);
+  outline-offset: 4px;
+}
+
+.cell-badge,
+.cell-monto {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--papel-brillo);
+  color: var(--verde-tinta);
+  border: 1px solid var(--renglon-fuerte);
+  border-radius: 4px;
+  padding: 2px 7px;
+  z-index: 2;
+}
+.cell-badge {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+/* Hit-area 44px como el × (el badge visual es bajo). */
+.cell-badge::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+}
+.cell-badge:focus-visible {
+  outline: 2px solid var(--verde-tinta);
+  outline-offset: 2px;
+}
+.cell-monto {
+  width: 11ch;
+}
+.cell-monto:focus-visible {
+  outline: 2px solid var(--verde-tinta);
+  outline-offset: 2px;
+}
+.cell-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: var(--celda-remove);
+  color: #fff;
+  font-size: 17px;
+  line-height: 1;
+  display: none;
+  z-index: 3;
+}
+/* Hit-area 44px: el visual queda en 28px, el ::after recibe el tap. */
+.cell-remove::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.cell:hover .cell-remove,
+.cell:focus-within .cell-remove {
+  display: block;
+}
+/* Sin hover (táctil) no hay revelado: siempre visible. Es capacidad, no breakpoint. */
+@media (hover: none) {
+  .cell .cell-remove {
+    display: block;
+  }
+}
+.cell-remove:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.cell-remove:hover {
+  background: var(--sello);
+}
+
+/* Giro manual: espejo del × pero arriba-izquierda y en verde (no es destructivo). */
+.cell-girar {
+  position: absolute;
+  top: 6px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(20, 25, 20, 0.72);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  display: none;
+  z-index: 3;
+}
+.cell-girar-izq {
+  left: 6px;
+}
+.cell-girar-der {
+  left: 40px;
+}
+/* Hit-area 44px: el visual queda en 28px, el ::after recibe el tap. */
+.cell-girar::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.cell:hover .cell-girar,
+.cell:focus-within .cell-girar {
+  display: block;
+}
+/* Sin hover (táctil) no hay revelado: siempre visible. Es capacidad, no breakpoint. */
+@media (hover: none) {
+  .cell .cell-girar {
+    display: block;
+  }
+}
+.cell-girar:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.cell-girar:hover {
+  background: var(--verde-tinta);
+}
+
+/* Modo OCR: la casilla muestra el texto del comprobante */
+.cell.cell-ocr {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
+  background: var(--papel-brillo);
+  border: 1px solid var(--renglon);
+  border-radius: 4px;
+}
+.cell-ocr-text {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 8px 8px 34px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tinta);
+  white-space: pre-wrap;
+  word-break: break-word;
+  scrollbar-width: thin;
+  scrollbar-color: var(--renglon-fuerte) transparent;
+  cursor: text;
+}
+.cell.cell-ocr .cell-remove {
+  display: block;
+  position: absolute;
+  top: auto;
+  bottom: 6px;
+  right: 6px;
+  width: auto;
+  height: auto;
+  padding: 3px 9px;
+  border: 1px solid var(--renglon);
+  border-radius: 4px;
+  background: var(--verde-claro);
+  color: var(--verde-tinta);
+  font-size: 12px;
+  font-family: var(--mono);
+  line-height: 1.2;
+  z-index: 2;
+}
+.cell.cell-ocr .cell-remove:hover {
+  background: var(--verde-tinta);
+  color: #fff;
+  border-color: var(--verde-tinta);
+}
+
+.cell-procesando::after {
+  content: "Procesando…";
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--tinta-fina);
+  background: var(--procesando-bg);
+  border: 1px solid var(--renglon);
+  border-radius: 4px;
+  padding: 2px 6px;
+  z-index: 2;
+}
+.cell-error {
+  border: 2px solid var(--sello);
+  border-radius: 4px;
+  background: var(--error-cell-bg);
+}
+.cell-error::after {
+  content: "Error: revisar imagen";
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--sello);
+  background: var(--error-bg);
+  border: 1px solid var(--sello);
+  border-radius: 4px;
+  padding: 2px 6px;
+  z-index: 2;
+}

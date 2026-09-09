@@ -1,0 +1,581 @@
+/* BASE — tokens :root, fuentes, reset, layout, controles globales, modal, print. Carga 1/4. */
+/* ============================================================
+   CORTAR Y ORDENAR FACTURAS — Diseño 1 · Libro Mayor
+   Papel contable clásico: marfil, renglones verdes, serif robusta,
+   sellos de goma y números tabulares. Sobrio, auditado, confiable.
+   ============================================================ */
+
+:root {
+  /* Papel y tinta (light-dark: valor claro, valor oscuro) */
+  --papel: light-dark(#faf6ea, #f4ecd8); /* papel marfil contable */
+  --papel-brillo: light-dark(#fffdf6, #fbf6e9); /* marfil más claro */
+  --papel-sombra: light-dark(#e6dcc0, #e2d6b8); /* marfil sombreado */
+  --tinta: light-dark(#2c3a28, #22311f); /* tinta verde negra del libro */
+  --tinta-suave: light-dark(#55654f, #4b5a47); /* tinta media */
+  --tinta-fina: light-dark(#7f8f7a, #7b8577); /* tinta tenue */
+  --renglon: light-dark(#cfe3c6, #b8cfae); /* renglón verde del libro contable */
+  --renglon-fuerte: light-dark(#9ecb96, #8fbf8a); /* renglón verde alto */
+  --sello: #b23a2e; /* sello de goma rojo */
+  --sello-suave: light-dark(#e7c4bd, #d8a29a); /* sello teñido */
+  --verde-tinta: #2f6b3a; /* verde tienda */
+  --verde-claro: #eef4ea; /* verde suave */
+
+  /* Superficies de la app */
+  --mesa: light-dark(#eceadf, #2e2b24); /* mesa ejecutiva */
+  --mesa-oscura: light-dark(#e3e1d4, #221f19); /* sombra de mesa */
+  --panel: light-dark(#f6f2e5, #3a352c); /* panel lateral */
+  --panel-claro: light-dark(#fdfaf0, #463f34); /* panel hover */
+  --borde-panel: light-dark(
+    color-mix(in srgb, #2c3a28 14%, transparent),
+    color-mix(in srgb, #fff 8%, transparent)
+  );
+  --texto-panel: light-dark(#2c3a28, #f0ead9); /* texto sobre panel */
+  --texto-panel-suave: light-dark(#57644f, #c9c0a8); /* claro ≈4.8:1 sobre #e3e1d4 (AA) */
+
+  /* Tema */
+  --input-bg: light-dark(#fffdf6, #241f18);
+  --input-placeholder: light-dark(#9aa48f, #8d8672);
+  --switch-bg: light-dark(#c9c4b2, #57504a);
+  --topbar-grad: light-dark(
+    linear-gradient(180deg, #f8f4e7, #efe9d7),
+    linear-gradient(180deg, #332f27, #2a2620)
+  );
+  --monto-bg: light-dark(
+    color-mix(in srgb, #2c3a28 6%, transparent),
+    color-mix(in srgb, #fff 5%, transparent)
+  );
+  --monto-valor: light-dark(#2f6b3a, #cfe6c2);
+  --dropzone-borde: light-dark(
+    color-mix(in srgb, #2c3a28 30%, transparent),
+    color-mix(in srgb, #f0ead9 30%, transparent)
+  );
+  --hover-claro: light-dark(
+    color-mix(in srgb, #2c3a28 7%, transparent),
+    color-mix(in srgb, #fff 8%, transparent)
+  );
+  --hover-ghost: light-dark(
+    color-mix(in srgb, #2c3a28 6%, transparent),
+    color-mix(in srgb, #fff 7%, transparent)
+  );
+  --fondo-sheet-tag: light-dark(
+    color-mix(in srgb, #faf6ea 95%, transparent),
+    color-mix(in srgb, #f4ecd8 90%, transparent)
+  );
+  --borde-sheet-tag: var(--renglon);
+  --procesando-bg: light-dark(
+    color-mix(in srgb, #faf6ea 95%, transparent),
+    color-mix(in srgb, #f4ecd8 90%, transparent)
+  );
+  --error-bg: light-dark(#fdf6f4, color-mix(in srgb, #f4ecd8 95%, transparent));
+  --error-cell-bg: color-mix(in srgb, #b23a2e 6%, transparent);
+  --aviso-motivo: light-dark(#b23a2e, #e59a8d); /* rojo sello; AA en ambos temas */
+  --celda-remove: light-dark(
+    color-mix(in srgb, #2c3a28 80%, transparent),
+    color-mix(in srgb, #22311f 75%, transparent)
+  );
+  --footer-barra: light-dark(
+    color-mix(in srgb, #faf6ea 95%, transparent),
+    color-mix(in srgb, #22311f 92%, transparent)
+  );
+
+  /* Superficies del modal (claro = marfil, oscuro = panel de la app) */
+  --modal-bg: light-dark(var(--papel), var(--panel));
+  --modal-input-bg: light-dark(var(--papel-brillo), var(--input-bg));
+  --modal-texto: light-dark(var(--tinta), var(--texto-panel));
+  --modal-texto-suave: light-dark(var(--tinta-suave), var(--texto-panel-suave));
+  --modal-borde: light-dark(var(--renglon), var(--borde-panel));
+
+  /* Opciones de distribución (minivista grid + aplicar a todas) */
+  --gridopt-bg: light-dark(var(--papel-brillo), var(--panel-claro));
+  --gridopt-hover: light-dark(
+    var(--verde-claro),
+    color-mix(in srgb, var(--verde-tinta) 28%, transparent)
+  );
+  --gridopt-activo: light-dark(
+    var(--verde-claro),
+    color-mix(in srgb, var(--verde-tinta) 30%, transparent)
+  );
+  --gridopt-borde: light-dark(var(--renglon), var(--borde-panel));
+  /* Estado activo de la minivista: claro = solo marco (fichas lavadas);
+     oscuro = fichas encendidas y texto en el verde luminoso del monto */
+  --ficha-activa: light-dark(var(--verde-claro), var(--monto-valor));
+  --layout-activo: light-dark(var(--verde-tinta), var(--monto-valor));
+
+  /* Tipografía (vendoreada en public/fonts: sin CDN por COEP require-corp) */
+  --serif: "Public Sans", "Segoe UI", Verdana, sans-serif;
+  --mono: "Public Sans", "Segoe UI", Verdana, sans-serif;
+
+  /* Medidas */
+  --radio: 10px;
+  --radio-s: 6px;
+  --sombra-hoja: 0 6px 14px rgba(0, 0, 0, 0.4), 0 18px 50px rgba(0, 0, 0, 0.25);
+  --anillo: 0 0 0 3px color-mix(in srgb, var(--renglon-fuerte) 50%, transparent);
+
+  color-scheme: dark;
+}
+
+/* ============ PUBLIC SANS VENDOREADA (OFL, ver public/fonts/OFL.txt) ============ */
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/public-sans-latin-400.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../../fonts/public-sans-latin-ext-400.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../../fonts/public-sans-latin-600.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../../fonts/public-sans-latin-ext-600.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../fonts/public-sans-latin-700.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../../fonts/public-sans-latin-ext-700.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("../../fonts/public-sans-latin-800.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("../../fonts/public-sans-latin-ext-800.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* ============ TEMA CLARO (Libro Mayor en papel) ============ */
+[data-tema="claro"] {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* El display de componentes (flex/block) pisa el [hidden] del UA: guardia global. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--serif);
+  background: var(--mesa);
+  color: var(--tinta);
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+input,
+select {
+  font-family: inherit;
+}
+
+/* ============ APP LAYOUT ============ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ponytail: tabulación compartida (monto/badges/contadores) — sede única en base, la usan topbar+canvas. */
+/* Números densos con la misma tabulación del monto (montos/badges/contadores). */
+.sheet-panel-count,
+.canvas-meta,
+.cell-monto,
+.dz-fmt {
+  font-variant-numeric: tabular-nums;
+}
+/* ============ WORKSPACE ============ */
+.workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+input,
+select {
+  background: var(--input-bg);
+  border: 1px solid var(--borde-panel);
+  color: var(--texto-panel);
+  border-radius: var(--radio-s);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--renglon-fuerte);
+  box-shadow: var(--anillo);
+}
+input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--texto-panel-suave);
+  margin-top: 10px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+/* Motivo del rechazo: rojo sello semibold (el nombre queda tenue). */
+.hint .motivo {
+  color: var(--aviso-motivo);
+  font-weight: 600;
+  font-size: 13px;
+}
+/* Botones */
+.btn {
+  border: none;
+  border-radius: var(--radio-s);
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s,
+    background 0.12s;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:focus-visible {
+  box-shadow: var(--anillo);
+}
+
+.btn-primary {
+  background: var(--verde-tinta);
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--verde-tinta), #000 12%);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--texto-panel);
+  border: 1px solid var(--borde-panel);
+}
+.btn-ghost:hover {
+  background: var(--hover-ghost);
+}
+
+.btn-danger {
+  background: var(--sello);
+  color: #fff;
+}
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--sello), #000 12%);
+}
+
+.btn-block {
+  width: 100%;
+}
+.btn-icon {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  color: var(--texto-panel);
+  line-height: 1;
+  padding: 4px;
+}
+
+/* ============ BOTONES DE PIE (accesibles 1 clic) ============ */
+.sheet-footer-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: var(--footer-barra);
+  border: 1px solid var(--borde-panel);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+  backdrop-filter: blur(6px);
+}
+.sheet-footer-bar .btn {
+  white-space: nowrap;
+}
+
+/* ============ MODALES ============ */
+.modal {
+  border: none;
+  padding: 0;
+  background: transparent;
+  width: min(560px, 92vw);
+  max-width: none;
+  margin: auto;
+  opacity: 0;
+  scale: 0.96;
+  transition:
+    opacity 0.2s allow-discrete,
+    scale 0.2s allow-discrete,
+    overlay 0.2s allow-discrete,
+    display 0.2s allow-discrete;
+}
+.modal:open {
+  display: block;
+  opacity: 1;
+  scale: 1;
+}
+@starting-style {
+  .modal:open {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+.modal::backdrop {
+  background: color-mix(in srgb, var(--tinta) 55%, transparent);
+  transition:
+    opacity 0.2s allow-discrete,
+    overlay 0.2s allow-discrete,
+    display 0.2s allow-discrete;
+}
+@starting-style {
+  .modal::backdrop {
+    opacity: 0;
+  }
+}
+.modal-card {
+  max-height: 82vh;
+  background: var(--modal-bg);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--modal-borde);
+  color: var(--modal-texto);
+}
+.modal-head h2 {
+  font-size: 18px;
+}
+.modal-head .btn-icon {
+  color: var(--modal-texto);
+}
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--renglon-fuerte) transparent;
+}
+.modal-body label {
+  display: block;
+  font-size: 13px;
+  color: var(--modal-texto-suave);
+  margin-bottom: 14px;
+}
+.modal-body label input,
+.modal-body label select {
+  width: 100%;
+  background: var(--modal-input-bg);
+  color: var(--modal-texto);
+  border-color: var(--modal-borde);
+  margin-top: 5px;
+}
+.modal-foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--modal-borde);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Confirmación destructiva: reutiliza .modal; solo identidad de peligro. */
+.modal-confirm .modal-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sello-peligro {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sello);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  rotate: -8deg; /* guiño al sello de goma */
+}
+.modal-confirm .modal-body p {
+  margin: 0 0 8px;
+  color: var(--modal-texto);
+  font-size: 14px;
+}
+.modal-confirm .modal-body p:last-child {
+  margin-bottom: 0;
+}
+.modal-confirm .modal-nota {
+  color: var(--modal-texto-suave);
+  font-size: 13px;
+}
+.modal-confirm .modal-foot {
+  gap: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal,
+  .modal::backdrop {
+    transition: none;
+  }
+}
+
+/* ============ MOVIMIENTO REDUCIDO ============ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ============ SALIDAS PDF / IMPRIMIR ============ */
+/* La arma salidas.ts en #zonaPrint solo para imprimir: 1 hoja lógica = 1 carta. */
+#zonaPrint {
+  display: none;
+}
+
+@page {
+  size: letter portrait;
+  margin: 0;
+}
+
+@media print {
+  .app {
+    display: none !important;
+  }
+
+  #zonaPrint {
+    display: block;
+  }
+
+  #zonaPrint,
+  #zonaPrint * {
+    print-color-adjust: exact;
+    /* ponytail: prefijo exigido por Chrome para print-color-adjust (ver -webkit-user-drag). */
+    -webkit-print-color-adjust: exact;
+  }
+
+  .hoja-print {
+    display: flex;
+    flex-direction: column;
+    width: 8.5in;
+    height: 11in;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding-left: 0.3in;
+    padding-right: 0.3in;
+    break-inside: avoid;
+    break-after: page;
+  }
+
+  .hoja-print:last-child {
+    break-after: auto;
+  }
+
+  .codigo-print {
+    flex: none;
+    height: 0.3in;
+    line-height: 0.3in;
+    font-size: 10pt;
+  }
+
+  .rejilla-print {
+    flex: 1;
+    display: grid;
+    gap: 0.15in;
+    min-height: 0;
+  }
+
+  .celda-print {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .celda-print img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}

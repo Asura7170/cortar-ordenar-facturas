@@ -1,0 +1,281 @@
+/* SIDEBAR — panel lateral, switch, código, OCR, export. Carga 3/4 tras topbar. */
+/* ============ SIDEBAR ============ */
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--borde-panel);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--texto-panel-suave) transparent;
+}
+
+.panel {
+  background: var(--panel-claro);
+  border: 1px solid var(--borde-panel);
+  border-radius: var(--radio);
+  padding: 14px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.panel-title {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--texto-panel-suave);
+  text-wrap: balance;
+}
+
+/* Dropzone */
+.dropzone {
+  display: block;
+  border: 2px dashed var(--dropzone-borde);
+  border-radius: var(--radio);
+  padding: 22px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--sello);
+  background: color-mix(in srgb, var(--sello) 8%, transparent);
+  box-shadow: var(--anillo);
+}
+/* Switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 22px;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--switch-bg);
+  border-radius: 22px;
+  transition: background 0.2s;
+}
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.switch input:checked + .switch-track {
+  background: var(--verde-tinta);
+}
+.switch input:checked + .switch-track::after {
+  transform: translateX(20px);
+}
+.switch input:focus-visible + .switch-track {
+  box-shadow: var(--anillo);
+}
+.switch,
+#cfgMoneda {
+  cursor: pointer;
+}
+
+.codigo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.field-mini {
+  font-size: 12px;
+  color: var(--texto-panel-suave);
+  white-space: nowrap;
+}
+.codigo-row input[type="number"] {
+  width: 56px;
+}
+.codigo-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+/* El código solo pide atención cuando su switch está activo (el JS lo
+   refleja en disabled); apagado conserva el fondo neutro. */
+#inputCodigo:enabled {
+  background: light-dark(var(--verde-claro), #1a281a);
+  color: light-dark(var(--verde-tinta), #e9f1e5);
+  border-color: var(--verde-tinta);
+}
+#inputCodigo:enabled::placeholder {
+  color: light-dark(var(--tinta-suave), #9db894);
+}
+
+/* Selector de esquina: radios nativos (teclado gratis) con mini-hoja visual.
+   El seleccionado se pinta con :has(), sin clases por JS. */
+.codigo-pos {
+  border: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.codigo-pos legend {
+  padding: 0;
+}
+.pos-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pos-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+  position: relative;
+}
+.pos-opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.pos-hoja {
+  flex-shrink: 0;
+  width: 30px;
+  height: 40px;
+  background: var(--papel);
+  border: 1px solid var(--renglon-fuerte);
+  border-radius: 3px;
+  position: relative;
+}
+.pos-hoja::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--texto-panel-suave);
+}
+.pos-sup-izq::after {
+  top: 3px;
+  left: 3px;
+}
+.pos-sup-der::after {
+  top: 3px;
+  right: 3px;
+}
+.pos-inf-izq::after {
+  bottom: 3px;
+  left: 3px;
+}
+.pos-inf-der::after {
+  bottom: 3px;
+  right: 3px;
+}
+.pos-nom {
+  font-size: 12px;
+  color: var(--texto-panel);
+}
+.pos-opt:has(:checked) .pos-hoja {
+  border-color: var(--verde-tinta);
+  border-width: 2px;
+}
+.pos-opt:has(:checked) .pos-hoja::after {
+  background: var(--verde-tinta);
+  border-color: var(--verde-tinta);
+}
+.pos-opt:has(:checked) .pos-nom {
+  font-weight: 700;
+}
+.pos-opt:has(:focus-visible) .pos-hoja {
+  box-shadow: var(--anillo);
+}
+.pos-opt:has(:disabled) {
+  opacity: 0.45;
+  cursor: default;
+}
+.panel-ocr .panel-head {
+  margin-bottom: 0;
+}
+.panel-ocr .panel-title .ocr-estado {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  margin-left: 6px;
+}
+.ocr-estado.on {
+  color: light-dark(var(--verde-tinta), limegreen);
+}
+/* Contraste AA: tan sobre panel oscuro ≈ 5.3:1 (chocolate daba 2.85). */
+.ocr-estado:not(.on) {
+  color: light-dark(var(--sello), tan);
+}
+
+/* El head del panel OCR no deja margen: lo aporta el botón de abajo. */
+.panel-ocr .btn-block {
+  margin-top: 10px;
+}
+/* Extraer montos: fantasma tan como Word/PDF/Imprimir. En claro el tan
+   puro no llega a AA, así que va un marrón tostado (tan queda en oscuro,
+   igual que .ocr-estado). */
+.btn-ia {
+  background: transparent;
+  color: light-dark(#7a5c2e, tan);
+  border: 1px solid currentColor;
+}
+.btn-ia:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+/* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son
+   fantasma con color de marca solo en texto y borde (fondo transparente
+   para no romper el estilo del sitio); Imprimir va sólido en verde. */
+.export-doble {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.btn-word {
+  background: transparent;
+  /* Azul Word en claro; aclarado en oscuro (el puro sobre panel oscuro ≈ 2:1). */
+  color: light-dark(#0e4ae2, #8fb0ff);
+  border: 1px solid currentColor;
+}
+.btn-word:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.btn-pdf {
+  background: transparent;
+  color: #fe5721;
+  border: 1px solid currentColor;
+}
+.btn-pdf:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.btn-imprimir {
+  min-height: 52px;
+  margin-top: 8px;
+  font-size: 14px;
+  background: transparent;
+  color: light-dark(var(--verde-tinta), var(--monto-valor));
+  border: 1px solid currentColor;
+}
+.btn-imprimir:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
