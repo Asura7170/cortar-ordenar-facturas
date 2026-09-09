@@ -2,10 +2,12 @@
    HTML debe estar montado ANTES del import dinámico del módulo bajo test. */
 export const FIXTURE_HTML = `
 <div id="montoTotal"></div>
+<div class="zoom-grupo">
 <button id="btnZoomMenos"></button>
 <button id="btnZoom" hidden></button>
 <button id="btnZoomMas"></button>
 <button id="btnLupa" aria-pressed="false"></button>
+</div>
 <main class="canvas" id="canvas">
   <div class="canvas-head"><span id="metaHojas"></span></div>
   <p id="aviso" role="status"></p>

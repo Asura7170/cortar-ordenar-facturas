@@ -396,6 +396,16 @@ describe("zoom ctrl+rueda (layout, scroll sincronizado)", () => {
     expect(sheets.style.getPropertyValue("zoom")).toBe("");
     expect(btn.hidden).toBe(true);
   });
+
+  it("Ctrl+0 restaura el zoom por teclado", () => {
+    rueda(true);
+    expect(el("sheets").style.getPropertyValue("zoom")).not.toBe("");
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key: "0" }),
+    );
+    expect(el("sheets").style.getPropertyValue("zoom")).toBe("");
+    expect(el<HTMLButtonElement>("btnZoom").hidden).toBe(true);
+  });
 });
 
 describe("lupa", () => {
@@ -444,6 +454,60 @@ describe("lupa", () => {
     const libre = new Event("click", { bubbles: true, cancelable: true });
     document.dispatchEvent(libre);
     expect(libre.defaultPrevented).toBe(false);
+  });
+
+  it("el grupo zoom no apaga la lupa (coexiste con ella)", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const mas = el<HTMLButtonElement>("btnZoomMas");
+    btn.click();
+    mas.dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerType: "mouse",
+      }),
+    );
+    mas.click();
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    expect(el("sheets").style.getPropertyValue("zoom")).not.toBe("");
+    btn.click();
+    el<HTMLButtonElement>("btnZoom").click();
+    expect(el("sheets").style.getPropertyValue("zoom")).toBe("");
+  });
+
+  it("un press sin clic no envenena el próximo clic", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    btn.click();
+    const press = (x: number): void => {
+      document.dispatchEvent(
+        Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+          button: 0,
+          isPrimary: true,
+          pointerType: "mouse",
+          clientX: x,
+          clientY: 10,
+        }),
+      );
+    };
+    press(10); // apaga la lupa y arma la supresión…
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    press(20); // …pero el clic nunca llega (soltar fuera): se purga
+    const libre = new Event("click", { bubbles: true, cancelable: true });
+    document.dispatchEvent(libre);
+    expect(libre.defaultPrevented).toBe(false);
+  });
+
+  it("M alterna la lupa", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const tecla = (key: string): void => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key }),
+      );
+    };
+    tecla("m");
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    tecla("m");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
   });
 });
 

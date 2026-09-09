@@ -924,13 +924,17 @@ export function initSheets(cb: SheetsCallbacks): void {
   btnLupa.addEventListener("click", () => setLupa(!lupaActiva));
 
   // ponytail: el primer press con la lupa apaga (y el clic en vuelo se traga:
-  // no dispara la acción de abajo). El botón se excluye: alterna por su cuenta.
+  // no dispara la acción de abajo). El grupo zoom se excluye: coexiste con la lente.
   document.addEventListener(
     "pointerdown",
     (e) => {
-      if (!lupaActiva || !e.isPrimary) return;
+      if (!lupaActiva) {
+        lupaSuprimirClic = false; // clic en vuelo que nunca llegó: no envenenar el próximo
+        return;
+      }
+      if (!e.isPrimary) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
-      if ((e.target as HTMLElement | null)?.closest?.("#btnLupa")) return;
+      if ((e.target as HTMLElement | null)?.closest?.("#btnLupa, .zoom-grupo")) return;
       e.stopPropagation();
       setLupa(false);
       lupaSuprimirClic = true;
