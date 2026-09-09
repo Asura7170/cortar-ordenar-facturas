@@ -33,6 +33,46 @@
             <p class="brand-sub">Lote · Recorte &amp; OCR · Export Word</p>
           </div>
         </div>
+        <div class="zoom-grupo" role="group" aria-label="Zoom de hojas">
+          <button
+            class="btn btn-ghost"
+            id="btnZoomMenos"
+            type="button"
+            title="Alejar (Ctrl+−)"
+            aria-label="Alejar"
+          >
+            −
+          </button>
+          <button
+            class="btn btn-ghost"
+            id="btnZoom"
+            type="button"
+            hidden
+            title="Restablecer zoom (Ctrl+0)"
+            aria-label="Restablecer zoom (Ctrl+0)"
+          >
+            100%
+          </button>
+          <button
+            class="btn btn-ghost"
+            id="btnZoomMas"
+            type="button"
+            title="Acercar (Ctrl++)"
+            aria-label="Acercar"
+          >
+            +
+          </button>
+          <button
+            class="btn btn-ghost"
+            id="btnLupa"
+            type="button"
+            title="Lupa (M)"
+            aria-label="Lupa"
+            aria-pressed="false"
+          >
+            Lupa
+          </button>
+        </div>
         <div class="monto-box">
           <span class="monto-label">MONTO TOTAL</span>
           <span class="monto-valor" id="montoTotal">US$ 0.00</span>
@@ -185,6 +225,9 @@
 
     <!-- Zona de impresión: la arma salidas.ts al pedir PDF/Imprimir (oculta en pantalla). -->
     <div id="zonaPrint" hidden aria-hidden="true"></div>
+
+    <!-- Lupa: cuadrado con zoom alrededor del puntero (lo pinta sheets.ts). -->
+    <div id="lupa" aria-hidden="true"><canvas id="lupaCanvas"></canvas></div>
 
     <!-- Modal Ajustes -->
     <dialog class="modal" id="modalAjustes" closedby="any" aria-labelledby="tituloAjustes">

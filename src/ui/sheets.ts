@@ -15,6 +15,13 @@ import { getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
 const metaHojas: HTMLElement = getEl("metaHojas");
+const btnZoom: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoom");
+const btnZoomMas: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoomMas");
+const btnZoomMenos: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoomMenos");
+const btnLupa: HTMLButtonElement = getEl<HTMLButtonElement>("btnLupa");
+const lupaEl: HTMLElement = getEl("lupa");
+const lupaCanvas: HTMLCanvasElement = getEl<HTMLCanvasElement>("lupaCanvas");
+const lupaCtx: CanvasRenderingContext2D | null = lupaCanvas.getContext("2d");
 // Tarjeta de subida: visible solo con cero comprobantes.
 const tarjetaVacia: HTMLElement = getEl("dropzone");
 const canvasEl: HTMLElement | null = document.querySelector(".canvas");
@@ -328,6 +335,119 @@ let celdaResaltada: HTMLElement | null = null;
 let rectsCache: Map<Element, DOMRect> | null = null;
 let renderPendiente = false;
 
+// ponytail: zoom de vista efímero (no persiste); es layout (zoom), no transform:
+// así el scrollHeight acompaña y no hay zonas negativas inalcanzables. El pan es el scroll nativo.
+let zoomEscala = 1;
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 4;
+
+function aplicarZoom(): void {
+  rectsCache = null;
+  if (zoomEscala === 1) sheetsEl.style.removeProperty("zoom");
+  else sheetsEl.style.setProperty("zoom", String(zoomEscala));
+  btnZoom.hidden = zoomEscala === 1;
+  if (!btnZoom.hidden) btnZoom.textContent = `${Math.round(zoomEscala * 100)}%`;
+}
+
+function zoomEn(clientX: number, clientY: number, factor: number): void {
+  const nueva = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoomEscala * factor));
+  if (nueva === zoomEscala) return;
+  // Punto bajo el puntero antes del cambio; tras el zoom ese punto está a
+  // dx*k del borde: se compensa con scroll (siempre dentro de [0, max]).
+  const stage = sheetsEl.getBoundingClientRect();
+  const dx = clientX - stage.left;
+  const dy = clientY - stage.top;
+  const k = nueva / zoomEscala;
+  zoomEscala = nueva;
+  aplicarZoom();
+  canvasEl?.scrollBy?.(dx * (k - 1), dy * (k - 1));
+}
+
+// Zoom centrado en el wrapper (botones y atajos de teclado).
+function zoomCentrado(factor: number): void {
+  const base = (canvasEl ?? sheetsEl).getBoundingClientRect();
+  zoomEn(base.left + base.width / 2, base.top + base.height / 2, factor);
+}
+
+// ponytail: lupa con el thumb de la grilla como fuente (sincrónica y exacta;
+// full-res bajo demanda cuando el blur a 2.5x lo justifique). Estado efímero.
+const LUPA_L = 200;
+const LUPA_ZOOM = 2.5;
+let lupaActiva = false;
+let lupaRaf: number | null = null;
+let lupaX = 0;
+let lupaY = 0;
+let lupaSuprimirClic = false;
+
+function setLupa(v: boolean): void {
+  lupaActiva = v;
+  btnLupa.setAttribute("aria-pressed", String(v));
+  // ponytail: la lente reemplaza al puntero (centrada): sin cursor nativo.
+  document.body.classList.toggle("lupa-activa", v);
+  lupaEl.style.opacity = v ? "1" : "0";
+  lupaEl.style.contentVisibility = v ? "visible" : "hidden";
+  if (v) {
+    const dpr = window.devicePixelRatio || 1;
+    lupaCanvas.width = LUPA_L * dpr;
+    lupaCanvas.height = LUPA_L * dpr;
+    lupaCanvas.style.width = `${LUPA_L}px`;
+    lupaCanvas.style.height = `${LUPA_L}px`;
+    lupaCtx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+  } else {
+    if (lupaRaf !== null) {
+      cancelAnimationFrame(lupaRaf);
+      lupaRaf = null;
+    }
+    lupaCtx?.clearRect(0, 0, LUPA_L, LUPA_L);
+  }
+}
+
+function dibujarLupa(): void {
+  lupaRaf = null;
+  if (!lupaActiva) return;
+  // Solo transform/opacity: el cuadrado reemplaza al puntero (centrado), sin layout.
+  const pad = 16;
+  const centra = (p: number, max: number): number =>
+    Math.min(Math.max(pad, p - LUPA_L / 2), Math.max(pad, max - LUPA_L - pad));
+  lupaEl.style.transform = `translate(${centra(lupaX, window.innerWidth)}px, ${centra(lupaY, window.innerHeight)}px)`;
+  const ctx = lupaCtx;
+  if (!ctx) return;
+  ctx.clearRect(0, 0, LUPA_L, LUPA_L);
+  const img = document.elementFromPoint(lupaX, lupaY)?.closest?.(".cell")?.querySelector("img");
+  if (img instanceof HTMLImageElement && img.naturalWidth >= 2) {
+    // Mapeo exacto con object-fit:contain (bandas según el ratio).
+    const r = img.getBoundingClientRect();
+    const s = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight);
+    if (s > 0) {
+      const lado = Math.min(LUPA_L / LUPA_ZOOM / s, img.naturalWidth, img.naturalHeight);
+      if (lado >= 1) {
+        const bx = (lupaX - (r.left + (r.width - img.naturalWidth * s) / 2)) / s;
+        const by = (lupaY - (r.top + (r.height - img.naturalHeight * s) / 2)) / s;
+        const sx = Math.min(Math.max(bx - lado / 2, 0), Math.max(img.naturalWidth - lado, 0));
+        const sy = Math.min(Math.max(by - lado / 2, 0), Math.max(img.naturalHeight - lado, 0));
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, sx, sy, lado, lado, 0, 0, LUPA_L, LUPA_L);
+        return;
+      }
+    }
+  }
+  // Fuera de foto: la lente amplía el fondo plano bajo el puntero (mesa, panel…).
+  ctx.fillStyle = fondoBajoPunto(lupaX, lupaY);
+  ctx.fillRect(0, 0, LUPA_L, LUPA_L);
+}
+
+// Primer fondo opaco bajo el punto (areas planas ampliadas = color plano).
+function fondoBajoPunto(x: number, y: number): string {
+  let el = document.elementFromPoint(x, y);
+  while (el && el !== document.documentElement) {
+    const bg = getComputedStyle(el).backgroundColor;
+    if (bg && !/^rgba\(0,\s*0,\s*0,\s*0\)$/.test(bg)) return bg;
+    el = el.parentElement;
+  }
+  return "#000";
+}
+
 function detenerScroll(): void {
   scrollDir = 0;
   if (scrollRaf !== null) {
@@ -628,6 +748,35 @@ export function initSheets(cb: SheetsCallbacks): void {
       cancelarDragVisual();
       soltarRenderPendiente();
     }
+    if (e.key === "Escape" && lupaActiva) {
+      setLupa(false);
+      return;
+    }
+    // ponytail: M alterna la lupa, salvo escribiendo (montos/código) o con Ctrl.
+    if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const t = e.target as HTMLElement | null;
+      if (
+        t instanceof HTMLInputElement ||
+        t instanceof HTMLTextAreaElement ||
+        t instanceof HTMLSelectElement ||
+        t?.isContentEditable
+      )
+        return;
+      setLupa(!lupaActiva);
+    }
+    // ponytail: atajos mínimos para no dejar el zoom solo al puntero (a11y teclado).
+    if (
+      (e.ctrlKey || e.metaKey) &&
+      (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "_" || e.key === "0")
+    ) {
+      e.preventDefault();
+      if (e.key === "0") {
+        zoomEscala = 1;
+        aplicarZoom();
+        return;
+      }
+      zoomCentrado(e.key === "+" || e.key === "=" ? 1.2 : 1 / 1.2);
+    }
   });
 
   // Evento delegado: un solo listener, switch por data-accion.
@@ -751,4 +900,66 @@ export function initSheets(cb: SheetsCallbacks): void {
     },
     { passive: true },
   );
+
+  // ponytail: ctrl+rueda = zoom solo canvas (sin ctrl el scroll sigue nativo).
+  (canvasEl ?? sheetsEl).addEventListener(
+    "wheel",
+    (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const delta = e.deltaMode === 0 ? e.deltaY : e.deltaY * 16;
+      zoomEn(e.clientX, e.clientY, Math.exp(-delta * 0.0015));
+    },
+    { passive: false },
+  );
+
+  btnZoom.addEventListener("click", () => {
+    zoomEscala = 1;
+    aplicarZoom();
+  });
+
+  btnZoomMas.addEventListener("click", () => zoomCentrado(1.2));
+  btnZoomMenos.addEventListener("click", () => zoomCentrado(1 / 1.2));
+
+  btnLupa.addEventListener("click", () => setLupa(!lupaActiva));
+
+  // ponytail: el primer press con la lupa apaga (y el clic en vuelo se traga:
+  // no dispara la acción de abajo). El botón se excluye: alterna por su cuenta.
+  document.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (!lupaActiva || !e.isPrimary) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if ((e.target as HTMLElement | null)?.closest?.("#btnLupa")) return;
+      e.stopPropagation();
+      setLupa(false);
+      lupaSuprimirClic = true;
+    },
+    true,
+  );
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!lupaSuprimirClic) return;
+      lupaSuprimirClic = false;
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    true,
+  );
+
+  // ponytail: la lupa no consume wheel (el ctrl+rueda sigue al zoom) ni clics.
+  const zonaLupa = canvasEl ?? sheetsEl;
+  zonaLupa.addEventListener("pointermove", (e) => {
+    if (!lupaActiva) return;
+    lupaX = e.clientX;
+    lupaY = e.clientY;
+    if (lupaRaf === null) lupaRaf = requestAnimationFrame(dibujarLupa);
+  });
+  zonaLupa.addEventListener("pointerleave", () => {
+    lupaEl.style.opacity = "0";
+  });
+  zonaLupa.addEventListener("pointerenter", () => {
+    if (lupaActiva) lupaEl.style.opacity = "1";
+  });
 }
