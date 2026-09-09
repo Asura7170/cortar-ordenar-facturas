@@ -191,6 +191,26 @@ describe("aplicarTotales", () => {
     expect(aplicarTotales(items, new Map([[1, 1250]]))).toBe(0);
     expect(c1.montoCents).toBeNull();
   });
+
+  it("borrador en edición gana al lote en vuelo (input enfocado)", () => {
+    const { c1 } = lote2();
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.dataset["id"] = String(c1.id);
+    const input = document.createElement("input");
+    input.className = "cell-monto";
+    input.dataset["accion"] = "monto";
+    cell.append(input);
+    document.body.append(cell);
+    input.focus();
+    try {
+      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
+      expect(aplicarTotales(items, new Map([[1, 4200]]))).toBe(0);
+      expect(c1.montoCents).toBeNull();
+    } finally {
+      cell.remove();
+    }
+  });
 });
 
 describe("extraerPendientes", () => {
