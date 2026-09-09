@@ -312,6 +312,11 @@ export function initSidebar(): void {
         if (c.thumbUrl) URL.revokeObjectURL(c.thumbUrl);
       }
     state.hojas = [crearHoja()];
+    // ponytail: cada lote trae código distinto; solo el número, resto intacto.
+    state.codigoValor = "";
+    renderCodigo();
     renderHojas();
+    // Último: si el storage falla, los renders ya corrieron.
+    if (state.codigoActivo) guardarCodigo();
   });
 }

@@ -1,5 +1,7 @@
 # Vendoreado upstream (onnxruntime-web): no reformatear.
 public/ort/
+# Public Sans vendoreada (OFL) + woff2: no reformatear.
+public/fonts/
 # Modelos PP-OCRv6 vendoreados + dict generado desde rec.yml: no reformatear.
 public/models/ocr/
 modelos-fuente/

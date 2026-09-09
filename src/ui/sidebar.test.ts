@@ -487,13 +487,54 @@ describe("modalLimpiar", () => {
     expect(revoke).toHaveBeenCalledWith("blob:img2");
   });
 
+  it("confirmar vacía también el número y lo persiste, resto intacto", () => {
+    state.hojas = [crearHoja()];
+    state.codigoActivo = true;
+    state.codigoLongitud = 8;
+    state.codigoValor = "12345678";
+    state.codigoPosicion = "sup-izq";
+    inputCodigo.value = "12345678";
+    localStorage.setItem(
+      "libro-mayor-state",
+      JSON.stringify({
+        codigoActivo: true,
+        codigoLongitud: 8,
+        codigoValor: "12345678",
+        codigoPosicion: "sup-izq",
+      }),
+    );
+    modalLimpiar.returnValue = "ok";
+    modalLimpiar.close();
+    expect(state.codigoValor).toBe("");
+    expect(inputCodigo.value).toBe("");
+    expect(state.codigoActivo).toBe(true);
+    expect(state.codigoLongitud).toBe(8);
+    expect(state.codigoPosicion).toBe("sup-izq");
+    expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toMatchObject({
+      codigoActivo: true,
+      codigoLongitud: 8,
+      codigoValor: "",
+      codigoPosicion: "sup-izq",
+    });
+  });
+
   it("cancelar no toca nada", () => {
     const h = crearHoja();
     h.slots[0] = comprobante();
     state.hojas.push(h);
+    state.codigoValor = "123456";
+    const blob = {
+      codigoActivo: true,
+      codigoLongitud: 6,
+      codigoValor: "123456",
+      codigoPosicion: "inf-der",
+    };
+    localStorage.setItem("libro-mayor-state", JSON.stringify(blob));
     modalLimpiar.returnValue = "";
     modalLimpiar.close();
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]).toBe(h);
+    expect(state.codigoValor).toBe("123456");
+    expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toEqual(blob);
   });
 });
