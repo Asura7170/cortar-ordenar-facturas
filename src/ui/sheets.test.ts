@@ -14,6 +14,7 @@ const {
   aplicarATodas,
   cambiarLayoutHoja,
   esDragDeArchivos,
+  esEcoDeRemocion,
   initSheets,
   quitarComprobante,
   renderHojas,
@@ -244,7 +245,7 @@ describe("monto manual", () => {
     expect(document.querySelector("input.cell-monto")).toBeNull();
   });
 
-  it("change inválido conserva el borrador para corregirlo", () => {
+  it("change inválido conserva el borrador sin robar el foco", () => {
     const c = sembrarOk();
     const input = inputMonto();
     input.value = "abc";
@@ -252,6 +253,34 @@ describe("monto manual", () => {
     expect(c.montoCents).toBeNull();
     const deNuevo = inputMonto();
     expect(deNuevo.value).toBe("abc");
+    // ponytail: el blur no reenfoca (solo Enter); el foco sigue donde lo dejó el usuario.
+    expect(document.activeElement).toBe(document.body);
+    expect(document.activeElement).not.toBe(deNuevo);
+  });
+
+  it("esEcoDeRemocion: desatachado es eco, atachado con foco no", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "777";
+    input.focus();
+    expect(esEcoDeRemocion(input)).toBe(false);
+    input.remove();
+    // ponytail: jsdom no dispara change por remoción (el guard real se cubre
+    // en E2E Chrome); acá se regresiona el predicado, que es lo testeable.
+    expect(esEcoDeRemocion(input)).toBe(true);
+  });
+
+  it("miniatura en vuelo no commitea ni pisa el borrador enfocado", () => {
+    const c = sembrarOk();
+    const input = inputMonto();
+    input.value = "45";
+    input.focus();
+    c.thumbUrl = "blob:thumb-nueva";
+    actualizarMiniatura(c.id);
+    expect(c.montoCents).toBeNull();
+    expect(c.montoManual).toBe(false);
+    const deNuevo = inputMonto();
+    expect(deNuevo.value).toBe("45");
     expect(document.activeElement).toBe(deNuevo);
   });
 
@@ -312,18 +341,19 @@ describe("monto manual", () => {
     expect(document.activeElement).toBe(document.querySelector(".cell-badge"));
   });
 
-  it("inválido en corrección conserva el tipeado sin tocar el previo", () => {
+  it("inválido en corrección conserva el tipeado sin tocar el previo ni reenfocar", () => {
     const c = sembrarOk();
     inputMonto().value = "500";
     inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     const editando = inputMonto();
     editando.value = "abc";
+    editando.blur(); // el foco ya salió (clic fuera): el change no lo trae de vuelta
     editando.dispatchEvent(new Event("change", { bubbles: true }));
     expect(c.montoCents).toBe(50000);
     const deNuevo = inputMonto();
     expect(deNuevo.value).toBe("abc");
-    expect(document.activeElement).toBe(deNuevo);
+    expect(document.activeElement).toBe(document.body);
   });
 
   it("render de fondo preserva borrador, foco y caret", () => {

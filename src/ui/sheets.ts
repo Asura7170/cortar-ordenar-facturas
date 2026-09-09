@@ -256,14 +256,11 @@ export function renderHojas(): void {
   }
   // ponytail: el borrador manual sobrevive a los renders de fondo (cola/IA/giro).
   const borrador = borradorEnEdicion();
+  // ponytail: todo change que llegue durante el swap es eco de remoción.
   const render = (): void => {
-    // ponytail: todo change que llegue durante el swap es eco de remoción.
-    mutandoHojas = true;
-    try {
+    bajoMutandoHojas(() => {
       renderCuerpo(borrador);
-    } finally {
-      mutandoHojas = false;
-    }
+    });
   };
   // ponytail: sin ViewTransition con reduced-motion ni durante la carga
   // inicial (los snapshots compiten con el drag/scroll); es solo un adorno.
@@ -384,19 +381,20 @@ function textoEditable(cents: Cents): string {
 }
 
 /** Valida y guarda el input (change o Enter). Id del comprobante o null si no hubo monto. */
-function commitearMonto(input: HTMLInputElement): number | null {
+function commitearMonto(input: HTMLInputElement, reenfocar = false): number | null {
   const cell = input.closest(".cell");
   const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
   const item = obtenerComprobante(id);
   if (!item) return null;
   const cents = parsearMonto(input.value);
   // Inválido → se conserva el borrador para corregirlo (el title muestra el formato).
+  // ponytail: el blur (change) no roba el foco: solo Enter reenfoca.
   if (cents === null) {
     const typed = input.value;
     renderHojas();
     const deNuevo = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
     if (deNuevo) deNuevo.value = typed;
-    enfocarMonto(id);
+    if (reenfocar) enfocarMonto(id);
     return null;
   }
   // change en text input = escribió + blur/enter: el total pasa a manual.
@@ -415,9 +413,12 @@ export function actualizarMiniatura(id: number): void {
   if (!cell) return;
   const slot = buscarSlot(id);
   if (!slot) return;
-  // ponytail: la mini no pisa el borrador en curso de esa celda.
+  // ponytail: la mini no pisa el borrador en curso de esa celda (y el
+  // replaceChildren bajo el flag no commitea el borrador vía change).
   const b = borradorEnEdicion();
-  pintarCelda(cell, slot.hoja.slots[slot.idx] ?? null, slot.idx, slot.hoja.id);
+  bajoMutandoHojas(() => {
+    pintarCelda(cell, slot.hoja.slots[slot.idx] ?? null, slot.idx, slot.hoja.id);
+  });
   if (b && b.id === id) restaurarBorrador(b);
 }
 
@@ -745,8 +746,11 @@ function moverSlot(
     return;
   }
 
-  pintarCelda(nodoOrigen, origen.slots[idxOrigen] ?? null, idxOrigen, origen.id);
-  pintarCelda(nodoDestino, hojaDestino.slots[slotDestino] ?? null, slotDestino, hojaDestino.id);
+  // ponytail: el parche de 2 celdas también destruye inputs con foco.
+  bajoMutandoHojas(() => {
+    pintarCelda(nodoOrigen, origen.slots[idxOrigen] ?? null, idxOrigen, origen.id);
+    pintarCelda(nodoDestino, hojaDestino.slots[slotDestino] ?? null, slotDestino, hojaDestino.id);
+  });
 
   const imgA = nodoDestino.querySelector("img");
   if (imgA) animarFlipDesde(imgA, centroA.x, centroA.y);
@@ -785,6 +789,21 @@ export interface SheetsCallbacks {
 // ponytail: swap destructivo en curso (un change que llegue ahora es eco de
 // remoción, no edición del usuario: se ignora en el handler change).
 let mutandoHojas = false;
+
+/** Corre una mutación destructiva del DOM bajo el flag anti-eco. */
+function bajoMutandoHojas(fn: () => void): void {
+  mutandoHojas = true;
+  try {
+    fn();
+  } finally {
+    mutandoHojas = false;
+  }
+}
+
+/** Predicado del guard anti-eco (exportado para regresionarlo en tests). */
+export function esEcoDeRemocion(target: HTMLInputElement): boolean {
+  return mutandoHojas || !target.isConnected;
+}
 
 export function initSheets(cb: SheetsCallbacks): void {
   // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
@@ -963,7 +982,7 @@ export function initSheets(cb: SheetsCallbacks): void {
     const target = e.target as HTMLElement | null;
     if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") return;
     // ponytail: eco de remoción (el swap destruyó el input enfocado): nunca es edición.
-    if (mutandoHojas || !target.isConnected) return;
+    if (esEcoDeRemocion(target)) return;
     commitearMonto(target);
   });
 
@@ -978,7 +997,7 @@ export function initSheets(cb: SheetsCallbacks): void {
       e.preventDefault();
       // ponytail: commit directo (sin blur): el foco sigue en el input y el
       // render sale síncrono, así el badge ya existe al enfocarlo.
-      const confirmado = commitearMonto(target);
+      const confirmado = commitearMonto(target, true);
       if (confirmado !== null) {
         cellById(confirmado)?.querySelector<HTMLElement>(".cell-badge")?.focus();
       }
