@@ -314,8 +314,9 @@ export function initSidebar(): void {
     state.hojas = [crearHoja()];
     // ponytail: cada lote trae código distinto; solo el número, resto intacto.
     state.codigoValor = "";
-    if (state.codigoActivo) guardarCodigo();
     renderCodigo();
     renderHojas();
+    // Último: si el storage falla, los renders ya corrieron.
+    if (state.codigoActivo) guardarCodigo();
   });
 }
