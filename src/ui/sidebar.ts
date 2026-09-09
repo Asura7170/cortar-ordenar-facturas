@@ -186,6 +186,9 @@ export function renderCodigo(): void {
   inputCodigo.placeholder = state.codigoActivo
     ? `Código (${state.codigoLongitud} dígitos)`
     : "Código";
+  // ponytail: el error visual vive hasta que el usuario corrige o se re-renderiza.
+  inputCodigo.classList.remove("codigo-error", "sacudir");
+  inputCodigo.removeAttribute("aria-invalid");
   radiosPosicion().forEach((r) => {
     r.checked = r.value === state.codigoPosicion;
     r.disabled = !state.codigoActivo;
@@ -298,6 +301,9 @@ export function initSidebar(): void {
   inputCodigo.addEventListener("input", () => {
     state.codigoValor = inputCodigo.value.replace(/\D/g, "").slice(0, state.codigoLongitud);
     inputCodigo.value = state.codigoValor;
+    // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
+    inputCodigo.classList.remove("codigo-error");
+    inputCodigo.removeAttribute("aria-invalid");
     if (chkCodigo.checked) guardarCodigo();
   });
 

@@ -329,12 +329,23 @@ describe("descargarWord", () => {
     state.codigoActivo = true;
     state.codigoValor = "corto";
     sembrar();
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    await descargarWord();
-    expect(click).not.toHaveBeenCalled();
-    expect(document.getElementById("aviso")?.textContent).toBe(
-      "Código inválido: revisá los dígitos.",
-    );
+    // ponytail: el gate marca el input (borde+vibración+foco), no solo el aviso.
+    const input = document.createElement("input");
+    input.id = "inputCodigo";
+    document.body.append(input);
+    try {
+      const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+      await descargarWord();
+      expect(click).not.toHaveBeenCalled();
+      expect(document.getElementById("aviso")?.textContent).toBe(
+        "Código inválido: revisá los dígitos.",
+      );
+      expect(input.classList.contains("codigo-error")).toBe(true);
+      expect(input.getAttribute("aria-invalid")).toBe("true");
+      expect(document.activeElement).toBe(input);
+    } finally {
+      input.remove();
+    }
   });
 
   it("sin comprobantes: no dispara descarga y avisa", async () => {

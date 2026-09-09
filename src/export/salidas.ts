@@ -195,6 +195,7 @@ export async function construirDocumento(
 export async function descargarWord(): Promise<void> {
   if (!codigoValido()) {
     avisar("Código inválido: revisá los dígitos.");
+    resaltarCodigo();
     return;
   }
   if (totalItems() === 0) {
@@ -295,6 +296,7 @@ function hojasNoVacias(): Hoja[] {
 function montarZona(): boolean {
   if (!codigoValido()) {
     avisar("Código inválido: revisá los dígitos.");
+    resaltarCodigo();
     return false;
   }
   const hojas = hojasNoVacias();
@@ -364,4 +366,16 @@ export async function imprimir(): Promise<void> {
 function avisar(texto: string): void {
   const el = document.getElementById("aviso");
   if (el) el.textContent = texto;
+}
+
+// ponytail: marca local nullable (sin importar sidebar: ese módulo exige todo
+// el fixture y rompería estos tests); sidebar.ts la levanta al teclear.
+function resaltarCodigo(): void {
+  const input = document.getElementById("inputCodigo");
+  if (!(input instanceof HTMLInputElement) || input.disabled) return;
+  input.classList.remove("sacudir");
+  void input.offsetWidth;
+  input.classList.add("codigo-error", "sacudir");
+  input.setAttribute("aria-invalid", "true");
+  input.focus();
 }

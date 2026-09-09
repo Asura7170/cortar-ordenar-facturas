@@ -98,7 +98,9 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 - `.panel` + `.switch` + `.codigo-row` (sidebar.css,
   `#chkCodigo/#chkOcr/#inputCodigo`): panel con head 12px uppercase; switch
   nativo con track; código con input numérico + rejilla de posición.
-  Estados: `:checked/:disabled/:focus-visible` siempre definidos.
+  Estados: `:checked/:disabled/:focus-visible` siempre definidos; error
+  `.codigo-error` (borde `--sello` + vibración `sacudir` solo `transform`) al
+  bloquear una salida con código activo incompleto.
 - `.sheet/.sheet-grid/.cell` (canvas.css, `#sheets`): hoja papel con renglones
   cada 34px; celda `empty` (discontinua) / con foto (`object-fit: contain`) /
   `drop-target` (inset verde). Hover revela × y girar; sin hover siempre

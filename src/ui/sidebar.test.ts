@@ -427,6 +427,15 @@ describe("código de pedido", () => {
     expect(inputCodigo.value).toBe("123456");
   });
 
+  it("teclear levanta el error visual del gate", () => {
+    inputCodigo.classList.add("codigo-error", "sacudir");
+    inputCodigo.setAttribute("aria-invalid", "true");
+    inputCodigo.value = "123";
+    inputCodigo.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(inputCodigo.classList.contains("codigo-error")).toBe(false);
+    expect(inputCodigo.hasAttribute("aria-invalid")).toBe(false);
+  });
+
   function radios(): NodeListOf<HTMLInputElement> {
     return document.querySelectorAll<HTMLInputElement>('input[name="posCodigo"]');
   }
