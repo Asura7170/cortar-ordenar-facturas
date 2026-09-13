@@ -4,6 +4,7 @@ import { initSheets } from "./ui/sheets";
 import { agregarArchivos, elegirArchivos, initSidebar, renderCodigo } from "./ui/sidebar";
 import { initOcrMode, renderOcrToggle } from "./ui/ocrMode";
 import { initSettings } from "./ui/settingsModal";
+import { initGithub } from "./ui/github";
 import { initExport } from "./export/salidas";
 import { renderHojas } from "./ui/sheets";
 import { getEl } from "./utils";
@@ -35,6 +36,7 @@ initSidebar();
 initOcrMode();
 initSettings();
 initExport();
+void initGithub();
 btnTema.addEventListener("click", () => {
   const nuevo = document.documentElement.dataset["tema"] === "claro" ? "oscuro" : "claro";
   localStorage.setItem(TEMA_KEY, nuevo);
