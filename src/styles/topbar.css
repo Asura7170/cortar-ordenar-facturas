@@ -134,3 +134,16 @@
 .tema-ico {
   line-height: 1;
 }
+
+/* GitHub: <a> con piel .btn — sin subrayado, icono alineado, 44px táctil. */
+.btn-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  text-decoration: none;
+}
+.github-ico {
+  line-height: 1;
+  flex-shrink: 0;
+}

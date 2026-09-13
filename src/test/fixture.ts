@@ -8,6 +8,7 @@ export const FIXTURE_HTML = `
 <button id="btnZoomMas"></button>
 <button id="btnLupa" aria-pressed="false"></button>
 </div>
+<span id="githubStars"></span>
 <main class="canvas" id="canvas">
   <div class="canvas-head"><span id="metaHojas"></span></div>
   <p id="aviso" role="status"></p>
