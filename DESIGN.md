@@ -117,6 +117,8 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 - `a.btn-github#btnGithub` (topbar): enlace externo con marca SVG inline +
   conteo vivo (`#githubStars`, fallback estático silencioso); `rel="noopener noreferrer"`,
   conteo `aria-hidden`.
+- `.panel-ajustes` (sidebar, `#btnAjustes`): último hijo con `margin-top:auto`;
+  botón a 44px táctil, icono con `.tema-ico` reutilizado.
 
 ## 9. Do's and Don'ts
 

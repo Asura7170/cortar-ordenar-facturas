@@ -304,6 +304,6 @@
 .panel-ajustes {
   margin-top: auto;
 }
-.ajustes-ico {
-  line-height: 1;
+.panel-ajustes .btn {
+  min-height: 44px;
 }
