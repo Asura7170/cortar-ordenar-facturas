@@ -40,4 +40,29 @@ describe("initGithub", () => {
     }
     expect(estrellas.textContent).toBe("");
   });
+
+  it("respuesta no-ok deja el fallback", async () => {
+    estrellas.textContent = "";
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      ({ ok: false, status: 403 }) as Response) as typeof fetch;
+    try {
+      await initGithub();
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(estrellas.textContent).toBe("");
+  });
+
+  it("forma inesperada deja el fallback", async () => {
+    estrellas.textContent = "";
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> => respuestaEstrellas("42")) as typeof fetch;
+    try {
+      await initGithub();
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(estrellas.textContent).toBe("");
+  });
 });

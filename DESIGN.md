@@ -115,7 +115,7 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
   (canvas/base, `#dropzone/#fileInput`): punteado verde para subir; primario
   una acción por vista, danger solo destructivo.
 - `a.btn-github#btnGithub` (topbar): enlace externo con marca SVG inline +
-  conteo vivo (`#githubStars`, fallback estático silencioso); `rel=noopener`,
+  conteo vivo (`#githubStars`, fallback estático silencioso); `rel="noopener noreferrer"`,
   conteo `aria-hidden`.
 
 ## 9. Do's and Don'ts

@@ -147,3 +147,7 @@
   line-height: 1;
   flex-shrink: 0;
 }
+/* Sin conteo (inicio/offline): el span vacío no deja aire por el gap. */
+.github-stars:empty {
+  display: none;
+}

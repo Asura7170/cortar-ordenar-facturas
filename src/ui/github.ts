@@ -3,11 +3,10 @@ import { getEl } from "../utils";
 
 const URL_REPO = "https://api.github.com/repos/Asura7170/cortar-ordenar-facturas";
 
-const estrellas: HTMLElement = getEl("githubStars");
-
 // ponytail: un fetch al arrancar, sin reintentos ni caché; si falla, el enlace estático basta.
 export async function initGithub(): Promise<void> {
   try {
+    const estrellas: HTMLElement = getEl("githubStars");
     const res = await fetch(URL_REPO);
     if (!res.ok) return;
     const datos: unknown = await res.json();
