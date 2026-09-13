@@ -299,3 +299,11 @@
 .btn-imprimir:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
+
+/* Ajustes al fondo del sidebar (flex columna: auto empuja abajo). */
+.panel-ajustes {
+  margin-top: auto;
+}
+.ajustes-ico {
+  line-height: 1;
+}
