@@ -185,31 +185,43 @@ describe("recortarMargenesBlancos", () => {
     expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
-  it("margen negro con contenido claro → recorta al bbox exacto", () => {
+  it("margen negro con texto → recorta hasta la tinta (come el aire)", () => {
+    // Rectángulo blanco con 4 líneas de texto (x8-32): el aire superior e
+    // izquierdo se come; el bbox ciñe el bloque de tinta (x8-32/y8-20).
     const { src, dibujos } = lienzoConMarco(
       () => [0, 0, 0],
-      (x, y) => (y === 14 ? [0, 0, 0] : [255, 255, 255]),
+      (x, y) => ([8, 12, 16, 20].includes(y) && x >= 8 && x <= 32 ? [0, 0, 0] : [255, 255, 255]),
     );
-    expect(src.width).toBe(30);
-    expect(src.height).toBe(20);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+    expect(src.width).toBe(25);
+    expect(src.height).toBe(13);
+    expect(dibujos[0]?.slice(1)).toEqual([8, 8, 25, 13, 0, 0, 25, 13]);
   });
 
-  it("cabecera oscura con texto claro no se decapita", () => {
-    // Fila 0 morada con texto blanco + resto blanco con texto oscuro en y=3:
-    // el recorte conserva la fila 0 (sy=0) y solo come el aire inferior.
-    const w = 10;
-    const h = 6;
-    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
-    const pintar = (x: number, y: number, r: number, g: number, b: number): void => {
-      const i = (y * w + x) * 4;
-      datos[i] = r;
-      datos[i + 1] = g;
-      datos[i + 2] = b;
-    };
-    for (let x = 0; x < w; x += 1) pintar(x, 0, 96, 1, 217);
-    pintar(5, 0, 255, 255, 255);
-    pintar(5, 3, 0, 0, 0);
+  it("marco morado BancoSol con marca de agua → ciñe el texto", () => {
+    // Réplica medida (marco #30007a 10px, tarjeta blanca, marca Δ~22, tinta):
+    // el marco, el aire y la marca ceden; frena la primera fila con tinta.
+    const w = 120;
+    const h = 90;
+    const datos = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const i = (y * w + x) * 4;
+        const marco = x < 10 || x >= w - 10 || y < 10 || y >= h - 10;
+        const tinta = !marco && x >= 20 && x <= 100 && y >= 35 && y <= 60;
+        const marca = !marco && !tinta && (y - 12) % 7 === 0;
+        const [r, g, b] = marco
+          ? [48, 0, 122]
+          : tinta
+            ? [0, 0, 0]
+            : marca
+              ? [233, 229, 241]
+              : [255, 255, 255];
+        datos[i] = r;
+        datos[i + 1] = g;
+        datos[i + 2] = b;
+        datos[i + 3] = 255;
+      }
+    }
     const dibujos: unknown[][] = [];
     const salida = {
       width: 0,
@@ -228,8 +240,141 @@ describe("recortarMargenesBlancos", () => {
       }),
     } as unknown as HTMLCanvasElement;
     const out = recortarMargenesBlancos(src, () => salida);
-    expect(out.height).toBe(4);
-    expect(dibujos[0]?.[2]).toBe(0);
+    expect(out.width).toBe(81);
+    expect(out.height).toBe(26);
+    expect(dibujos[0]?.slice(1)).toEqual([20, 35, 81, 26, 0, 0, 81, 26]);
+  });
+
+  it("cabecera oscura con texto claro no se decapita", () => {
+    // Fila 0 morada con texto blanco (con contadores morados, como glifos
+    // reales) + bloque oscuro x10-30/y8-12: la fila 0 se conserva (sy=0),
+    // los laterales ceden y el bbox ciñe el bloque (x10-30/y0-12).
+    const w = 40;
+    const h = 20;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const pintar = (x: number, y: number, r: number, g: number, b: number): void => {
+      const i = (y * w + x) * 4;
+      datos[i] = r;
+      datos[i + 1] = g;
+      datos[i + 2] = b;
+    };
+    for (let x = 0; x < w; x += 1) pintar(x, 0, 96, 1, 217);
+    for (let x = 18; x <= 22; x += 1) pintar(x, 0, 255, 255, 255);
+    pintar(20, 0, 96, 1, 217);
+    for (let y = 8; y <= 12; y += 1) {
+      for (let x = 10; x <= 30; x += 1) pintar(x, y, 0, 0, 0);
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(21);
+    expect(out.height).toBe(13);
+    expect(dibujos[0]?.slice(1)).toEqual([10, 0, 21, 13, 0, 0, 21, 13]);
+  });
+
+  it("artefacto JPEG de borde (Δ44-50) no veta columnas", () => {
+    // Réplica BancoSol-1: marco morado + tarjeta con tinta + 1px de ruido en
+    // la última fila. Sin perdón, cada columna colapsa a ese píxel y x0/x1 se
+    // clavan en los bordes (marcos intactos); con perdón ciñe (x14-46/y14-26).
+    const w = 60;
+    const h = 40;
+    const datos = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const i = (y * w + x) * 4;
+        const tarjeta = x >= 8 && x <= 51 && y >= 8 && y <= 31;
+        const tinta = tarjeta && x >= 14 && x <= 46 && y >= 14 && y <= 26;
+        const [r, g, b] = tinta ? [0, 0, 0] : tarjeta ? [255, 255, 255] : [48, 0, 122];
+        datos[i] = r;
+        datos[i + 1] = g;
+        datos[i + 2] = b;
+        datos[i + 3] = 255;
+      }
+    }
+    const ruido = (x: number, r: number, g: number, b: number): void => {
+      const i = ((h - 1) * w + x) * 4;
+      datos[i] = r;
+      datos[i + 1] = g;
+      datos[i + 2] = b;
+    };
+    ruido(3, 93, 45, 167);
+    ruido(56, 98, 50, 172);
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(33);
+    expect(out.height).toBe(13);
+    expect(dibujos[0]?.slice(1)).toEqual([14, 14, 33, 13, 0, 0, 33, 13]);
+  });
+
+  it("mota de 2px no es aire (frena conservador)", () => {
+    // Trazo negro de 2px en la fila 0 + bloque x5-16/y5-8: la fila 0 se
+    // conserva (sy=0); el bbox ciñe lo demás (x5-16/y0-8).
+    const w = 22;
+    const h = 10;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const pintar = (x: number, y: number): void => {
+      const i = (y * w + x) * 4;
+      datos[i] = 0;
+      datos[i + 1] = 0;
+      datos[i + 2] = 0;
+    };
+    pintar(10, 0);
+    pintar(11, 0);
+    for (let y = 5; y <= 8; y += 1) {
+      for (let x = 5; x <= 16; x += 1) pintar(x, y);
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(12);
+    expect(out.height).toBe(9);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 0, 12, 9, 0, 0, 12, 9]);
   });
 
   it("todo blanco → devuelve el mismo lienzo", () => {

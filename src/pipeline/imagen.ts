@@ -93,8 +93,16 @@ export const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
 /** Fábrica real de lienzo (compartida con docaligner para no duplicarla). */
 export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
-/** Salto por canal que rompe el fondo (ruido JPEG/degradado suave <15; borde de contenido muy por encima). */
-const TOL_FONDO = 15;
+/** Salto entre píxeles vecinos que marca contenido (medido BancoSol: ruido JPEG y marca de agua ≤~25; etiquetas grises ~125, texto y bordes muy por encima). */
+const TOL_FONDO = 40;
+/** Brillo medio mínimo del tramo central para recortar (blanco/gris papel sí; tinta y marcos oscuros no: la foto sobre mesa se conserva). */
+const LUZ_MEDIA = 180;
+/** Ancho mínimo del tramo central (un píxel suelto —motas, un trazo— no es aire). */
+const ANCHO_MIN_MEDIO = 4;
+/** Ancho máximo de racha perdonable en bordes (artefacto JPEG/AA de 1-2px). */
+const RUIDO_MAX_ANCHO = 2;
+/** Salto máximo perdonable (tenue: tinta y bordes reales lo superan). */
+const RUIDO_MAX_SALTO = 120;
 /** Paso del scan de bordes (1: exacto; sub-ms a 720px, muy lejos de los ~250ms de ORT). */
 const PASO_BORDE = 1;
 /** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
@@ -104,12 +112,11 @@ const AREA_MINIMA = 0.15;
 
 /**
  * Recorta franjas de fondo por lado (blanco, gris app, color bancario o negro).
- * El fondo se muestrea del propio borde y se sigue en degradado: solo un salto
- * brusco marca contenido. Así el texto claro sobre cabecera oscura no se
- * decapita (sus dos colores rompen la fila) y el quad de DocAligner no tuerce.
- * La sombra de mesa suave también se sigue; la rugosa frena como antes.
+ * El fondo se sigue en degradado desde ambos bordes; el tramo central debe ser
+ * liso y claro: así ceden marcos bitono y aire con marca de agua, y frenan la
+ * tinta interior, el texto claro sobre cabecera y la foto sobre mesa clara.
  */
-// ponytail: bbox por fondo muestreado, no Canny ni paleta; guarda 15% si ticket ralo.
+// ponytail: una pasada por línea (bordes + medio); sin paleta ni Canny; guarda 15% si ticket ralo.
 export function recortarMargenesBlancos(
   src: HTMLCanvasElement,
   crear: CrearLienzo = crearReal,
@@ -125,30 +132,65 @@ export function recortarMargenesBlancos(
   } catch {
     return src;
   }
-  const difiere = (i: number, ref: number): boolean =>
-    Math.abs((datos[i] ?? 0) - (datos[ref] ?? 0)) > TOL_FONDO ||
-    Math.abs((datos[i + 1] ?? 0) - (datos[ref + 1] ?? 0)) > TOL_FONDO ||
-    Math.abs((datos[i + 2] ?? 0) - (datos[ref + 2] ?? 0)) > TOL_FONDO;
-  const filaFondo = (y: number): boolean => {
+  const salto = (i: number, ref: number): number =>
+    Math.max(
+      Math.abs((datos[i] ?? 0) - (datos[ref] ?? 0)),
+      Math.abs((datos[i + 1] ?? 0) - (datos[ref + 1] ?? 0)),
+      Math.abs((datos[i + 2] ?? 0) - (datos[ref + 2] ?? 0)),
+    );
+  const difiere = (i: number, ref: number): boolean => salto(i, ref) > TOL_FONDO;
+  /** Línea de fondo: tramos lisos en ambos bordes + tramo central liso y claro. */
+  const lineaFondo = (eje: 0 | 1, fijo: number, n: number): boolean => {
+    const toma = (k: number): number => {
+      const i = (eje === 0 ? fijo * ancho + k : k * ancho + fijo) * 4;
+      return (datos[i + 3] ?? 0) < 128 ? -1 : i; // transparente = fondo
+    };
+    let a = 0;
     let ref = -1;
-    for (let x = 0; x < ancho; x += PASO_BORDE) {
-      const i = (y * ancho + x) * 4;
-      if ((datos[i + 3] ?? 0) < 128) continue; // transparente = fondo
+    let saltos = 0;
+    for (; a < n; a += PASO_BORDE) {
+      const i = toma(a);
+      if (i < 0) continue;
+      if (ref >= 0 && difiere(i, ref)) {
+        // ponytail: se perdona el ruido angosto y tenue de borde (artefacto
+        // JPEG Δ44-50 medido en BancoSol); la tinta agota el presupuesto.
+        if (saltos >= RUIDO_MAX_ANCHO || salto(i, ref) >= RUIDO_MAX_SALTO) break;
+        saltos += 1;
+        continue;
+      }
+      ref = i;
+      saltos = 0;
+    }
+    let b = n - 1;
+    ref = -1;
+    saltos = 0;
+    for (; b >= a; b -= PASO_BORDE) {
+      const i = toma(b);
+      if (i < 0) continue;
+      if (ref >= 0 && difiere(i, ref)) {
+        if (saltos >= RUIDO_MAX_ANCHO || salto(i, ref) >= RUIDO_MAX_SALTO) break;
+        saltos += 1;
+        continue;
+      }
+      ref = i;
+      saltos = 0;
+    }
+    let suma = 0;
+    let cuenta = 0;
+    ref = -1;
+    if (a <= b && b - a + 1 < ANCHO_MIN_MEDIO) return false;
+    for (let k = a; k <= b; k += PASO_BORDE) {
+      const i = toma(k);
+      if (i < 0) continue;
       if (ref >= 0 && difiere(i, ref)) return false;
       ref = i;
+      suma += (datos[i] ?? 0) + (datos[i + 1] ?? 0) + (datos[i + 2] ?? 0);
+      cuenta += 1;
     }
-    return true;
+    return cuenta === 0 || suma / (cuenta * 3) >= LUZ_MEDIA;
   };
-  const colFondo = (x: number): boolean => {
-    let ref = -1;
-    for (let y = 0; y < alto; y += PASO_BORDE) {
-      const i = (y * ancho + x) * 4;
-      if ((datos[i + 3] ?? 0) < 128) continue; // transparente = fondo
-      if (ref >= 0 && difiere(i, ref)) return false;
-      ref = i;
-    }
-    return true;
-  };
+  const filaFondo = (y: number): boolean => lineaFondo(0, y, ancho);
+  const colFondo = (x: number): boolean => lineaFondo(1, x, alto);
   let x0 = 0;
   let y0 = 0;
   let x1 = ancho - 1;
