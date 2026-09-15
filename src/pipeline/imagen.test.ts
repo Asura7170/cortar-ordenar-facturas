@@ -200,16 +200,6 @@ describe("recortarMargenesBlancos", () => {
     expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
-  it("marco gris app #f7f8fa → recorta al contenido", () => {
-    const { src, dibujos } = lienzoConMarco(
-      () => [247, 248, 250],
-      () => [128, 128, 128],
-    );
-    expect(src.width).toBe(30);
-    expect(src.height).toBe(20);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
-  });
-
   it("todo blanco → devuelve el mismo lienzo", () => {
     const datos = new Uint8ClampedArray(10 * 10 * 4).fill(255);
     const src = {

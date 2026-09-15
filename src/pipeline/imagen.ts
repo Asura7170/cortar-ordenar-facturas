@@ -93,13 +93,10 @@ export const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
 /** Fábrica real de lienzo (compartida con docaligner para no duplicarla). */
 export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
-/** Canal mínimo del blanco (tolera ruido JPEG; el gris app #f7f8fa también es fondo). */
+/** Canal mínimo del blanco (tolera ruido JPEG; cubre el gris app #f7f8fa). */
 const FONDO_BLANCO_MIN = 240;
 /** Canal máximo del negro (tolera ruido JPEG/foto de página oscura). */
 const FONDO_NEGRO_MAX = 25;
-/** Gris app #f7f8fa = (247,248,250); tolerancia por canal (ruido JPEG). */
-const FONDO_APP: readonly [number, number, number] = [247, 248, 250];
-const FONDO_APP_TOL = 12;
 /** Paso del scan de bordes (1: exacto; sub-ms a 720px, muy lejos de los ~250ms de ORT). */
 const PASO_BORDE = 1;
 /** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
@@ -108,7 +105,7 @@ const MARGEN_RECORTE = 0;
 const AREA_MINIMA = 0.15;
 
 /**
- * Recorta franjas de color puro por lado (blanco, negro o gris app #f7f8fa).
+ * Recorta franjas de color puro por lado (blanco o negro).
  * La sombra de la mesa cuenta como tinta, así que el bbox conserva la
  * foto + sombra y el ticket blanco interior no se agujerea.
  */
@@ -135,11 +132,7 @@ export function recortarMargenesBlancos(
     const b = datos[idx + 2] ?? 0;
     if (r >= FONDO_BLANCO_MIN && g >= FONDO_BLANCO_MIN && b >= FONDO_BLANCO_MIN) return true;
     if (r <= FONDO_NEGRO_MAX && g <= FONDO_NEGRO_MAX && b <= FONDO_NEGRO_MAX) return true;
-    return (
-      Math.abs(r - FONDO_APP[0]) <= FONDO_APP_TOL &&
-      Math.abs(g - FONDO_APP[1]) <= FONDO_APP_TOL &&
-      Math.abs(b - FONDO_APP[2]) <= FONDO_APP_TOL
-    );
+    return false;
   };
   const filaFondo = (y: number): boolean => {
     const base = y * ancho;
