@@ -93,16 +93,13 @@ export const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
 /** Fábrica real de lienzo (compartida con docaligner para no duplicarla). */
 export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
-/** Salto entre píxeles vecinos que marca contenido (medido BancoSol: ruido JPEG y marca de agua ≤~25; etiquetas grises ~125, texto y bordes muy por encima). */
-const TOL_FONDO = 40;
-/** Brillo medio mínimo del tramo central para recortar (blanco/gris papel sí; tinta y marcos oscuros no: la foto sobre mesa se conserva). */
-const LUZ_MEDIA = 180;
-/** Ancho mínimo del tramo central (un píxel suelto —motas, un trazo— no es aire). */
-const ANCHO_MIN_MEDIO = 4;
-/** Ancho máximo de racha perdonable en bordes (artefacto JPEG/AA de 1-2px). */
-const RUIDO_MAX_ANCHO = 2;
-/** Salto máximo perdonable (tenue: tinta y bordes reales lo superan). */
-const RUIDO_MAX_SALTO = 120;
+/** Canal mínimo del blanco (tolera ruido JPEG; el gris app #f7f8fa también es fondo). */
+const FONDO_BLANCO_MIN = 240;
+/** Canal máximo del negro (tolera ruido JPEG/foto de página oscura). */
+const FONDO_NEGRO_MAX = 25;
+/** Gris app #f7f8fa = (247,248,250); tolerancia por canal (ruido JPEG). */
+const FONDO_APP: readonly [number, number, number] = [247, 248, 250];
+const FONDO_APP_TOL = 12;
 /** Paso del scan de bordes (1: exacto; sub-ms a 720px, muy lejos de los ~250ms de ORT). */
 const PASO_BORDE = 1;
 /** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
@@ -111,12 +108,11 @@ const MARGEN_RECORTE = 0;
 const AREA_MINIMA = 0.15;
 
 /**
- * Recorta franjas de fondo por lado (blanco, gris app, color bancario o negro).
- * El fondo se sigue en degradado desde ambos bordes; el tramo central debe ser
- * liso y claro: así ceden marcos bitono y aire con marca de agua, y frenan la
- * tinta interior, el texto claro sobre cabecera y la foto sobre mesa clara.
+ * Recorta franjas de color puro por lado (blanco, negro o gris app #f7f8fa).
+ * La sombra de la mesa cuenta como tinta, así que el bbox conserva la
+ * foto + sombra y el ticket blanco interior no se agujerea.
  */
-// ponytail: una pasada por línea (bordes + medio); sin paleta ni Canny; guarda 15% si ticket ralo.
+// ponytail: bbox por paleta fija, no Canny ni degradado; guarda 15% si ticket ralo.
 export function recortarMargenesBlancos(
   src: HTMLCanvasElement,
   crear: CrearLienzo = crearReal,
@@ -132,65 +128,32 @@ export function recortarMargenesBlancos(
   } catch {
     return src;
   }
-  const salto = (i: number, ref: number): number =>
-    Math.max(
-      Math.abs((datos[i] ?? 0) - (datos[ref] ?? 0)),
-      Math.abs((datos[i + 1] ?? 0) - (datos[ref + 1] ?? 0)),
-      Math.abs((datos[i + 2] ?? 0) - (datos[ref + 2] ?? 0)),
+  const esFondo = (idx: number): boolean => {
+    if ((datos[idx + 3] ?? 0) < 128) return true;
+    const r = datos[idx] ?? 0;
+    const g = datos[idx + 1] ?? 0;
+    const b = datos[idx + 2] ?? 0;
+    if (r >= FONDO_BLANCO_MIN && g >= FONDO_BLANCO_MIN && b >= FONDO_BLANCO_MIN) return true;
+    if (r <= FONDO_NEGRO_MAX && g <= FONDO_NEGRO_MAX && b <= FONDO_NEGRO_MAX) return true;
+    return (
+      Math.abs(r - FONDO_APP[0]) <= FONDO_APP_TOL &&
+      Math.abs(g - FONDO_APP[1]) <= FONDO_APP_TOL &&
+      Math.abs(b - FONDO_APP[2]) <= FONDO_APP_TOL
     );
-  const difiere = (i: number, ref: number): boolean => salto(i, ref) > TOL_FONDO;
-  /** Línea de fondo: tramos lisos en ambos bordes + tramo central liso y claro. */
-  const lineaFondo = (eje: 0 | 1, fijo: number, n: number): boolean => {
-    const toma = (k: number): number => {
-      const i = (eje === 0 ? fijo * ancho + k : k * ancho + fijo) * 4;
-      return (datos[i + 3] ?? 0) < 128 ? -1 : i; // transparente = fondo
-    };
-    let a = 0;
-    let ref = -1;
-    let saltos = 0;
-    for (; a < n; a += PASO_BORDE) {
-      const i = toma(a);
-      if (i < 0) continue;
-      if (ref >= 0 && difiere(i, ref)) {
-        // ponytail: se perdona el ruido angosto y tenue de borde (artefacto
-        // JPEG Δ44-50 medido en BancoSol); la tinta agota el presupuesto.
-        if (saltos >= RUIDO_MAX_ANCHO || salto(i, ref) >= RUIDO_MAX_SALTO) break;
-        saltos += 1;
-        continue;
-      }
-      ref = i;
-      saltos = 0;
-    }
-    let b = n - 1;
-    ref = -1;
-    saltos = 0;
-    for (; b >= a; b -= PASO_BORDE) {
-      const i = toma(b);
-      if (i < 0) continue;
-      if (ref >= 0 && difiere(i, ref)) {
-        if (saltos >= RUIDO_MAX_ANCHO || salto(i, ref) >= RUIDO_MAX_SALTO) break;
-        saltos += 1;
-        continue;
-      }
-      ref = i;
-      saltos = 0;
-    }
-    let suma = 0;
-    let cuenta = 0;
-    ref = -1;
-    if (a <= b && b - a + 1 < ANCHO_MIN_MEDIO) return false;
-    for (let k = a; k <= b; k += PASO_BORDE) {
-      const i = toma(k);
-      if (i < 0) continue;
-      if (ref >= 0 && difiere(i, ref)) return false;
-      ref = i;
-      suma += (datos[i] ?? 0) + (datos[i + 1] ?? 0) + (datos[i + 2] ?? 0);
-      cuenta += 1;
-    }
-    return cuenta === 0 || suma / (cuenta * 3) >= LUZ_MEDIA;
   };
-  const filaFondo = (y: number): boolean => lineaFondo(0, y, ancho);
-  const colFondo = (x: number): boolean => lineaFondo(1, x, alto);
+  const filaFondo = (y: number): boolean => {
+    const base = y * ancho;
+    for (let x = 0; x < ancho; x += PASO_BORDE) {
+      if (!esFondo((base + x) * 4)) return false;
+    }
+    return true;
+  };
+  const colFondo = (x: number): boolean => {
+    for (let y = 0; y < alto; y += PASO_BORDE) {
+      if (!esFondo((y * ancho + x) * 4)) return false;
+    }
+    return true;
+  };
   let x0 = 0;
   let y0 = 0;
   let x1 = ancho - 1;
