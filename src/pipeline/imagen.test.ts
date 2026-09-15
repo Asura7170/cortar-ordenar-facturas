@@ -189,15 +189,117 @@ describe("recortarMargenesBlancos", () => {
     expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
-  it("marco negro con ruido JPEG → recorta (tolerancia)", () => {
-    // Ruido ≤25 por canal sigue siendo negro (fondo), no tinta.
+  it("marco negro con ruido JPEG ±8 → recorta (tolerancia)", () => {
+    // Ruido leve sigue siendo el color del lado, no tinta.
     const { src, dibujos } = lienzoConMarco(
-      (x, y) => [(x + y) % 20, (x * 2 + y) % 18, (x + y * 3) % 22],
+      (x, y) => [(x + y) % 9, (x * 2 + y) % 8, (x + y * 3) % 9],
       () => [128, 128, 128],
     );
     expect(src.width).toBe(30);
     expect(src.height).toBe(20);
     expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("marco morado digital uniforme → recorta (cualquier color)", () => {
+    const { src, dibujos } = lienzoConMarco(
+      () => [48, 0, 122],
+      () => [128, 128, 128],
+    );
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("lados de distinto color → recorta (cada lado con el suyo)", () => {
+    // Izquierda negra, resto blanco: la esquina no bloquea al vecino.
+    const { src, dibujos } = lienzoConMarco(
+      (x) => (x < 5 ? [0, 0, 0] : [255, 255, 255]),
+      () => [128, 128, 128],
+    );
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("barra uniforme interior ≠ borde → se conserva", () => {
+    // Franja gris a ancho completo (y10-12) + bloque (x5-34/y20-24) en
+    // página blanca: la franja frena arriba (y0=10), no se come.
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const gris = (x: number, y: number): void => {
+      const i = (y * w + x) * 4;
+      datos[i] = 128;
+      datos[i + 1] = 128;
+      datos[i + 2] = 128;
+    };
+    for (let x = 0; x < w; x += 1) {
+      for (let y = 10; y <= 12; y += 1) gris(x, y);
+    }
+    for (let y = 20; y <= 24; y += 1) {
+      for (let x = 5; x <= 34; x += 1) gris(x, y);
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(40);
+    expect(out.height).toBe(15);
+    expect(dibujos[0]?.slice(1)).toEqual([0, 10, 40, 15, 0, 0, 40, 15]);
+  });
+
+  it("1px distinto en el marco → esa fila frena", () => {
+    // Píxel rojo en (20,2): las filas 0-1 ceden, la 2 se conserva (sy=2).
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const i = (2 * w + 20) * 4;
+    datos[i] = 200;
+    datos[i + 1] = 0;
+    datos[i + 2] = 0;
+    for (let y = 5; y <= 24; y += 1) {
+      for (let x = 5; x <= 34; x += 1) {
+        const j = (y * w + x) * 4;
+        datos[j] = 128;
+        datos[j + 1] = 128;
+        datos[j + 2] = 128;
+      }
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(30);
+    expect(out.height).toBe(23);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 2, 30, 23, 0, 0, 30, 23]);
   });
 
   it("todo blanco → devuelve el mismo lienzo", () => {

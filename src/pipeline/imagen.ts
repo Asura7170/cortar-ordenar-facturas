@@ -93,23 +93,19 @@ export const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
 /** Fábrica real de lienzo (compartida con docaligner para no duplicarla). */
 export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
-/** Canal mínimo del blanco (tolera ruido JPEG; cubre el gris app #f7f8fa). */
-const FONDO_BLANCO_MIN = 240;
-/** Canal máximo del negro (tolera ruido JPEG/foto de página oscura). */
-const FONDO_NEGRO_MAX = 25;
-/** Paso del scan de bordes (1: exacto; sub-ms a 720px, muy lejos de los ~250ms de ORT). */
-const PASO_BORDE = 1;
+/** Distancia máxima por canal al color del borde (medido: fila digital ≤6). */
+const TOL_LADO = 15;
 /** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
 const MARGEN_RECORTE = 0;
 /** Bbox <15% del área → no recortar (ticket ralo, evita colapso). */
 const AREA_MINIMA = 0.15;
 
 /**
- * Recorta franjas de color puro por lado (blanco o negro).
- * La sombra de la mesa cuenta como tinta, así que el bbox conserva la
- * foto + sombra y el ticket blanco interior no se agujerea.
+ * Recorta franjas uniformes por lado, del color que sea (cada lado con el suyo).
+ * La sombra de la mesa no es uniforme: frena como antes y el bbox conserva la
+ * foto + sombra; el ticket interior no se agujerea (su color ≠ borde).
  */
-// ponytail: bbox por paleta fija, no Canny ni degradado; guarda 15% si ticket ralo.
+// ponytail: refs por mediana de borde, no paleta ni Canny; guarda 15% si ticket ralo.
 export function recortarMargenesBlancos(
   src: HTMLCanvasElement,
   crear: CrearLienzo = crearReal,
@@ -125,25 +121,55 @@ export function recortarMargenesBlancos(
   } catch {
     return src;
   }
-  const esFondo = (idx: number): boolean => {
-    if ((datos[idx + 3] ?? 0) < 128) return true;
-    const r = datos[idx] ?? 0;
-    const g = datos[idx + 1] ?? 0;
-    const b = datos[idx + 2] ?? 0;
-    if (r >= FONDO_BLANCO_MIN && g >= FONDO_BLANCO_MIN && b >= FONDO_BLANCO_MIN) return true;
-    if (r <= FONDO_NEGRO_MAX && g <= FONDO_NEGRO_MAX && b <= FONDO_NEGRO_MAX) return true;
-    return false;
+  type RGB = readonly [number, number, number];
+  const px = (x: number, y: number): number => (y * ancho + x) * 4;
+  /** Mediana por canal del borde (robusta a motas 1px; ignora transparentes). */
+  const medianaBorde = (toma: (k: number) => number, n: number): RGB => {
+    const rs: number[] = [];
+    const gs: number[] = [];
+    const bs: number[] = [];
+    for (let k = 0; k < n; k += 1) {
+      const i = toma(k);
+      if ((datos[i + 3] ?? 0) < 128) continue;
+      rs.push(datos[i] ?? 0);
+      gs.push(datos[i + 1] ?? 0);
+      bs.push(datos[i + 2] ?? 0);
+    }
+    const med = (v: number[]): number => {
+      if (v.length === 0) return 0;
+      const o = [...v].sort((a, b) => a - b);
+      return o[Math.floor(o.length / 2)] ?? 0;
+    };
+    return [med(rs), med(gs), med(bs)];
   };
-  const filaFondo = (y: number): boolean => {
-    const base = y * ancho;
-    for (let x = 0; x < ancho; x += PASO_BORDE) {
-      if (!esFondo((base + x) * 4)) return false;
+  const iguala = (i: number, ref: RGB): boolean =>
+    (datos[i + 3] ?? 0) < 128 ||
+    (Math.abs((datos[i] ?? 0) - ref[0]) <= TOL_LADO &&
+      Math.abs((datos[i + 1] ?? 0) - ref[1]) <= TOL_LADO &&
+      Math.abs((datos[i + 2] ?? 0) - ref[2]) <= TOL_LADO);
+  const refArriba = medianaBorde((x) => px(x, 0), ancho);
+  const refAbajo = medianaBorde((x) => px(x, alto - 1), ancho);
+  const refIzq = medianaBorde((y) => px(0, y), alto);
+  const refDer = medianaBorde((y) => px(ancho - 1, y), alto);
+  // Fila recortable: franjas laterales del color de su lado + centro del de arriba/abajo
+  // (cada lado puede traer su propio color sin bloquear al vecino).
+  const filaFondo = (y: number, ref: RGB): boolean => {
+    let a = 0;
+    while (a < ancho && iguala(px(a, y), refIzq)) a += 1;
+    let b = ancho - 1;
+    while (b >= a && iguala(px(b, y), refDer)) b -= 1;
+    for (let x = a; x <= b; x += 1) {
+      if (!iguala(px(x, y), ref)) return false;
     }
     return true;
   };
-  const colFondo = (x: number): boolean => {
-    for (let y = 0; y < alto; y += PASO_BORDE) {
-      if (!esFondo((y * ancho + x) * 4)) return false;
+  const colFondo = (x: number, ref: RGB): boolean => {
+    let a = 0;
+    while (a < alto && iguala(px(x, a), refArriba)) a += 1;
+    let b = alto - 1;
+    while (b >= a && iguala(px(x, b), refAbajo)) b -= 1;
+    for (let y = a; y <= b; y += 1) {
+      if (!iguala(px(x, y), ref)) return false;
     }
     return true;
   };
@@ -151,11 +177,11 @@ export function recortarMargenesBlancos(
   let y0 = 0;
   let x1 = ancho - 1;
   let y1 = alto - 1;
-  while (y0 < y1 && filaFondo(y0)) y0 += 1;
-  while (y1 > y0 && filaFondo(y1)) y1 -= 1;
-  while (x0 < x1 && colFondo(x0)) x0 += 1;
-  while (x1 > x0 && colFondo(x1)) x1 -= 1;
-  if (filaFondo(y0) && colFondo(x0)) return src;
+  while (y0 < y1 && filaFondo(y0, refArriba)) y0 += 1;
+  while (y1 > y0 && filaFondo(y1, refAbajo)) y1 -= 1;
+  while (x0 < x1 && colFondo(x0, refIzq)) x0 += 1;
+  while (x1 > x0 && colFondo(x1, refDer)) x1 -= 1;
+  if (filaFondo(y0, refArriba) && colFondo(x0, refIzq)) return src;
   const sx = Math.max(0, x0 - MARGEN_RECORTE);
   const sy = Math.max(0, y0 - MARGEN_RECORTE);
   const ex = Math.min(ancho - 1, x1 + MARGEN_RECORTE);

@@ -87,6 +87,8 @@ function lienzoFalso(pixeles: Uint8ClampedArray): {
       relleno = v;
     },
     getImageData: (_x: number, _y: number, w: number, h: number): { data: Uint8ClampedArray } => {
+      // Tras un put (el warp de rectificar), se lee lo puesto si encaja en dims.
+      if (puesto && puesto.w === w && puesto.h === h) return { data: puesto.datos };
       // Si el lienzo pide más píxeles de los dados, se completa en negro (?? 0 del lector).
       if (pixeles.length >= w * h * 4) return { data: pixeles };
       const ext = new Uint8ClampedArray(w * h * 4);
@@ -304,6 +306,35 @@ describe("bitmapATensor/rectificar", () => {
     const p = falso.puesto();
     expect(p?.w).toBe(9);
     expect(p?.h).toBe(7);
+  });
+
+  it("rectificar recorta la cuña blanca del quad salido (2º pase)", async () => {
+    // Fuente 10x8 con bloque gris (x2-7/y3-6); quad salido 2px por arriba:
+    // el warp deja 2 filas blancas y el mismo recorte las quita (sy>0).
+    const pix = blanco(10, 8);
+    for (let y = 3; y <= 6; y += 1) {
+      for (let x = 2; x <= 7; x += 1) {
+        const i = (y * 10 + x) * 4;
+        pix[i] = 100;
+        pix[i + 1] = 100;
+        pix[i + 2] = 100;
+      }
+    }
+    const falso = lienzoFalso(pix);
+    const blob = await rectificar(
+      bitmapFalso(10, 8),
+      [
+        { x: 0, y: -2 },
+        { x: 9, y: -2 },
+        { x: 9, y: 7 },
+        { x: 0, y: 7 },
+      ],
+      falso.crear,
+    );
+    expect(blob.type).toBe("image/jpeg");
+    const d = falso.dibujo();
+    expect(d?.[1]).toBe(1);
+    expect(d?.[2]).toBe(4);
   });
 });
 
