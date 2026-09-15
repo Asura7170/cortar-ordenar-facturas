@@ -468,6 +468,17 @@ describe("hojaPrint", () => {
     expect((celdas[2] as HTMLElement).style.gridColumn).toBe("1 / span 2");
   });
 
+  it("u3h: casilla alta con row-span 2 (geometria + print)", () => {
+    const rects = geometria("u3h", "inf-der");
+    const simple = rects[0];
+    const alta = rects[2];
+    if (!simple || !alta) throw new Error("rect ausente");
+    expect(alta.h).toBeGreaterThan(Math.round(simple.h * 1.9));
+    const sec = hojaPrint(hojaLlena(3, "u3h"), "1", "inf-der");
+    const celdas = sec.querySelectorAll(".celda-print");
+    expect((celdas[2] as HTMLElement).style.gridRow).toBe("1 / span 2");
+  });
+
   it("sup-izq: banda primera a la izquierda y padding 0.6 arriba", () => {
     const sec = hojaPrint(hojaLlena(1), "99", "sup-izq");
     expect(sec.style.paddingTop).toBe("0.6in");
