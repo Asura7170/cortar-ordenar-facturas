@@ -25,7 +25,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: npx -y wrangler@4 pages deploy dist --project-name cortar-ordenar-facturas --branch main
+      - run: pnpm dlx --allow-build=esbuild --allow-build=workerd wrangler@4 pages deploy dist --project-name cortar-ordenar-facturas --branch main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: b6874c516d9bd57c8377b670aa3a3b80
