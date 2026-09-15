@@ -1,12 +1,12 @@
 Vendoreado third-party (no modificar)
 =========================================
 
-1. lcnet100_h_e_bifpn_256_fp32.onnx — modelo DocAligner heatmap/lcnet100
+1. fastvit_sa24_h_e_bifpn_256_fp32.onnx — modelo DocAligner heatmap/fastvit_sa24 (activo)
    Origen: DocsaidLab/DocAligner (https://github.com/DocsaidLab/DocAligner)
    Licencia: Apache-2.0 (ver https://github.com/DocsaidLab/DocAligner/blob/main/LICENSE)
    Descargado del espejo HuggingFace 7rplus/pagescan-weights (mismo peso, con atribución).
    Para regenerar: ver scripts/download-models.mjs de andor83/ml-web-scanner
-   (Google Drive de DocsaidLab) o el resolve de HuggingFace indicado en spec.md.
+   (Google Drive de DocsaidLab, file_id 14vUH77v6yGg7zFctUgcT6BzV5Iisg4Dl) o el resolve de HuggingFace indicado en spec.md.
 
 2. Geometría en src/pipeline/docaligner.ts (ordenarQuad, decode heatmap,
    homografía DLT, warp bilineal) portada de:

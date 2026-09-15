@@ -1,4 +1,4 @@
-/* Detección de esquinas DocAligner (heatmap/lcnet100) + warp perspectiva en canvas.
+/* Detección de esquinas DocAligner (heatmap/fastvit_sa24) + warp perspectiva en canvas.
    Geometría y decode portados de andor83/ml-web-scanner (MIT — ver public/models/NOTICE.txt);
    pesos DocAligner de DocsaidLab (Apache-2.0 — ver public/models/NOTICE.txt).
    Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + blancas). Fallo → blob original. */
@@ -31,7 +31,7 @@ export const PAD_BORDE: number = 100;
 export const UMBRAL_HEATMAP: number = 0.3;
 
 /** Modelo vendoreado same-origin (COEP require-corp bloquea CDNs sin cabecera CORP). */
-const RUTA_MODELO: string = `${import.meta.env.BASE_URL}models/lcnet100_h_e_bifpn_256_fp32.onnx`;
+const RUTA_MODELO: string = `${import.meta.env.BASE_URL}models/fastvit_sa24_h_e_bifpn_256_fp32.onnx`;
 
 /** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
 export function ordenarQuad(puntos: readonly Punto[]): Quad {

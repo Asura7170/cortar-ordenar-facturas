@@ -6,7 +6,7 @@ App frontend-only, Chrome desktop-only. TypeScript + Vite+ (toolchain VoidZero: 
 
 ## 1. Resumen
 
-Pegar/subir/arrastrar imágenes y PDFs → normalizar (`imagen.ts`) → recorte DocAligner heatmap/lcnet100 vía onnxruntime-web + warp canvas → enderezar por confianza OCR → OCR propio det+rec ONNX (PP-OCRv6_small) → extracción de TOTAL con LLM openai-compatible en lote (o monto manual) → grilla carta N-up con 10 plantillas (default `u4x2`, arrastre libre tipo Word) → salidas Word real (.docx) / PDF (print-to-PDF) / Imprimir, con código de pedido en esquina.
+Pegar/subir/arrastrar imágenes y PDFs → normalizar (`imagen.ts`) → recorte DocAligner heatmap/fastvit_sa24 vía onnxruntime-web + warp canvas → enderezar por confianza OCR → OCR propio det+rec ONNX (PP-OCRv6_small) → extracción de TOTAL con LLM openai-compatible en lote (o monto manual) → grilla carta N-up con 10 plantillas (default `u4x2`, arrastre libre tipo Word) → salidas Word real (.docx) / PDF (print-to-PDF) / Imprimir, con código de pedido en esquina.
 
 ## 2. Estructura real
 
@@ -19,7 +19,7 @@ facturas/
 ├─ vitest.config.ts      # jsdom + src/**/*.test.ts + setup.ts
 ├─ spec.md               # este archivo (fuente técnica)
 ├─ public/
-│  ├─ models/lcnet100_h_e_bifpn_256_fp32.onnx + ocr/det.onnx + ocr/rec.onnx + NOTICE.txt
+│  ├─ models/fastvit_sa24_h_e_bifpn_256_fp32.onnx + ocr/det.onnx + ocr/rec.onnx + NOTICE.txt
 │  ├─ ort/ort-wasm-simd-threaded.asyncify.{mjs,wasm}  # wasmPaths = BASE_URL ort/
 │  └─ fonts/*.woff2 + llms.txt + robots.txt
 └─ src/
@@ -54,7 +54,7 @@ facturas/
 ## 3. Pipeline
 
 - **imagen `imagen.ts:6,9,12-15`:** `LADO_MAX_IMAGEN=2000`, `CALIDAD_JPEG=0.9`, `BLANCO_UMBRAL=250/MUESTRA=4/RATIO=0.995`. `normalizarImagen` → JPEG único; `recortarMargenesBlancos` (bbox luminancia, guarda 15% si ralo `AREA_MINIMA=0.15`); error tipado `blanca|ilegible`.
-- **docaligner `docaligner.ts:25,28,31,34,453,509,512`:** `LADO_MODELO=256`, `PAD_BORDE=100` (extrapola esquinas cortadas), `UMBRAL_HEATMAP=0.3`, `RUTA_MODELO=BASE_URL models/lcnet100...`, `TIMEOUT_EP_MS=30s` + `conTimeout` + latch `epCaidos` + `reintentarEps`, singleton `obtenerSesion/crearSesion`, `wasmPaths=BASE_URL ort/`, `numThreads=1`, EPs `["webgpu","wasm"]`. Sin quad plausible → imagen completa, la cola sigue. Sin config en UI.
+- **docaligner `docaligner.ts:25,28,31,34,453,509,512`:** `LADO_MODELO=256`, `PAD_BORDE=100` (extrapola esquinas cortadas), `UMBRAL_HEATMAP=0.3`, `RUTA_MODELO=BASE_URL models/fastvit_sa24...`, `TIMEOUT_EP_MS=30s` + `conTimeout` + latch `epCaidos` + `reintentarEps`, singleton `obtenerSesion/crearSesion`, `wasmPaths=BASE_URL ort/`, `numThreads=1`, EPs `["webgpu","wasm"]`. Sin quad plausible → imagen completa, la cola sigue. Sin config en UI.
 - **ocr `ocr.ts:21-22,28,206,210-216,436`:** `RUTA_DET/REC=BASE_URL models/ocr/*.onnx`, `LADO_DET_MAX=960`, `DET_MEDIA/STD` ImageNet, `MULTIPLO=32`, `UMBRAL_MAPA_VACIO=0.0005`, `UMBRAL_REC_OK=0.9`, `TOP_CAJAS_GIRO=2`, `GIROS=[0,270,90,180]`, `CHUNK_REC=16`. `enderezar()` prueba giros y queda con mejor confianza; det solo recorta líneas.
 - **queue `queue.ts:15,72,92,207`:** `THUMB_MAX=800`, `precalentarModelos()` al agregar, fases `detectarYRecortar→enderezar→extraerTexto→miniatura→ok`, guards `buscarSlot` no-resucita, `console.info` timings, auto `extraerPendientes({desdeCola:true})` al drenar.
 - **rotar `rotar.ts:16,29`:** `QUIETUD_GIRO_MS=1500`, `girarYReleer(id,90|270)` con debounce; relee OCR y reabre si era manual.
@@ -104,7 +104,7 @@ flowchart TD
     C -- "Imagen" --> E["createImageBitmap + EXIF<br/>normalizar JPEG .9 · resize si >2000px"]
     D --> F["precalentarModelos + Cola FIFO<br/>estado por item: procesando/OK/error"]
     E --> F
-    F --> G["DocAligner lcnet100<br/>256px + borde100 → heatmap → 4 esquinas → warp canvas"]
+    F --> G["DocAligner fastvit_sa24<br/>256px + borde100 → heatmap → 4 esquinas → warp canvas"]
     G --> H{"¿Quad plausible?<br/>conf ≥0.3 · convexo"}
     H -- "No" --> I["Imagen completa, sin recortar"]
     H -- "Sí" --> J["Imagen recortada"]
