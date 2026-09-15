@@ -1,6 +1,6 @@
 # Especificación — Cortar y Ordenar Facturas
 
-App frontend-only, Chrome desktop-only. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vitest, Oxlint, Oxfmt; comandos `vp`, package manager pnpm 11). Sin backend.
+App frontend-only, Chrome desktop-only. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vitest, Oxlint, Oxfmt; comandos `vp`, package manager pnpm 12). Sin backend.
 
 > `PRODUCT.md` describe producto (usuario, tono, principios). En lo técnico manda este `spec.md`.
 
@@ -83,7 +83,7 @@ Una fuente (`state.hojas` + layout + `codigoPosicion`): la vista carta es lo que
 
 | Comando          | Qué hace                                                                                                                                |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `vp install`     | instala (pnpm 11 fijado en devEngines) + `prepare: vp config` activa `.vite-hooks/`                                                     |
+| `vp install`     | instala (pnpm 12 fijado en devEngines) + `prepare: vp config` activa `.vite-hooks/`                                                     |
 | `pnpm dev`       | `vp dev --open`, COOP/COEP para WASM threads                                                                                            |
 | `pnpm test`      | `vitest run` local. `ponytail: vp test` roto en vp 0.3.0 con pnpm/jsdom → usar binario                                                  |
 | `pnpm typecheck` | `tsc --noEmit` (estricto: `verbatimModuleSyntax/import type`, `erasableSyntaxOnly`, `isolatedDeclarations`, `noUncheckedIndexedAccess`) |
