@@ -5,7 +5,7 @@ Frontend-only, sin backend. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vite
 ## Comandos (pnpm, no npm; `vp` donde aplique)
 
 ```bash
-vp install      # instalar (delega a pnpm 11, fijado en devEngines)
+vp install      # instalar (delega a pnpm 12, fijado en devEngines)
 pnpm dev        # vp dev --open: dev server, abre Chrome solo (server.open)
 pnpm test       # vitest run local (110 tests, ~2s). Ver NOTA abajo: NO usar `vp test`
 pnpm typecheck  # tsc --noEmit

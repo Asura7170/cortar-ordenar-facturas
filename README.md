@@ -5,13 +5,13 @@ Frontend-only, Chrome desktop-only. Fotos/PDFs → recorte DocAligner + OCR PP-O
 ## Requisitos
 
 - Chrome latest en desktop (usa WASM, SharedArrayBuffer, `<dialog closedby>`, etc.)
-- `node ^20.19.0 || ^22.18.0 || >=24.11.0` + `pnpm 11` (ver `devEngines`)
+- `node ^20.19.0 || ^22.18.0 || >=24.11.0` + `pnpm 12` (ver `devEngines`)
 - Servir con COOP/COEP (lo pone `vite.config.ts`). No usar `file://` ni `python -m http.server`.
 
 ## Instalación
 
 ```bash
-vp install      # pnpm 11 + vp config (activa .vite-hooks/)
+vp install      # pnpm 12 + vp config (activa .vite-hooks/)
 pnpm dev        # vp dev --open, abre Chrome
 ```
 

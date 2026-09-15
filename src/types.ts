@@ -23,8 +23,9 @@ export type LayoutId =
   | "u6x2"
   | "u6m";
 
-/** Posición [fila, columna, span] dentro del grid de la hoja. */
-export type PlantillaPos = readonly [fila: number, col: number, span: number];
+/** Posición [fila, columna, spanCol, spanFila?] dentro del grid de la hoja. */
+// ponytail: 4º elemento opcional (default 1); evita objeto para no tocar los 10 literales.
+export type PlantillaPos = readonly [fila: number, col: number, span: number, spanFila?: number];
 
 /** Plantilla de distribución N-up de una hoja. */
 export interface Plantilla {

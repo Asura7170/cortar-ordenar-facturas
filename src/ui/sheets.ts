@@ -34,7 +34,9 @@ function celda(
   slotIdx: number,
   hojaId: number,
 ): HTMLElement {
-  const estilo = pos ? `grid-row: ${pos[0]}; grid-column: ${pos[1]} / span ${pos[2]};` : "";
+  const estilo = pos
+    ? `grid-row: ${pos[0]} / span ${pos[3] ?? 1}; grid-column: ${pos[1]} / span ${pos[2]};`
+    : "";
   const div = document.createElement("div");
   div.className = "cell";
   div.style.cssText = estilo;
@@ -168,8 +170,8 @@ function panelHoja(hoja: Hoja, idx: number): string {
     const l = PLANTILLAS[id];
     const fichas = Iterator.from(l.pos)
       .map(
-        ([f, c, s]) =>
-          `<span class="ficha" style="grid-row:${f};grid-column:${c} / span ${s};"></span>`,
+        ([f, c, s, rf]) =>
+          `<span class="ficha" style="grid-row:${f} / span ${rf ?? 1};grid-column:${c} / span ${s};"></span>`,
       )
       .toArray()
       .join("");

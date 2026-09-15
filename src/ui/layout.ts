@@ -23,12 +23,12 @@ export const PLANTILLAS: Record<LayoutId, Plantilla> = {
   },
   u3h: {
     total: 3,
-    filas: 1,
-    cols: 3,
+    filas: 2,
+    cols: 2,
     pos: [
       [1, 1, 1],
-      [1, 2, 1],
-      [1, 3, 1],
+      [2, 1, 1],
+      [1, 2, 1, 2],
     ],
   },
   u3v: {
@@ -106,7 +106,7 @@ export const NOMBRES_LAYOUT: Record<LayoutId, string> = {
   u1: "1 · Centrado",
   u2h: "2 · Fila",
   u2v: "2 · Columna",
-  u3h: "3 · Fila",
+  u3h: "3 · 1+2",
   u3v: "3 · Columna",
   u3m: "3 · 2+1",
   u4x2: "4 · Cuadrado",
