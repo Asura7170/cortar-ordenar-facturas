@@ -27,6 +27,11 @@ describe("PLANTILLAS", () => {
     }
   });
 
+  it("u3h es 2 izq. + 1 alto der. (row-span 2)", () => {
+    expect(PLANTILLAS.u3h).toMatchObject({ filas: 2, cols: 2 });
+    expect(PLANTILLAS.u3h.pos[2]).toEqual([1, 2, 1, 2]);
+  });
+
   it("ORDEN_PLANTILLAS trae las 10 y NOMBRES las nombra a todas", () => {
     expect(ORDEN_PLANTILLAS).toHaveLength(10);
     for (const id of Object.keys(TOTALES) as LayoutId[]) {

@@ -68,11 +68,11 @@ export function geometria(layout: LayoutId, posicion: PosicionCodigo): RectEmu[]
   const celdaH = (ALTO_CARTA - arriba - abajo) / p.filas;
   const mediaCalle = Math.round((GUTTER / 2) * EMU_POR_PULGADA);
   const calle = mediaCalle * 2;
-  return p.pos.map(([fila, col, span]) => ({
+  return p.pos.map(([fila, col, span, spanFila]) => ({
     x: Math.round((MARGEN + (col - 1) * celdaW) * EMU_POR_PULGADA) + mediaCalle,
     y: Math.round((arriba + (fila - 1) * celdaH) * EMU_POR_PULGADA) + mediaCalle,
     w: Math.max(1, Math.round(span * celdaW * EMU_POR_PULGADA) - calle),
-    h: Math.max(1, Math.round(celdaH * EMU_POR_PULGADA) - calle),
+    h: Math.max(1, Math.round((spanFila ?? 1) * celdaH * EMU_POR_PULGADA) - calle),
   }));
 }
 
@@ -268,12 +268,12 @@ export function hojaPrint(hoja: Hoja, codigo: string, posicion: PosicionCodigo):
   rejilla.className = "rejilla-print";
   rejilla.style.gridTemplateColumns = `repeat(${p.cols}, 1fr)`;
   rejilla.style.gridTemplateRows = `repeat(${p.filas}, 1fr)`;
-  p.pos.forEach(([fila, col, span], i) => {
+  p.pos.forEach(([fila, col, span, spanFila], i) => {
     const item = hoja.slots[i];
     if (!item) return;
     const celda = document.createElement("div");
     celda.className = "celda-print";
-    celda.style.gridRow = `${fila}`;
+    celda.style.gridRow = `${fila} / span ${spanFila ?? 1}`;
     celda.style.gridColumn = `${col} / span ${span}`;
     const img = document.createElement("img");
     // ponytail: imgUrl directo (ya es full-res y vive en la sesión); sin object URLs que revocar.
