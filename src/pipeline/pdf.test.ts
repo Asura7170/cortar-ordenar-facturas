@@ -5,8 +5,9 @@ import {
   PDF_MAX_PAGINAS,
   admitirPdf,
   admiteTamanoPdf,
-  esPdf,
   esPaginaBlanca,
+  esPaginaNegra,
+  esPdf,
   expandirPdf,
   vistaSegura,
 } from "./pdf";
@@ -128,8 +129,38 @@ describe("esPaginaBlanca", () => {
     expect(esPaginaBlanca(lienzoFalso([...px(1, 0, 0, 0), ...px(3, 255, 255, 255)]))).toBe(false);
   });
 
-  it("canal justo en 250 no es blanco (umbral exclusivo)", () => {
-    expect(esPaginaBlanca(lienzoFalso(px(4, 250, 250, 250)))).toBe(false);
+  it("canal justo en 245 no es blanco (umbral exclusivo)", () => {
+    expect(esPaginaBlanca(lienzoFalso(px(4, 245, 245, 245)))).toBe(false);
+  });
+
+  it("gris app #f7f8fa lleno → vacía", () => {
+    expect(esPaginaBlanca(lienzoFalso(px(4, 247, 248, 250)))).toBe(true);
+  });
+});
+
+describe("esPaginaNegra", () => {
+  function lienzoFalso(pixeles: number[]): HTMLCanvasElement {
+    const datos = new Uint8ClampedArray(pixeles);
+    return {
+      width: 2,
+      height: 2,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+      toBlob: (cb: (b: Blob | null) => void): void => {
+        cb(new Blob(["x"], { type: "image/jpeg" }));
+      },
+    } as unknown as HTMLCanvasElement;
+  }
+  const px = (n: number, r: number, g: number, b: number, a = 255): number[] =>
+    Array.from({ length: n }, () => [r, g, b, a]).flat();
+
+  it("todo negro → vacía", () => {
+    expect(esPaginaNegra(lienzoFalso(px(4, 0, 0, 0)))).toBe(true);
+  });
+
+  it("un píxel claro → no vacía", () => {
+    expect(esPaginaNegra(lienzoFalso([...px(1, 255, 255, 255), ...px(3, 0, 0, 0)]))).toBe(false);
   });
 });
 
@@ -139,7 +170,9 @@ describe("expandirPdf", () => {
     fueCerrado: () => boolean;
   } {
     let cerrado = false;
-    const tin = (blanca: boolean): number[] => (blanca ? [255, 255, 255, 255] : [0, 0, 0, 255]);
+    // Tinta gris media: ni blanca ni negra para los gates (el 2x2 solo muestrea el píxel 0).
+    const tin = (blanca: boolean): number[] =>
+      blanca ? [255, 255, 255, 255] : [100, 100, 100, 255];
     const abrir = async (): Promise<DocumentoPdf> => ({
       total: opc.total ?? 3,
       renderizar: async (i: number): Promise<HTMLCanvasElement | null> => {

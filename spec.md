@@ -35,7 +35,7 @@ facturas/
    │  ├─ ocrMode.ts      # toggle chkOcr (no persiste) + renderHojas
    │  └─ settingsModal.ts# baseUrl/model/apiKey/moneda + restablecerAjustes
    ├─ pipeline/
-   │  ├─ imagen.ts       # JPEG único, LADO_MAX 2000, JPEG 0.9, blancas 99.5%/250
+   │  ├─ imagen.ts       # JPEG único, LADO_MAX 2000, JPEG 0.9, recorte fondo muestreado, vacías 99.5%
    │  ├─ docaligner.ts   # 256px/borde100/conf 0.3, EP webgpu→wasm 30s + latch, threads 1
    │  ├─ ocr.ts          # det 960 + enderezar [0,270,90,180] + rec chunks 16
    │  ├─ ocrDb.ts        # cajasDesdeMapa (bin 0.2, caja 0.45, max 3000, unclip 1.4)
@@ -53,12 +53,12 @@ facturas/
 
 ## 3. Pipeline
 
-- **imagen `imagen.ts:6,9,12-15`:** `LADO_MAX_IMAGEN=2000`, `CALIDAD_JPEG=0.9`, `BLANCO_UMBRAL=250/MUESTRA=4/RATIO=0.995`. `normalizarImagen` → JPEG único; `recortarMargenesBlancos` (bbox luminancia, guarda 15% si ralo `AREA_MINIMA=0.15`); error tipado `blanca|ilegible`.
+- **imagen `imagen.ts:6,9,12-15`:** `LADO_MAX_IMAGEN=2000`, `CALIDAD_JPEG=0.9`, `BLANCO_UMBRAL=245/MUESTRA=4/RATIO=0.995` (+ `esPaginaNegra` mismo ratio). `normalizarImagen` → recorte fondo + JPEG único; `recortarMargenesBlancos` (fondo muestreado del borde con `TOL_FONDO=15`, guarda 15% si ralo `AREA_MINIMA=0.15`); error tipado `blanca|ilegible` (negra reuse `blanca`).
 - **docaligner `docaligner.ts:25,28,31,34,453,509,512`:** `LADO_MODELO=256`, `PAD_BORDE=100` (extrapola esquinas cortadas), `UMBRAL_HEATMAP=0.3`, `RUTA_MODELO=BASE_URL models/fastvit_sa24...`, `TIMEOUT_EP_MS=30s` + `conTimeout` + latch `epCaidos` + `reintentarEps`, singleton `obtenerSesion/crearSesion`, `wasmPaths=BASE_URL ort/`, `numThreads=1`, EPs `["webgpu","wasm"]`. Sin quad plausible → imagen completa, la cola sigue. Sin config en UI.
 - **ocr `ocr.ts:21-22,28,206,210-216,436`:** `RUTA_DET/REC=BASE_URL models/ocr/*.onnx`, `LADO_DET_MAX=960`, `DET_MEDIA/STD` ImageNet, `MULTIPLO=32`, `UMBRAL_MAPA_VACIO=0.0005`, `UMBRAL_REC_OK=0.9`, `TOP_CAJAS_GIRO=2`, `GIROS=[0,270,90,180]`, `CHUNK_REC=16`. `enderezar()` prueba giros y queda con mejor confianza; det solo recorta líneas.
 - **queue `queue.ts:15,72,92,207`:** `THUMB_MAX=800`, `precalentarModelos()` al agregar, fases `detectarYRecortar→enderezar→extraerTexto→miniatura→ok`, guards `buscarSlot` no-resucita, `console.info` timings, auto `extraerPendientes({desdeCola:true})` al drenar.
 - **rotar `rotar.ts:16,29`:** `QUIETUD_GIRO_MS=1500`, `girarYReleer(id,90|270)` con debounce; relee OCR y reabre si era manual.
-- **pdf `pdf.ts:10,13,73,91`:** `PDF_MAX_BYTES=5MiB`, `PDF_MAX_PAGINAS=10` (por archivo), `ANCHO_MINI_PDF=720`, `vistaSegura=alto≤4000 && area≤8M`. `esPdf` por MIME+ext, `admitirPdf` con avisos sin `innerHTML`. Cada página no-blanca = comprobante; blancas se omiten.
+- **pdf `pdf.ts:10,13,73,91`:** `PDF_MAX_BYTES=5MiB`, `PDF_MAX_PAGINAS=10` (por archivo), `ANCHO_MINI_PDF=720`, `vistaSegura=alto≤4000 && area≤8M`. `esPdf` por MIME+ext, `admitirPdf` con avisos sin `innerHTML`. Cada página no-blanca/no-negra = comprobante; blancas y negras se omiten.
 - **extract `extract.ts:11-13,15,17-18,46,92,177`:** `MAX_TEXTO=1800`, `MAX_CHARS_LOTE=12000`, `MAX_ITEMS=25`, `TIMEOUT=60s`, `temperature:0/max_tokens:1000`, prompt `SOLO JSON {"1":"12.50","2":null}`, `partirLote` en chunks, `extraerPendientes({forzado?,desdeCola?})` + botón `btnIA`. `parsearMonto` US estricto rechaza `1,234` sin decimal. Monto manual en tarjeta siempre gana y sí suma.
 - **Entrada `sidebar.ts:83,87`:** regex `image/(jpeg|png|webp|bmp|gif)`, resto (incl. HEIC) → `formato no soportado`, no rompe cola. PDF con `>5MB/>10p/protegido/ilegible` → aviso en entrada sin entrar a cola.
 

@@ -1,7 +1,7 @@
 /* Detección de esquinas DocAligner (heatmap/fastvit_sa24) + warp perspectiva en canvas.
    Geometría y decode portados de andor83/ml-web-scanner (MIT — ver public/models/NOTICE.txt);
    pesos DocAligner de DocsaidLab (Apache-2.0 — ver public/models/NOTICE.txt).
-   Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + blancas). Fallo → blob original. */
+   Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + recorte + vacías). Fallo → blob original. */
 import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 

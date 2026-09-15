@@ -80,6 +80,21 @@ describe("normalizarImagen", () => {
     ).rejects.toThrow("blanca");
   });
 
+  it("negra llena lanza como blanca (mismo aviso)", async () => {
+    const falso = lienzoFalso(px(16, 0, 0, 0));
+    await expect(
+      normalizarImagen(img("n2.png", "image/png"), cargar(100, 80), falso.crear),
+    ).rejects.toThrow("blanca");
+  });
+
+  it("gris app #f7f8fa lleno lanza como blanca", async () => {
+    const gris: number[] = Array.from({ length: 16 }, () => [247, 248, 250, 255]).flat();
+    const falso = lienzoFalso(gris);
+    await expect(
+      normalizarImagen(img("g2.png", "image/png"), cargar(100, 80), falso.crear),
+    ).rejects.toThrow("blanca");
+  });
+
   it("decode roto lanza ilegible", async () => {
     const roto: CargarBitmap = async () => {
       throw new Error("rota");
@@ -111,8 +126,12 @@ describe("normalizarImagen", () => {
 });
 
 describe("recortarMargenesBlancos", () => {
-  /** Foto 40x30 con bloque oscuro amplio (x5-34, y5-24) = foto sobre hoja blanca. */
-  function lienzoConMarco(): { src: HTMLCanvasElement; dibujos: unknown[][] } {
+  /** Foto 40x30 con bloque amplio (x5-34, y5-24) = foto sobre fondo dado. */
+  type Pintar = (x: number, y: number) => readonly [number, number, number];
+  function lienzoConMarco(
+    pintar: Pintar = () => [255, 255, 255],
+    bloque: Pintar = () => [0, 0, 0],
+  ): { src: HTMLCanvasElement; dibujos: unknown[][] } {
     const w = 40;
     const h = 30;
     const datos = new Uint8ClampedArray(w * h * 4);
@@ -120,10 +139,10 @@ describe("recortarMargenesBlancos", () => {
       for (let x = 0; x < w; x += 1) {
         const tinta = x >= 5 && x <= 34 && y >= 5 && y <= 24;
         const i = (y * w + x) * 4;
-        const v = tinta ? 0 : 255;
-        datos[i] = v;
-        datos[i + 1] = v;
-        datos[i + 2] = v;
+        const [r, g, b] = tinta ? bloque(x, y) : pintar(x, y);
+        datos[i] = r;
+        datos[i + 1] = g;
+        datos[i + 2] = b;
         datos[i + 3] = 255;
       }
     }
@@ -154,6 +173,63 @@ describe("recortarMargenesBlancos", () => {
     expect(src.width).toBe(30);
     expect(src.height).toBe(20);
     expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("margen morado degradado #30007a→#6001d9 → recorta al contenido", () => {
+    const { src, dibujos } = lienzoConMarco((x) => {
+      const t = x / 39;
+      return [Math.round(48 + 48 * t), Math.round(t), Math.round(122 + 95 * t)];
+    });
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("margen negro con contenido claro → recorta al bbox exacto", () => {
+    const { src, dibujos } = lienzoConMarco(
+      () => [0, 0, 0],
+      (x, y) => (y === 14 ? [0, 0, 0] : [255, 255, 255]),
+    );
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("cabecera oscura con texto claro no se decapita", () => {
+    // Fila 0 morada con texto blanco + resto blanco con texto oscuro en y=3:
+    // el recorte conserva la fila 0 (sy=0) y solo come el aire inferior.
+    const w = 10;
+    const h = 6;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const pintar = (x: number, y: number, r: number, g: number, b: number): void => {
+      const i = (y * w + x) * 4;
+      datos[i] = r;
+      datos[i + 1] = g;
+      datos[i + 2] = b;
+    };
+    for (let x = 0; x < w; x += 1) pintar(x, 0, 96, 1, 217);
+    pintar(5, 0, 255, 255, 255);
+    pintar(5, 3, 0, 0, 0);
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.height).toBe(4);
+    expect(dibujos[0]?.[2]).toBe(0);
   });
 
   it("todo blanco → devuelve el mismo lienzo", () => {

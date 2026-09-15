@@ -8,8 +8,8 @@ export const LADO_MAX_IMAGEN: number = 2000;
 /** Calidad JPEG única del pipeline (intake, páginas PDF y miniaturas). */
 export const CALIDAD_JPEG: number = 0.9;
 
-/** Canal >250 = blanco; píxeles muestreados cada 4px. */
-const BLANCO_UMBRAL = 250;
+/** Canal >245 = blanco (antes 250: el gris app #f7f8fa también vacía); píxeles muestreados cada 4px. */
+const BLANCO_UMBRAL = 245;
 const BLANCO_MUESTRA = 4;
 /** ≥99.5% blancos/transparentes → imagen vacía (se omite). */
 const BLANCO_RATIO = 0.995;
@@ -45,6 +45,43 @@ export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
   return total > 0 && blancos / total >= BLANCO_RATIO;
 }
 
+/** Canal <20 = negro (tolera ruido JPEG/foto de página oscura). */
+const NEGRO_UMBRAL = 20;
+/** ≥99.5% negros/transparentes → imagen vacía, igual que blanca (se omite). */
+const NEGRO_RATIO = 0.995;
+
+/**
+ * Imagen oscura: casi todo negro o transparente. Espejo de esPaginaBlanca
+ * para comprobantes bancarios con fondo negro (el motivo thrown se reutiliza:
+ * el llamador no distingue el string, solo avisa "no se pudo leer").
+ */
+// ponytail: espejo de esPaginaBlanca, no abstracción; el umbral vive aquí, no en config.
+export function esPaginaNegra(lienzo: HTMLCanvasElement): boolean {
+  const ctx = lienzo.getContext("2d");
+  if (!ctx || lienzo.width < 1 || lienzo.height < 1) return false;
+  let datos: Uint8ClampedArray;
+  try {
+    datos = ctx.getImageData(0, 0, lienzo.width, lienzo.height).data;
+  } catch {
+    return false;
+  }
+  let negros = 0;
+  let total = 0;
+  for (let i = 0; i + 3 < datos.length; i += 4 * BLANCO_MUESTRA) {
+    total += 1;
+    if ((datos[i + 3] ?? 0) < 128) {
+      negros += 1;
+    } else if (
+      (datos[i] ?? 255) < NEGRO_UMBRAL &&
+      (datos[i + 1] ?? 255) < NEGRO_UMBRAL &&
+      (datos[i + 2] ?? 255) < NEGRO_UMBRAL
+    ) {
+      negros += 1;
+    }
+  }
+  return total > 0 && negros / total >= NEGRO_RATIO;
+}
+
 /** Decode inyectable (jsdom no implementa createImageBitmap). */
 export type CargarBitmap = (f: Blob, opc?: ImageBitmapOptions) => Promise<ImageBitmap>;
 
@@ -56,8 +93,8 @@ export const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
 /** Fábrica real de lienzo (compartida con docaligner para no duplicarla). */
 export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
-/** Canal <245 = tinta (250 es blanco hoja; 245 tolera JPEG/sombra mesa). */
-const TINTA_UMBRAL = 245;
+/** Salto por canal que rompe el fondo (ruido JPEG/degradado suave <15; borde de contenido muy por encima). */
+const TOL_FONDO = 15;
 /** Paso del scan de bordes (1: exacto; sub-ms a 720px, muy lejos de los ~250ms de ORT). */
 const PASO_BORDE = 1;
 /** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
@@ -66,11 +103,13 @@ const MARGEN_RECORTE = 0;
 const AREA_MINIMA = 0.15;
 
 /**
- * Recorta franjas blancas laterales (hoja PDF alrededor de la foto).
- * La sombra de la mesa cuenta como tinta, así que el bbox conserva la
- * foto + sombra y el ticket blanco interior no se agujerea.
+ * Recorta franjas de fondo por lado (blanco, gris app, color bancario o negro).
+ * El fondo se muestrea del propio borde y se sigue en degradado: solo un salto
+ * brusco marca contenido. Así el texto claro sobre cabecera oscura no se
+ * decapita (sus dos colores rompen la fila) y el quad de DocAligner no tuerce.
+ * La sombra de mesa suave también se sigue; la rugosa frena como antes.
  */
-// ponytail: bbox por luminancia, no Canny; guarda 15% si ticket ralo.
+// ponytail: bbox por fondo muestreado, no Canny ni paleta; guarda 15% si ticket ralo.
 export function recortarMargenesBlancos(
   src: HTMLCanvasElement,
   crear: CrearLienzo = crearReal,
@@ -86,36 +125,39 @@ export function recortarMargenesBlancos(
   } catch {
     return src;
   }
-  const esTinta = (idx: number): boolean => {
-    if ((datos[idx + 3] ?? 0) < 128) return false;
-    return (
-      (datos[idx] ?? 255) < TINTA_UMBRAL ||
-      (datos[idx + 1] ?? 255) < TINTA_UMBRAL ||
-      (datos[idx + 2] ?? 255) < TINTA_UMBRAL
-    );
-  };
-  const filaTinta = (y: number): boolean => {
-    const base = y * ancho;
+  const difiere = (i: number, ref: number): boolean =>
+    Math.abs((datos[i] ?? 0) - (datos[ref] ?? 0)) > TOL_FONDO ||
+    Math.abs((datos[i + 1] ?? 0) - (datos[ref + 1] ?? 0)) > TOL_FONDO ||
+    Math.abs((datos[i + 2] ?? 0) - (datos[ref + 2] ?? 0)) > TOL_FONDO;
+  const filaFondo = (y: number): boolean => {
+    let ref = -1;
     for (let x = 0; x < ancho; x += PASO_BORDE) {
-      if (esTinta((base + x) * 4)) return true;
+      const i = (y * ancho + x) * 4;
+      if ((datos[i + 3] ?? 0) < 128) continue; // transparente = fondo
+      if (ref >= 0 && difiere(i, ref)) return false;
+      ref = i;
     }
-    return false;
+    return true;
   };
-  const colTinta = (x: number): boolean => {
+  const colFondo = (x: number): boolean => {
+    let ref = -1;
     for (let y = 0; y < alto; y += PASO_BORDE) {
-      if (esTinta((y * ancho + x) * 4)) return true;
+      const i = (y * ancho + x) * 4;
+      if ((datos[i + 3] ?? 0) < 128) continue; // transparente = fondo
+      if (ref >= 0 && difiere(i, ref)) return false;
+      ref = i;
     }
-    return false;
+    return true;
   };
   let x0 = 0;
   let y0 = 0;
   let x1 = ancho - 1;
   let y1 = alto - 1;
-  while (y0 < y1 && !filaTinta(y0)) y0 += 1;
-  while (y1 > y0 && !filaTinta(y1)) y1 -= 1;
-  while (x0 < x1 && !colTinta(x0)) x0 += 1;
-  while (x1 > x0 && !colTinta(x1)) x1 -= 1;
-  if (!filaTinta(y0) && !colTinta(x0)) return src;
+  while (y0 < y1 && filaFondo(y0)) y0 += 1;
+  while (y1 > y0 && filaFondo(y1)) y1 -= 1;
+  while (x0 < x1 && colFondo(x0)) x0 += 1;
+  while (x1 > x0 && colFondo(x1)) x1 -= 1;
+  if (filaFondo(y0) && colFondo(x0)) return src;
   const sx = Math.max(0, x0 - MARGEN_RECORTE);
   const sy = Math.max(0, y0 - MARGEN_RECORTE);
   const ex = Math.min(ancho - 1, x1 + MARGEN_RECORTE);
@@ -140,8 +182,8 @@ export function recortarMargenesBlancos(
 /** Por qué se rechazó una imagen (para el aviso; el llamador mapea a texto). */
 export type MotivoImagen = "blanca" | "ilegible";
 
-/** Normaliza un File a JPEG: EXIF enderezada, tope de lado, sin blancas.
-    Lanza Error(MotivoImagen) si es corrupta o vacía. */
+/** Normaliza un File a JPEG: EXIF enderezada, tope de lado, recorte de fondo y sin vacías.
+    Lanza Error(MotivoImagen) si es corrupta o vacía (negra incluida: mismo aviso). */
 // ponytail: se decodifica antes de medir; Chrome rechaza dimensiones absurdas
 // con error (→ "ilegible", el lote sigue). Parser de headers pre-decode solo
 // si aparece un caso real de bomba de descompresión.
@@ -164,9 +206,11 @@ export async function normalizarImagen(
     const ctx = lienzo.getContext("2d");
     if (!ctx) throw new Error("ilegible");
     ctx.drawImage(bmp, 0, 0, lienzo.width, lienzo.height);
-    if (esPaginaBlanca(lienzo)) throw new Error("blanca");
+    // ponytail: mismo recorte que el PDF (el aire tuerce el quad de DocAligner).
+    const recortado = recortarMargenesBlancos(lienzo, crear);
+    if (esPaginaBlanca(recortado) || esPaginaNegra(recortado)) throw new Error("blanca");
     const blob = await new Promise<Blob | null>((res) =>
-      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+      recortado.toBlob(res, "image/jpeg", CALIDAD_JPEG),
     );
     if (!blob) throw new Error("ilegible");
     return blob;
