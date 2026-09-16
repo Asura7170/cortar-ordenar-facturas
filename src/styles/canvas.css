@@ -426,9 +426,10 @@ body.is-dragging .cell:not(.empty) {
   border-color: var(--verde-tinta);
 }
 
-/* Durante el drag, el botón ×, el badge y el input no deben capturar el drop */
+/* Durante el drag, botones ×/giro/recorte, badge e input no capturan el drop */
 .sheet-grid.dragging .cell-remove,
 .sheet-grid.dragging .cell-girar,
+.sheet-grid.dragging .cell-recortar,
 .sheet-grid.dragging .cell-badge,
 .sheet-grid.dragging .cell-monto {
   pointer-events: none;
@@ -558,6 +559,69 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell-girar:hover {
   background: var(--verde-tinta);
+}
+
+/* Recorte manual: abajo-izquierda (el badge/monto vive abajo-derecha).
+   Mismo lenguaje que el giro: círculo oscuro, revelado por hover/foco. */
+.cell-recortar {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(20, 25, 20, 0.72);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  display: none;
+  z-index: 3;
+}
+/* Hit-area 44px: el visual queda en 28px, el ::after recibe el tap. */
+.cell-recortar::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.cell:hover .cell-recortar,
+.cell:focus-within .cell-recortar {
+  display: block;
+}
+/* Sin hover (táctil) no hay revelado: siempre visible. Es capacidad, no breakpoint. */
+@media (hover: none) {
+  .cell .cell-recortar {
+    display: block;
+  }
+}
+.cell-recortar:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.cell-recortar:hover {
+  background: var(--verde-tinta);
+}
+
+/* Modal Recorte: escena con base fija + overlay de guías apilado. */
+.modal-recorte .modal-card {
+  max-width: min(940px, 94dvw);
+}
+.recorte-escena {
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: #111;
+  border-radius: var(--radio);
+  overflow: hidden;
+}
+.recorte-escena canvas {
+  grid-area: 1 / 1;
+  display: block;
+  touch-action: none; /* el arrastre de tiradores lo gestiona Pointer Events */
+}
+#recorteGuia:focus-visible {
+  outline: 2px solid var(--verde-tinta);
+  outline-offset: 2px;
 }
 
 /* Modo OCR: la casilla muestra el texto del comprobante */

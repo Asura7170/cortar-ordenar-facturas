@@ -758,6 +758,15 @@ describe("giro manual", () => {
     expect(botonGiro("girar-der").getAttribute("aria-label")).toBe("Girar a la derecha");
   });
 
+  it("botón ✂ solo en celda ok en modo imagen", () => {
+    sembrar("u1", [100]); // pendiente: sin botón
+    expect(document.querySelector('[data-accion="recortar"]')).toBeNull();
+    sembrarGirable();
+    const b = document.querySelector<HTMLButtonElement>('[data-accion="recortar"]');
+    expect(b?.getAttribute("aria-label")).toBe("Recortar comprobante");
+    expect(b?.classList.contains("cell-recortar")).toBe(true);
+  });
+
   it("en modo OCR no hay botones de giro", () => {
     state.modoOcr = true;
     try {

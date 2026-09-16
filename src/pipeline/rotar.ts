@@ -74,7 +74,7 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
         id,
         setTimeout(() => {
           relecturas.delete(id);
-          void releer(id, girado, deps);
+          void releerTrasEdicion(id, girado, deps);
         }, QUIETUD_GIRO_MS),
       );
     } finally {
@@ -85,8 +85,9 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
   }
 }
 
-/** Fase diferida: un solo OCR tras la quietud + refresco del monto. Nunca lanza. */
-async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
+/** Fase diferida: un solo OCR tras la quietud + refresco del monto. Nunca lanza.
+ * Exportada para el recorte manual (también invalida texto y monto). */
+export async function releerTrasEdicion(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
   if (!item || !buscarSlot(id)) return;
   try {
