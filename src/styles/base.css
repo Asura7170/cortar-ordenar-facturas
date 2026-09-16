@@ -458,6 +458,34 @@ input::placeholder {
   gap: 10px;
 }
 
+/* Modelos en este equipo: renglón del libro, sin tarjeta (eco de .codigo-pos). */
+.grupo-modelos {
+  border: none;
+  border-top: 1px solid var(--modal-borde);
+  padding: 14px 0 0;
+  margin: 0 0 14px;
+}
+.grupo-modelos legend {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--modal-texto-suave);
+  padding: 0;
+}
+#estadoModelos {
+  display: block;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--modal-texto);
+  min-height: 20px;
+  margin: 8px 0 10px;
+}
+.fila-modelos {
+  display: flex;
+  gap: 10px;
+}
+
 /* Confirmación destructiva: reutiliza .modal; solo identidad de peligro. */
 .modal-confirm .modal-head h2 {
   display: flex;
