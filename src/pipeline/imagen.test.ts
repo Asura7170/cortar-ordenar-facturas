@@ -210,10 +210,11 @@ describe("recortarMargenesBlancos", () => {
     expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
-  it("lados de distinto color → recorta (cada lado con el suyo)", () => {
-    // Izquierda negra, resto blanco: la esquina no bloquea al vecino.
+  it("lados de distinto color no puro → recorta (cada lado con el suyo)", () => {
+    // Izquierda morada, resto verde (ninguno es blanco/negro: la paleta fija
+    // no recortaba esto): la esquina no bloquea al vecino.
     const { src, dibujos } = lienzoConMarco(
-      (x) => (x < 5 ? [0, 0, 0] : [255, 255, 255]),
+      (x) => (x < 5 ? [48, 0, 122] : [0, 100, 0]),
       () => [128, 128, 128],
     );
     expect(src.width).toBe(30);
@@ -260,6 +261,53 @@ describe("recortarMargenesBlancos", () => {
     expect(out.width).toBe(40);
     expect(out.height).toBe(15);
     expect(dibujos[0]?.slice(1)).toEqual([0, 10, 40, 15, 0, 0, 40, 15]);
+  });
+
+  it("frontera TOL: diff 15 cede, diff 16 frena", () => {
+    // Filas a ancho completo sobre blanco 255 + bloque gris (x5-34/y22-24):
+    // la fila 240 (diff 15) se come, la 239 (diff 16) frena (y0=20).
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const fila = (y: number, v: number): void => {
+      for (let x = 0; x < w; x += 1) {
+        const i = (y * w + x) * 4;
+        datos[i] = v;
+        datos[i + 1] = v;
+        datos[i + 2] = v;
+      }
+    };
+    fila(10, 240);
+    fila(20, 239);
+    for (let y = 22; y <= 24; y += 1) {
+      for (let x = 5; x <= 34; x += 1) {
+        const i = (y * w + x) * 4;
+        datos[i] = 128;
+        datos[i + 1] = 128;
+        datos[i + 2] = 128;
+      }
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(40);
+    expect(out.height).toBe(5);
+    expect(dibujos[0]?.slice(1)).toEqual([0, 20, 40, 5, 0, 0, 40, 5]);
   });
 
   it("1px distinto en el marco → esa fila frena", () => {

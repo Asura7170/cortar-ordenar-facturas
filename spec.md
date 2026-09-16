@@ -35,7 +35,7 @@ facturas/
    │  ├─ ocrMode.ts      # toggle chkOcr (no persiste) + renderHojas
    │  └─ settingsModal.ts# baseUrl/model/apiKey/moneda + restablecerAjustes
    ├─ pipeline/
-   │  ├─ imagen.ts       # JPEG único, LADO_MAX 2000, JPEG 0.9, recorte fondo muestreado, vacías 99.5%
+   │  ├─ imagen.ts       # JPEG único, LADO_MAX 2000, JPEG 0.9, recorte por lado uniforme, vacías 99.5%
    │  ├─ docaligner.ts   # 256px/borde100/conf 0.3, EP webgpu→wasm 30s + latch, threads 1
    │  ├─ ocr.ts          # det 960 + enderezar [0,270,90,180] + rec chunks 16
    │  ├─ ocrDb.ts        # cajasDesdeMapa (bin 0.2, caja 0.45, max 3000, unclip 1.4)

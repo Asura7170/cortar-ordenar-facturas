@@ -18,7 +18,7 @@ const BLANCO_RATIO = 0.995;
  * Imagen vacía: casi todo blanco o transparente (el PDF sin fondo se
  * compone sobre blanco). Sin píxeles legibles no se puede juzgar → se conserva.
  */
-// ponytail: umbral fijo 250/99.5%; conteo por texto/OCR si hay falsos positivos en tickets ralos.
+// ponytail: umbral fijo 245/99.5%; conteo por texto/OCR si hay falsos positivos en tickets ralos.
 export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
   const ctx = lienzo.getContext("2d");
   if (!ctx || lienzo.width < 1 || lienzo.height < 1) return false;
