@@ -309,6 +309,29 @@ describe("abrirRecorte", () => {
     }
   });
 
+  it("achicar al mínimo con upscale commitea (mínimo en ambas unidades)", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps, creados } = depsRecorte(200, 80);
+      const c = sembrar();
+      const antes = c.file;
+      await abrirRecorte(c.id, deps as never);
+      // Sin el mínimo natural, 24 display ≈ 5 naturales y confirmar rechaza.
+      guia.dispatchEvent(puntero("pointerdown", 916, 370));
+      guia.dispatchEvent(puntero("pointermove", 30, 30));
+      guia.dispatchEvent(puntero("pointerup", 30, 30));
+      btnOk.click();
+      await vaciar();
+      expect(creados[0]).toMatchObject({ width: 8, height: 8 });
+      expect(c.file).not.toBe(antes);
+      expect(modal.open).toBe(false);
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
   it("arrastrar el interior a rect completo no cambia nada", async () => {
     const ctx = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")

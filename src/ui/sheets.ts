@@ -959,9 +959,6 @@ export function initSheets(cb: SheetsCallbacks): void {
     const target = e.target as HTMLElement | null;
     const btn = target?.closest?.("[data-accion]");
     if (!(btn instanceof HTMLElement)) return;
-    // ponytail: el clic que descartó el editor no reabre ni acciona (carrera
-    // descarte→clic en la celda de abajo).
-    if (Date.now() - state.cierreRecorte < VENTANA_CIERRE_RECORTE_MS) return;
     const accion = btn.dataset["accion"];
     const cell = btn.closest(".cell");
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
@@ -993,6 +990,9 @@ export function initSheets(cb: SheetsCallbacks): void {
         void girarYReleer(id, 90);
         return;
       case "recortar":
+        // ponytail: solo recortar se suprime tras el descarte (carrera
+        // descarte→clic en la celda de abajo); el resto acciona siempre.
+        if (Date.now() - state.cierreRecorte < VENTANA_CIERRE_RECORTE_MS) return;
         // ponytail: dinámico (recorte importa la cola: estático sería ciclo).
         void import("./recorte").then((m) => m.abrirRecorte(id)).catch(() => {});
         return;

@@ -170,7 +170,8 @@ export async function procesarCola(): Promise<void> {
                       ? await mod.girarBlob(sig.previoDocAligner, end.grados)
                       : null;
                   if (previoGirado && buscarSlot(sig.id)) sig.previoDocAligner = previoGirado;
-                  else delete sig.previoDocAligner;
+                  // ponytail: si falla, se conserva el viejo (un fallo transitorio
+                  // no debe destruir la fuente de recuperación del sobre-recorte).
                   sig.file = end.blob;
                   blob = end.blob;
                 }

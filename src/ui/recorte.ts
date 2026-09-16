@@ -253,10 +253,12 @@ function moverA(b: Borde, p: { x: number; y: number }): void {
   let arr = rect.y;
   let der = der0;
   let aba = aba0;
-  if (b === "n" || b === "ne" || b === "no") arr = Math.min(Math.max(p.y, MARGEN), aba0 - MIN_LADO);
-  if (b === "s" || b === "se" || b === "so") aba = Math.max(Math.min(p.y, abaMax), arr + MIN_LADO);
-  if (b === "o" || b === "no" || b === "so") izq = Math.min(Math.max(p.x, MARGEN), der0 - MIN_LADO);
-  if (b === "e" || b === "ne" || b === "se") der = Math.max(Math.min(p.x, derMax), izq + MIN_LADO);
+  // ponytail: mínimo en ambas unidades (con upscale, 24 display < 8 naturales).
+  const minLado = Math.max(MIN_LADO, Math.ceil(MIN_NATURAL / escala));
+  if (b === "n" || b === "ne" || b === "no") arr = Math.min(Math.max(p.y, MARGEN), aba0 - minLado);
+  if (b === "s" || b === "se" || b === "so") aba = Math.max(Math.min(p.y, abaMax), arr + minLado);
+  if (b === "o" || b === "no" || b === "so") izq = Math.min(Math.max(p.x, MARGEN), der0 - minLado);
+  if (b === "e" || b === "ne" || b === "se") der = Math.max(Math.min(p.x, derMax), izq + minLado);
   rect = { x: izq, y: arr, w: der - izq, h: aba - arr };
   pedirGuia();
 }
