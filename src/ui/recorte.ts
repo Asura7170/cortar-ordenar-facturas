@@ -13,7 +13,6 @@ const base: HTMLCanvasElement = getEl<HTMLCanvasElement>("recorteBase");
 const guia: HTMLCanvasElement = getEl<HTMLCanvasElement>("recorteGuia");
 const btnOk: HTMLButtonElement = getEl<HTMLButtonElement>("btnRecorteOk");
 const btnReset: HTMLButtonElement = getEl<HTMLButtonElement>("btnRecorteReset");
-const aviso: HTMLElement = getEl("avisoRecorte");
 
 type Borde = "n" | "s" | "e" | "o" | "ne" | "no" | "se" | "so";
 
@@ -100,9 +99,9 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   // La escena ya tiene layout (el dialog está abierto): llenar ampliando o reduciendo.
   // ponytail: el marco flotante se encoge al canvas (medir la escena sería
   // circular): el espacio sale del viewport, igual que maxH.
-  const maxW = Math.max(200, Math.min(window.innerWidth * 0.9, 860));
-  // ponytail: cabe en el viewport con barra y leyenda flotantes (sin tarjeta).
-  const maxH = Math.max(200, Math.min(window.innerHeight * 0.82 - 150, 560));
+  const maxW = Math.max(200, Math.min(window.innerWidth * 0.9, 940));
+  // ponytail: cabe en el viewport con la barra flotante (sin tarjeta).
+  const maxH = Math.max(200, Math.min(window.innerHeight * 0.82 - 150, 640));
   const k = Math.min((maxW - MARGEN * 2) / foto.width, (maxH - MARGEN * 2) / foto.height);
   cw = Math.max(1, Math.round(foto.width * k));
   ch = Math.max(1, Math.round(foto.height * k));
@@ -127,7 +126,6 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   ctxBase.imageSmoothingQuality = "high";
   ctxBase.drawImage(foto, MARGEN, MARGEN, cw, ch);
   restablecer();
-  aviso.textContent = "";
 }
 
 function restablecer(): void {
@@ -277,7 +275,7 @@ async function confirmar(): Promise<void> {
     const w = Math.min(Math.round(rect.w * escala), foto.width - sx);
     const h = Math.min(Math.round(rect.h * escala), foto.height - sy);
     if (w < MIN_NATURAL || h < MIN_NATURAL) {
-      aviso.textContent = "El recorte es demasiado pequeño.";
+      avisar("El recorte es demasiado pequeño.");
       return;
     }
     const lienzo = crear();

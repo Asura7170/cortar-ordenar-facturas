@@ -30,7 +30,6 @@ export const FIXTURE_HTML = `
 <dialog id="modalRecorte">
   <canvas id="recorteBase"></canvas>
   <canvas id="recorteGuia" tabindex="0"></canvas>
-  <p id="avisoRecorte"></p>
   <button id="btnRecorteReset" type="button"></button>
   <button id="btnRecorteOk" type="button"></button>
 </dialog>

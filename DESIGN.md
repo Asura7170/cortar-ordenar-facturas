@@ -112,8 +112,8 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 - `.modal/.modal-card` (base.css, `#modalAjustes/#modalLimpiar`): `<dialog>`
   con `closedby`, backdrop, head/body/foot. Uso: `showModal()`, nunca divs.
 - `.modal-recorte` (canvas.css, `#modalRecorte`): variante sin tarjeta — la
-  foto flota sola sobre el velo con sombra de modal; barra de acciones y
-  leyenda flotan debajo en `modal-bg` con borde `borde-panel` (mismos botones
+  foto flota sola sobre el velo con sombra de modal; la barra de acciones
+  flota debajo en `modal-bg` con borde `borde-panel` (mismos botones
   del sistema, sin colores nuevos). Tiradores 10px verde/blanco, hit 22px.
 - `.dropzone/.dropzone-grande` + `.btn-primary/.btn-ghost/.btn-danger`
   (canvas/base, `#dropzone/#fileInput`): punteado verde para subir; primario

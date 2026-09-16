@@ -235,7 +235,7 @@ describe("abrirRecorte", () => {
       guia.dispatchEvent(puntero("pointerup", 60, 30));
       btnOk.click();
       await vaciar();
-      expect(creados[0]).toMatchObject({ width: 200, height: 74 });
+      expect(creados[0]).toMatchObject({ width: 200, height: 75 });
     } finally {
       ctx.mockRestore();
     }
@@ -271,7 +271,7 @@ describe("abrirRecorte", () => {
       const antes = c.file;
       await abrirRecorte(c.id, deps as never);
       // Se achica por la esquina "se" (854,345 con llenado) y se mueve por el interior.
-      guia.dispatchEvent(puntero("pointerdown", 854, 345));
+      guia.dispatchEvent(puntero("pointerdown", 916, 370));
       guia.dispatchEvent(puntero("pointermove", 400, 200));
       guia.dispatchEvent(puntero("pointerup", 400, 200));
       guia.dispatchEvent(puntero("pointerdown", 203, 103));
@@ -279,7 +279,7 @@ describe("abrirRecorte", () => {
       guia.dispatchEvent(puntero("pointerup", 260, 140));
       btnOk.click();
       await vaciar();
-      expect(creados[0]).toMatchObject({ width: 93, height: 46 });
+      expect(creados[0]).toMatchObject({ width: 87, height: 43 });
       expect(c.file).not.toBe(antes);
     } finally {
       ctx.mockRestore();
@@ -294,7 +294,7 @@ describe("abrirRecorte", () => {
       const { deps, creados } = depsRecorte(200, 80);
       const c = sembrar();
       await abrirRecorte(c.id, deps as never);
-      guia.dispatchEvent(puntero("pointerdown", 854, 345));
+      guia.dispatchEvent(puntero("pointerdown", 916, 370));
       guia.dispatchEvent(puntero("pointermove", 400, 200));
       guia.dispatchEvent(puntero("pointerup", 400, 200));
       guia.dispatchEvent(puntero("pointerdown", 203, 103));
@@ -303,7 +303,7 @@ describe("abrirRecorte", () => {
       btnOk.click();
       await vaciar();
       // Fijado abajo-derecha: mismo tamaño, sin salirse.
-      expect(creados[0]).toMatchObject({ width: 93, height: 46 });
+      expect(creados[0]).toMatchObject({ width: 87, height: 43 });
     } finally {
       ctx.mockRestore();
     }
