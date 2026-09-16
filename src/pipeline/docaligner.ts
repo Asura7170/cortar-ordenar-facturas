@@ -30,8 +30,14 @@ export const PAD_BORDE: number = 100;
 /** Binarización del heatmap por canal (mismo valor que el gate de confianza). */
 export const UMBRAL_HEATMAP: number = 0.3;
 
-/** Modelo vendoreado same-origin (COEP require-corp bloquea CDNs sin cabecera CORP). */
-const RUTA_MODELO: string = `${import.meta.env.BASE_URL}models/fastvit_sa24_h_e_bifpn_256_fp32.onnx`;
+/** Pesos en prod: Pages rechaza archivos >25MB; la URL /resolve/ es estable (el 302 firmado caduca). */
+export const URL_MODELO_HF: string =
+  "https://huggingface.co/7rplus/pagescan-weights/resolve/main/fastvit_sa24_h_e_bifpn_256_fp32.onnx";
+
+/** Modelo local en dev/test, remoto en prod (mismo peso; CORS de HF pasa COEP require-corp). */
+const RUTA_MODELO: string = import.meta.env.PROD
+  ? URL_MODELO_HF
+  : `${import.meta.env.BASE_URL}models/fastvit_sa24_h_e_bifpn_256_fp32.onnx`;
 
 /** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
 export function ordenarQuad(puntos: readonly Punto[]): Quad {
@@ -504,6 +510,29 @@ export async function iniciarSesion<T>(
   throw ultimoError instanceof Error ? ultimoError : new Error("ORT sin proveedor válido");
 }
 
+/** Presupuesto de descarga de pesos (79MB: 30s no bastan en enlaces lentos; fuera del presupuesto EP). */
+export const TIMEOUT_MODELO_MS: number = 300_000;
+
+/**
+ * Descarga los pesos con caché Cache Storage (una sola descarga por navegador).
+ * Sin `caches` (jsdom) → red directa.
+ */
+export async function descargarPesos(): Promise<ArrayBuffer> {
+  const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
+  const guardada = await cache?.match(RUTA_MODELO);
+  if (guardada) return guardada.arrayBuffer();
+  // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
+  const res = await fetch(RUTA_MODELO, { signal: AbortSignal.timeout(TIMEOUT_MODELO_MS) });
+  if (!res.ok) throw new Error(`modelo DocAligner: HTTP ${res.status}`);
+  const pesos = await res.arrayBuffer();
+  // ponytail: copia para la caché (ORT podría neutrar el búfer) + put sin await (la sesión no espera).
+  void cache?.put(
+    RUTA_MODELO,
+    new Response(pesos.slice(0), { headers: { "Content-Length": String(pesos.byteLength) } }),
+  );
+  return pesos;
+}
+
 async function crearSesion(): Promise<SesionDetectora> {
   // ponytail: build solo-webgpu (sin jsep deprecado ni webgl): el dist pasa de ~30MB a <1MB.
   const ort = await import("onnxruntime-web/webgpu");
@@ -513,9 +542,7 @@ async function crearSesion(): Promise<SesionDetectora> {
   // Chrome bajo COEP require-corp (y en headless cuelgan sin rechazar); ~250ms/foto bastan.
   ort.env.wasm.numThreads = 1;
   // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
-  const res = await fetch(RUTA_MODELO, { signal: AbortSignal.timeout(TIMEOUT_EP_MS) });
-  if (!res.ok) throw new Error(`modelo DocAligner: HTTP ${res.status}`);
-  const pesos = await res.arrayBuffer();
+  const pesos = await descargarPesos();
   return iniciarSesion(async (ep: string): Promise<SesionDetectora> => {
     const s = await ort.InferenceSession.create(pesos, {
       executionProviders: [ep],

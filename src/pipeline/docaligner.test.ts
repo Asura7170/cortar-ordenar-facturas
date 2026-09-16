@@ -7,6 +7,7 @@ import {
   conBorde,
   conTimeout,
   decodificarHeatmap,
+  descargarPesos,
   detectarYRecortar,
   esConvexo,
   esQuadPlausible,
@@ -19,6 +20,7 @@ import {
   reintentarEps,
   tamanoSalida,
   UMBRAL_HEATMAP,
+  URL_MODELO_HF,
   warpear,
 } from "./docaligner";
 import type { BuferPixeles, IntentarEp, Quad, SesionDetectora } from "./docaligner";
@@ -515,5 +517,93 @@ describe("conBorde/quitarBorde", () => {
       { x: 100, y: 100 },
       { x: 0, y: 100 },
     ]);
+  });
+});
+
+describe("descargarPesos", () => {
+  const BYTES = new Uint8Array([1, 2, 3]).buffer;
+  type Tienda = Map<unknown, { arrayBuffer: () => Promise<ArrayBuffer> }>;
+  // jsdom no trae Response: dummy (el put falso no lo lee).
+  class RespuestaFalsa {
+    readonly cuerpo: unknown;
+    readonly init: unknown;
+    constructor(cuerpo: unknown, init?: unknown) {
+      this.cuerpo = cuerpo;
+      this.init = init;
+    }
+  }
+
+  function conRed(tienda: Tienda, fetchFn: ReturnType<typeof vi.fn>): () => void {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    g["Response"] = RespuestaFalsa;
+    g["fetch"] = fetchFn;
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({
+        match: async (k: unknown): Promise<unknown> => tienda.get(k) ?? undefined,
+        put: async (k: unknown): Promise<void> => {
+          tienda.set(k, { arrayBuffer: async () => BYTES });
+        },
+      }),
+    };
+    return () => {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    };
+  }
+
+  const redOk = (): ReturnType<typeof vi.fn> =>
+    vi.fn(async () => ({ ok: true, status: 200, arrayBuffer: async () => BYTES }));
+
+  it("URL_MODELO_HF es el resolve estable de HF (no el CDN firmado)", () => {
+    expect(URL_MODELO_HF).toBe(
+      "https://huggingface.co/7rplus/pagescan-weights/resolve/main/fastvit_sa24_h_e_bifpn_256_fp32.onnx",
+    );
+  });
+
+  it("miss descarga una vez; hit no refetchea", async () => {
+    const tienda: Tienda = new Map();
+    const fetchFn = redOk();
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      await expect(descargarPesos()).resolves.toBe(BYTES);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      await expect(descargarPesos()).resolves.toBe(BYTES);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("sin caches va a red directa", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"] };
+    delete g["caches"];
+    const fetchFn = redOk();
+    g["fetch"] = fetchFn;
+    try {
+      await expect(descargarPesos()).resolves.toBe(BYTES);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      g["fetch"] = real.fetch;
+      if (real.caches !== undefined) g["caches"] = real.caches;
+    }
+  });
+
+  it("HTTP no-ok lanza", async () => {
+    const tienda: Tienda = new Map();
+    const fetchFn = vi.fn(async () => ({
+      ok: false,
+      status: 404,
+      arrayBuffer: async () => BYTES,
+    }));
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      await expect(descargarPesos()).rejects.toThrow("HTTP 404");
+    } finally {
+      restaurar();
+    }
   });
 });

@@ -24,6 +24,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Pages rechaza archivos >25MB: el fastvit (79MB) se sirve de HuggingFace en prod.
+      - run: mv public/models/fastvit_sa24_h_e_bifpn_256_fp32.onnx "$RUNNER_TEMP/"
       - run: pnpm build
       - run: pnpm dlx --allow-build=esbuild --allow-build=workerd wrangler@4 pages deploy dist --project-name cortar-ordenar-facturas --branch main
         env:
