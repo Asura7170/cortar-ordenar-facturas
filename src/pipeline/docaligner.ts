@@ -531,7 +531,11 @@ export async function descargarConCache(
   const tarea = (async (): Promise<ArrayBuffer> => {
     const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
     const guardada = await cache?.match(clave);
-    if (guardada) return guardada.arrayBuffer();
+    if (guardada) {
+      const buf = await guardada.arrayBuffer();
+      if (buf.byteLength >= minBytes) return buf;
+      await cache?.delete(clave).catch(() => false);
+    }
     // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
     const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
@@ -539,13 +543,19 @@ export async function descargarConCache(
     if (pesos.byteLength < minBytes) {
       throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
     }
-    // ponytail: copia para la caché (ORT podría neutrar el búfer) + put sin await (la sesión no espera).
-    void cache
-      ?.put(
-        clave,
-        new Response(pesos.slice(0), { headers: { "Content-Length": String(pesos.byteLength) } }),
-      )
-      .catch((e: unknown) => console.warn("modelos: caché put falló", e));
+    // ponytail: put con await (un put local cuesta ms; perderlo cuesta una re-descarga) + warn si falla.
+    try {
+      if (cache) {
+        await cache.put(
+          clave,
+          new Response(pesos.slice(0), {
+            headers: { "Content-Length": String(pesos.byteLength) },
+          }),
+        );
+      }
+    } catch (e: unknown) {
+      console.warn("modelos: caché put falló", e);
+    }
     return pesos;
   })();
   enVuelo.set(clave, tarea);
@@ -622,8 +632,10 @@ async function crearSesion(): Promise<SesionDetectora> {
   try {
     return await iniciarSesion(intentar);
   } catch (e: unknown) {
-    // ponytail: create fallido = peso corrupto cacheado, no EP caído: expulsar y soltar latch.
-    await olvidarSesionFallida();
+    // ponytail: solo el fallo de integridad expulsa el peso (un timeout de EP no borra 79MB buenos).
+    if (e instanceof Error && /corrupto|incompleto|heatmap|sin salida/i.test(e.message)) {
+      await olvidarSesionFallida();
+    }
     throw e;
   }
 }

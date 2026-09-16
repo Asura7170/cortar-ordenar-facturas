@@ -748,4 +748,62 @@ describe("descargarPesos", () => {
       restaurar();
     }
   });
+
+  it("hit infradimensionado se expulsa y refetchea", async () => {
+    const tienda: Tienda = new Map([
+      ["k", { arrayBuffer: async () => BYTES, headers: { get: () => "3" } }],
+    ]);
+    const grande = new ArrayBuffer(60_000_000);
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => grande,
+    }));
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      const r = await descargarConCache("k", 30_000, 50_000_000);
+      expect(r).toBe(grande);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      // el put falso guarda 3B: se siembra la buena a mano y el hit ya no refetchea.
+      tienda.set("k", { arrayBuffer: async () => grande, headers: { get: () => "60000000" } });
+      await expect(descargarConCache("k", 30_000, 50_000_000)).resolves.toBe(grande);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("no resuelve antes de persistir el put", async () => {
+    const tienda: Tienda = new Map();
+    let abrir!: () => void;
+    const puerta = new Promise<void>((res) => {
+      abrir = res;
+    });
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    g["Response"] = RespuestaFalsa;
+    g["fetch"] = redOk();
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({
+        match: async () => undefined,
+        put: async (k: unknown): Promise<void> => {
+          await puerta;
+          tienda.set(k, { arrayBuffer: async () => BYTES });
+        },
+      }),
+    };
+    try {
+      const p = descargarConCache("k", 30_000, 2);
+      await new Promise((res) => setTimeout(res, 10));
+      expect(tienda.size).toBe(0); // fetch listo, put atascado
+      abrir();
+      await expect(p).resolves.toBe(BYTES);
+      expect(tienda.size).toBe(1);
+    } finally {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    }
+  });
 });

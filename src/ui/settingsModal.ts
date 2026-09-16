@@ -77,11 +77,18 @@ export function initSettings(): void {
       });
   });
   btnBorrarModelos.addEventListener("click", () => {
-    void borrarModelos().then((habia) => {
-      estadoModelos.textContent = habia
-        ? "Modelos: borrados (se descargan de nuevo al usarse)"
-        : "Modelos: no había nada descargado";
-    });
+    void borrarModelos().then(
+      (habia) => {
+        estadoModelos.textContent = habia
+          ? "Modelos: borrados (se descargan de nuevo al usarse)"
+          : "Modelos: no había nada descargado";
+      },
+      (e: unknown) => {
+        console.warn("modelos:", e);
+        estadoModelos.textContent =
+          "Modelos: no se pudo borrar (" + (e instanceof Error ? e.message : "error") + ")";
+      },
+    );
   });
   formAjustes.addEventListener("submit", () => {
     state.configIA.baseUrl = cfgBaseUrl.value || CONFIG_IA_DEFAULT.baseUrl;

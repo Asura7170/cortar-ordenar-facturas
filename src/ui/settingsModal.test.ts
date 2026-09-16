@@ -212,4 +212,24 @@ describe("Modelos", () => {
       modalAjustes.close();
     }
   });
+
+  it("borrado que falla muestra la causa", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realCaches = g["caches"];
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({}),
+      delete: async (): Promise<boolean> => {
+        throw new Error("denegado");
+      },
+    };
+    try {
+      btnBorrarModelos.click();
+      await pausa();
+      expect(estadoModelos.textContent).toContain("no se pudo borrar");
+      expect(estadoModelos.textContent).toContain("denegado");
+    } finally {
+      if (realCaches === undefined) delete g["caches"];
+      else g["caches"] = realCaches;
+    }
+  });
 });
