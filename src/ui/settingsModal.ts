@@ -32,7 +32,11 @@ function textoModelos(bytes: number): string {
 }
 
 async function pintarModelos(): Promise<void> {
-  estadoModelos.textContent = textoModelos(await tamanoModelos());
+  try {
+    estadoModelos.textContent = textoModelos(await tamanoModelos());
+  } catch {
+    estadoModelos.textContent = "Modelos: no se pudo consultar el almacenamiento";
+  }
 }
 
 function pintarAjustes(): void {
@@ -61,8 +65,10 @@ export function initSettings(): void {
     void Promise.all([descargarPesos(), descargarPesosOcr()])
       .then(
         () => pintarModelos(),
-        () => {
-          estadoModelos.textContent = "Modelos: no se pudo descargar (revisa tu conexión)";
+        (e: unknown) => {
+          console.warn("modelos:", e);
+          estadoModelos.textContent =
+            "Modelos: no se pudo descargar (" + (e instanceof Error ? e.message : "error") + ")";
         },
       )
       .finally(() => {

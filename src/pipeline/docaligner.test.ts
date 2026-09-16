@@ -7,6 +7,7 @@ import {
   conBorde,
   conTimeout,
   decodificarHeatmap,
+  descargarConCache,
   descargarPesos,
   borrarModelos,
   detectarYRecortar,
@@ -14,6 +15,7 @@ import {
   esQuadPlausible,
   iniciarSesion,
   LADO_MODELO,
+  olvidarSesionFallida,
   ordenarQuad,
   PAD_BORDE,
   quitarBorde,
@@ -545,11 +547,15 @@ describe("descargarPesos", () => {
     g["fetch"] = fetchFn;
     g["caches"] = {
       open: async (): Promise<unknown> => ({
-        match: async (k: unknown): Promise<unknown> => tienda.get(k) ?? undefined,
+        match: async (k: unknown): Promise<unknown> => {
+          const url = typeof k === "string" ? k : (k as { url: string }).url;
+          return tienda.get(url) ?? undefined;
+        },
         put: async (k: unknown): Promise<void> => {
           tienda.set(k, { arrayBuffer: async () => BYTES });
         },
-        keys: async (): Promise<unknown[]> => [...tienda.keys()],
+        keys: async (): Promise<unknown[]> => [...tienda.keys()].map((url) => ({ url })),
+        delete: async (k: unknown): Promise<boolean> => tienda.delete(k),
       }),
       delete: async (): Promise<boolean> => {
         const habia = tienda.size > 0;
@@ -579,9 +585,9 @@ describe("descargarPesos", () => {
     const fetchFn = redOk();
     const restaurar = conRed(tienda, fetchFn);
     try {
-      await expect(descargarPesos()).resolves.toBe(BYTES);
+      await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
       expect(fetchFn).toHaveBeenCalledTimes(1);
-      await expect(descargarPesos()).resolves.toBe(BYTES);
+      await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
       expect(fetchFn).toHaveBeenCalledTimes(1);
     } finally {
       restaurar();
@@ -595,7 +601,7 @@ describe("descargarPesos", () => {
     const fetchFn = redOk();
     g["fetch"] = fetchFn;
     try {
-      await expect(descargarPesos()).resolves.toBe(BYTES);
+      await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
       expect(fetchFn).toHaveBeenCalledTimes(1);
     } finally {
       g["fetch"] = real.fetch;
@@ -651,6 +657,93 @@ describe("descargarPesos", () => {
       await expect(borrarModelos()).resolves.toBe(true);
       await expect(tamanoModelos()).resolves.toBe(0);
       await expect(borrarModelos()).resolves.toBe(false);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("peso bajo el mínimo no se cachea (reintento refetchea)", async () => {
+    const tienda: Tienda = new Map();
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => BYTES,
+    }));
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      await expect(descargarPesos()).rejects.toThrow("corrupto");
+      expect(tienda.size).toBe(0);
+      await expect(descargarPesos()).rejects.toThrow("corrupto");
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("dos miss concurrentes hacen un solo fetch", async () => {
+    const tienda: Tienda = new Map();
+    const fetchFn = redOk();
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      const [a, b] = await Promise.all([
+        descargarConCache("clave-test", 30_000, 2),
+        descargarConCache("clave-test", 30_000, 2),
+      ]);
+      expect(a).toBe(BYTES);
+      expect(b).toBe(a);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("put que falla avisa y aun así resuelve", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    g["Response"] = RespuestaFalsa;
+    g["fetch"] = redOk();
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({
+        match: async () => undefined,
+        put: async (): Promise<void> => {
+          throw new Error("quota");
+        },
+      }),
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const r = await descargarConCache("clave-test", 30_000, 2);
+      expect(r).toBe(BYTES);
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    }
+  });
+
+  it("olvidarSesionFallida expulsa el peso y suelta el latch", async () => {
+    const tienda: Tienda = new Map();
+    const grande = new ArrayBuffer(60_000_000);
+    const restaurar = conRed(
+      tienda,
+      vi.fn(async () => ({ ok: true, status: 200, arrayBuffer: async () => grande })),
+    );
+    try {
+      await descargarPesos();
+      expect(tienda.size).toBe(1);
+      let intentos = 0;
+      const caido: IntentarEp = async () => {
+        intentos += 1;
+        throw new Error("create corrupto");
+      };
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      expect(intentos).toBe(1);
+      await olvidarSesionFallida();
+      expect(tienda.size).toBe(0);
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      expect(intentos).toBe(2); // latch suelto: webgpu se reintenta
     } finally {
       restaurar();
     }

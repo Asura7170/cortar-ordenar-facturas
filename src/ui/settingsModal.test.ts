@@ -110,14 +110,18 @@ describe("Modelos", () => {
     const bytes = new Uint8Array([7]).buffer;
     g["caches"] = {
       open: async (): Promise<unknown> => ({
-        match: async (k: unknown): Promise<unknown> => tienda.get(k) ?? undefined,
-        put: async (k: unknown): Promise<void> => {
+        match: async (k: unknown): Promise<unknown> => {
+          const url = typeof k === "string" ? k : (k as { url: string }).url;
+          return tienda.get(url) ?? undefined;
+        },
+        put: async (k: unknown, v: unknown): Promise<void> => {
+          const cuerpo = (v as { cuerpo?: ArrayBuffer }).cuerpo;
           tienda.set(k, {
             arrayBuffer: async () => bytes,
-            headers: { get: () => "1048576" },
+            headers: { get: () => String(cuerpo?.byteLength ?? 0) },
           });
         },
-        keys: async (): Promise<unknown[]> => [...tienda.keys()],
+        keys: async (): Promise<unknown[]> => [...tienda.keys()].map((url) => ({ url })),
       }),
       delete: async (): Promise<boolean> => {
         const habia = tienda.size > 0;
@@ -149,17 +153,18 @@ describe("Modelos", () => {
 
   it("descargar pinta el tamaño y borrar lo vacía", async () => {
     const tienda = new Map<unknown, unknown>();
+    const grande = new ArrayBuffer(60_000_000);
     const fetchFn = vi.fn(async () => ({
       ok: true,
       status: 200,
-      arrayBuffer: async () => new Uint8Array([7]).buffer,
+      arrayBuffer: async () => grande,
     }));
     const restaurar = conRed(tienda, fetchFn);
     try {
       btnDescargarModelos.click();
       await pausa();
-      // docaligner + det + rec = 3 entradas de 1MB.
-      expect(estadoModelos.textContent).toBe("Modelos: ~3 MB en este navegador");
+      // docaligner + det + rec = 3 entradas de ~57MB.
+      expect(estadoModelos.textContent).toBe("Modelos: ~172 MB en este navegador");
       btnBorrarModelos.click();
       await pausa();
       expect(estadoModelos.textContent).toContain("borrados");
@@ -169,6 +174,42 @@ describe("Modelos", () => {
       expect(estadoModelos.textContent).toContain("no había nada");
     } finally {
       restaurar();
+    }
+  });
+
+  it("descarga fallida muestra la causa y libera los botones", async () => {
+    const tienda = new Map<unknown, unknown>();
+    const fetchFn = vi.fn(async () => {
+      throw new Error("red caída");
+    });
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      btnDescargarModelos.click();
+      await pausa();
+      expect(estadoModelos.textContent).toContain("red caída");
+      expect(btnDescargarModelos.disabled).toBe(false);
+      expect(btnBorrarModelos.disabled).toBe(false);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("caché que lanza pinta error de consulta", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realCaches = g["caches"];
+    g["caches"] = {
+      open: async (): Promise<unknown> => {
+        throw new Error("denegado");
+      },
+    };
+    try {
+      btnAjustes.click();
+      await pausa();
+      expect(estadoModelos.textContent).toContain("no se pudo consultar");
+    } finally {
+      if (realCaches === undefined) delete g["caches"];
+      else g["caches"] = realCaches;
+      modalAjustes.close();
     }
   });
 });

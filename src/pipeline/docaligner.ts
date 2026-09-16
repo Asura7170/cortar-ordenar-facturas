@@ -513,29 +513,52 @@ export async function iniciarSesion<T>(
 /** Presupuesto de descarga de pesos (79MB: 30s no bastan en enlaces lentos; fuera del presupuesto EP). */
 export const TIMEOUT_MODELO_MS: number = 300_000;
 
+/** Descargas en curso por clave (dos miss concurrentes = un solo fetch). */
+const enVuelo = new Map<string, Promise<ArrayBuffer>>();
+
 /**
  * Descarga con caché Cache Storage (una sola descarga por navegador y clave).
- * Sin `caches` (jsdom) → red directa.
+ * Sin `caches` (jsdom) → red directa. `minBytes` expulsa errores con 200
+ * (páginas HTML de HF) antes de cachear.
  */
-export async function descargarConCache(clave: string, timeoutMs: number): Promise<ArrayBuffer> {
-  const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
-  const guardada = await cache?.match(clave);
-  if (guardada) return guardada.arrayBuffer();
-  // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
-  const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
-  if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
-  const pesos = await res.arrayBuffer();
-  // ponytail: copia para la caché (ORT podría neutrar el búfer) + put sin await (la sesión no espera).
-  void cache?.put(
-    clave,
-    new Response(pesos.slice(0), { headers: { "Content-Length": String(pesos.byteLength) } }),
-  );
-  return pesos;
+export async function descargarConCache(
+  clave: string,
+  timeoutMs: number,
+  minBytes = 0,
+): Promise<ArrayBuffer> {
+  const enCurso = enVuelo.get(clave);
+  if (enCurso) return enCurso;
+  const tarea = (async (): Promise<ArrayBuffer> => {
+    const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
+    const guardada = await cache?.match(clave);
+    if (guardada) return guardada.arrayBuffer();
+    // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
+    const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
+    const pesos = await res.arrayBuffer();
+    if (pesos.byteLength < minBytes) {
+      throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
+    }
+    // ponytail: copia para la caché (ORT podría neutrar el búfer) + put sin await (la sesión no espera).
+    void cache
+      ?.put(
+        clave,
+        new Response(pesos.slice(0), { headers: { "Content-Length": String(pesos.byteLength) } }),
+      )
+      .catch((e: unknown) => console.warn("modelos: caché put falló", e));
+    return pesos;
+  })();
+  enVuelo.set(clave, tarea);
+  try {
+    return await tarea;
+  } finally {
+    enVuelo.delete(clave);
+  }
 }
 
 /** Pesos DocAligner (una sola descarga por navegador). */
 export function descargarPesos(): Promise<ArrayBuffer> {
-  return descargarConCache(RUTA_MODELO, TIMEOUT_MODELO_MS);
+  return descargarConCache(RUTA_MODELO, TIMEOUT_MODELO_MS, 50_000_000);
 }
 
 /** Bytes ocupados por los modelos en este navegador (0 sin caché). */
@@ -544,7 +567,7 @@ export async function tamanoModelos(): Promise<number> {
   const cache = await caches.open("modelos");
   let total = 0;
   for (const peticion of await cache.keys()) {
-    const res = await cache.match(peticion);
+    const res = await cache.match(peticion.url);
     total += Number(res?.headers.get("Content-Length") ?? 0);
   }
   return total;
@@ -554,6 +577,17 @@ export async function tamanoModelos(): Promise<number> {
 export async function borrarModelos(): Promise<boolean> {
   if (typeof caches === "undefined") return false;
   return caches.delete("modelos");
+}
+
+/** Expulsa el peso cacheado y suelta el latch (create fallido = bytes corruptos, no EP caído). */
+export async function olvidarSesionFallida(): Promise<void> {
+  if (typeof caches !== "undefined") {
+    await caches
+      .open("modelos")
+      .then((c) => c.delete(RUTA_MODELO))
+      .catch(() => false);
+  }
+  reintentarEps();
 }
 
 async function crearSesion(): Promise<SesionDetectora> {
@@ -566,7 +600,7 @@ async function crearSesion(): Promise<SesionDetectora> {
   ort.env.wasm.numThreads = 1;
   // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
   const pesos = await descargarPesos();
-  return iniciarSesion(async (ep: string): Promise<SesionDetectora> => {
+  const intentar = async (ep: string): Promise<SesionDetectora> => {
     const s = await ort.InferenceSession.create(pesos, {
       executionProviders: [ep],
       graphOptimizationLevel: "all",
@@ -584,7 +618,14 @@ async function crearSesion(): Promise<SesionDetectora> {
         return { datos: o.data as Float32Array, dims: [...o.dims] };
       },
     };
-  });
+  };
+  try {
+    return await iniciarSesion(intentar);
+  } catch (e: unknown) {
+    // ponytail: create fallido = peso corrupto cacheado, no EP caído: expulsar y soltar latch.
+    await olvidarSesionFallida();
+    throw e;
+  }
 }
 
 /** Lienzo con borde negro alrededor del bitmap (capybara.pad con pad_value=0). Lanza sin contexto. */

@@ -13,6 +13,7 @@ import {
   tamanoDet,
   tensorDet,
   tensorDetDesdeRgba,
+  TIMEOUT_OCR_MS,
 } from "./ocr";
 import type { NucleoOcr, SalidaOcr, SubsesionOcr } from "./ocr";
 import { DICT_OCR } from "./ocrDict";
@@ -820,7 +821,7 @@ describe("descargarPesosOcr", () => {
     const g = globalThis as Record<string, unknown>;
     const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
     const tienda = new Map<unknown, unknown>();
-    const bytes = new Uint8Array([7]).buffer;
+    const bytes = new ArrayBuffer(12_000_000); // pasa los mínimos det/rec
     const fetchFn = vi.fn(async () => ({
       ok: true,
       status: 200,
@@ -853,6 +854,29 @@ describe("descargarPesosOcr", () => {
       g["Response"] = real.Response;
       if (real.caches === undefined) delete g["caches"];
       else g["caches"] = real.caches;
+    }
+  });
+
+  it("TIMEOUT_OCR_MS cubre 30MB en enlaces lentos", () => {
+    expect(TIMEOUT_OCR_MS).toBe(120_000);
+  });
+
+  it("descarga colgada aborta al timeout inyectado", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    delete g["caches"];
+    g["fetch"] = vi.fn(
+      async (_u: unknown, o?: { signal?: AbortSignal }): Promise<Response> =>
+        new Promise((_res, rej) => {
+          o?.signal?.addEventListener("abort", () => rej(new Error("abortado")));
+        }),
+    );
+    try {
+      await expect(descargarPesosOcr(50)).rejects.toThrow();
+    } finally {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches !== undefined) g["caches"] = real.caches;
     }
   });
 });
