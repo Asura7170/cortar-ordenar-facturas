@@ -72,8 +72,10 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   const cargar = deps?.cargar ?? cargarReal;
   let foto: ImageBitmap;
   try {
-    const original = item.file ?? (await (await fetch(item.imgUrl)).blob());
-    foto = await cargar(original);
+    // ponytail: el editor abre el intake pre-warp (recupera lo cortado de más);
+    // sin previo (DocAligner no-op), la imagen actual.
+    const fuente = item.previoDocAligner ?? item.file ?? (await (await fetch(item.imgUrl)).blob());
+    foto = await cargar(fuente);
   } catch {
     avisar("No se pudo abrir el recorte.");
     return;
@@ -231,6 +233,9 @@ async function confirmar(): Promise<void> {
     URL.revokeObjectURL(item.imgUrl);
     item.imgUrl = URL.createObjectURL(recortado);
     item.file = recortado;
+    // ponytail: el recorte manual es el nuevo definitivo (conservar el previo
+    // resucitaría píxeles cortados a propósito).
+    delete item.previoDocAligner;
     const thumb = await generarMiniatura(recortado);
     if (thumb && buscarSlot(id)) asignarMiniatura(item, thumb);
     else if (buscarSlot(id)) item.thumbUrl = item.imgUrl;

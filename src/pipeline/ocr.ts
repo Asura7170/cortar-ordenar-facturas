@@ -111,6 +111,7 @@ async function nucleoReal(): Promise<NucleoOcr> {
   // ponytail: las bajadas en paralelo (la mitad del tiempo); las sesiones en
   // serie (compiten por el mismo contexto GPU). El latch de EPs caídos sigue
   // compartido con docaligner: si webgpu murió ahí, aquí ni se intenta.
+  // ponytail: los run() tampoco se solapan (la relectura espera a la cola en rotar).
   const [detBuf, recBuf] = await Promise.all([
     descargarConCache(RUTA_DET, TIMEOUT_OCR_MS, 5_000_000),
     descargarConCache(RUTA_REC, TIMEOUT_OCR_MS, 10_000_000),

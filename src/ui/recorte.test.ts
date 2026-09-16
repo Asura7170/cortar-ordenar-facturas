@@ -173,6 +173,27 @@ describe("abrirRecorte", () => {
     }
   });
 
+  it("abre desde el previo pre-warp y confirmar lo limpia", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps } = depsRecorte();
+      const c = sembrar();
+      const previo = new Blob(["previo"]);
+      c.previoDocAligner = previo;
+      await abrirRecorte(c.id, deps as never);
+      expect(modal.open).toBe(true);
+      expect(deps.cargar).toHaveBeenCalledWith(previo);
+      btnOk.click();
+      await vaciar();
+      expect(c.previoDocAligner).toBeUndefined();
+      expect(c.file).toBeInstanceOf(Blob);
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
   it("cerrar sin confirmar no toca el comprobante", async () => {
     const ctx = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")

@@ -19,7 +19,7 @@ vi.mock("./queue", async (importOriginal) => {
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
-const { girarYReleer } = await import("./rotar");
+const { girarYReleer, releerTrasEdicion } = await import("./rotar");
 const { extraerTexto } = await import("./ocr");
 const { extraerPendientes } = await import("./extract");
 const { comprobante } = await import("../test/factoria");
@@ -101,6 +101,58 @@ describe("girarYReleer", () => {
     expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
     // giro + procesando + ok + reapertura (el null se pinta aunque el lote sea no-op)
     expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(4);
+  });
+
+  it("el giro descarta el previo (orientación rancia)", async () => {
+    const { deps } = depsGiro();
+    const c = sembrar();
+    c.previoDocAligner = new Blob(["previo"]);
+    await girarYReleer(c.id, 90, deps);
+    expect(c.previoDocAligner).toBeUndefined();
+    expect(c.file).toBeInstanceOf(Blob);
+  });
+
+  it("relecturas concurrentes del mismo id se serializan (B espera a A)", async () => {
+    const eventos: string[] = [];
+    vi.mocked(extraerTexto).mockImplementation(async (b: Blob) => {
+      const tag = b === blobA ? "A" : "B";
+      eventos.push(`${tag}-ini`);
+      await new Promise((r) => setTimeout(r, 10));
+      eventos.push(`${tag}-fin`);
+      return "LEÍDO";
+    });
+    const c = sembrar();
+    const blobA = new Blob(["a"]);
+    const blobB = new Blob(["b"]);
+    try {
+      await Promise.all([releerTrasEdicion(c.id, blobA), releerTrasEdicion(c.id, blobB)]);
+      expect(eventos).toEqual(["A-ini", "A-fin", "B-ini", "B-fin"]);
+      expect(c.textoOcr).toBe("LEÍDO");
+    } finally {
+      vi.mocked(extraerTexto).mockResolvedValue("TOTAL LEÍDO");
+    }
+  });
+
+  it("con cola activa espera el drenaje antes del OCR y del lote", async () => {
+    vi.useFakeTimers();
+    const c = sembrar();
+    state.colaEnProceso = true;
+    try {
+      const p = releerTrasEdicion(c.id, new Blob(["x"]));
+      await vi.advanceTimersByTimeAsync(1000);
+      // Sin solape de run(): ni OCR ni lote mientras la cola trabaja.
+      expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
+      expect(vi.mocked(extraerPendientes)).not.toHaveBeenCalled();
+      state.colaEnProceso = false;
+      await vi.advanceTimersByTimeAsync(1000);
+      await p;
+      expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+      expect(c.estado).toBe("ok");
+    } finally {
+      state.colaEnProceso = false;
+      vi.useRealTimers();
+    }
   });
 
   it("OCR fallido en la relectura: ok sin texto rancio, con aviso", async () => {
