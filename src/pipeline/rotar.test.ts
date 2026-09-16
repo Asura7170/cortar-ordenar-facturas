@@ -283,4 +283,117 @@ describe("girarYReleer", () => {
     expect(buscarSlot(c.id)).toBeNull();
     expect(c.imgUrl).toBe(urlAntes); // el giro huérfano se descarta
   });
+
+  it("thumb huérfana se revoca si el slot muere en la ventana", async () => {
+    const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    try {
+      const { deps } = depsGiro();
+      const c = sembrar();
+      const thumbVieja = c.thumbUrl;
+      vi.mocked(generarMiniatura).mockImplementationOnce(async () => {
+        state.hojas = [crearHoja()]; // Limpiar durante el await.
+        return "blob:thumb";
+      });
+      await girarYReleer(c.id, 90, deps);
+      expect(revocar).toHaveBeenCalledWith("blob:thumb");
+      expect(c.thumbUrl).toBe(thumbVieja);
+    } finally {
+      revocar.mockRestore();
+    }
+  });
+
+  it("timer rancio no relee si otro editor commitió después", async () => {
+    vi.useFakeTimers();
+    try {
+      const { deps } = depsGiro();
+      const c = sembrar();
+      await girarYReleer(c.id, 90, deps); // programa el timer diferido
+      expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
+      c.file = new Blob(["otro"]); // un recorte commitió después del giro
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
+      expect(c.textoOcr).toBe("VIEJO");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("giro y recorte en vuelo: el último commit gana entero, sin mezcla", async () => {
+    const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    const crearUrl = vi
+      .spyOn(URL, "createObjectURL")
+      .mockImplementation((b: unknown) => `blob:${(b as Blob).size}`);
+    const { abrirRecorte, initRecorte } = await import("../ui/recorte");
+    const { cancelarRelecturaProgramada } = await import("./rotar");
+    initRecorte();
+    try {
+      const bmpGiro = { width: 10, height: 20, close: vi.fn() };
+      const previoBlob = new Blob(["previo"]);
+      let soltarGiro: ((b: ImageBitmap) => void) | undefined;
+      let soltarPrevio: ((b: ImageBitmap) => void) | undefined;
+      const depsGiro = {
+        // Puertas por fuente: el giro se suspende en el previo, a mitad del commit.
+        cargar: (f: Blob) => {
+          if (f === previoBlob) {
+            return new Promise<ImageBitmap>((res) => {
+              soltarPrevio = res;
+            });
+          }
+          return new Promise<ImageBitmap>((res) => {
+            soltarGiro = res;
+          });
+        },
+        crear: vi.fn(() => ({
+          width: 0,
+          height: 0,
+          getContext: () => ({ setTransform: vi.fn(), drawImage: vi.fn() }),
+          toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
+        })),
+      };
+      const bmpCrop = { width: 100, height: 80, close: vi.fn() };
+      const depsCrop = {
+        cargar: vi.fn(async () => bmpCrop),
+        crear: vi.fn(() => ({
+          width: 0,
+          height: 0,
+          getContext: () => ({ drawImage: vi.fn() }),
+          toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["recorte"])),
+        })),
+      };
+      vi.mocked(generarMiniatura)
+        .mockImplementationOnce(async (f: Blob) => `thumb:${f.size}`)
+        .mockImplementationOnce(async (f: Blob) => `thumb:${f.size}`);
+      const c = sembrar();
+      c.previoDocAligner = previoBlob;
+      const pg = girarYReleer(c.id, 90, depsGiro as never);
+      await abrirRecorte(c.id, depsCrop as never);
+      for (let i = 0; i < 100 && !soltarGiro; i++) await Promise.resolve();
+      soltarGiro?.(bmpGiro as unknown as ImageBitmap);
+      // El giro queda suspendido entre imgUrl= y file= (código viejo): ahí
+      // commitea el recorte entero y recién después termina el giro.
+      for (let i = 0; i < 200 && !soltarPrevio; i++) await Promise.resolve();
+      document.getElementById("btnRecorteOk")?.click();
+      await new Promise((r) => setTimeout(r, 200)); // confirmar entero (C gana píxeles)
+      expect(await (c.file as Blob).text()).toBe("recorte");
+      soltarPrevio?.(bmpGiro as unknown as ImageBitmap);
+      await pg;
+      await new Promise((r) => setTimeout(r, 100));
+      cancelarRelecturaProgramada(c.id); // el timer del giro no fuga al resto
+      // El giro terminó último: todo G ("girado" 6B), nada de C ("recorte" 7B).
+      expect(await (c.file as Blob).text()).toBe("girado");
+      expect(c.imgUrl).toBe("blob:6");
+      expect(c.thumbUrl).toBe("thumb:6");
+      const modal = document.getElementById("modalRecorte") as HTMLDialogElement | null;
+      if (modal?.open) modal.close();
+    } finally {
+      ctx.mockRestore();
+      crearUrl.mockRestore();
+    }
+  });
 });

@@ -401,6 +401,31 @@ describe("abrirRecorte", () => {
     }
   });
 
+  it("thumb huérfana se revoca si el slot muere en la ventana", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const { generarMiniatura } = await import("../pipeline/queue");
+    try {
+      const { deps } = depsRecorte();
+      const c = sembrar();
+      const thumbVieja = c.thumbUrl;
+      vi.mocked(generarMiniatura).mockImplementationOnce(async () => {
+        state.hojas.length = 0; // Limpiar durante el await.
+        return "blob:thumb";
+      });
+      await abrirRecorte(c.id, deps as never);
+      btnOk.click();
+      await vaciar();
+      expect(revocar).toHaveBeenCalledWith("blob:thumb");
+      expect(c.thumbUrl).toBe(thumbVieja);
+    } finally {
+      ctx.mockRestore();
+      revocar.mockRestore();
+    }
+  });
+
   it("limpiado durante el decode no abre editor fantasma", async () => {
     const ctx = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")

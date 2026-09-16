@@ -59,27 +59,35 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
         lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
       );
       if (!girado) throw new Error("sin blob girado");
-      // ponytail: commit tras los awaits (igual que la cola: sin dueño no se guarda).
-      if (!buscarSlot(id)) return;
-      URL.revokeObjectURL(item.imgUrl);
-      item.imgUrl = URL.createObjectURL(girado);
       // ponytail: el previo acompaña al giro (con orientación rancia el próximo
       // recorte manual no podría ensanchar); si falla, se conserva el viejo.
-      if (item.previoDocAligner) {
-        const giradoPrevio = await girarBlob(item.previoDocAligner, grados, cargar, crear);
-        if (giradoPrevio && buscarSlot(id)) item.previoDocAligner = giradoPrevio;
-      }
-      item.file = girado;
+      const giradoPrevio = item.previoDocAligner
+        ? await girarBlob(item.previoDocAligner, grados, cargar, crear)
+        : null;
       const thumb = await generarMiniatura(girado);
-      if (thumb && buscarSlot(id)) asignarMiniatura(item, thumb);
+      const imgNueva = URL.createObjectURL(girado);
+      // ponytail: commit atómico tras los awaits (giro vs recorte en vuelo:
+      // mutar partido mezclaba imgUrl de uno con file/thumb del otro).
+      if (!buscarSlot(id)) {
+        URL.revokeObjectURL(imgNueva);
+        if (thumb) URL.revokeObjectURL(thumb);
+        return;
+      }
+      URL.revokeObjectURL(item.imgUrl);
+      item.imgUrl = imgNueva;
+      item.file = girado;
+      if (giradoPrevio) item.previoDocAligner = giradoPrevio;
+      if (thumb) asignarMiniatura(item, thumb);
       // ponytail: sin thumb se muestra el giro nuevo (alias revocado o esqueleto mienten).
-      else if (buscarSlot(id)) item.thumbUrl = item.imgUrl;
+      else item.thumbUrl = item.imgUrl;
       renderHojas();
       clearTimeout(relecturas.get(id));
       relecturas.set(
         id,
         setTimeout(() => {
           relecturas.delete(id);
+          // ponytail: si un recorte commitió después, el giro es rancio: no relee.
+          if (obtenerComprobante(id)?.file !== girado) return;
           void releerTrasEdicion(id, girado, deps);
         }, QUIETUD_GIRO_MS),
       );

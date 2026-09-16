@@ -312,14 +312,22 @@ async function confirmar(): Promise<void> {
       modal.close();
       return;
     }
+    const thumb = await generarMiniatura(recortado);
+    // ponytail: commit atómico (giro en vuelo: mutar partido mezclaba imágenes).
+    // Sin dueño se cierra y la thumb huérfana se revoca.
+    if (!buscarSlot(id)) {
+      if (thumb) URL.revokeObjectURL(thumb);
+      modal.close();
+      return;
+    }
     URL.revokeObjectURL(item.imgUrl);
     item.imgUrl = URL.createObjectURL(recortado);
     item.file = recortado;
     // ponytail: el previo se conserva (cada sesión parte de la imagen más
     // ancha: así un sobre-recorte siempre se puede rectificar ensanchando).
-    const thumb = await generarMiniatura(recortado);
-    if (thumb && buscarSlot(id)) asignarMiniatura(item, thumb);
-    else if (buscarSlot(id)) item.thumbUrl = item.imgUrl;
+    if (thumb) asignarMiniatura(item, thumb);
+    // ponytail: sin thumb se muestra el recorte nuevo (alias revocado o esqueleto mienten).
+    else item.thumbUrl = item.imgUrl;
     modal.close();
     const { renderHojas } = await import("./sheets");
     renderHojas();
