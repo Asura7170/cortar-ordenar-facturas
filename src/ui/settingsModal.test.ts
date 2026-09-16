@@ -1,5 +1,5 @@
 /* Tests P1: modal de ajustes — submit y Predeterminado (DOM aislado). */
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture, el } from "../test/fixture";
 
 montarFixture();
@@ -15,6 +15,9 @@ const cfgModel = el<HTMLInputElement>("cfgModel");
 const cfgApiKey = el<HTMLInputElement>("cfgApiKey");
 const cfgMoneda = el<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes = el<HTMLButtonElement>("btnResetAjustes");
+const estadoModelos = el("estadoModelos");
+const btnDescargarModelos = el<HTMLButtonElement>("btnDescargarModelos");
+const btnBorrarModelos = el<HTMLButtonElement>("btnBorrarModelos");
 
 initSettings();
 
@@ -86,5 +89,147 @@ describe("Predeterminado", () => {
     expect(cfgModel.value).toBe("qwen/qwen3.8-27b");
     expect(cfgApiKey.value).toBe("");
     expect(cfgMoneda.value).toBe("USD");
+  });
+});
+
+describe("Modelos", () => {
+  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+
+  function conRed(tienda: Map<unknown, unknown>, fetchFn: ReturnType<typeof vi.fn>): () => void {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    g["Response"] = class {
+      readonly cuerpo: unknown;
+      readonly init: unknown;
+      constructor(cuerpo: unknown, init?: unknown) {
+        this.cuerpo = cuerpo;
+        this.init = init;
+      }
+    };
+    g["fetch"] = fetchFn;
+    const bytes = new Uint8Array([7]).buffer;
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({
+        match: async (k: unknown): Promise<unknown> => {
+          const url = typeof k === "string" ? k : (k as { url: string }).url;
+          return tienda.get(url) ?? undefined;
+        },
+        put: async (k: unknown, v: unknown): Promise<void> => {
+          const cuerpo = (v as { cuerpo?: ArrayBuffer }).cuerpo;
+          tienda.set(k, {
+            arrayBuffer: async () => bytes,
+            headers: { get: () => String(cuerpo?.byteLength ?? 0) },
+          });
+        },
+        keys: async (): Promise<unknown[]> => [...tienda.keys()].map((url) => ({ url })),
+      }),
+      delete: async (): Promise<boolean> => {
+        const habia = tienda.size > 0;
+        tienda.clear();
+        return habia;
+      },
+    };
+    return () => {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    };
+  }
+
+  it("abrir sin caché pinta no descargados", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realCaches = g["caches"];
+    delete g["caches"];
+    try {
+      btnAjustes.click();
+      await pausa();
+      expect(estadoModelos.textContent).toBe("Modelos: no descargados");
+    } finally {
+      if (realCaches !== undefined) g["caches"] = realCaches;
+      modalAjustes.close();
+    }
+  });
+
+  it("descargar pinta el tamaño y borrar lo vacía", async () => {
+    const tienda = new Map<unknown, unknown>();
+    const grande = new ArrayBuffer(60_000_000);
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => grande,
+    }));
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      btnDescargarModelos.click();
+      await pausa();
+      // docaligner + det + rec = 3 entradas de ~57MB.
+      expect(estadoModelos.textContent).toBe("Modelos: ~172 MB en este navegador");
+      btnBorrarModelos.click();
+      await pausa();
+      expect(estadoModelos.textContent).toContain("borrados");
+      expect(tienda.size).toBe(0);
+      btnBorrarModelos.click();
+      await pausa();
+      expect(estadoModelos.textContent).toContain("no había nada");
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("descarga fallida muestra la causa y libera los botones", async () => {
+    const tienda = new Map<unknown, unknown>();
+    const fetchFn = vi.fn(async () => {
+      throw new Error("red caída");
+    });
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      btnDescargarModelos.click();
+      await pausa();
+      expect(estadoModelos.textContent).toContain("red caída");
+      expect(btnDescargarModelos.disabled).toBe(false);
+      expect(btnBorrarModelos.disabled).toBe(false);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("caché que lanza pinta error de consulta", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realCaches = g["caches"];
+    g["caches"] = {
+      open: async (): Promise<unknown> => {
+        throw new Error("denegado");
+      },
+    };
+    try {
+      btnAjustes.click();
+      await pausa();
+      expect(estadoModelos.textContent).toContain("no se pudo consultar");
+    } finally {
+      if (realCaches === undefined) delete g["caches"];
+      else g["caches"] = realCaches;
+      modalAjustes.close();
+    }
+  });
+
+  it("borrado que falla muestra la causa", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const realCaches = g["caches"];
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({}),
+      delete: async (): Promise<boolean> => {
+        throw new Error("denegado");
+      },
+    };
+    try {
+      btnBorrarModelos.click();
+      await pausa();
+      expect(estadoModelos.textContent).toContain("no se pudo borrar");
+      expect(estadoModelos.textContent).toContain("denegado");
+    } finally {
+      if (realCaches === undefined) delete g["caches"];
+      else g["caches"] = realCaches;
+    }
   });
 });

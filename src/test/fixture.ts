@@ -40,6 +40,9 @@ export const FIXTURE_HTML = `
     <option value="EUR">EUR</option><option value="BOB">BOB</option>
   </select>
   <button id="btnResetAjustes" type="button"></button>
+  <output id="estadoModelos"></output>
+  <button id="btnDescargarModelos" type="button"></button>
+  <button id="btnBorrarModelos" type="button"></button>
 </form>
 <button id="btnDescargar2"></button>
 <button id="btnPdf" type="button"></button>

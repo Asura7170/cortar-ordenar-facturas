@@ -7,18 +7,24 @@ import {
   conBorde,
   conTimeout,
   decodificarHeatmap,
+  descargarConCache,
+  descargarPesos,
+  borrarModelos,
   detectarYRecortar,
   esConvexo,
   esQuadPlausible,
   iniciarSesion,
   LADO_MODELO,
+  olvidarSesionFallida,
   ordenarQuad,
   PAD_BORDE,
   quitarBorde,
   rectificar,
   reintentarEps,
+  tamanoModelos,
   tamanoSalida,
   UMBRAL_HEATMAP,
+  URL_MODELO_HF,
   warpear,
 } from "./docaligner";
 import type { BuferPixeles, IntentarEp, Quad, SesionDetectora } from "./docaligner";
@@ -515,5 +521,289 @@ describe("conBorde/quitarBorde", () => {
       { x: 100, y: 100 },
       { x: 0, y: 100 },
     ]);
+  });
+});
+
+describe("descargarPesos", () => {
+  const BYTES = new Uint8Array([1, 2, 3]).buffer;
+  type Tienda = Map<
+    unknown,
+    { arrayBuffer: () => Promise<ArrayBuffer>; headers?: { get: (n: string) => string | null } }
+  >;
+  // jsdom no trae Response: dummy (el put falso no lo lee).
+  class RespuestaFalsa {
+    readonly cuerpo: unknown;
+    readonly init: unknown;
+    constructor(cuerpo: unknown, init?: unknown) {
+      this.cuerpo = cuerpo;
+      this.init = init;
+    }
+  }
+
+  function conRed(tienda: Tienda, fetchFn: ReturnType<typeof vi.fn>): () => void {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    g["Response"] = RespuestaFalsa;
+    g["fetch"] = fetchFn;
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({
+        match: async (k: unknown): Promise<unknown> => {
+          const url = typeof k === "string" ? k : (k as { url: string }).url;
+          return tienda.get(url) ?? undefined;
+        },
+        put: async (k: unknown): Promise<void> => {
+          tienda.set(k, { arrayBuffer: async () => BYTES });
+        },
+        keys: async (): Promise<unknown[]> => [...tienda.keys()].map((url) => ({ url })),
+        delete: async (k: unknown): Promise<boolean> => tienda.delete(k),
+      }),
+      delete: async (): Promise<boolean> => {
+        const habia = tienda.size > 0;
+        tienda.clear();
+        return habia;
+      },
+    };
+    return () => {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    };
+  }
+
+  const redOk = (): ReturnType<typeof vi.fn> =>
+    vi.fn(async () => ({ ok: true, status: 200, arrayBuffer: async () => BYTES }));
+
+  it("URL_MODELO_HF es el resolve estable de HF (no el CDN firmado)", () => {
+    expect(URL_MODELO_HF).toBe(
+      "https://huggingface.co/7rplus/pagescan-weights/resolve/main/fastvit_sa24_h_e_bifpn_256_fp32.onnx",
+    );
+  });
+
+  it("miss descarga una vez; hit no refetchea", async () => {
+    const tienda: Tienda = new Map();
+    const fetchFn = redOk();
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("sin caches va a red directa", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"] };
+    delete g["caches"];
+    const fetchFn = redOk();
+    g["fetch"] = fetchFn;
+    try {
+      await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      g["fetch"] = real.fetch;
+      if (real.caches !== undefined) g["caches"] = real.caches;
+    }
+  });
+
+  it("HTTP no-ok lanza", async () => {
+    const tienda: Tienda = new Map();
+    const fetchFn = vi.fn(async () => ({
+      ok: false,
+      status: 404,
+      arrayBuffer: async () => BYTES,
+    }));
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      await expect(descargarPesos()).rejects.toThrow("HTTP 404");
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("tamanoModelos suma Content-Length (0 si vacía o sin caches)", async () => {
+    const tienda: Tienda = new Map([
+      ["a", { arrayBuffer: async () => BYTES, headers: { get: () => "100" } }],
+      ["b", { arrayBuffer: async () => BYTES, headers: { get: () => "23" } }],
+    ]);
+    const restaurar = conRed(tienda, redOk());
+    try {
+      await expect(tamanoModelos()).resolves.toBe(123);
+      tienda.clear();
+      await expect(tamanoModelos()).resolves.toBe(0);
+    } finally {
+      restaurar();
+    }
+    const g = globalThis as Record<string, unknown>;
+    const realCaches = g["caches"];
+    delete g["caches"];
+    try {
+      await expect(tamanoModelos()).resolves.toBe(0);
+      await expect(borrarModelos()).resolves.toBe(false);
+    } finally {
+      if (realCaches !== undefined) g["caches"] = realCaches;
+    }
+  });
+
+  it("borrarModelos vacía y avisa si había algo", async () => {
+    const tienda: Tienda = new Map([
+      ["a", { arrayBuffer: async () => BYTES, headers: { get: () => "100" } }],
+    ]);
+    const restaurar = conRed(tienda, redOk());
+    try {
+      await expect(borrarModelos()).resolves.toBe(true);
+      await expect(tamanoModelos()).resolves.toBe(0);
+      await expect(borrarModelos()).resolves.toBe(false);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("peso bajo el mínimo no se cachea (reintento refetchea)", async () => {
+    const tienda: Tienda = new Map();
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => BYTES,
+    }));
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      await expect(descargarPesos()).rejects.toThrow("corrupto");
+      expect(tienda.size).toBe(0);
+      await expect(descargarPesos()).rejects.toThrow("corrupto");
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("dos miss concurrentes hacen un solo fetch", async () => {
+    const tienda: Tienda = new Map();
+    const fetchFn = redOk();
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      const [a, b] = await Promise.all([
+        descargarConCache("clave-test", 30_000, 2),
+        descargarConCache("clave-test", 30_000, 2),
+      ]);
+      expect(a).toBe(BYTES);
+      expect(b).toBe(a);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("put que falla avisa y aun así resuelve", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    g["Response"] = RespuestaFalsa;
+    g["fetch"] = redOk();
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({
+        match: async () => undefined,
+        put: async (): Promise<void> => {
+          throw new Error("quota");
+        },
+      }),
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const r = await descargarConCache("clave-test", 30_000, 2);
+      expect(r).toBe(BYTES);
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    }
+  });
+
+  it("olvidarSesionFallida expulsa el peso y suelta el latch", async () => {
+    const tienda: Tienda = new Map();
+    const grande = new ArrayBuffer(60_000_000);
+    const restaurar = conRed(
+      tienda,
+      vi.fn(async () => ({ ok: true, status: 200, arrayBuffer: async () => grande })),
+    );
+    try {
+      await descargarPesos();
+      expect(tienda.size).toBe(1);
+      let intentos = 0;
+      const caido: IntentarEp = async () => {
+        intentos += 1;
+        throw new Error("create corrupto");
+      };
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      expect(intentos).toBe(1);
+      await olvidarSesionFallida();
+      expect(tienda.size).toBe(0);
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      expect(intentos).toBe(2); // latch suelto: webgpu se reintenta
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("hit infradimensionado se expulsa y refetchea", async () => {
+    const tienda: Tienda = new Map([
+      ["k", { arrayBuffer: async () => BYTES, headers: { get: () => "3" } }],
+    ]);
+    const grande = new ArrayBuffer(60_000_000);
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => grande,
+    }));
+    const restaurar = conRed(tienda, fetchFn);
+    try {
+      const r = await descargarConCache("k", 30_000, 50_000_000);
+      expect(r).toBe(grande);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      // el put falso guarda 3B: se siembra la buena a mano y el hit ya no refetchea.
+      tienda.set("k", { arrayBuffer: async () => grande, headers: { get: () => "60000000" } });
+      await expect(descargarConCache("k", 30_000, 50_000_000)).resolves.toBe(grande);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("no resuelve antes de persistir el put", async () => {
+    const tienda: Tienda = new Map();
+    let abrir!: () => void;
+    const puerta = new Promise<void>((res) => {
+      abrir = res;
+    });
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    g["Response"] = RespuestaFalsa;
+    g["fetch"] = redOk();
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({
+        match: async () => undefined,
+        put: async (k: unknown): Promise<void> => {
+          await puerta;
+          tienda.set(k, { arrayBuffer: async () => BYTES });
+        },
+      }),
+    };
+    try {
+      const p = descargarConCache("k", 30_000, 2);
+      await new Promise((res) => setTimeout(res, 10));
+      expect(tienda.size).toBe(0); // fetch listo, put atascado
+      abrir();
+      await expect(p).resolves.toBe(BYTES);
+      expect(tienda.size).toBe(1);
+    } finally {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    }
   });
 });

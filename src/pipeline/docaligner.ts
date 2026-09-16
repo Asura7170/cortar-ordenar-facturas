@@ -30,8 +30,14 @@ export const PAD_BORDE: number = 100;
 /** Binarización del heatmap por canal (mismo valor que el gate de confianza). */
 export const UMBRAL_HEATMAP: number = 0.3;
 
-/** Modelo vendoreado same-origin (COEP require-corp bloquea CDNs sin cabecera CORP). */
-const RUTA_MODELO: string = `${import.meta.env.BASE_URL}models/fastvit_sa24_h_e_bifpn_256_fp32.onnx`;
+/** Pesos en prod: Pages rechaza archivos >25MB; la URL /resolve/ es estable (el 302 firmado caduca). */
+export const URL_MODELO_HF: string =
+  "https://huggingface.co/7rplus/pagescan-weights/resolve/main/fastvit_sa24_h_e_bifpn_256_fp32.onnx";
+
+/** Modelo local en dev/test, remoto en prod (mismo peso; CORS de HF pasa COEP require-corp). */
+const RUTA_MODELO: string = import.meta.env.PROD
+  ? URL_MODELO_HF
+  : `${import.meta.env.BASE_URL}models/fastvit_sa24_h_e_bifpn_256_fp32.onnx`;
 
 /** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
 export function ordenarQuad(puntos: readonly Punto[]): Quad {
@@ -504,6 +510,96 @@ export async function iniciarSesion<T>(
   throw ultimoError instanceof Error ? ultimoError : new Error("ORT sin proveedor válido");
 }
 
+/** Presupuesto de descarga de pesos (79MB: 30s no bastan en enlaces lentos; fuera del presupuesto EP). */
+export const TIMEOUT_MODELO_MS: number = 300_000;
+
+/** Descargas en curso por clave (dos miss concurrentes = un solo fetch). */
+const enVuelo = new Map<string, Promise<ArrayBuffer>>();
+
+/**
+ * Descarga con caché Cache Storage (una sola descarga por navegador y clave).
+ * Sin `caches` (jsdom) → red directa. `minBytes` expulsa errores con 200
+ * (páginas HTML de HF) antes de cachear.
+ */
+export async function descargarConCache(
+  clave: string,
+  timeoutMs: number,
+  minBytes = 0,
+): Promise<ArrayBuffer> {
+  const enCurso = enVuelo.get(clave);
+  if (enCurso) return enCurso;
+  const tarea = (async (): Promise<ArrayBuffer> => {
+    const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
+    const guardada = await cache?.match(clave);
+    if (guardada) {
+      const buf = await guardada.arrayBuffer();
+      if (buf.byteLength >= minBytes) return buf;
+      await cache?.delete(clave).catch(() => false);
+    }
+    // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
+    const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
+    const pesos = await res.arrayBuffer();
+    if (pesos.byteLength < minBytes) {
+      throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
+    }
+    // ponytail: put con await (un put local cuesta ms; perderlo cuesta una re-descarga) + warn si falla.
+    try {
+      if (cache) {
+        await cache.put(
+          clave,
+          new Response(pesos.slice(0), {
+            headers: { "Content-Length": String(pesos.byteLength) },
+          }),
+        );
+      }
+    } catch (e: unknown) {
+      console.warn("modelos: caché put falló", e);
+    }
+    return pesos;
+  })();
+  enVuelo.set(clave, tarea);
+  try {
+    return await tarea;
+  } finally {
+    enVuelo.delete(clave);
+  }
+}
+
+/** Pesos DocAligner (una sola descarga por navegador). */
+export function descargarPesos(): Promise<ArrayBuffer> {
+  return descargarConCache(RUTA_MODELO, TIMEOUT_MODELO_MS, 50_000_000);
+}
+
+/** Bytes ocupados por los modelos en este navegador (0 sin caché). */
+export async function tamanoModelos(): Promise<number> {
+  if (typeof caches === "undefined") return 0;
+  const cache = await caches.open("modelos");
+  let total = 0;
+  for (const peticion of await cache.keys()) {
+    const res = await cache.match(peticion.url);
+    total += Number(res?.headers.get("Content-Length") ?? 0);
+  }
+  return total;
+}
+
+/** Borra los modelos descargados (recorte + OCR); true si había algo. */
+export async function borrarModelos(): Promise<boolean> {
+  if (typeof caches === "undefined") return false;
+  return caches.delete("modelos");
+}
+
+/** Expulsa el peso cacheado y suelta el latch (create fallido = bytes corruptos, no EP caído). */
+export async function olvidarSesionFallida(): Promise<void> {
+  if (typeof caches !== "undefined") {
+    await caches
+      .open("modelos")
+      .then((c) => c.delete(RUTA_MODELO))
+      .catch(() => false);
+  }
+  reintentarEps();
+}
+
 async function crearSesion(): Promise<SesionDetectora> {
   // ponytail: build solo-webgpu (sin jsep deprecado ni webgl): el dist pasa de ~30MB a <1MB.
   const ort = await import("onnxruntime-web/webgpu");
@@ -513,10 +609,8 @@ async function crearSesion(): Promise<SesionDetectora> {
   // Chrome bajo COEP require-corp (y en headless cuelgan sin rechazar); ~250ms/foto bastan.
   ort.env.wasm.numThreads = 1;
   // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
-  const res = await fetch(RUTA_MODELO, { signal: AbortSignal.timeout(TIMEOUT_EP_MS) });
-  if (!res.ok) throw new Error(`modelo DocAligner: HTTP ${res.status}`);
-  const pesos = await res.arrayBuffer();
-  return iniciarSesion(async (ep: string): Promise<SesionDetectora> => {
+  const pesos = await descargarPesos();
+  const intentar = async (ep: string): Promise<SesionDetectora> => {
     const s = await ort.InferenceSession.create(pesos, {
       executionProviders: [ep],
       graphOptimizationLevel: "all",
@@ -534,7 +628,16 @@ async function crearSesion(): Promise<SesionDetectora> {
         return { datos: o.data as Float32Array, dims: [...o.dims] };
       },
     };
-  });
+  };
+  try {
+    return await iniciarSesion(intentar);
+  } catch (e: unknown) {
+    // ponytail: solo el fallo de integridad expulsa el peso (un timeout de EP no borra 79MB buenos).
+    if (e instanceof Error && /corrupto|incompleto|heatmap|sin salida/i.test(e.message)) {
+      await olvidarSesionFallida();
+    }
+    throw e;
+  }
 }
 
 /** Lienzo con borde negro alrededor del bitmap (capybara.pad con pad_value=0). Lanza sin contexto. */

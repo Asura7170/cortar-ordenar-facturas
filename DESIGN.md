@@ -119,6 +119,9 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
   conteo `aria-hidden`.
 - `.panel-ajustes` (sidebar, `#btnAjustes`): último hijo con `margin-top:auto`;
   botón a 44px táctil, icono con `.tema-ico` reutilizado.
+- `.grupo-modelos` (base, `#estadoModelos/#btnDescargarModelos/#btnBorrarModelos`):
+  renglón con hairline superior, legend 12px uppercase, estado tabular sin
+  saltos (`min-height`); Descargar ghost, Borrar `btn-danger` (remover).
 
 ## 9. Do's and Don'ts
 

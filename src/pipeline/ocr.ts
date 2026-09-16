@@ -2,7 +2,7 @@
    Sin dependencias nuevas: modelos en public/models/ocr, pre/post-proceso en
    ocrDb.ts/ocrRec.ts. Entrada: blob ya recortado por DocAligner; salida:
    texto plano por líneas ("" si no hay texto o algo falla: la cola sigue). */
-import { TIMEOUT_EP_MS, iniciarSesion } from "./docaligner";
+import { descargarConCache, iniciarSesion } from "./docaligner";
 import { DICT_OCR } from "./ocrDict";
 import { cajasDesdeMapa } from "./ocrDb";
 import type { CajaDb } from "./ocrDb";
@@ -61,11 +61,15 @@ export interface DepsOcr {
 
 type OrtModulo = typeof import("onnxruntime-web/webgpu");
 
-/** Descarga un modelo con el mismo presupuesto que un intento de EP. */
-async function descargarModelo(ruta: string): Promise<ArrayBuffer> {
-  const res = await fetch(ruta, { signal: AbortSignal.timeout(TIMEOUT_EP_MS) });
-  if (!res.ok) throw new Error(`modelo OCR: HTTP ${res.status} en ${ruta}`);
-  return res.arrayBuffer();
+/** Presupuesto de descarga det+rec (30MB: el mismo enlace lento que motivó 300s en DocAligner). */
+export const TIMEOUT_OCR_MS: number = 120_000;
+
+/** Precarga det+rec en caché sin crear sesiones (para el botón "Descargar ahora"). */
+export async function descargarPesosOcr(timeoutMs: number = TIMEOUT_OCR_MS): Promise<void> {
+  await Promise.all([
+    descargarConCache(RUTA_DET, timeoutMs, 5_000_000),
+    descargarConCache(RUTA_REC, timeoutMs, 10_000_000),
+  ]);
 }
 
 /** Envuelve una sesión ort real en la interfaz mínima (casts solo aquí). */
@@ -108,8 +112,8 @@ async function nucleoReal(): Promise<NucleoOcr> {
   // serie (compiten por el mismo contexto GPU). El latch de EPs caídos sigue
   // compartido con docaligner: si webgpu murió ahí, aquí ni se intenta.
   const [detBuf, recBuf] = await Promise.all([
-    descargarModelo(RUTA_DET),
-    descargarModelo(RUTA_REC),
+    descargarConCache(RUTA_DET, TIMEOUT_OCR_MS, 5_000_000),
+    descargarConCache(RUTA_REC, TIMEOUT_OCR_MS, 10_000_000),
   ]);
   const det = envolver(ort, await iniciarSesion(crearSesion(detBuf)), "det");
   const rec = envolver(ort, await iniciarSesion(crearSesion(recBuf)), "rec");
