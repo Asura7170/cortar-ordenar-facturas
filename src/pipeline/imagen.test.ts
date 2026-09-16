@@ -80,6 +80,21 @@ describe("normalizarImagen", () => {
     ).rejects.toThrow("blanca");
   });
 
+  it("negra llena lanza como blanca (mismo aviso)", async () => {
+    const falso = lienzoFalso(px(16, 0, 0, 0));
+    await expect(
+      normalizarImagen(img("n2.png", "image/png"), cargar(100, 80), falso.crear),
+    ).rejects.toThrow("blanca");
+  });
+
+  it("gris app #f7f8fa lleno lanza como blanca", async () => {
+    const gris: number[] = Array.from({ length: 16 }, () => [247, 248, 250, 255]).flat();
+    const falso = lienzoFalso(gris);
+    await expect(
+      normalizarImagen(img("g2.png", "image/png"), cargar(100, 80), falso.crear),
+    ).rejects.toThrow("blanca");
+  });
+
   it("decode roto lanza ilegible", async () => {
     const roto: CargarBitmap = async () => {
       throw new Error("rota");
@@ -111,8 +126,12 @@ describe("normalizarImagen", () => {
 });
 
 describe("recortarMargenesBlancos", () => {
-  /** Foto 40x30 con bloque oscuro amplio (x5-34, y5-24) = foto sobre hoja blanca. */
-  function lienzoConMarco(): { src: HTMLCanvasElement; dibujos: unknown[][] } {
+  /** Foto 40x30 con bloque amplio (x5-34, y5-24) = foto sobre fondo dado. */
+  type Pintar = (x: number, y: number) => readonly [number, number, number];
+  function lienzoConMarco(
+    pintar: Pintar = () => [255, 255, 255],
+    bloque: Pintar = () => [0, 0, 0],
+  ): { src: HTMLCanvasElement; dibujos: unknown[][] } {
     const w = 40;
     const h = 30;
     const datos = new Uint8ClampedArray(w * h * 4);
@@ -120,10 +139,10 @@ describe("recortarMargenesBlancos", () => {
       for (let x = 0; x < w; x += 1) {
         const tinta = x >= 5 && x <= 34 && y >= 5 && y <= 24;
         const i = (y * w + x) * 4;
-        const v = tinta ? 0 : 255;
-        datos[i] = v;
-        datos[i + 1] = v;
-        datos[i + 2] = v;
+        const [r, g, b] = tinta ? bloque(x, y) : pintar(x, y);
+        datos[i] = r;
+        datos[i + 1] = g;
+        datos[i + 2] = b;
         datos[i + 3] = 255;
       }
     }
@@ -149,11 +168,186 @@ describe("recortarMargenesBlancos", () => {
   }
 
   it("marco blanco → recorta al bbox exacto", () => {
-    const { src, dibujos } = lienzoConMarco();
+    const { src, dibujos } = lienzoConMarco(
+      () => [255, 255, 255],
+      () => [128, 128, 128],
+    );
     // bbox x5-34/y5-24 sin margen → sx5 sy5 w30 h20
     expect(src.width).toBe(30);
     expect(src.height).toBe(20);
     expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("marco negro → recorta al contenido", () => {
+    // Negro puro también es fondo: cede igual que el blanco.
+    const { src, dibujos } = lienzoConMarco(
+      () => [0, 0, 0],
+      () => [128, 128, 128],
+    );
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("marco negro con ruido JPEG ±8 → recorta (tolerancia)", () => {
+    // Ruido leve sigue siendo el color del lado, no tinta.
+    const { src, dibujos } = lienzoConMarco(
+      (x, y) => [(x + y) % 9, (x * 2 + y) % 8, (x + y * 3) % 9],
+      () => [128, 128, 128],
+    );
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("marco morado digital uniforme → recorta (cualquier color)", () => {
+    const { src, dibujos } = lienzoConMarco(
+      () => [48, 0, 122],
+      () => [128, 128, 128],
+    );
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("lados de distinto color no puro → recorta (cada lado con el suyo)", () => {
+    // Izquierda morada, resto verde (ninguno es blanco/negro: la paleta fija
+    // no recortaba esto): la esquina no bloquea al vecino.
+    const { src, dibujos } = lienzoConMarco(
+      (x) => (x < 5 ? [48, 0, 122] : [0, 100, 0]),
+      () => [128, 128, 128],
+    );
+    expect(src.width).toBe(30);
+    expect(src.height).toBe(20);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+  });
+
+  it("barra uniforme interior ≠ borde → se conserva", () => {
+    // Franja gris a ancho completo (y10-12) + bloque (x5-34/y20-24) en
+    // página blanca: la franja frena arriba (y0=10), no se come.
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const gris = (x: number, y: number): void => {
+      const i = (y * w + x) * 4;
+      datos[i] = 128;
+      datos[i + 1] = 128;
+      datos[i + 2] = 128;
+    };
+    for (let x = 0; x < w; x += 1) {
+      for (let y = 10; y <= 12; y += 1) gris(x, y);
+    }
+    for (let y = 20; y <= 24; y += 1) {
+      for (let x = 5; x <= 34; x += 1) gris(x, y);
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(40);
+    expect(out.height).toBe(15);
+    expect(dibujos[0]?.slice(1)).toEqual([0, 10, 40, 15, 0, 0, 40, 15]);
+  });
+
+  it("frontera TOL: diff 15 cede, diff 16 frena", () => {
+    // Filas a ancho completo sobre blanco 255 + bloque gris (x5-34/y22-24):
+    // la fila 240 (diff 15) se come, la 239 (diff 16) frena (y0=20).
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const fila = (y: number, v: number): void => {
+      for (let x = 0; x < w; x += 1) {
+        const i = (y * w + x) * 4;
+        datos[i] = v;
+        datos[i + 1] = v;
+        datos[i + 2] = v;
+      }
+    };
+    fila(10, 240);
+    fila(20, 239);
+    for (let y = 22; y <= 24; y += 1) {
+      for (let x = 5; x <= 34; x += 1) {
+        const i = (y * w + x) * 4;
+        datos[i] = 128;
+        datos[i + 1] = 128;
+        datos[i + 2] = 128;
+      }
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(40);
+    expect(out.height).toBe(5);
+    expect(dibujos[0]?.slice(1)).toEqual([0, 20, 40, 5, 0, 0, 40, 5]);
+  });
+
+  it("1px distinto en el marco → esa fila frena", () => {
+    // Píxel rojo en (20,2): las filas 0-1 ceden, la 2 se conserva (sy=2).
+    const w = 40;
+    const h = 30;
+    const datos = new Uint8ClampedArray(w * h * 4).fill(255);
+    const i = (2 * w + 20) * 4;
+    datos[i] = 200;
+    datos[i + 1] = 0;
+    datos[i + 2] = 0;
+    for (let y = 5; y <= 24; y += 1) {
+      for (let x = 5; x <= 34; x += 1) {
+        const j = (y * w + x) * 4;
+        datos[j] = 128;
+        datos[j + 1] = 128;
+        datos[j + 2] = 128;
+      }
+    }
+    const dibujos: unknown[][] = [];
+    const salida = {
+      width: 0,
+      height: 0,
+      getContext: (): unknown => ({
+        drawImage: (...a: unknown[]): void => {
+          dibujos.push(a);
+        },
+      }),
+    } as unknown as HTMLCanvasElement;
+    const src = {
+      width: w,
+      height: h,
+      getContext: (): unknown => ({
+        getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
+      }),
+    } as unknown as HTMLCanvasElement;
+    const out = recortarMargenesBlancos(src, () => salida);
+    expect(out.width).toBe(30);
+    expect(out.height).toBe(23);
+    expect(dibujos[0]?.slice(1)).toEqual([5, 2, 30, 23, 0, 0, 30, 23]);
   });
 
   it("todo blanco → devuelve el mismo lienzo", () => {
@@ -172,7 +366,7 @@ describe("recortarMargenesBlancos", () => {
     ).toBe(src);
   });
 
-  it("tinta a borde → nada que recortar", () => {
+  it("fondo a borde → nada que recortar", () => {
     const w = 10;
     const h = 10;
     const datos = new Uint8ClampedArray(w * h * 4).fill(255);
@@ -204,16 +398,17 @@ describe("recortarMargenesBlancos", () => {
     ).toBe(src);
   });
 
-  it("tinta en impares → bbox exacto (regresión paso 2)", () => {
-    // L en x=11/y=7 impares: con paso 2 filas y columnas enteras se ven blancas.
+  it("tinta gris en impares → bbox exacto (regresión paso 1)", () => {
+    // L en x=11/y=7 impares con tinta gris (el negro puro es fondo):
+    // el scan por píxel no salta filas ni columnas con tinta.
     const w = 40;
     const h = 30;
     const datos = new Uint8ClampedArray(w * h * 4).fill(255);
     const tinta = (x: number, y: number): void => {
       const i = (y * w + x) * 4;
-      datos[i] = 0;
-      datos[i + 1] = 0;
-      datos[i + 2] = 0;
+      datos[i] = 128;
+      datos[i + 1] = 128;
+      datos[i + 2] = 128;
     };
     for (let y = 5; y <= 24; y += 1) tinta(11, y);
     for (let x = 5; x <= 34; x += 1) tinta(x, 7);

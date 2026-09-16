@@ -3,7 +3,13 @@
    (pdf.js vía import dinámico: solo se descarga cuando llega un PDF).
    Todo rechazo se avisa y se descarta sin crear comprobante ni blob URL. */
 import workerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
-import { CALIDAD_JPEG, crearReal, esPaginaBlanca, recortarMargenesBlancos } from "./imagen";
+import {
+  CALIDAD_JPEG,
+  crearReal,
+  esPaginaBlanca,
+  esPaginaNegra,
+  recortarMargenesBlancos,
+} from "./imagen";
 import type { CrearLienzo } from "./imagen";
 
 /** Tope de tamaño por PDF (5 MiB, inclusivo). */
@@ -133,10 +139,10 @@ async function abrirPdfReal(f: File): Promise<DocumentoPdf> {
 export type AbrirPdf = (f: File) => Promise<DocumentoPdf>;
 
 // Detección de página vacía (vive en imagen.ts: vale para PDF e intake).
-export { esPaginaBlanca } from "./imagen";
+export { esPaginaBlanca, esPaginaNegra } from "./imagen";
 
 /**
- * Fan-out: cada página no-blanca → una PaginaPdf (un render por página,
+ * Fan-out: cada página no-blanca/no-negra → una PaginaPdf (un render por página,
  * apertura única, un destroy). Nunca lanza: lo ilegible da [].
  * El llamador avisa "no se pudo leer" si vuelve vacío.
  */
@@ -158,7 +164,7 @@ export async function expandirPdf(
         const original = await doc.renderizar(i);
         if (!original) continue;
         const lienzo = recortarMargenesBlancos(original, crear);
-        if (esPaginaBlanca(lienzo)) continue;
+        if (esPaginaBlanca(lienzo) || esPaginaNegra(lienzo)) continue;
         const blob = await new Promise<Blob | null>((res) =>
           lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
         );

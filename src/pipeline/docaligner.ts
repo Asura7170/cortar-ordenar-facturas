@@ -1,8 +1,8 @@
-/* Detección de esquinas DocAligner (heatmap/lcnet100) + warp perspectiva en canvas.
+/* Detección de esquinas DocAligner (heatmap/fastvit_sa24) + warp perspectiva en canvas.
    Geometría y decode portados de andor83/ml-web-scanner (MIT — ver public/models/NOTICE.txt);
    pesos DocAligner de DocsaidLab (Apache-2.0 — ver public/models/NOTICE.txt).
-   Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + blancas). Fallo → blob original. */
-import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
+   Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + recorte + vacías). Fallo → blob original. */
+import { CALIDAD_JPEG, cargarReal, crearReal, recortarMargenesBlancos } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 /** Punto en píxeles de la imagen original. */
@@ -31,7 +31,7 @@ export const PAD_BORDE: number = 100;
 export const UMBRAL_HEATMAP: number = 0.3;
 
 /** Modelo vendoreado same-origin (COEP require-corp bloquea CDNs sin cabecera CORP). */
-const RUTA_MODELO: string = `${import.meta.env.BASE_URL}models/lcnet100_h_e_bifpn_256_fp32.onnx`;
+const RUTA_MODELO: string = `${import.meta.env.BASE_URL}models/fastvit_sa24_h_e_bifpn_256_fp32.onnx`;
 
 /** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
 export function ordenarQuad(puntos: readonly Punto[]): Quad {
@@ -422,8 +422,10 @@ export async function rectificar(
   const ctx2 = lienzo.getContext("2d");
   if (!ctx2) throw new Error("rectificar: sin contexto 2d");
   ctx2.putImageData(new ImageData(fuera.datos, width, height), 0, 0);
+  // ponytail: el warp deja cuñas blancas si el quad se salió de la foto; el mismo recorte las quita.
+  const limpio = recortarMargenesBlancos(lienzo, crear);
   const blob = await new Promise<Blob | null>((res) =>
-    lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+    limpio.toBlob(res, "image/jpeg", CALIDAD_JPEG),
   );
   if (!blob) throw new Error("rectificar: sin blob");
   return blob;
