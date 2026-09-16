@@ -514,23 +514,46 @@ export async function iniciarSesion<T>(
 export const TIMEOUT_MODELO_MS: number = 300_000;
 
 /**
- * Descarga los pesos con caché Cache Storage (una sola descarga por navegador).
+ * Descarga con caché Cache Storage (una sola descarga por navegador y clave).
  * Sin `caches` (jsdom) → red directa.
  */
-export async function descargarPesos(): Promise<ArrayBuffer> {
+export async function descargarConCache(clave: string, timeoutMs: number): Promise<ArrayBuffer> {
   const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
-  const guardada = await cache?.match(RUTA_MODELO);
+  const guardada = await cache?.match(clave);
   if (guardada) return guardada.arrayBuffer();
   // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
-  const res = await fetch(RUTA_MODELO, { signal: AbortSignal.timeout(TIMEOUT_MODELO_MS) });
-  if (!res.ok) throw new Error(`modelo DocAligner: HTTP ${res.status}`);
+  const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
   const pesos = await res.arrayBuffer();
   // ponytail: copia para la caché (ORT podría neutrar el búfer) + put sin await (la sesión no espera).
   void cache?.put(
-    RUTA_MODELO,
+    clave,
     new Response(pesos.slice(0), { headers: { "Content-Length": String(pesos.byteLength) } }),
   );
   return pesos;
+}
+
+/** Pesos DocAligner (una sola descarga por navegador). */
+export function descargarPesos(): Promise<ArrayBuffer> {
+  return descargarConCache(RUTA_MODELO, TIMEOUT_MODELO_MS);
+}
+
+/** Bytes ocupados por los modelos en este navegador (0 sin caché). */
+export async function tamanoModelos(): Promise<number> {
+  if (typeof caches === "undefined") return 0;
+  const cache = await caches.open("modelos");
+  let total = 0;
+  for (const peticion of await cache.keys()) {
+    const res = await cache.match(peticion);
+    total += Number(res?.headers.get("Content-Length") ?? 0);
+  }
+  return total;
+}
+
+/** Borra los modelos descargados (recorte + OCR); true si había algo. */
+export async function borrarModelos(): Promise<boolean> {
+  if (typeof caches === "undefined") return false;
+  return caches.delete("modelos");
 }
 
 async function crearSesion(): Promise<SesionDetectora> {

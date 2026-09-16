@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   bgrDesdeRgba,
+  descargarPesosOcr,
   diagVacio,
   enderezar,
   envolver,
@@ -811,5 +812,47 @@ describe("enderezar (decisión rec)", () => {
     expect(r.grados).toBe(0);
     expect(detLlamadas).toEqual([]);
     expect(recLlamadas).toEqual([]);
+  });
+});
+
+describe("descargarPesosOcr", () => {
+  it("baja det+rec una vez; la segunda tira de caché", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    const tienda = new Map<unknown, unknown>();
+    const bytes = new Uint8Array([7]).buffer;
+    const fetchFn = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => bytes,
+    }));
+    g["Response"] = class {
+      readonly cuerpo: unknown;
+      readonly init: unknown;
+      constructor(cuerpo: unknown, init?: unknown) {
+        this.cuerpo = cuerpo;
+        this.init = init;
+      }
+    };
+    g["fetch"] = fetchFn;
+    g["caches"] = {
+      open: async (): Promise<unknown> => ({
+        match: async (k: unknown): Promise<unknown> => tienda.get(k) ?? undefined,
+        put: async (k: unknown): Promise<void> => {
+          tienda.set(k, { arrayBuffer: async () => bytes });
+        },
+      }),
+    };
+    try {
+      await descargarPesosOcr();
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+      await descargarPesosOcr();
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+    } finally {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    }
   });
 });

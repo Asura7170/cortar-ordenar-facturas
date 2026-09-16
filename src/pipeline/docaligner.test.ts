@@ -8,6 +8,7 @@ import {
   conTimeout,
   decodificarHeatmap,
   descargarPesos,
+  borrarModelos,
   detectarYRecortar,
   esConvexo,
   esQuadPlausible,
@@ -18,6 +19,7 @@ import {
   quitarBorde,
   rectificar,
   reintentarEps,
+  tamanoModelos,
   tamanoSalida,
   UMBRAL_HEATMAP,
   URL_MODELO_HF,
@@ -522,7 +524,10 @@ describe("conBorde/quitarBorde", () => {
 
 describe("descargarPesos", () => {
   const BYTES = new Uint8Array([1, 2, 3]).buffer;
-  type Tienda = Map<unknown, { arrayBuffer: () => Promise<ArrayBuffer> }>;
+  type Tienda = Map<
+    unknown,
+    { arrayBuffer: () => Promise<ArrayBuffer>; headers?: { get: (n: string) => string | null } }
+  >;
   // jsdom no trae Response: dummy (el put falso no lo lee).
   class RespuestaFalsa {
     readonly cuerpo: unknown;
@@ -544,7 +549,13 @@ describe("descargarPesos", () => {
         put: async (k: unknown): Promise<void> => {
           tienda.set(k, { arrayBuffer: async () => BYTES });
         },
+        keys: async (): Promise<unknown[]> => [...tienda.keys()],
       }),
+      delete: async (): Promise<boolean> => {
+        const habia = tienda.size > 0;
+        tienda.clear();
+        return habia;
+      },
     };
     return () => {
       g["fetch"] = real.fetch;
@@ -602,6 +613,44 @@ describe("descargarPesos", () => {
     const restaurar = conRed(tienda, fetchFn);
     try {
       await expect(descargarPesos()).rejects.toThrow("HTTP 404");
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("tamanoModelos suma Content-Length (0 si vacía o sin caches)", async () => {
+    const tienda: Tienda = new Map([
+      ["a", { arrayBuffer: async () => BYTES, headers: { get: () => "100" } }],
+      ["b", { arrayBuffer: async () => BYTES, headers: { get: () => "23" } }],
+    ]);
+    const restaurar = conRed(tienda, redOk());
+    try {
+      await expect(tamanoModelos()).resolves.toBe(123);
+      tienda.clear();
+      await expect(tamanoModelos()).resolves.toBe(0);
+    } finally {
+      restaurar();
+    }
+    const g = globalThis as Record<string, unknown>;
+    const realCaches = g["caches"];
+    delete g["caches"];
+    try {
+      await expect(tamanoModelos()).resolves.toBe(0);
+      await expect(borrarModelos()).resolves.toBe(false);
+    } finally {
+      if (realCaches !== undefined) g["caches"] = realCaches;
+    }
+  });
+
+  it("borrarModelos vacía y avisa si había algo", async () => {
+    const tienda: Tienda = new Map([
+      ["a", { arrayBuffer: async () => BYTES, headers: { get: () => "100" } }],
+    ]);
+    const restaurar = conRed(tienda, redOk());
+    try {
+      await expect(borrarModelos()).resolves.toBe(true);
+      await expect(tamanoModelos()).resolves.toBe(0);
+      await expect(borrarModelos()).resolves.toBe(false);
     } finally {
       restaurar();
     }
