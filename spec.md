@@ -100,7 +100,7 @@ flowchart TD
     A["Pegar / Subir / Arrastrar / Ctrl+V"] --> B{"¿Formato válido?<br/>jpg · png · webp · bmp · gif · pdf"}
     B -- "No (incl. HEIC)" --> B1["Aviso: formato no soportado"]
     B -- "Sí" --> C{"¿PDF o imagen?"}
-    C -- "PDF" --> D["pdf.js gate ≤5MB ≤10p<br/>raster MINI 720 · JPEG .9 · vistaSegura<br/>blancas se omiten · fan-out 1 pág=1 comprobante"]
+    C -- "PDF" --> D["pdf.js gate ≤5MB ≤10p<br/>raster MINI 720 · JPEG .9 · vistaSegura<br/>blancas y negras se omiten · fan-out 1 pág=1 comprobante"]
     C -- "Imagen" --> E["createImageBitmap + EXIF<br/>normalizar JPEG .9 · resize si >2000px"]
     D --> F["precalentarModelos + Cola FIFO<br/>estado por item: procesando/OK/error"]
     E --> F

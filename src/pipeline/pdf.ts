@@ -142,7 +142,7 @@ export type AbrirPdf = (f: File) => Promise<DocumentoPdf>;
 export { esPaginaBlanca, esPaginaNegra } from "./imagen";
 
 /**
- * Fan-out: cada página no-blanca → una PaginaPdf (un render por página,
+ * Fan-out: cada página no-blanca/no-negra → una PaginaPdf (un render por página,
  * apertura única, un destroy). Nunca lanza: lo ilegible da [].
  * El llamador avisa "no se pudo leer" si vuelve vacío.
  */
