@@ -369,6 +369,15 @@ input::placeholder {
 }
 
 /* ============ MODALES ============ */
+/* Solo lectores de pantalla (títulos de diálogos sin cromo). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
 .modal {
   border: none;
   padding: 0;

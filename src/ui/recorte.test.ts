@@ -138,6 +138,9 @@ describe("abrirRecorte", () => {
       const antes = c.file;
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(true);
+      // Marco de 6px por lado: los tiradores del borde respiran dentro.
+      expect(el<HTMLCanvasElement>("recorteBase").width).toBe(100 + 12);
+      expect(el<HTMLCanvasElement>("recorteBase").height).toBe(80 + 12);
       btnOk.click();
       await vaciar();
       // Rect inicial = imagen completa (100x80 naturales, escala 1).
@@ -190,6 +193,134 @@ describe("abrirRecorte", () => {
       // El previo sobrevive: la próxima sesión puede volver a ensanchar.
       expect(c.previoDocAligner).toBe(previo);
       expect(c.file).toBeInstanceOf(Blob);
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("clic en el velo cierra; clic dentro no", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps } = depsRecorte();
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      expect(modal.open).toBe(true);
+      guia.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      expect(modal.open).toBe(true); // dentro: sigue abierto
+      modal.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      expect(modal.open).toBe(false); // velo (target = dialog): cierra
+      expect(state.cierreRecorte).toBeGreaterThan(0);
+      expect(c.file).toBeDefined(); // cerrar no commitea
+    } finally {
+      ctx.mockRestore();
+      state.cierreRecorte = 0;
+    }
+  });
+
+  it("agarra en plena línea lejos de tiradores", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps, creados } = depsRecorte(200, 80);
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      // Borde superior en x=60 (tiradores a 46px o más): mueve el lado norte.
+      guia.dispatchEvent(puntero("pointerdown", 60, 6));
+      guia.dispatchEvent(puntero("pointermove", 60, 30));
+      guia.dispatchEvent(puntero("pointerup", 60, 30));
+      btnOk.click();
+      await vaciar();
+      expect(creados[0]).toMatchObject({ width: 200, height: 56 });
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("esquina generosa: agarra a ~31px del vértice", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps, creados } = depsRecorte(200, 80);
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      // A 31px del vértice "no" (fuera de los 22px viejos): igual agarra.
+      guia.dispatchEvent(puntero("pointerdown", 28, 28));
+      guia.dispatchEvent(puntero("pointermove", 50, 50));
+      guia.dispatchEvent(puntero("pointerup", 50, 50));
+      btnOk.click();
+      await vaciar();
+      expect(creados[0]).toMatchObject({ width: 156, height: 36 });
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("arrastrar el interior mueve sin redimensionar", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps, creados } = depsRecorte(200, 80);
+      const c = sembrar();
+      const antes = c.file;
+      await abrirRecorte(c.id, deps as never);
+      // Se achica por la esquina "se" y luego se mueve por el interior.
+      guia.dispatchEvent(puntero("pointerdown", 206, 86));
+      guia.dispatchEvent(puntero("pointermove", 150, 60));
+      guia.dispatchEvent(puntero("pointerup", 150, 60));
+      guia.dispatchEvent(puntero("pointerdown", 78, 33));
+      guia.dispatchEvent(puntero("pointermove", 100, 45));
+      guia.dispatchEvent(puntero("pointerup", 100, 45));
+      btnOk.click();
+      await vaciar();
+      expect(creados[0]).toMatchObject({ width: 144, height: 54 });
+      expect(c.file).not.toBe(antes);
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("mover más allá del borde fija el área al filo", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps, creados } = depsRecorte(200, 80);
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      guia.dispatchEvent(puntero("pointerdown", 206, 86));
+      guia.dispatchEvent(puntero("pointermove", 150, 60));
+      guia.dispatchEvent(puntero("pointerup", 150, 60));
+      guia.dispatchEvent(puntero("pointerdown", 78, 33));
+      guia.dispatchEvent(puntero("pointermove", 9999, 9999));
+      guia.dispatchEvent(puntero("pointerup", 9999, 9999));
+      btnOk.click();
+      await vaciar();
+      // Fijado abajo-derecha: mismo tamaño, sin salirse.
+      expect(creados[0]).toMatchObject({ width: 144, height: 54 });
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("arrastrar el interior a rect completo no cambia nada", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps, creados } = depsRecorte(200, 80);
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      guia.dispatchEvent(puntero("pointerdown", 106, 46));
+      guia.dispatchEvent(puntero("pointermove", 150, 60));
+      guia.dispatchEvent(puntero("pointerup", 150, 60));
+      btnOk.click();
+      await vaciar();
+      expect(creados[0]).toMatchObject({ width: 200, height: 80 });
     } finally {
       ctx.mockRestore();
     }

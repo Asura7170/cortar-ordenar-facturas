@@ -89,6 +89,8 @@ export interface EstadoApp {
   moneda: Moneda;
   colaEnProceso: boolean;
   modoOcr: boolean;
+  /** Timestamp del último cierre del editor de recorte (el clic que cierra no reabre). Efímero, no persiste. */
+  cierreRecorte: number;
 }
 
 /** Subset persistido en localStorage (clave `libro-mayor-state`); cada ventana guarda solo lo suyo. */

@@ -1,7 +1,7 @@
 /* Recorte manual por comprobante: modal con la imagen fija en el canvas base
    y 8 tiradores (4 lados + 4 esquinas) sobre el overlay. Confirmar commitea
    el recorte como JPEG y relee el OCR (igual que el giro). Estado efímero. */
-import { buscarSlot, obtenerComprobante } from "../state";
+import { buscarSlot, obtenerComprobante, state } from "../state";
 import { asignarMiniatura, generarMiniatura } from "../pipeline/queue";
 import { releerTrasEdicion } from "../pipeline/rotar";
 import { CALIDAD_JPEG, cargarReal, crearReal } from "../pipeline/imagen";
@@ -42,11 +42,15 @@ interface Rect {
   h: number;
 }
 
-const RADIO_HIT = 22; // hit-area táctil; el visual es de 12px
-const LADO_VISUAL = 12;
+const RADIO_ESQUINA = 32; // esquinas generosas (manos mayores, táctil)
+const RADIO_LADO = 26;
+const BANDA_BORDE = 14; // agarre en plena línea, lejos de tiradores
+const LADO_VISUAL = 10;
 const MIN_LADO = 24; // lado mínimo en px display (el natural se valida al confirmar)
 const MIN_NATURAL = 8; // lado mínimo en px naturales al confirmar
 const PASO_TECLA = 2;
+/** Marco alrededor de la foto: aire para los tiradores del borde. */
+const MARGEN = 6;
 
 let idAbierto: number | null = null;
 let bmp: ImageBitmap | null = null;
@@ -55,6 +59,10 @@ let cw = 0;
 let ch = 0;
 let rect: Rect = { x: 0, y: 0, w: 0, h: 0 };
 let activo = 7; // índice del tirador activo (empieza en "se")
+let borde: Borde = "se"; // borde en arrastre (el agarre puede empezar en plena línea)
+let moviendoEntero = false; // arrastre del área completa por su interior
+let agarreX = 0; // offset puntero−origen al agarrar el interior
+let agarreY = 0;
 let enArrastre = false;
 let raf: number | null = null;
 let depsVigentes: DepsOcr | undefined;
@@ -92,19 +100,20 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   // La escena ya tiene layout (el dialog está abierto): encajar sin ampliar.
   const escena = guia.parentElement;
   const maxW = Math.min(escena?.clientWidth || 860, 860);
-  // ponytail: cabe en la tarjeta (82vh menos head/foot/paddings): sin scroll
-  // ni clip que escondan tiradores en viewports bajos.
-  const maxH = Math.max(200, Math.min(window.innerHeight * 0.82 - 200, 560));
-  const k = Math.min(maxW / foto.width, maxH / foto.height, 1);
+  // ponytail: cabe en el viewport con barra y leyenda flotantes (sin tarjeta).
+  const maxH = Math.max(200, Math.min(window.innerHeight * 0.82 - 150, 560));
+  const k = Math.min((maxW - MARGEN * 2) / foto.width, (maxH - MARGEN * 2) / foto.height, 1);
   cw = Math.max(1, Math.round(foto.width * k));
   ch = Math.max(1, Math.round(foto.height * k));
   escala = foto.width / cw;
   const dpr = window.devicePixelRatio || 1;
+  const anchoLienzo = cw + MARGEN * 2;
+  const altoLienzo = ch + MARGEN * 2;
   for (const c of [base, guia]) {
-    c.width = Math.round(cw * dpr);
-    c.height = Math.round(ch * dpr);
-    c.style.width = `${cw}px`;
-    c.style.height = `${ch}px`;
+    c.width = Math.round(anchoLienzo * dpr);
+    c.height = Math.round(altoLienzo * dpr);
+    c.style.width = `${anchoLienzo}px`;
+    c.style.height = `${altoLienzo}px`;
   }
   const ctxBase = base.getContext("2d");
   if (!ctxBase) {
@@ -115,13 +124,13 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   }
   ctxBase.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctxBase.imageSmoothingQuality = "high";
-  ctxBase.drawImage(foto, 0, 0, cw, ch);
+  ctxBase.drawImage(foto, MARGEN, MARGEN, cw, ch);
   restablecer();
   aviso.textContent = "";
 }
 
 function restablecer(): void {
-  rect = { x: 0, y: 0, w: cw, h: ch };
+  rect = { x: MARGEN, y: MARGEN, w: cw, h: ch };
   activo = 7;
   dibujarGuia();
 }
@@ -135,6 +144,7 @@ function cerrarAnterior(): void {
   bmp = null;
   idAbierto = null;
   enArrastre = false;
+  moviendoEntero = false;
 }
 
 function pedirGuia(): void {
@@ -152,12 +162,14 @@ function dibujarGuia(): void {
   if (!ctx) return;
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, cw, ch);
+  ctx.clearRect(0, 0, cw + MARGEN * 2, ch + MARGEN * 2);
+  // ponytail: el velo vive solo sobre la foto (el marco queda transparente y
+  // se funde con el velo del diálogo: sin borde negro).
   ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-  ctx.fillRect(0, 0, cw, rect.y);
-  ctx.fillRect(0, rect.y + rect.h, cw, ch - rect.y - rect.h);
-  ctx.fillRect(0, rect.y, rect.x, rect.h);
-  ctx.fillRect(rect.x + rect.w, rect.y, cw - rect.x - rect.w, rect.h);
+  ctx.fillRect(MARGEN, MARGEN, cw, rect.y - MARGEN);
+  ctx.fillRect(MARGEN, rect.y + rect.h, cw, MARGEN + ch - rect.y - rect.h);
+  ctx.fillRect(MARGEN, rect.y, rect.x - MARGEN, rect.h);
+  ctx.fillRect(rect.x + rect.w, rect.y, MARGEN + cw - rect.x - rect.w, rect.h);
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#fff";
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
@@ -165,10 +177,10 @@ function dibujarGuia(): void {
     const hx = rect.x + rect.w * t.fx;
     const hy = rect.y + rect.h * t.fy;
     const l = LADO_VISUAL / 2;
-    ctx.fillStyle = i === activo ? "#1d7a3a" : "#fff";
+    ctx.fillStyle = i === activo ? "#fff" : "#1d7a3a";
     ctx.fillRect(hx - l, hy - l, LADO_VISUAL, LADO_VISUAL);
     ctx.lineWidth = 2;
-    ctx.strokeStyle = i === activo ? "#fff" : "#1d7a3a";
+    ctx.strokeStyle = i === activo ? "#1d7a3a" : "#fff";
     ctx.strokeRect(hx - l, hy - l, LADO_VISUAL, LADO_VISUAL);
   });
 }
@@ -180,25 +192,72 @@ function punto(e: PointerEvent): { x: number; y: number } {
 
 function tiradorEn(p: { x: number; y: number }): number {
   for (const [i, t] of TIRADORES.entries()) {
+    const radio = t.fx !== 0.5 && t.fy !== 0.5 ? RADIO_ESQUINA : RADIO_LADO;
     const hx = rect.x + rect.w * t.fx;
     const hy = rect.y + rect.h * t.fy;
-    if (Math.hypot(p.x - hx, p.y - hy) <= RADIO_HIT) return i;
+    if (Math.hypot(p.x - hx, p.y - hy) <= radio) return i;
   }
   return -1;
 }
 
-/** Mueve los bordes del tirador al punto (siempre dentro de la imagen). */
+/** Borde bajo el punto: tirador cercano, o la línea más próxima en banda. */
+function bordeEn(p: { x: number; y: number }): Borde | null {
+  const i = tiradorEn(p);
+  if (i >= 0) return TIRADORES[i]?.b ?? null;
+  const izq = rect.x;
+  const arr = rect.y;
+  const der = rect.x + rect.w;
+  const aba = rect.y + rect.h;
+  if (
+    p.x < izq - BANDA_BORDE ||
+    p.x > der + BANDA_BORDE ||
+    p.y < arr - BANDA_BORDE ||
+    p.y > aba + BANDA_BORDE
+  )
+    return null;
+  const dN = Math.abs(p.y - arr);
+  const dS = Math.abs(p.y - aba);
+  const dO = Math.abs(p.x - izq);
+  const dE = Math.abs(p.x - der);
+  const d = Math.min(dN, dS, dO, dE);
+  if (d > BANDA_BORDE) return null;
+  // Cerca de un vértice manda la esquina (coherente con el radio generoso).
+  if (d === dN) return p.x < izq + RADIO_ESQUINA ? "no" : p.x > der - RADIO_ESQUINA ? "ne" : "n";
+  if (d === dS) return p.x < izq + RADIO_ESQUINA ? "so" : p.x > der - RADIO_ESQUINA ? "se" : "s";
+  if (d === dO) return p.y < arr + RADIO_ESQUINA ? "no" : p.y > aba - RADIO_ESQUINA ? "so" : "o";
+  return p.y < arr + RADIO_ESQUINA ? "ne" : p.y > aba - RADIO_ESQUINA ? "se" : "e";
+}
+
+/** True si el punto cae dentro del rect (para mover el área completa). */
+function dentroDe(p: { x: number; y: number }): boolean {
+  return p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h;
+}
+
+/** Traslada el rect preservando el tamaño, siempre dentro de la foto. */
+function moverEntero(p: { x: number; y: number }): void {
+  rect = {
+    x: Math.min(Math.max(p.x - agarreX, MARGEN), MARGEN + cw - rect.w),
+    y: Math.min(Math.max(p.y - agarreY, MARGEN), MARGEN + ch - rect.h),
+    w: rect.w,
+    h: rect.h,
+  };
+  pedirGuia();
+}
+
+/** Mueve los bordes del tirador al punto (siempre dentro de la foto). */
 function moverA(b: Borde, p: { x: number; y: number }): void {
   const der0 = rect.x + rect.w;
   const aba0 = rect.y + rect.h;
+  const derMax = cw + MARGEN;
+  const abaMax = ch + MARGEN;
   let izq = rect.x;
   let arr = rect.y;
   let der = der0;
   let aba = aba0;
-  if (b === "n" || b === "ne" || b === "no") arr = Math.min(Math.max(p.y, 0), aba0 - MIN_LADO);
-  if (b === "s" || b === "se" || b === "so") aba = Math.max(Math.min(p.y, ch), arr + MIN_LADO);
-  if (b === "o" || b === "no" || b === "so") izq = Math.min(Math.max(p.x, 0), der0 - MIN_LADO);
-  if (b === "e" || b === "ne" || b === "se") der = Math.max(Math.min(p.x, cw), izq + MIN_LADO);
+  if (b === "n" || b === "ne" || b === "no") arr = Math.min(Math.max(p.y, MARGEN), aba0 - MIN_LADO);
+  if (b === "s" || b === "se" || b === "so") aba = Math.max(Math.min(p.y, abaMax), arr + MIN_LADO);
+  if (b === "o" || b === "no" || b === "so") izq = Math.min(Math.max(p.x, MARGEN), der0 - MIN_LADO);
+  if (b === "e" || b === "ne" || b === "se") der = Math.max(Math.min(p.x, derMax), izq + MIN_LADO);
   rect = { x: izq, y: arr, w: der - izq, h: aba - arr };
   pedirGuia();
 }
@@ -212,8 +271,8 @@ async function confirmar(): Promise<void> {
   if (!item || item.estado !== "ok") return;
   const crear = depsVigentes?.crear ?? crearReal;
   try {
-    const sx = Math.min(Math.round(rect.x * escala), foto.width - 1);
-    const sy = Math.min(Math.round(rect.y * escala), foto.height - 1);
+    const sx = Math.min(Math.round((rect.x - MARGEN) * escala), foto.width - 1);
+    const sy = Math.min(Math.round((rect.y - MARGEN) * escala), foto.height - 1);
     const w = Math.min(Math.round(rect.w * escala), foto.width - sx);
     const h = Math.min(Math.round(rect.h * escala), foto.height - sy);
     if (w < MIN_NATURAL || h < MIN_NATURAL) {
@@ -261,17 +320,35 @@ export function initRecorte(): void {
     if (bmp) restablecer();
   });
   modal.addEventListener("close", () => {
+    state.cierreRecorte = Date.now();
     cerrarAnterior();
+  });
+  // ponytail: descarte explícito (sin depender de closedby): el clic en el
+  // velo tiene como target el propio dialog; el de la foto/barra, a sus hijos.
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal && modal.open) modal.close();
   });
 
   guia.addEventListener("pointerdown", (e) => {
     if (!bmp || !e.isPrimary) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    const i = tiradorEn(punto(e));
-    if (i < 0) return;
+    const p = punto(e);
+    const b = bordeEn(p);
     e.preventDefault();
-    activo = i;
-    enArrastre = true;
+    if (!b) {
+      // Interior sin borde cerca: se mueve el área completa.
+      if (!dentroDe(p)) return;
+      moviendoEntero = true;
+      agarreX = p.x - rect.x;
+      agarreY = p.y - rect.y;
+    } else {
+      borde = b;
+      activo = Math.max(
+        0,
+        TIRADORES.findIndex((t) => t.b === b),
+      );
+      enArrastre = true;
+    }
     try {
       guia.setPointerCapture(e.pointerId);
     } catch {
@@ -283,15 +360,21 @@ export function initRecorte(): void {
     if (!bmp) return;
     const p = punto(e);
     if (enArrastre) {
-      moverA(TIRADORES[activo]?.b ?? "se", p);
+      moverA(borde, p);
       return;
     }
-    // ponytail: cursor del tirador bajo el puntero sin redibujar (barato).
-    const i = tiradorEn(p);
-    guia.style.cursor = i < 0 ? "default" : (TIRADORES[i]?.cursor ?? "default");
+    if (moviendoEntero) {
+      moverEntero(p);
+      return;
+    }
+    // ponytail: cursor de la zona bajo el puntero sin redibujar (barato).
+    const b = bordeEn(p);
+    if (b) guia.style.cursor = TIRADORES.find((t) => t.b === b)?.cursor ?? "default";
+    else guia.style.cursor = dentroDe(p) ? "move" : "default";
   });
   const soltar = (): void => {
     enArrastre = false;
+    moviendoEntero = false;
   };
   guia.addEventListener("pointerup", soltar);
   guia.addEventListener("pointercancel", soltar);
@@ -302,6 +385,7 @@ export function initRecorte(): void {
     if (e.key === "Tab") {
       e.preventDefault();
       activo = (activo + (e.shiftKey ? TIRADORES.length - 1 : 1)) % TIRADORES.length;
+      borde = TIRADORES[activo]?.b ?? borde;
       dibujarGuia();
       return;
     }

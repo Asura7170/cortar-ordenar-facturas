@@ -374,34 +374,35 @@
       closedby="any"
       aria-labelledby="tituloRecorte"
     >
-      <div class="modal-card">
-        <div class="modal-head">
-          <h2 id="tituloRecorte">Recortar comprobante</h2>
-          <button
-            class="btn btn-icon"
-            command="close"
-            commandfor="modalRecorte"
-            aria-label="Cerrar"
-          >
-            ×
-          </button>
+      <h2 id="tituloRecorte" class="sr-only">Recortar comprobante</h2>
+      <div class="recorte-marco">
+        <button
+          class="recorte-cerrar"
+          command="close"
+          commandfor="modalRecorte"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+        <div class="recorte-escena">
+          <canvas id="recorteBase"></canvas>
+          <canvas
+            id="recorteGuia"
+            tabindex="0"
+            aria-label="Guías de recorte: Tab cambia de tirador, flechas ajustan"
+          ></canvas>
         </div>
-        <div class="modal-body">
-          <div class="recorte-escena">
-            <canvas id="recorteBase"></canvas>
-            <canvas
-              id="recorteGuia"
-              tabindex="0"
-              aria-label="Guías de recorte: Tab cambia de tirador, flechas ajustan"
-            ></canvas>
-          </div>
-          <p class="modal-nota" id="avisoRecorte" aria-live="polite"></p>
-        </div>
-        <form method="dialog" class="modal-foot">
-          <button class="btn btn-ghost" type="button" id="btnRecorteReset">Restablecer</button>
-          <button class="btn btn-ghost" type="submit" value="cancel" autofocus>Cancelar</button>
-          <button class="btn btn-primary" type="button" id="btnRecorteOk">Recortar</button>
-        </form>
+      </div>
+      <form method="dialog" class="recorte-barra">
+        <button class="btn btn-ghost" type="button" id="btnRecorteReset">Restablecer</button>
+        <button class="btn btn-ghost" type="submit" value="cancel" autofocus>Cancelar</button>
+        <button class="btn btn-primary" type="button" id="btnRecorteOk">Recortar</button>
+      </form>
+      <div class="recorte-leyenda">
+        <p class="recorte-ayuda">
+          Arrastrá el área, bordes o esquinas · Tab cambia de tirador · flechas ajustan
+        </p>
+        <p class="modal-nota recorte-aviso" id="avisoRecorte" aria-live="polite"></p>
       </div>
     </dialog>
 

@@ -602,17 +602,65 @@ body.is-dragging .cell:not(.empty) {
   background: var(--verde-tinta);
 }
 
-/* Modal Recorte: escena con base fija + overlay de guías apilado. */
-.modal-recorte .modal-card {
-  max-width: min(940px, 94dvw);
+/* Modal Recorte flotante: la foto sola sobre el velo, barra de acciones
+   flotante debajo. Sin tarjeta: el contenido centra en columna. */
+.modal-recorte {
+  width: auto;
+  max-width: 94dvw;
+  overflow: visible;
+  background: transparent;
+}
+/* Centrado por bloque (nunca flex): display idéntico abierto/cerrado para que
+   el fundido de salida no recoloque nada a mitad de camino. */
+.recorte-marco,
+.recorte-barra,
+.recorte-leyenda {
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
+/* Marco foto + ×: el ancho lo fija la foto (nunca la barra), así la × vive
+   sobre su esquina aunque la barra sea más ancha. */
+.recorte-marco {
+  position: relative;
+}
+/* × flotante sobre el velo (fuera de la foto: no tapa tiradores). */
+.recorte-cerrar {
+  position: absolute;
+  top: -48px;
+  right: -24px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--borde-panel);
+  border-radius: 50%;
+  background: var(--modal-bg);
+  color: var(--modal-texto);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 3;
+}
+/* Hit-area 44px: el visual queda en 28px, el ::after recibe el tap. */
+.recorte-cerrar::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.recorte-cerrar:hover {
+  background: var(--verde-tinta);
+  color: #fff;
+}
+.recorte-cerrar:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 .recorte-escena {
   position: relative;
   display: grid;
   place-items: center;
-  background: #111;
-  border-radius: var(--radio);
+  background: transparent;
   overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 .recorte-escena canvas {
   grid-area: 1 / 1;
@@ -621,7 +669,41 @@ body.is-dragging .cell:not(.empty) {
 }
 #recorteGuia:focus-visible {
   outline: 2px solid var(--verde-tinta);
-  outline-offset: 2px;
+  outline-offset: -2px;
+}
+/* Barra flotante: superficie elevada, mismos botones del sistema. */
+.recorte-barra {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px;
+  background: var(--modal-bg);
+  border: 1px solid var(--borde-panel);
+  border-radius: var(--radio);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.recorte-leyenda {
+  margin-top: 10px;
+  padding: 6px 14px;
+  background: var(--modal-bg);
+  border: 1px solid var(--borde-panel);
+  border-radius: var(--radio);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+.recorte-ayuda {
+  margin: 0;
+  font-size: 11px;
+  color: var(--modal-texto-suave);
+  text-wrap: balance;
+}
+.recorte-aviso:empty {
+  display: none;
+}
+.recorte-aviso {
+  min-height: 1.5em;
+  margin-bottom: 0;
+  text-align: center;
 }
 
 /* Modo OCR: la casilla muestra el texto del comprobante */

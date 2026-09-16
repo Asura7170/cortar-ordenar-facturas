@@ -785,6 +785,21 @@ describe("giro manual", () => {
     expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 90);
   });
 
+  it("clic justo tras cerrar el editor no acciona (anti-resurrección)", () => {
+    vi.mocked(girarYReleer).mockClear();
+    const c = sembrarGirable();
+    state.cierreRecorte = Date.now();
+    try {
+      botonGiro("girar-izq").click();
+      expect(vi.mocked(girarYReleer)).not.toHaveBeenCalled();
+      state.cierreRecorte = Date.now() - 1000;
+      botonGiro("girar-izq").click();
+      expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 270);
+    } finally {
+      state.cierreRecorte = 0;
+    }
+  });
+
   it("corregir-monto abre edición con el valor previo y sin reintento IA", () => {
     const h = crearHoja("u1");
     const c = comprobante({ estado: "ok", montoCents: 500, montoManual: true });

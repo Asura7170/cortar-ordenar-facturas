@@ -6,6 +6,7 @@ import {
   obtenerComprobante,
   redistribuir,
   state,
+  VENTANA_CIERRE_RECORTE_MS,
 } from "../state";
 import type { Cents, Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
@@ -958,6 +959,9 @@ export function initSheets(cb: SheetsCallbacks): void {
     const target = e.target as HTMLElement | null;
     const btn = target?.closest?.("[data-accion]");
     if (!(btn instanceof HTMLElement)) return;
+    // ponytail: el clic que descartó el editor no reabre ni acciona (carrera
+    // descarte→clic en la celda de abajo).
+    if (Date.now() - state.cierreRecorte < VENTANA_CIERRE_RECORTE_MS) return;
     const accion = btn.dataset["accion"];
     const cell = btn.closest(".cell");
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
