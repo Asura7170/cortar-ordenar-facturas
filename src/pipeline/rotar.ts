@@ -8,7 +8,7 @@ import { sanear } from "../utils";
 import { asignarMiniatura, generarMiniatura } from "./queue";
 import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
 import type { DepsOcr } from "./ocr";
-import { lienzoGirado } from "./ocr";
+import { girarBlob, lienzoGirado } from "./ocr";
 
 export type GiroManual = 90 | 270;
 
@@ -63,8 +63,13 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
       if (!buscarSlot(id)) return;
       URL.revokeObjectURL(item.imgUrl);
       item.imgUrl = URL.createObjectURL(girado);
-      // ponytail: el giro invalida la orientación del previo (y no corta).
-      delete item.previoDocAligner;
+      // ponytail: el previo acompaña al giro (con orientación rancia el próximo
+      // recorte manual no podría ensanchar); si falla, se descarta en silencio.
+      if (item.previoDocAligner) {
+        const giradoPrevio = await girarBlob(item.previoDocAligner, grados, cargar, crear);
+        if (giradoPrevio && buscarSlot(id)) item.previoDocAligner = giradoPrevio;
+        else delete item.previoDocAligner;
+      }
       item.file = girado;
       const thumb = await generarMiniatura(girado);
       if (thumb && buscarSlot(id)) asignarMiniatura(item, thumb);

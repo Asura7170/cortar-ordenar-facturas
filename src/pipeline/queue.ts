@@ -163,9 +163,14 @@ export async function procesarCola(): Promise<void> {
                 } else {
                   URL.revokeObjectURL(sig.imgUrl);
                   sig.imgUrl = imgNueva;
-                  // ponytail: la rotación deja el previo con orientación rancia (y
-                  // rotar no corta: nada que recuperar tras ella).
-                  delete sig.previoDocAligner;
+                  // ponytail: el previo acompaña a la rotación (ver giro manual).
+                  const mod = await import("./ocr").catch((): null => null);
+                  const previoGirado =
+                    sig.previoDocAligner && mod
+                      ? await mod.girarBlob(sig.previoDocAligner, end.grados)
+                      : null;
+                  if (previoGirado && buscarSlot(sig.id)) sig.previoDocAligner = previoGirado;
+                  else delete sig.previoDocAligner;
                   sig.file = end.blob;
                   blob = end.blob;
                 }

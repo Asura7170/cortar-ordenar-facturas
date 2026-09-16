@@ -287,6 +287,29 @@ export function lienzoGirado(
   return lienzo;
 }
 
+/** Rota un blob ±90°/180° a JPEG (null si no se puede). Nunca lanza. */
+export async function girarBlob(
+  fuente: Blob,
+  grados: Giro,
+  cargar: CargarBitmap = cargarReal,
+  crear: CrearLienzo = crearReal,
+): Promise<Blob | null> {
+  try {
+    const bmp = await cargar(fuente);
+    try {
+      const lienzo = lienzoGirado(bmp, grados, crear);
+      if (!lienzo) return null;
+      return await new Promise<Blob | null>((res) =>
+        lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+      );
+    } finally {
+      bmp.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
 /** Lienzo → JPEG (misma calidad que el intake). Null si no codifica. */
 function blobDeLienzo(lienzo: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((res) => {

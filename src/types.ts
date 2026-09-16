@@ -57,7 +57,7 @@ export interface Comprobante {
   readonly posicion: number;
   /** Blob original (imágenes) o recorte DocAligner; ausente en PDF (usar imgUrl). Mutable: el pipeline lo reemplaza por el recorte. */
   file?: Blob;
-  /** Intake pre-DocAligner (post-trim previo, pre-warp): fuente del recorte manual para recuperar lo cortado de más. Sin object URL (nunca se revoca). Mutable: la cola lo fija, giros y recorte manual lo borran. */
+  /** Intake pre-DocAligner (post-trim previo, pre-warp): fuente del recorte manual para recuperar lo cortado de más. Sin object URL (nunca se revoca). Mutable: la cola lo fija, las rotaciones lo acompañan, el recorte manual lo conserva. */
   previoDocAligner?: Blob;
 }
 

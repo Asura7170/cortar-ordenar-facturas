@@ -103,12 +103,16 @@ describe("girarYReleer", () => {
     expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(4);
   });
 
-  it("el giro descarta el previo (orientación rancia)", async () => {
-    const { deps } = depsGiro();
+  it("el giro rota el previo junto al file (sigue ensanchable)", async () => {
+    const { creados, deps } = depsGiro();
     const c = sembrar();
-    c.previoDocAligner = new Blob(["previo"]);
+    const previoViejo = new Blob(["previo"]);
+    c.previoDocAligner = previoViejo;
     await girarYReleer(c.id, 90, deps);
-    expect(c.previoDocAligner).toBeUndefined();
+    expect(c.previoDocAligner).toBeInstanceOf(Blob);
+    expect(c.previoDocAligner).not.toBe(previoViejo);
+    // Giro principal + previo: ambos lienzos 10x20 → 20x10.
+    expect(creados[1]).toMatchObject({ width: 20, height: 10 });
     expect(c.file).toBeInstanceOf(Blob);
   });
 

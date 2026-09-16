@@ -92,7 +92,9 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   // La escena ya tiene layout (el dialog está abierto): encajar sin ampliar.
   const escena = guia.parentElement;
   const maxW = Math.min(escena?.clientWidth || 860, 860);
-  const maxH = Math.min(window.innerHeight * 0.6, 560);
+  // ponytail: cabe en la tarjeta (82vh menos head/foot/paddings): sin scroll
+  // ni clip que escondan tiradores en viewports bajos.
+  const maxH = Math.max(200, Math.min(window.innerHeight * 0.82 - 200, 560));
   const k = Math.min(maxW / foto.width, maxH / foto.height, 1);
   cw = Math.max(1, Math.round(foto.width * k));
   ch = Math.max(1, Math.round(foto.height * k));
@@ -233,9 +235,8 @@ async function confirmar(): Promise<void> {
     URL.revokeObjectURL(item.imgUrl);
     item.imgUrl = URL.createObjectURL(recortado);
     item.file = recortado;
-    // ponytail: el recorte manual es el nuevo definitivo (conservar el previo
-    // resucitaría píxeles cortados a propósito).
-    delete item.previoDocAligner;
+    // ponytail: el previo se conserva (cada sesión parte de la imagen más
+    // ancha: así un sobre-recorte siempre se puede rectificar ensanchando).
     const thumb = await generarMiniatura(recortado);
     if (thumb && buscarSlot(id)) asignarMiniatura(item, thumb);
     else if (buscarSlot(id)) item.thumbUrl = item.imgUrl;

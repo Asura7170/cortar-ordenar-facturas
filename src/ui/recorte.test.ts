@@ -173,7 +173,7 @@ describe("abrirRecorte", () => {
     }
   });
 
-  it("abre desde el previo pre-warp y confirmar lo limpia", async () => {
+  it("abre desde el previo pre-warp y confirmar lo conserva", async () => {
     const ctx = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
@@ -187,7 +187,8 @@ describe("abrirRecorte", () => {
       expect(deps.cargar).toHaveBeenCalledWith(previo);
       btnOk.click();
       await vaciar();
-      expect(c.previoDocAligner).toBeUndefined();
+      // El previo sobrevive: la próxima sesión puede volver a ensanchar.
+      expect(c.previoDocAligner).toBe(previo);
       expect(c.file).toBeInstanceOf(Blob);
     } finally {
       ctx.mockRestore();
