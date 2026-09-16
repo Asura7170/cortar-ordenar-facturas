@@ -53,6 +53,8 @@ function depsRecorte(
 } {
   const bmp = { width: w, height: h, close: vi.fn() };
   const creados: { width: number; height: number }[] = [];
+  // Viewport fijo: la escala de llenado es determinista (768 → maxH 479.76).
+  vi.spyOn(window, "innerHeight", "get").mockReturnValue(768);
   return {
     bmp,
     creados,
@@ -138,12 +140,12 @@ describe("abrirRecorte", () => {
       const antes = c.file;
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(true);
-      // Marco de 6px por lado: los tiradores del borde respiran dentro.
-      expect(el<HTMLCanvasElement>("recorteBase").width).toBe(100 + 12);
-      expect(el<HTMLCanvasElement>("recorteBase").height).toBe(80 + 12);
+      // Marco de 6px por lado: 100x80 llenan a 585x468 (k=5.847).
+      expect(el<HTMLCanvasElement>("recorteBase").width).toBe(585 + 12);
+      expect(el<HTMLCanvasElement>("recorteBase").height).toBe(468 + 12);
       btnOk.click();
       await vaciar();
-      // Rect inicial = imagen completa (100x80 naturales, escala 1).
+      // Rect inicial = imagen completa (100x80 naturales).
       expect(creados[0]).toMatchObject({ width: 100, height: 80 });
       expect(c.file).not.toBe(antes);
       expect(c.file).toBeInstanceOf(Blob);
@@ -227,13 +229,13 @@ describe("abrirRecorte", () => {
       const { deps, creados } = depsRecorte(200, 80);
       const c = sembrar();
       await abrirRecorte(c.id, deps as never);
-      // Borde superior en x=60 (tiradores a 46px o más): mueve el lado norte.
+      // Borde superior en x=60 (lejos de tiradores): mueve el lado norte.
       guia.dispatchEvent(puntero("pointerdown", 60, 6));
       guia.dispatchEvent(puntero("pointermove", 60, 30));
       guia.dispatchEvent(puntero("pointerup", 60, 30));
       btnOk.click();
       await vaciar();
-      expect(creados[0]).toMatchObject({ width: 200, height: 56 });
+      expect(creados[0]).toMatchObject({ width: 200, height: 74 });
     } finally {
       ctx.mockRestore();
     }
@@ -253,7 +255,7 @@ describe("abrirRecorte", () => {
       guia.dispatchEvent(puntero("pointerup", 50, 50));
       btnOk.click();
       await vaciar();
-      expect(creados[0]).toMatchObject({ width: 156, height: 36 });
+      expect(creados[0]).toMatchObject({ width: 190, height: 70 });
     } finally {
       ctx.mockRestore();
     }
@@ -268,16 +270,16 @@ describe("abrirRecorte", () => {
       const c = sembrar();
       const antes = c.file;
       await abrirRecorte(c.id, deps as never);
-      // Se achica por la esquina "se" y luego se mueve por el interior.
-      guia.dispatchEvent(puntero("pointerdown", 206, 86));
-      guia.dispatchEvent(puntero("pointermove", 150, 60));
-      guia.dispatchEvent(puntero("pointerup", 150, 60));
-      guia.dispatchEvent(puntero("pointerdown", 78, 33));
-      guia.dispatchEvent(puntero("pointermove", 100, 45));
-      guia.dispatchEvent(puntero("pointerup", 100, 45));
+      // Se achica por la esquina "se" (854,345 con llenado) y se mueve por el interior.
+      guia.dispatchEvent(puntero("pointerdown", 854, 345));
+      guia.dispatchEvent(puntero("pointermove", 400, 200));
+      guia.dispatchEvent(puntero("pointerup", 400, 200));
+      guia.dispatchEvent(puntero("pointerdown", 203, 103));
+      guia.dispatchEvent(puntero("pointermove", 260, 140));
+      guia.dispatchEvent(puntero("pointerup", 260, 140));
       btnOk.click();
       await vaciar();
-      expect(creados[0]).toMatchObject({ width: 144, height: 54 });
+      expect(creados[0]).toMatchObject({ width: 93, height: 46 });
       expect(c.file).not.toBe(antes);
     } finally {
       ctx.mockRestore();
@@ -292,16 +294,16 @@ describe("abrirRecorte", () => {
       const { deps, creados } = depsRecorte(200, 80);
       const c = sembrar();
       await abrirRecorte(c.id, deps as never);
-      guia.dispatchEvent(puntero("pointerdown", 206, 86));
-      guia.dispatchEvent(puntero("pointermove", 150, 60));
-      guia.dispatchEvent(puntero("pointerup", 150, 60));
-      guia.dispatchEvent(puntero("pointerdown", 78, 33));
+      guia.dispatchEvent(puntero("pointerdown", 854, 345));
+      guia.dispatchEvent(puntero("pointermove", 400, 200));
+      guia.dispatchEvent(puntero("pointerup", 400, 200));
+      guia.dispatchEvent(puntero("pointerdown", 203, 103));
       guia.dispatchEvent(puntero("pointermove", 9999, 9999));
       guia.dispatchEvent(puntero("pointerup", 9999, 9999));
       btnOk.click();
       await vaciar();
       // Fijado abajo-derecha: mismo tamaño, sin salirse.
-      expect(creados[0]).toMatchObject({ width: 144, height: 54 });
+      expect(creados[0]).toMatchObject({ width: 93, height: 46 });
     } finally {
       ctx.mockRestore();
     }

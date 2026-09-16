@@ -97,12 +97,13 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   bmp = foto;
   depsVigentes = deps;
   modal.showModal();
-  // La escena ya tiene layout (el dialog está abierto): encajar sin ampliar.
-  const escena = guia.parentElement;
-  const maxW = Math.min(escena?.clientWidth || 860, 860);
+  // La escena ya tiene layout (el dialog está abierto): llenar ampliando o reduciendo.
+  // ponytail: el marco flotante se encoge al canvas (medir la escena sería
+  // circular): el espacio sale del viewport, igual que maxH.
+  const maxW = Math.max(200, Math.min(window.innerWidth * 0.9, 860));
   // ponytail: cabe en el viewport con barra y leyenda flotantes (sin tarjeta).
   const maxH = Math.max(200, Math.min(window.innerHeight * 0.82 - 150, 560));
-  const k = Math.min((maxW - MARGEN * 2) / foto.width, (maxH - MARGEN * 2) / foto.height, 1);
+  const k = Math.min((maxW - MARGEN * 2) / foto.width, (maxH - MARGEN * 2) / foto.height);
   cw = Math.max(1, Math.round(foto.width * k));
   ch = Math.max(1, Math.round(foto.height * k));
   escala = foto.width / cw;
