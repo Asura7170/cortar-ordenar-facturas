@@ -91,6 +91,13 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
   }
 }
 
+/** Cancela la relectura diferida de un giro (el recorte commitea su propia
+    relectura inmediata: sin esto el timer rancio la pisaba después). */
+export function cancelarRelecturaProgramada(id: number): void {
+  clearTimeout(relecturas.get(id));
+  relecturas.delete(id);
+}
+
 /** Cadena de relecturas por item: el giro con debounce y el recorte manual se
     solaparían sobre el mismo id (texto/monto cruzados). Igual que girosEnCurso. */
 const relecturasEnCurso = new Map<number, Promise<void>>();

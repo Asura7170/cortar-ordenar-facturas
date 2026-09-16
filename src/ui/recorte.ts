@@ -3,7 +3,7 @@
    el recorte como JPEG y relee el OCR (igual que el giro). Estado efímero. */
 import { buscarSlot, obtenerComprobante, state } from "../state";
 import { asignarMiniatura, generarMiniatura } from "../pipeline/queue";
-import { releerTrasEdicion } from "../pipeline/rotar";
+import { releerTrasEdicion, cancelarRelecturaProgramada } from "../pipeline/rotar";
 import { CALIDAD_JPEG, cargarReal, crearReal } from "../pipeline/imagen";
 import type { DepsOcr } from "../pipeline/ocr";
 import { getEl } from "../utils";
@@ -72,11 +72,16 @@ function avisar(texto: string): void {
 }
 
 /** Abre el editor para el comprobante (no-op fuera de ok o sin bitmap). */
+/** Apertura en curso: dos clics rápidos pasarían el guard modal.open (falso
+    hasta el showModal) y el segundo mataría el bitmap del primero. */
+let aperturaEnCurso = false;
+
 export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
-  if (modal.open) return;
+  if (modal.open || aperturaEnCurso) return;
   const item = obtenerComprobante(id);
   if (!item || item.estado !== "ok") return;
   const cargar = deps?.cargar ?? cargarReal;
+  aperturaEnCurso = true;
   let foto: ImageBitmap;
   try {
     // ponytail: el editor abre el intake pre-warp (recupera lo cortado de más);
@@ -86,8 +91,17 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   } catch {
     avisar("No se pudo abrir el recorte.");
     return;
+  } finally {
+    aperturaEnCurso = false;
   }
   if (foto.width < 2 || foto.height < 2) {
+    foto.close();
+    return;
+  }
+  // ponytail: el decode tarda (~100ms): si el item se fue en la ventana, no
+  // se abre un editor fantasma (igual que cola/rotar re-chequean al dueño).
+  const vigente = obtenerComprobante(id);
+  if (!vigente || vigente.estado !== "ok" || !buscarSlot(id)) {
     foto.close();
     return;
   }
@@ -264,13 +278,15 @@ function moverA(b: Borde, p: { x: number; y: number }): void {
 }
 
 /** Confirma: recorta en píxeles naturales, commitea y relee el OCR. Nunca lanza. */
+let confirmando = false; // anti doble-clic/Enter (dos commits solapados revocaban URLs vivas)
 async function confirmar(): Promise<void> {
   const id = idAbierto;
   const foto = bmp;
-  if (id === null || !foto) return;
+  if (id === null || !foto || confirmando) return;
   const item = obtenerComprobante(id);
   if (!item || item.estado !== "ok") return;
   const crear = depsVigentes?.crear ?? crearReal;
+  confirmando = true;
   try {
     const sx = Math.min(Math.round((rect.x - MARGEN) * escala), foto.width - 1);
     const sy = Math.min(Math.round((rect.y - MARGEN) * escala), foto.height - 1);
@@ -291,7 +307,11 @@ async function confirmar(): Promise<void> {
     );
     if (!recortado) throw new Error("sin blob recortado");
     // ponytail: commit tras los awaits (igual que la cola: sin dueño no se guarda).
-    if (!buscarSlot(id)) return;
+    // Sin dueño se cierra (el evento close limpia el bitmap rancio).
+    if (!buscarSlot(id)) {
+      modal.close();
+      return;
+    }
     URL.revokeObjectURL(item.imgUrl);
     item.imgUrl = URL.createObjectURL(recortado);
     item.file = recortado;
@@ -303,9 +323,14 @@ async function confirmar(): Promise<void> {
     modal.close();
     const { renderHojas } = await import("./sheets");
     renderHojas();
+    // ponytail: el giro programa su relectura con debounce (si el recorte
+    // llega antes, el timer rancio la pisaría después con texto viejo).
+    cancelarRelecturaProgramada(id);
     void releerTrasEdicion(id, recortado, depsVigentes);
   } catch {
     avisar("No se pudo recortar la imagen.");
+  } finally {
+    confirmando = false;
   }
 }
 

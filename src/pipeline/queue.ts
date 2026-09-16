@@ -164,16 +164,22 @@ export async function procesarCola(): Promise<void> {
                   URL.revokeObjectURL(sig.imgUrl);
                   sig.imgUrl = imgNueva;
                   // ponytail: el previo acompaña a la rotación (ver giro manual).
-                  const mod = await import("./ocr").catch((): null => null);
+                  // Sin re-import (ocr ya está cargado arriba).
                   const previoGirado =
-                    sig.previoDocAligner && mod
-                      ? await mod.girarBlob(sig.previoDocAligner, end.grados)
+                    sig.previoDocAligner && ocr
+                      ? await ocr.girarBlob(sig.previoDocAligner, end.grados)
                       : null;
-                  if (previoGirado && buscarSlot(sig.id)) sig.previoDocAligner = previoGirado;
-                  // ponytail: si falla, se conserva el viejo (un fallo transitorio
-                  // no debe destruir la fuente de recuperación del sobre-recorte).
-                  sig.file = end.blob;
-                  blob = end.blob;
+                  // ponytail: re-chequeo tras el await (limpiado en la ventana:
+                  // se revoca lo nuevo, no se muta el sig huérfano).
+                  if (!buscarSlot(sig.id)) {
+                    URL.revokeObjectURL(imgNueva);
+                  } else {
+                    if (previoGirado) sig.previoDocAligner = previoGirado;
+                    // ponytail: si falla, se conserva el viejo (un fallo transitorio
+                    // no debe destruir la fuente de recuperación del sobre-recorte).
+                    sig.file = end.blob;
+                    blob = end.blob;
+                  }
                 }
               }
             }

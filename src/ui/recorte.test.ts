@@ -332,6 +332,101 @@ describe("abrirRecorte", () => {
     }
   });
 
+  it("recortar tras girar cancela la relectura rancia del giro", async () => {
+    vi.useFakeTimers();
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { girarYReleer } = await import("../pipeline/rotar");
+      const bmpGiro = { width: 100, height: 80, close: vi.fn() };
+      const depsGiro = {
+        cargar: vi.fn(async () => bmpGiro),
+        crear: vi.fn(() => ({
+          width: 0,
+          height: 0,
+          getContext: () => ({ setTransform: vi.fn(), drawImage: vi.fn() }),
+          toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
+        })),
+      };
+      const c = sembrar();
+      await girarYReleer(c.id, 90, depsGiro as never);
+      // Timer del giro pendiente: el OCR aún no corrió.
+      expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
+      const { deps } = depsRecorte();
+      await abrirRecorte(c.id, deps as never);
+      btnOk.click();
+      await vi.advanceTimersByTimeAsync(2000); // vence el debounce del giro
+      // Solo la relectura inmediata del recorte (sin fix serían 2).
+      expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
+      expect(c.textoOcr).toBe("TOTAL LEÍDO");
+    } finally {
+      ctx.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("doble clic en Recortar commitea una sola vez", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps, creados } = depsRecorte();
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      btnOk.click();
+      btnOk.click();
+      await vaciar();
+      expect(creados).toHaveLength(1);
+      expect(c.file).toBeInstanceOf(Blob);
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("doble apertura concurrente decodifica una sola vez", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps } = depsRecorte();
+      const c = sembrar();
+      const p1 = abrirRecorte(c.id, deps as never);
+      const p2 = abrirRecorte(c.id, deps as never);
+      await Promise.all([p1, p2]);
+      expect(deps.cargar).toHaveBeenCalledTimes(1);
+      expect(modal.open).toBe(true);
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("limpiado durante el decode no abre editor fantasma", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      const bmp = { width: 100, height: 80, close: vi.fn() };
+      const deps = {
+        cargar: vi.fn(async () => {
+          await promise;
+          return bmp;
+        }),
+        crear: vi.fn(),
+      };
+      const c = sembrar();
+      const apertura = abrirRecorte(c.id, deps as never);
+      state.hojas.length = 0; // Limpiar durante el decode.
+      resolve();
+      await apertura;
+      expect(modal.open).toBe(false);
+      expect(bmp.close).toHaveBeenCalled();
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
   it("arrastrar el interior a rect completo no cambia nada", async () => {
     const ctx = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")
