@@ -306,16 +306,17 @@ async function confirmar(): Promise<void> {
       lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
     );
     if (!recortado) throw new Error("sin blob recortado");
-    // ponytail: commit tras los awaits (igual que la cola: sin dueño no se guarda).
-    // Sin dueño se cierra (el evento close limpia el bitmap rancio).
-    if (!buscarSlot(id)) {
+    // ponytail: commit tras los awaits (igual que la cola: sin dueño no se
+    // guarda). Sin dueño o descarte en vuelo se cierra (el evento close limpia
+    // el bitmap rancio).
+    if (idAbierto !== id || !buscarSlot(id)) {
       modal.close();
       return;
     }
     const thumb = await generarMiniatura(recortado);
     // ponytail: commit atómico (giro en vuelo: mutar partido mezclaba imágenes).
-    // Sin dueño se cierra y la thumb huérfana se revoca.
-    if (!buscarSlot(id)) {
+    // Sin dueño o descarte en vuelo se cierra y la thumb huérfana se revoca.
+    if (idAbierto !== id || !buscarSlot(id)) {
       if (thumb) URL.revokeObjectURL(thumb);
       modal.close();
       return;
@@ -328,8 +329,10 @@ async function confirmar(): Promise<void> {
     if (thumb) asignarMiniatura(item, thumb);
     // ponytail: sin thumb se muestra el recorte nuevo (alias revocado o esqueleto mienten).
     else item.thumbUrl = item.imgUrl;
-    modal.close();
+    // ponytail: import antes del close (si falla, el catch dice la verdad:
+    // nada se commiteó todavía).
     const { renderHojas } = await import("./sheets");
+    modal.close();
     renderHojas();
     // ponytail: el giro programa su relectura con debounce (si el recorte
     // llega antes, el timer rancio la pisaría después con texto viejo).
@@ -413,12 +416,13 @@ export function initRecorte(): void {
   guia.addEventListener("pointerup", soltar);
   guia.addEventListener("pointercancel", soltar);
 
-  // Teclado: Tab rota el tirador activo, flechas lo mueven, Enter confirma.
+  // Teclado: [ ] rotan el tirador activo, flechas lo mueven, Enter confirma.
+  // Tab queda libre: el orden nativo del <dialog> alcanza barra y cerrar.
   guia.addEventListener("keydown", (e) => {
     if (!bmp) return;
-    if (e.key === "Tab") {
+    if (e.key === "[" || e.key === "]") {
       e.preventDefault();
-      activo = (activo + (e.shiftKey ? TIRADORES.length - 1 : 1)) % TIRADORES.length;
+      activo = (activo + (e.key === "[" ? TIRADORES.length - 1 : 1)) % TIRADORES.length;
       borde = TIRADORES[activo]?.b ?? borde;
       dibujarGuia();
       return;

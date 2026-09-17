@@ -426,6 +426,74 @@ describe("abrirRecorte", () => {
     }
   });
 
+  it("descarte en vuelo: cerrar durante toBlob no commitea", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { promise, resolve } = Promise.withResolvers<Blob | null>();
+      const { deps, bmp } = depsRecorte();
+      deps.crear = vi.fn(() => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({ drawImage: vi.fn() }),
+        toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
+      }));
+      const c = sembrar();
+      const antes = c.file;
+      const urlVieja = c.imgUrl;
+      await abrirRecorte(c.id, deps as never);
+      btnOk.click();
+      await vaciar(); // confirmar quedó esperando el toBlob
+      modal.close(); // cancelar en vuelo
+      resolve(new Blob(["recorte"]));
+      await vaciar();
+      // Sin el guard idAbierto, el commit sobrevivía al descarte.
+      expect(c.file).toBe(antes);
+      expect(c.imgUrl).toBe(urlVieja);
+      expect(c.textoOcr).toBe("VIEJO");
+      expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
+      expect(bmp.close).toHaveBeenCalled();
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("Tab no atrapa foco; ] rota el tirador activo", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps, creados } = depsRecorte(200, 80);
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      // Tab sin preventDefault: el orden nativo del <dialog> alcanza la barra.
+      const tabLibre = guia.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
+      );
+      expect(tabLibre).toBe(true);
+      // activo pasa de "se" a "n": Shift+ArrowDown encoge desde el norte.
+      guia.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "]", bubbles: true, cancelable: true }),
+      );
+      guia.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "ArrowDown",
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      btnOk.click();
+      await vaciar();
+      // Con el tirador viejo ("se"), bajar queda fijado al filo: altura 80.
+      expect(creados[0]).toMatchObject({ width: 200 });
+      expect(creados[0]?.height).toBeLessThan(80);
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
   it("limpiado durante el decode no abre editor fantasma", async () => {
     const ctx = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")
