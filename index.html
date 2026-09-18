@@ -367,6 +367,39 @@
       </div>
     </dialog>
 
+    <!-- Modal Recorte manual: imagen fija + tiradores en el overlay -->
+    <dialog
+      class="modal modal-recorte"
+      id="modalRecorte"
+      closedby="any"
+      aria-labelledby="tituloRecorte"
+    >
+      <h2 id="tituloRecorte" class="sr-only">Recortar comprobante</h2>
+      <div class="recorte-marco">
+        <button
+          class="recorte-cerrar"
+          command="close"
+          commandfor="modalRecorte"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+        <div class="recorte-escena">
+          <canvas id="recorteBase"></canvas>
+          <canvas
+            id="recorteGuia"
+            tabindex="0"
+            aria-label="Guías de recorte: [ ] cambian de tirador, flechas ajustan"
+          ></canvas>
+        </div>
+      </div>
+      <form method="dialog" class="recorte-barra">
+        <button class="btn btn-ghost" type="button" id="btnRecorteReset">Restablecer</button>
+        <button class="btn btn-ghost" type="submit" value="cancel" autofocus>Cancelar</button>
+        <button class="btn btn-primary" type="button" id="btnRecorteOk">Recortar</button>
+      </form>
+    </dialog>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -57,6 +57,8 @@ export interface Comprobante {
   readonly posicion: number;
   /** Blob original (imágenes) o recorte DocAligner; ausente en PDF (usar imgUrl). Mutable: el pipeline lo reemplaza por el recorte. */
   file?: Blob;
+  /** Intake pre-DocAligner (post-trim previo, pre-warp): fuente del recorte manual para recuperar lo cortado de más. Sin object URL (nunca se revoca). Mutable: la cola lo fija, las rotaciones lo acompañan, el recorte manual lo conserva. */
+  previoDocAligner?: Blob;
 }
 
 /** Hoja carta con casillas fijas (una por posición de la plantilla). */
@@ -87,6 +89,8 @@ export interface EstadoApp {
   moneda: Moneda;
   colaEnProceso: boolean;
   modoOcr: boolean;
+  /** Timestamp del último cierre del editor de recorte (el clic que cierra no reabre). Efímero, no persiste. */
+  cierreRecorte: number;
 }
 
 /** Subset persistido en localStorage (clave `libro-mayor-state`); cada ventana guarda solo lo suyo. */

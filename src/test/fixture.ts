@@ -27,6 +27,12 @@ export const FIXTURE_HTML = `
   <input type="radio" name="posCodigo" value="inf-der">
 </fieldset>
 <dialog id="modalLimpiar"></dialog>
+<dialog id="modalRecorte">
+  <canvas id="recorteBase"></canvas>
+  <canvas id="recorteGuia" tabindex="0"></canvas>
+  <button id="btnRecorteReset" type="button"></button>
+  <button id="btnRecorteOk" type="button"></button>
+</dialog>
 <input id="chkOcr" type="checkbox">
 <span id="ocrEstado"></span>
 <dialog id="modalAjustes"></dialog>

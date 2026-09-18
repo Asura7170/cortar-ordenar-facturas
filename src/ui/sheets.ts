@@ -6,6 +6,7 @@ import {
   obtenerComprobante,
   redistribuir,
   state,
+  VENTANA_CIERRE_RECORTE_MS,
 } from "../state";
 import type { Cents, Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
@@ -112,6 +113,15 @@ function pintarCelda(
       g.textContent = glifo;
       div.append(g);
     }
+    // Recorte manual: abajo-izquierda (el badge/monto vive abajo-derecha).
+    const r = document.createElement("button");
+    r.type = "button";
+    r.className = "cell-recortar";
+    r.dataset["accion"] = "recortar";
+    r.title = "Recortar";
+    r.setAttribute("aria-label", "Recortar comprobante");
+    r.textContent = "✂";
+    div.append(r);
   }
   if (item.thumbUrl) {
     const img = document.createElement("img");
@@ -844,7 +854,7 @@ export function initSheets(cb: SheetsCallbacks): void {
     if (!(cell instanceof HTMLElement) || cell.classList.contains("empty")) return;
     if (
       target?.closest?.(
-        '[data-accion="quitar"],[data-accion="girar-izq"],[data-accion="girar-der"],[data-accion="monto"],[data-accion="corregir-monto"]',
+        '[data-accion="quitar"],[data-accion="girar-izq"],[data-accion="girar-der"],[data-accion="recortar"],[data-accion="monto"],[data-accion="corregir-monto"]',
       )
     )
       return;
@@ -978,6 +988,13 @@ export function initSheets(cb: SheetsCallbacks): void {
         return;
       case "girar-der":
         void girarYReleer(id, 90);
+        return;
+      case "recortar":
+        // ponytail: solo recortar se suprime tras el descarte (carrera
+        // descarte→clic en la celda de abajo); el resto acciona siempre.
+        if (Date.now() - state.cierreRecorte < VENTANA_CIERRE_RECORTE_MS) return;
+        // ponytail: dinámico (recorte importa la cola: estático sería ciclo).
+        void import("./recorte").then((m) => m.abrirRecorte(id)).catch(() => {});
         return;
       case "corregir-monto": {
         const item = obtenerComprobante(id);

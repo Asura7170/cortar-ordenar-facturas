@@ -8,6 +8,7 @@ import {
   enderezar,
   envolver,
   extraerTexto,
+  girarBlob,
   reconocerCaja,
   reconocerLote,
   tamanoDet,
@@ -318,6 +319,63 @@ describe("extraerTexto", () => {
     expect(texto).toBe("AA");
     expect(creados).toBe(1); // solo recorteCaja; antes eran 2 (base temporal + recorte)
     expect(decodes).toBe(0); // Fase 2: en reuse no se decodifica el blob
+  });
+});
+
+describe("girarBlob", () => {
+  function caso(toBlob: (cb: (b: Blob | null) => void, tipo?: string, calidad?: number) => void): {
+    lienzo: HTMLCanvasElement;
+    pedidos: { tipo: string | undefined; calidad: number | undefined }[];
+  } {
+    const pedidos: { tipo: string | undefined; calidad: number | undefined }[] = [];
+    const lienzo = {
+      width: 0,
+      height: 0,
+      getContext: () => ({ setTransform: () => {}, drawImage: () => {} }),
+      toBlob: (cb: (b: Blob | null) => void, tipo?: string, calidad?: number) => {
+        pedidos.push({ tipo, calidad });
+        toBlob(cb, tipo, calidad);
+      },
+    } as unknown as HTMLCanvasElement;
+    return { lienzo, pedidos };
+  }
+
+  it("90° rota 10x20 → JPEG en lienzo 20x10", async () => {
+    const { lienzo, pedidos } = caso((cb) => cb(new Blob(["g"])));
+    const fuera = await girarBlob(
+      new Blob(["f"]),
+      90,
+      () => Promise.resolve(bitmapFalso(10, 20)),
+      () => lienzo,
+    );
+    expect(fuera).toBeInstanceOf(Blob);
+    expect(lienzo.width).toBe(20);
+    expect(lienzo.height).toBe(10);
+    expect(pedidos).toEqual([{ tipo: "image/jpeg", calidad: 0.9 }]);
+  });
+
+  it("sin contexto o sin blob → null sin lanzar", async () => {
+    const sinCtx = { width: 0, height: 0, getContext: () => null } as unknown as HTMLCanvasElement;
+    await expect(
+      girarBlob(
+        new Blob(["f"]),
+        90,
+        () => Promise.resolve(bitmapFalso(10, 20)),
+        () => sinCtx,
+      ),
+    ).resolves.toBeNull();
+    const { lienzo } = caso((cb) => cb(null));
+    await expect(
+      girarBlob(
+        new Blob(["f"]),
+        90,
+        () => Promise.resolve(bitmapFalso(10, 20)),
+        () => lienzo,
+      ),
+    ).resolves.toBeNull();
+    await expect(
+      girarBlob(new Blob(["f"]), 90, () => Promise.reject(new Error("roto"))),
+    ).resolves.toBeNull();
   });
 });
 

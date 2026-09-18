@@ -13,6 +13,9 @@ import { layoutDe } from "./ui/layout";
 
 export const LS_KEY = "libro-mayor-state";
 
+/** Ventana anti-resurrección tras cerrar el editor (el clic que cierra no reabre). */
+export const VENTANA_CIERRE_RECORTE_MS = 350;
+
 export const MONEDAS: Record<Moneda, { simbolo: string }> = {
   USD: { simbolo: "US$" },
   ARS: { simbolo: "AR$" },
@@ -38,6 +41,7 @@ export const state: EstadoApp = {
   moneda: MONEDA_DEFAULT,
   colaEnProceso: false,
   modoOcr: false,
+  cierreRecorte: 0,
 };
 
 let seq = 0;

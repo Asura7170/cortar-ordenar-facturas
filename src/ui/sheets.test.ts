@@ -4,6 +4,8 @@ import { montarFixture, el, eventoDrop, eventoDragover } from "../test/fixture";
 
 // El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
 vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
+// El editor real abre un modal: se aserta el cableado, no el canvas.
+vi.mock("./recorte", () => ({ abrirRecorte: vi.fn(async () => {}) }));
 // El lote post-corregir no debe pegar a la red en tests.
 vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
 
@@ -21,6 +23,7 @@ const {
 } = await import("./sheets");
 const { archivo, comprobante } = await import("../test/factoria");
 const { girarYReleer } = await import("../pipeline/rotar");
+const { abrirRecorte } = await import("./recorte");
 const { extraerPendientes } = await import("../pipeline/extract");
 import type { Comprobante, Hoja, LayoutId } from "../types";
 
@@ -48,6 +51,11 @@ function boton(accion: string): HTMLButtonElement {
   const b = document.querySelector<HTMLButtonElement>(`[data-accion="${accion}"]`);
   if (!b) throw new Error(`sin botón ${accion}`);
   return b;
+}
+
+/** Espera a que el import dinámico (clic → abrirRecorte) termine. */
+async function vaciar(): Promise<void> {
+  for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
 }
 
 describe("cambiarLayoutHoja / aplicarATodas", () => {
@@ -758,6 +766,15 @@ describe("giro manual", () => {
     expect(botonGiro("girar-der").getAttribute("aria-label")).toBe("Girar a la derecha");
   });
 
+  it("botón ✂ solo en celda ok en modo imagen", () => {
+    sembrar("u1", [100]); // pendiente: sin botón
+    expect(document.querySelector('[data-accion="recortar"]')).toBeNull();
+    sembrarGirable();
+    const b = document.querySelector<HTMLButtonElement>('[data-accion="recortar"]');
+    expect(b?.getAttribute("aria-label")).toBe("Recortar comprobante");
+    expect(b?.classList.contains("cell-recortar")).toBe(true);
+  });
+
   it("en modo OCR no hay botones de giro", () => {
     state.modoOcr = true;
     try {
@@ -774,6 +791,35 @@ describe("giro manual", () => {
     expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 270);
     botonGiro("girar-der").click();
     expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 90);
+  });
+
+  it("clic justo tras cerrar el editor no reabre (anti-resurrección)", async () => {
+    vi.mocked(abrirRecorte).mockClear();
+    const c = sembrarGirable();
+    state.cierreRecorte = Date.now();
+    try {
+      boton("recortar").click();
+      await vaciar();
+      expect(vi.mocked(abrirRecorte)).not.toHaveBeenCalled();
+      state.cierreRecorte = Date.now() - 1000;
+      boton("recortar").click();
+      await vaciar();
+      expect(vi.mocked(abrirRecorte)).toHaveBeenCalledWith(c.id);
+    } finally {
+      state.cierreRecorte = 0;
+    }
+  });
+
+  it("el resto acciona pese al cierre reciente (guard solo en recortar)", () => {
+    vi.mocked(girarYReleer).mockClear();
+    const c = sembrarGirable();
+    state.cierreRecorte = Date.now();
+    try {
+      botonGiro("girar-izq").click();
+      expect(vi.mocked(girarYReleer)).toHaveBeenCalledWith(c.id, 270);
+    } finally {
+      state.cierreRecorte = 0;
+    }
   });
 
   it("corregir-monto abre edición con el valor previo y sin reintento IA", () => {

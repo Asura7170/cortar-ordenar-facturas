@@ -6,6 +6,22 @@ import { montarFixture } from "../test/fixture";
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
 // El auto IA real haría fetch: stub (cada test lo ajusta).
 vi.mock("./extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
+// OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
+// jsdom); cada test simula giro/texto/girarBlob.
+vi.mock("./ocr", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./ocr")>();
+  return {
+    ...real,
+    enderezar: vi.fn(async (blob: Blob) => ({ blob, grados: 0, cajas: [], base: null })),
+    extraerTexto: vi.fn(async () => ""),
+    girarBlob: vi.fn(async () => null),
+  };
+});
+// DocAligner real necesita onnx: identidad por defecto (no-op); cada test simula el corte.
+vi.mock("./docaligner", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./docaligner")>();
+  return { ...real, detectarYRecortar: vi.fn(async (b: Blob) => b) };
+});
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
@@ -108,6 +124,93 @@ describe("procesarCola", () => {
     } finally {
       vi.mocked(extraerPendientes).mockResolvedValue(undefined);
     }
+  });
+
+  it("throw en el render no aborta la cola (el ítem sigue a ok)", async () => {
+    const h = crearHoja();
+    const c = comprobante({ nombre: "t.png", file: new Blob(["x"]) });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    vi.mocked(renderHojas).mockImplementationOnce(() => {
+      throw new Error("pintura");
+    });
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(c.estado).toBe("ok");
+    expect(state.colaEnProceso).toBe(false);
+  });
+
+  it("throw a mitad de drenaje: el ítem falla en error, los hermanos siguen", async () => {
+    const h1 = crearHoja();
+    const malo = comprobante({ nombre: "malo.png", file: new Blob(["x"]) });
+    h1.slots[0] = malo;
+    const h2 = crearHoja();
+    const bueno = comprobante({ nombre: "bueno.png", file: new Blob(["y"]) });
+    h2.slots[0] = bueno;
+    state.hojas.push(h1, h2);
+    // Inyección del fallo fuera de las etapas con catch: el log final lanza una vez.
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.mocked(console.info).mockImplementationOnce(() => {
+      throw new Error("log");
+    });
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(3000);
+    await p;
+    expect(malo.estado).toBe("error");
+    expect(bueno.estado).toBe("ok");
+    expect(state.colaEnProceso).toBe(false);
+  });
+
+  it("enderezar con giro rota el previo junto al file", async () => {
+    const { enderezar, girarBlob } = await import("./ocr");
+    const h = crearHoja();
+    const c = comprobante({
+      nombre: "t.png",
+      file: new Blob(["intake"]),
+      previoDocAligner: new Blob(["previo"]),
+    });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const rotado = new Blob(["rotado"]);
+    const previoRotado = new Blob(["previo-rotado"]);
+    vi.mocked(enderezar).mockResolvedValueOnce({ blob: rotado, grados: 90, cajas: [], base: null });
+    vi.mocked(girarBlob).mockResolvedValueOnce(previoRotado);
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(c.file).toBe(rotado);
+    expect(c.previoDocAligner).toBe(previoRotado);
+    expect(c.estado).toBe("ok");
+  });
+
+  it("DocAligner que corta guarda el intake como previo", async () => {
+    const { detectarYRecortar } = await import("./docaligner");
+    const h = crearHoja();
+    const intake = new Blob(["intake"]);
+    const c = comprobante({ nombre: "t.png", file: intake });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const cortado = new Blob(["doc"]);
+    vi.mocked(detectarYRecortar).mockResolvedValueOnce(cortado);
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(c.file).toBe(cortado);
+    expect(c.previoDocAligner).toBe(intake);
+  });
+
+  it("DocAligner no-op no guarda previo", async () => {
+    const h = crearHoja();
+    const intake = new Blob(["intake"]);
+    const c = comprobante({ nombre: "t.png", file: intake });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(c.file).toBe(intake);
+    expect(c.previoDocAligner).toBeUndefined();
   });
 
   it("asignarMiniatura no revoca el imgUrl aliased (PDF, hilo #1 PR9)", () => {

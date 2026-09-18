@@ -3,12 +3,12 @@
    corre una sola vez tras QUIETUD_GIRO_MS sin pulsar (doble giro = 2 giros +
    1 OCR). Sin enderezar (que podría devolver el giro) ni re-recortar. Manual
    intacto; no-manual se reabre y el lote lo relee. Nunca lanza. */
-import { buscarSlot, obtenerComprobante } from "../state";
+import { buscarSlot, obtenerComprobante, state } from "../state";
 import { sanear } from "../utils";
 import { asignarMiniatura, generarMiniatura } from "./queue";
 import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
 import type { DepsOcr } from "./ocr";
-import { lienzoGirado } from "./ocr";
+import { girarBlob, lienzoGirado } from "./ocr";
 
 export type GiroManual = 90 | 270;
 
@@ -59,22 +59,41 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
         lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
       );
       if (!girado) throw new Error("sin blob girado");
-      // ponytail: commit tras los awaits (igual que la cola: sin dueño no se guarda).
-      if (!buscarSlot(id)) return;
-      URL.revokeObjectURL(item.imgUrl);
-      item.imgUrl = URL.createObjectURL(girado);
-      item.file = girado;
+      // ponytail: el previo acompaña al giro (con orientación rancia el próximo
+      // recorte manual ensancharía sobre píxeles viejos: se aborta, no se mezcla).
+      const giradoPrevio = item.previoDocAligner
+        ? await girarBlob(item.previoDocAligner, grados, cargar, crear)
+        : null;
+      if (item.previoDocAligner && !giradoPrevio) throw new Error("sin previo girado");
       const thumb = await generarMiniatura(girado);
-      if (thumb && buscarSlot(id)) asignarMiniatura(item, thumb);
+      const imgNueva = URL.createObjectURL(girado);
+      // ponytail: commit atómico tras los awaits (giro vs recorte en vuelo:
+      // mutar partido mezclaba imgUrl de uno con file/thumb del otro).
+      if (!buscarSlot(id)) {
+        URL.revokeObjectURL(imgNueva);
+        if (thumb) URL.revokeObjectURL(thumb);
+        return;
+      }
+      URL.revokeObjectURL(item.imgUrl);
+      item.imgUrl = imgNueva;
+      item.file = girado;
+      if (giradoPrevio) item.previoDocAligner = giradoPrevio;
+      if (thumb) asignarMiniatura(item, thumb);
       // ponytail: sin thumb se muestra el giro nuevo (alias revocado o esqueleto mienten).
-      else if (buscarSlot(id)) item.thumbUrl = item.imgUrl;
+      // La thumb vieja distinta se revoca (igual que asignarMiniatura).
+      else {
+        if (item.thumbUrl && item.thumbUrl !== item.imgUrl) URL.revokeObjectURL(item.thumbUrl);
+        item.thumbUrl = item.imgUrl;
+      }
       renderHojas();
       clearTimeout(relecturas.get(id));
       relecturas.set(
         id,
         setTimeout(() => {
           relecturas.delete(id);
-          void releer(id, girado, deps);
+          // ponytail: si un recorte commitió después, el giro es rancio: no relee.
+          if (obtenerComprobante(id)?.file !== girado) return;
+          void releerTrasEdicion(id, girado, deps);
         }, QUIETUD_GIRO_MS),
       );
     } finally {
@@ -85,7 +104,39 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
   }
 }
 
-/** Fase diferida: un solo OCR tras la quietud + refresco del monto. Nunca lanza. */
+/** Cancela la relectura diferida de un giro (el recorte commitea su propia
+    relectura inmediata: sin esto el timer rancio la pisaba después). */
+export function cancelarRelecturaProgramada(id: number): void {
+  clearTimeout(relecturas.get(id));
+  relecturas.delete(id);
+}
+
+/** Cadena de relecturas por item: el giro con debounce y el recorte manual se
+    solaparían sobre el mismo id (texto/monto cruzados). Igual que girosEnCurso. */
+const relecturasEnCurso = new Map<number, Promise<void>>();
+
+/** Relectura serializada por item (el último editor corre último: su texto gana). */
+export async function releerTrasEdicion(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
+  const anterior = relecturasEnCurso.get(id) ?? Promise.resolve();
+  const turno = anterior.catch(() => {}).then(() => releer(id, blob, deps));
+  relecturasEnCurso.set(id, turno);
+  try {
+    await turno;
+  } finally {
+    if (relecturasEnCurso.get(id) === turno) relecturasEnCurso.delete(id);
+  }
+}
+
+/** Espera a que la cola suelte el flag (tope 120s: el lote nunca queda huérfano). */
+async function esperarDrenaje(): Promise<void> {
+  for (let i = 0; i < 480 && state.colaEnProceso; i++) {
+    await new Promise((res) => setTimeout(res, 250));
+  }
+}
+
+/** Fase diferida: un solo OCR tras la quietud + refresco del monto. Nunca lanza.
+ * (Trabajadora privada: entrar por releerTrasEdicion, que serializa por item.
+ * También la usa el recorte manual, que invalida texto y monto igual.) */
 async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
   if (!item || !buscarSlot(id)) return;
@@ -93,6 +144,9 @@ async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
     const { renderHojas } = await import("../ui/sheets");
     item.estado = "procesando";
     renderHojas();
+    // ponytail: las sesiones ORT son singletons sin mutex interno (un run()
+    // concurrente de la cola + este cuelga a ambos): el OCR espera su turno.
+    if (state.colaEnProceso) await esperarDrenaje();
     const ocr = await import("./ocr").catch((): null => null);
     if (buscarSlot(id)) item.textoOcr = sanear(ocr ? await ocr.extraerTexto(blob, deps) : "");
     // ponytail: ok ANTES del lote (candidatos exige ok: en procesando se autoexcluía).
@@ -100,13 +154,15 @@ async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
       item.estado = "ok";
       renderHojas();
     }
-    // No-manual: el total se reabre y el lote lo relee (pelado: silencioso y
-    // respeta la cola activa; el drenado lo levanta si aquella trabaja).
+    // No-manual: el total se reabre y el lote lo relee. Si la cola trabaja se
+    // espera a que drene: el batch excluye al "procesando" y sin espera el
+    // monto quedaba huérfano hasta el próximo disparo.
     // El lote pinta solo si aplica (el ok + texto ya quedaron pintados arriba).
     if (!item.montoManual && buscarSlot(id)) {
       item.montoCents = null;
       renderHojas(); // el lote puede ser no-op: sin esto el badge viejo miente
       const mod = await import("./extract").catch((): null => null);
+      if (state.colaEnProceso) await esperarDrenaje();
       await Promise.resolve(mod?.extraerPendientes()).catch(() => {});
     }
   } catch {
