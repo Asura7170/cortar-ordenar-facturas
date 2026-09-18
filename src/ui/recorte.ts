@@ -52,6 +52,7 @@ const PASO_TECLA = 2;
 const MARGEN = 6;
 
 let idAbierto: number | null = null;
+let sesion = 0; // token anti sesión cruzada: cerrar+reabrir invalida confirms en vuelo
 let bmp: ImageBitmap | null = null;
 let escala = 1; // px naturales por px display
 let cw = 0;
@@ -149,6 +150,7 @@ function restablecer(): void {
 }
 
 function cerrarAnterior(): void {
+  sesion++; // invalida la confirmación en vuelo (ya no es su diálogo)
   if (raf !== null) {
     cancelAnimationFrame(raf);
     raf = null;
@@ -282,6 +284,7 @@ let confirmando = false; // anti doble-clic/Enter (dos commits solapados revocab
 async function confirmar(): Promise<void> {
   const id = idAbierto;
   const foto = bmp;
+  const miSesion = sesion;
   if (id === null || !foto || confirmando) return;
   const item = obtenerComprobante(id);
   if (!item || item.estado !== "ok") return;
@@ -306,6 +309,9 @@ async function confirmar(): Promise<void> {
       lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
     );
     if (!recortado) throw new Error("sin blob recortado");
+    // ponytail: sesión cruzada (cerrar+reabrir en vuelo): la confirmación vieja
+    // no commitea y no toca el diálogo nuevo (sin close: ya no es suyo).
+    if (sesion !== miSesion) return;
     // ponytail: commit tras los awaits (igual que la cola: sin dueño no se
     // guarda). Sin dueño o descarte en vuelo se cierra (el evento close limpia
     // el bitmap rancio).
@@ -314,6 +320,11 @@ async function confirmar(): Promise<void> {
       return;
     }
     const thumb = await generarMiniatura(recortado);
+    // ponytail: sesión cruzada tras el segundo await (la thumb huérfana se revoca).
+    if (sesion !== miSesion) {
+      if (thumb) URL.revokeObjectURL(thumb);
+      return;
+    }
     // ponytail: commit atómico (giro en vuelo: mutar partido mezclaba imágenes).
     // Sin dueño o descarte en vuelo se cierra y la thumb huérfana se revoca.
     if (idAbierto !== id || !buscarSlot(id)) {
@@ -328,10 +339,15 @@ async function confirmar(): Promise<void> {
     // ancha: así un sobre-recorte siempre se puede rectificar ensanchando).
     if (thumb) asignarMiniatura(item, thumb);
     // ponytail: sin thumb se muestra el recorte nuevo (alias revocado o esqueleto mienten).
-    else item.thumbUrl = item.imgUrl;
+    // La thumb vieja distinta se revoca (igual que asignarMiniatura).
+    else {
+      if (item.thumbUrl && item.thumbUrl !== item.imgUrl) URL.revokeObjectURL(item.thumbUrl);
+      item.thumbUrl = item.imgUrl;
+    }
     // ponytail: import antes del close (si falla, el catch dice la verdad:
-    // nada se commiteó todavía).
+    // nada se commiteó todavía). Sesión cruzada: el diálogo nuevo sigue abierto.
     const { renderHojas } = await import("./sheets");
+    if (sesion !== miSesion) return;
     modal.close();
     renderHojas();
     // ponytail: el giro programa su relectura con debounce (si el recorte

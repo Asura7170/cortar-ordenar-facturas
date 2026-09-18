@@ -60,10 +60,11 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
       );
       if (!girado) throw new Error("sin blob girado");
       // ponytail: el previo acompaña al giro (con orientación rancia el próximo
-      // recorte manual no podría ensanchar); si falla, se conserva el viejo.
+      // recorte manual ensancharía sobre píxeles viejos: se aborta, no se mezcla).
       const giradoPrevio = item.previoDocAligner
         ? await girarBlob(item.previoDocAligner, grados, cargar, crear)
         : null;
+      if (item.previoDocAligner && !giradoPrevio) throw new Error("sin previo girado");
       const thumb = await generarMiniatura(girado);
       const imgNueva = URL.createObjectURL(girado);
       // ponytail: commit atómico tras los awaits (giro vs recorte en vuelo:
@@ -79,7 +80,11 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
       if (giradoPrevio) item.previoDocAligner = giradoPrevio;
       if (thumb) asignarMiniatura(item, thumb);
       // ponytail: sin thumb se muestra el giro nuevo (alias revocado o esqueleto mienten).
-      else item.thumbUrl = item.imgUrl;
+      // La thumb vieja distinta se revoca (igual que asignarMiniatura).
+      else {
+        if (item.thumbUrl && item.thumbUrl !== item.imgUrl) URL.revokeObjectURL(item.thumbUrl);
+        item.thumbUrl = item.imgUrl;
+      }
       renderHojas();
       clearTimeout(relecturas.get(id));
       relecturas.set(

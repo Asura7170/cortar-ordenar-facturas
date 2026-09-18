@@ -302,6 +302,47 @@ describe("girarYReleer", () => {
     }
   });
 
+  it("previo que no gira aborta el giro (sin mezcla de orientaciones)", async () => {
+    const { deps } = depsGiro();
+    const c = sembrar();
+    const previoViejo = new Blob(["previo"]);
+    c.previoDocAligner = previoViejo;
+    const antes = c.file;
+    const urlVieja = c.imgUrl;
+    // Solo el segundo lienzo (el del previo) falla: toBlob null.
+    const crearBase = deps.crear.getMockImplementation();
+    let llamadas = 0;
+    deps.crear.mockImplementation(() => {
+      llamadas++;
+      const lienzo = (crearBase?.() ?? {}) as {
+        toBlob: (cb: (b: Blob | null) => void) => void;
+      } & Record<string, unknown>;
+      if (llamadas === 2) lienzo.toBlob = (cb) => cb(null);
+      return lienzo as unknown as HTMLCanvasElement;
+    });
+    await girarYReleer(c.id, 90, deps);
+    // Sin el throw, el giro commiteaba file rotado con previo viejo.
+    expect(c.file).toBe(antes);
+    expect(c.imgUrl).toBe(urlVieja);
+    expect(c.previoDocAligner).toBe(previoViejo);
+    expect(document.getElementById("aviso")?.textContent).toBe("No se pudo girar la imagen.");
+  });
+
+  it("sin thumb se revoca la thumb vieja distinta (sin fuga)", async () => {
+    const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    try {
+      const { deps } = depsGiro();
+      vi.mocked(generarMiniatura).mockResolvedValueOnce(null);
+      const c = sembrar();
+      c.thumbUrl = "blob:thumb-vieja";
+      await girarYReleer(c.id, 90, deps);
+      expect(revocar).toHaveBeenCalledWith("blob:thumb-vieja");
+      expect(c.thumbUrl).toBe(c.imgUrl);
+    } finally {
+      revocar.mockRestore();
+    }
+  });
+
   it("timer rancio no relee si otro editor commitió después", async () => {
     vi.useFakeTimers();
     try {

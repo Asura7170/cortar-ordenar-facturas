@@ -426,6 +426,28 @@ describe("abrirRecorte", () => {
     }
   });
 
+  it("sin thumb se revoca la thumb vieja distinta (sin fuga)", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const { generarMiniatura } = await import("../pipeline/queue");
+    try {
+      const { deps } = depsRecorte();
+      vi.mocked(generarMiniatura).mockResolvedValueOnce(null);
+      const c = sembrar();
+      c.thumbUrl = "blob:thumb-vieja";
+      await abrirRecorte(c.id, deps as never);
+      btnOk.click();
+      await vaciar();
+      expect(revocar).toHaveBeenCalledWith("blob:thumb-vieja");
+      expect(c.thumbUrl).toBe(c.imgUrl);
+    } finally {
+      ctx.mockRestore();
+      revocar.mockRestore();
+    }
+  });
+
   it("descarte en vuelo: cerrar durante toBlob no commitea", async () => {
     const ctx = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")
@@ -454,6 +476,39 @@ describe("abrirRecorte", () => {
       expect(c.textoOcr).toBe("VIEJO");
       expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
       expect(bmp.close).toHaveBeenCalled();
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("sesión cruzada: reabrir durante toBlob no commitea ni cierra lo nuevo", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { promise, resolve } = Promise.withResolvers<Blob | null>();
+      const { deps } = depsRecorte();
+      deps.crear = vi.fn(() => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({ drawImage: vi.fn() }),
+        toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
+      }));
+      const c = sembrar();
+      const antes = c.file;
+      await abrirRecorte(c.id, deps as never);
+      btnOk.click();
+      await vaciar(); // confirmar quedó esperando el toBlob
+      modal.close(); // descartar...
+      await abrirRecorte(c.id, deps as never); // ...y reabrir el mismo comprobante
+      expect(modal.open).toBe(true);
+      resolve(new Blob(["recorte"]));
+      await vaciar();
+      // La confirmación vieja murió con su sesión: nada commitea, lo nuevo sigue abierto.
+      expect(c.file).toBe(antes);
+      expect(c.textoOcr).toBe("VIEJO");
+      expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
+      expect(modal.open).toBe(true);
     } finally {
       ctx.mockRestore();
     }
