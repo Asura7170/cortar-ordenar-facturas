@@ -7,7 +7,15 @@ import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
-import { detectarTipo, esZen, sesionIA, urlProxy } from "./modelos";
+import {
+  campoRazonamiento,
+  detectarTipo,
+  esZen,
+  sesionIA,
+  sinTemperatura,
+  urlProxy,
+} from "./modelos";
+import type { NivelRazonamiento } from "../types";
 
 export const MAX_TEXTO = 1800;
 export const MAX_CHARS_LOTE = 12000;
@@ -132,18 +140,22 @@ export async function extraerTotalesLote(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const cuerpo =
-      detectarTipo(config.baseUrl) === "responses"
+    const tipo = detectarTipo(config.baseUrl);
+    const nivel: NivelRazonamiento = config.razonamiento ?? "auto";
+    const armar = (nv: NivelRazonamiento): Record<string, unknown> =>
+      tipo === "responses"
         ? {
             model: config.model,
             instructions: SISTEMA,
             input: construirPrompt(items),
-            temperature: 0,
+            ...(sinTemperatura(nv) ? {} : { temperature: 0 }),
+            ...campoRazonamiento(tipo, nv),
             max_output_tokens: 8000,
           }
         : {
             model: config.model,
-            temperature: 0,
+            ...(sinTemperatura(nv) ? {} : { temperature: 0 }),
+            ...campoRazonamiento(tipo, nv),
             max_tokens: 8000,
             messages: [
               { role: "system", content: SISTEMA },
@@ -151,16 +163,26 @@ export async function extraerTotalesLote(
             ],
           };
     const destino = urlProxy(config.baseUrl);
-    const res = await fetchFn(destino, {
+    const headers = {
+      "Content-Type": "application/json",
+      ...(esZen(destino) ? { "x-opencode-session": sesionIA() } : {}),
+      Authorization: `Bearer ${config.apiKey}`,
+    };
+    let res = await fetchFn(destino, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(esZen(destino) ? { "x-opencode-session": sesionIA() } : {}),
-        Authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify(cuerpo),
+      headers,
+      body: JSON.stringify(armar(nivel)),
       signal: ctrl.signal,
     });
+    // ponytail: 400 con nivel explícito → 1 reintento limpio (mismo criterio que el ping).
+    if (!res.ok && res.status === 400 && nivel !== "auto") {
+      res = await fetchFn(destino, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(armar("auto")),
+        signal: ctrl.signal,
+      });
+    }
     if (!res.ok) throw new Error(`LLM ${res.status}`);
     const data: unknown = await res.json().catch((): null => null);
     const content = extraerContenido(data);

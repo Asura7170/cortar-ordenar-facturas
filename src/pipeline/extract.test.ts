@@ -237,6 +237,56 @@ describe("extraerTotalesLote", () => {
     expect(mapa.get(1)).toBeNull();
   });
 
+  it("razonamiento: auto omite, none envía effort, low omite temperature", async () => {
+    const { c1 } = lote2();
+    const cuerpos: string[] = [];
+    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpos.push(String(o?.body ?? ""));
+      return respuesta('{"1":"1.00"}');
+    });
+    const item = { idx: 1, id: c1.id, texto: "TOTAL 1.00" };
+    await extraerTotalesLote(
+      [item],
+      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k" },
+      fetchFn as FetchFn,
+    );
+    expect(cuerpos[0]).not.toContain("reasoning");
+    await extraerTotalesLote(
+      [item],
+      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "none" },
+      fetchFn as FetchFn,
+    );
+    expect(cuerpos[1]).toContain('"reasoning_effort":"none"');
+    expect(cuerpos[1]).toContain('"temperature":0');
+    await extraerTotalesLote(
+      [item],
+      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "low" },
+      fetchFn as FetchFn,
+    );
+    expect(cuerpos[2]).toContain('"reasoning_effort":"low"');
+    expect(cuerpos[2]).not.toContain("temperature");
+  });
+
+  it("razonamiento: 400 reintenta limpio una vez", async () => {
+    const { c1 } = lote2();
+    const cuerpos: string[] = [];
+    let n = 0;
+    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpos.push(String(o?.body ?? ""));
+      n++;
+      if (n === 1) return respuesta("x", false, 400);
+      return respuesta('{"1":"2.00"}');
+    });
+    const mapa = await extraerTotalesLote(
+      [{ idx: 1, id: c1.id, texto: "TOTAL 2.00" }],
+      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "low" },
+      fetchFn as FetchFn,
+    );
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(cuerpos[1]).not.toContain("reasoning");
+    expect(mapa.get(1)).toBe(200);
+  });
+
   it("extraerContenido: chat y responses", () => {
     expect(extraerContenido({ choices: [{ message: { content: "hola" } }] })).toBe("hola");
     expect(extraerContenido({ output: [{ content: [{ text: "a" }, { text: "b" }] }] })).toBe("ab");

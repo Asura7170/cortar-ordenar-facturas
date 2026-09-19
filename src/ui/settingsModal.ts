@@ -14,11 +14,15 @@ import { borrarModelos, descargarPesos, tamanoModelos } from "../pipeline/docali
 import { descargarPesosOcr } from "../pipeline/ocr";
 import {
   detectarTipo,
+  esNivelRazonamiento,
+  etiquetaNivel,
   listarModelos,
+  nivelesPara,
   probarConexion,
   sugeridosZenGo,
   urlProxy,
 } from "../pipeline/modelos";
+import type { NivelRazonamiento } from "../types";
 
 const modalAjustes: HTMLDialogElement = getEl<HTMLDialogElement>("modalAjustes");
 const btnAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnAjustes");
@@ -26,6 +30,7 @@ const formAjustes: HTMLFormElement = getEl<HTMLFormElement>("formAjustes");
 const cfgBaseUrl: HTMLInputElement = getEl<HTMLInputElement>("cfgBaseUrl");
 const cfgModel: HTMLSelectElement = getEl<HTMLSelectElement>("cfgModel");
 const cfgModelManual: HTMLInputElement = getEl<HTMLInputElement>("cfgModelManual");
+const cfgRazonamiento: HTMLSelectElement = getEl<HTMLSelectElement>("cfgRazonamiento");
 const btnRefrescarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnRefrescarModelos");
 const estadoModelosIA: HTMLElement = getEl("estadoModelosIA");
 const btnProbarIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnProbarIA");
@@ -86,6 +91,35 @@ function modeloElegido(): string {
   return cfgModel.value === MANUAL ? cfgModelManual.value : cfgModel.value;
 }
 
+/** Niveles según el modelo (3 o 6+No); conserva el actual si sigue válido. */
+function pintarRazonamiento(modelo: string, actual: string): void {
+  const niveles = nivelesPara(modelo);
+  cfgRazonamiento.innerHTML = "";
+  for (const n of niveles) {
+    const o = document.createElement("option");
+    o.value = n;
+    o.textContent = etiquetaNivel(n);
+    cfgRazonamiento.append(o);
+  }
+  cfgRazonamiento.value =
+    actual.trim() !== "" && (niveles as string[]).includes(actual) ? actual : "auto";
+}
+
+function razonamientoElegido(): NivelRazonamiento {
+  const v: unknown = cfgRazonamiento.value;
+  return esNivelRazonamiento(v) ? v : "auto";
+}
+
+/** Repinta niveles tras cambiar de modelo sin perder el elegido si vale. */
+function refrescarRazonamiento(): void {
+  pintarRazonamiento(
+    modeloElegido() || state.configIA.model,
+    esNivelRazonamiento(cfgRazonamiento.value)
+      ? cfgRazonamiento.value
+      : (state.configIA.razonamiento ?? "auto"),
+  );
+}
+
 /** POST mínimo: verifica endpoint+key+modelo sin gastar. Nunca lanza. */
 async function probarConexionUI(): Promise<void> {
   const base = cfgBaseUrl.value || CONFIG_IA_DEFAULT.baseUrl;
@@ -98,7 +132,13 @@ async function probarConexionUI(): Promise<void> {
   btnProbarIA.disabled = true;
   estadoPruebaIA.textContent = `Probando (${detectarTipo(base)})…`;
   cfgApiKey.removeAttribute("aria-invalid");
-  const r = await probarConexion(base, key, modeloElegido() || CONFIG_IA_DEFAULT.model);
+  const r = await probarConexion(
+    base,
+    key,
+    modeloElegido() || CONFIG_IA_DEFAULT.model,
+    fetch,
+    razonamientoElegido(),
+  );
   if (r.ok) {
     const via = urlProxy(base) !== base ? ", proxy dev" : "";
     estadoPruebaIA.textContent = `✓ OK (${r.tipo}${via}, ${r.ms}ms).`;
@@ -135,6 +175,7 @@ async function cargarModelos(forzado: boolean): Promise<void> {
     const lista = await listarModelos(base, key);
     ultimaLista = lista;
     pintarOpciones([...sugeridos, ...lista], actual);
+    refrescarRazonamiento();
     const total = new Set([...sugeridos, ...lista]).size;
     estadoModelosIA.textContent =
       total > 0
@@ -142,6 +183,7 @@ async function cargarModelos(forzado: boolean): Promise<void> {
         : `Modelos (${tipo}): sin lista (revisá URL, clave, CORS).`;
   } catch (e: unknown) {
     pintarOpciones([...sugeridos, ...ultimaLista], actual);
+    refrescarRazonamiento();
     const causa = e instanceof Error ? e.message : "error";
     estadoModelosIA.textContent = causa.includes("CORS")
       ? `Modelos (${tipo}): el servidor no lista desde navegador; elegí sugerido o pegá el ID manual. (${causa})`
@@ -157,6 +199,7 @@ function pintarAjustes(): void {
   cfgMoneda.value = state.moneda;
   cfgModelManual.value = "";
   pintarOpciones([...sugeridosZenGo(state.configIA.baseUrl), ...ultimaLista], state.configIA.model);
+  pintarRazonamiento(state.configIA.model, state.configIA.razonamiento ?? "auto");
   estadoPruebaIA.textContent = "Sin probar.";
   cfgApiKey.removeAttribute("aria-invalid");
   btnProbarIA.disabled = state.configIA.apiKey.trim() === "";
@@ -172,9 +215,14 @@ export function initSettings(): void {
   cfgModel.addEventListener("change", () => {
     cfgModelManual.hidden = cfgModel.value !== MANUAL;
     if (cfgModel.value === MANUAL) cfgModelManual.focus();
+    refrescarRazonamiento();
     invalidarPrueba();
   });
-  cfgModelManual.addEventListener("input", invalidarPrueba);
+  cfgModelManual.addEventListener("input", () => {
+    refrescarRazonamiento();
+    invalidarPrueba();
+  });
+  cfgRazonamiento.addEventListener("change", invalidarPrueba);
   cfgBaseUrl.addEventListener("input", invalidarPrueba);
   cfgApiKey.addEventListener("input", () => {
     btnRefrescarModelos.disabled = cfgApiKey.value.trim() === "";
@@ -229,6 +277,7 @@ export function initSettings(): void {
     state.configIA.baseUrl = cfgBaseUrl.value || CONFIG_IA_DEFAULT.baseUrl;
     state.configIA.model = modeloElegido() || CONFIG_IA_DEFAULT.model;
     state.configIA.apiKey = cfgApiKey.value;
+    state.configIA.razonamiento = razonamientoElegido();
     state.moneda = isMoneda(cfgMoneda.value) ? cfgMoneda.value : MONEDA_DEFAULT;
     guardarAjustes();
     renderMonto();

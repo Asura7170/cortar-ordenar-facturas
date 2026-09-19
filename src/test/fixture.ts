@@ -40,6 +40,7 @@ export const FIXTURE_HTML = `
 <form id="formAjustes" method="dialog">
   <input id="cfgBaseUrl">
   <select id="cfgModel"></select>
+  <select id="cfgRazonamiento"></select>
   <input id="cfgModelManual">
   <button id="btnRefrescarModelos" type="button"></button>
   <output id="estadoModelosIA"></output>

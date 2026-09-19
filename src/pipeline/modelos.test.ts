@@ -2,11 +2,16 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   detectarTipo,
+  esNivelRazonamiento,
   esZen,
+  etiquetaNivel,
   extraerIdsModelos,
+  campoRazonamiento,
   listarModelos,
+  nivelesPara,
   probarConexion,
   sesionIA,
+  sinTemperatura,
   sugeridosZenGo,
   urlListaModelos,
   urlProxy,
@@ -203,5 +208,75 @@ describe("probarConexion", () => {
       ok: false,
       mensaje: expect.stringContaining("falta sesion") as unknown,
     });
+  });
+});
+
+describe("razonamiento", () => {
+  it("reducido (kimi) 3+No, completo 5+No con No segundo", () => {
+    expect(nivelesPara("kimi-k3")).toEqual(["auto", "none", "low", "high", "max"]);
+    expect(nivelesPara("deepseek-v4-pro")).toEqual(["auto", "none", "low", "high", "max"]);
+    expect(nivelesPara("muse-spark-1.3-contributor")).toEqual([
+      "auto",
+      "none",
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "max",
+    ]);
+    expect(nivelesPara("mimo-v2.5")[1]).toBe("none");
+    expect(etiquetaNivel("none")).toBe("No razonar");
+    expect(esNivelRazonamiento("low")).toBe(true);
+    expect(esNivelRazonamiento("xxx")).toBe(false);
+  });
+
+  it("chat none envía effort con temperature; low omite temperature", async () => {
+    const cuerpos: string[] = [];
+    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpos.push(String(o?.body ?? ""));
+      return { ok: true, status: 200 } as Response;
+    });
+    await probarConexion("https://x.test/v1/chat/completions", "k", "m", fetchFn, "none");
+    expect(cuerpos[0]).toContain('"reasoning_effort":"none"');
+    expect(cuerpos[0]).toContain('"temperature":0');
+    await probarConexion("https://x.test/v1/chat/completions", "k", "m", fetchFn, "low");
+    expect(cuerpos[1]).toContain('"reasoning_effort":"low"');
+    expect(cuerpos[1]).not.toContain("temperature");
+  });
+
+  it("responses usa objeto reasoning; auto lo omite", async () => {
+    const cuerpos: string[] = [];
+    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpos.push(String(o?.body ?? ""));
+      return { ok: true, status: 200 } as Response;
+    });
+    await probarConexion("https://x.test/v1/responses", "k", "m", fetchFn, "low");
+    expect(cuerpos[0]).toContain('"reasoning":{"effort":"low"}');
+    await probarConexion("https://x.test/v1/responses", "k", "m", fetchFn);
+    expect(cuerpos[1]).not.toContain("reasoning");
+    expect(campoRazonamiento("chat", "auto")).toEqual({});
+    expect(sinTemperatura("none")).toBe(false);
+    expect(sinTemperatura("low")).toBe(true);
+  });
+
+  it("400 con nivel reintenta limpio una vez", async () => {
+    const cuerpos: string[] = [];
+    let n = 0;
+    const fetchFn = vi.fn(async (): Promise<Response> => {
+      n++;
+      return (
+        n === 1
+          ? { ok: false, status: 400, json: async (): Promise<unknown> => ({}) }
+          : { ok: true, status: 200 }
+      ) as Response;
+    });
+    const fetchSpy = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpos.push(String(o?.body ?? ""));
+      return fetchFn();
+    });
+    const r = await probarConexion("https://x.test/v1/chat/completions", "k", "m", fetchSpy, "low");
+    expect(r).toMatchObject({ ok: true });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(cuerpos[1]).not.toContain("reasoning");
   });
 });

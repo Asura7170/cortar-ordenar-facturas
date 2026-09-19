@@ -1,5 +1,6 @@
 /* Modelos LLM: normaliza base chat/responses y lista /models (convención OpenAI). */
 import type { FetchFn } from "./extract";
+import type { NivelRazonamiento } from "../types";
 
 export type TipoEndpoint = "chat" | "responses";
 
@@ -114,6 +115,52 @@ function mensajeProveedor(json: unknown): string {
   const m = typeof err === "object" && err !== null ? (err as { message?: unknown }).message : err;
   return typeof m === "string" ? m.trim().slice(0, 160) : "";
 }
+/** Niveles por modelo: kimi/deepseek/gpt-oss reducidos (3+No), resto completos (5+No).
+    Auto primero (omitir), No segundo (rápido). El GET /models no trae niveles. */
+export function nivelesPara(model: string): NivelRazonamiento[] {
+  const m = model.toLowerCase();
+  if (/kimi|deepseek|gpt-oss|gpt_oss/.test(m)) return ["auto", "none", "low", "high", "max"];
+  return ["auto", "none", "minimal", "low", "medium", "high", "max"];
+}
+
+/** Etiqueta ES del nivel para el select. */
+export function etiquetaNivel(n: NivelRazonamiento): string {
+  if (n === "auto") return "Auto";
+  if (n === "none") return "No razonar";
+  if (n === "minimal") return "Mínimo";
+  if (n === "low") return "Bajo";
+  if (n === "medium") return "Medio";
+  if (n === "high") return "Alto";
+  return "Máximo";
+}
+
+/** Guard para blobs legacy / valor del select. */
+export function esNivelRazonamiento(v: unknown): v is NivelRazonamiento {
+  return (
+    v === "auto" ||
+    v === "none" ||
+    v === "minimal" ||
+    v === "low" ||
+    v === "medium" ||
+    v === "high" ||
+    v === "max"
+  );
+}
+
+/** Fragmento wire: chat plano vs responses objeto; auto = {}. */
+export function campoRazonamiento(
+  tipo: TipoEndpoint,
+  nivel: NivelRazonamiento,
+): Record<string, unknown> {
+  if (nivel === "auto") return {};
+  if (tipo === "responses") return { reasoning: { effort: nivel } };
+  return { reasoning_effort: nivel };
+}
+
+/** Con esfuerzo explícito se omite temperature (muchos reasoning solo aceptan el default). */
+export function sinTemperatura(nivel: NivelRazonamiento): boolean {
+  return nivel !== "auto" && nivel !== "none";
+}
 /** Sugerencias sin red solo para zen (el resto sigue con /models en vivo). */
 export function sugeridosZenGo(baseUrl: string): string[] {
   return baseUrl.includes("opencode.ai/zen") ? [...MODELOS_ZEN_GO] : [];
@@ -182,14 +229,22 @@ export async function probarConexion(
   apiKey: string,
   model: string,
   fetchFn: FetchFn = fetch,
+  nivel: NivelRazonamiento = "auto",
 ): Promise<PruebaConexion> {
   const tipo = detectarTipo(baseUrl);
-  const cuerpo =
+  const armar = (nv: NivelRazonamiento): Record<string, unknown> =>
     tipo === "responses"
-      ? { model, input: "ping", temperature: 0, max_output_tokens: 16 }
+      ? {
+          model,
+          input: "ping",
+          ...(sinTemperatura(nv) ? {} : { temperature: 0 }),
+          ...campoRazonamiento(tipo, nv),
+          max_output_tokens: 16,
+        }
       : {
           model,
-          temperature: 0,
+          ...(sinTemperatura(nv) ? {} : { temperature: 0 }),
+          ...campoRazonamiento(tipo, nv),
           max_tokens: 1,
           messages: [{ role: "user", content: "ping" }],
         };
@@ -198,16 +253,26 @@ export async function probarConexion(
   const ini = performance.now();
   try {
     const destino = urlProxy(baseUrl);
-    const res = await fetchFn(destino, {
+    const headers = {
+      "Content-Type": "application/json",
+      ...(esZen(destino) ? { "x-opencode-session": sesionIA() } : {}),
+      Authorization: `Bearer ${apiKey}`,
+    };
+    let res = await fetchFn(destino, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(esZen(destino) ? { "x-opencode-session": sesionIA() } : {}),
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(cuerpo),
+      headers,
+      body: JSON.stringify(armar(nivel)),
       signal: ctrl.signal,
     });
+    // ponytail: 400 con nivel explícito → 1 reintento limpio (proveedor sin ese effort).
+    if (!res.ok && res.status === 400 && nivel !== "auto") {
+      res = await fetchFn(destino, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(armar("auto")),
+        signal: ctrl.signal,
+      });
+    }
     if (!res.ok) {
       let prov = "";
       try {

@@ -13,6 +13,7 @@ const formAjustes = el<HTMLFormElement>("formAjustes");
 const cfgBaseUrl = el<HTMLInputElement>("cfgBaseUrl");
 const cfgModel = el<HTMLSelectElement>("cfgModel");
 const cfgModelManual = el<HTMLInputElement>("cfgModelManual");
+const cfgRazonamiento = el<HTMLSelectElement>("cfgRazonamiento");
 const btnRefrescarModelos = el<HTMLButtonElement>("btnRefrescarModelos");
 const estadoModelosIA = el("estadoModelosIA");
 const cfgApiKey = el<HTMLInputElement>("cfgApiKey");
@@ -68,6 +69,7 @@ describe("submit", () => {
       baseUrl: "http://nuevo",
       model: "modelo-x",
       apiKey: "secreto",
+      razonamiento: "auto",
     });
     expect(state.moneda).toBe("ARS");
     expect(document.getElementById("montoTotal")?.textContent).toBe("AR$ 1.00");
@@ -327,6 +329,30 @@ describe("selector modelos LLM", () => {
     btnAjustes.click();
     const valores = [...cfgModel.options].map((o) => o.value);
     expect(valores).toContain("muse-spark-1.3-contributor");
+    modalAjustes.close();
+  });
+
+  it("razonamiento: kimi reducido, genérico completo, No segundo y persiste", () => {
+    state.configIA = {
+      baseUrl: "https://opencode.ai/zen/go/v1/chat/completions",
+      model: "kimi-k3",
+      apiKey: "k",
+    };
+    btnAjustes.click();
+    expect([...cfgRazonamiento.options].map((o) => o.value)).toEqual([
+      "auto",
+      "none",
+      "low",
+      "high",
+      "max",
+    ]);
+    expect(cfgRazonamiento.options[1]?.text).toBe("No razonar");
+    opcion("muse-spark-1.3-contributor");
+    cfgModel.dispatchEvent(new Event("change", { bubbles: true }));
+    expect([...cfgRazonamiento.options].map((o) => o.value)).toContain("medium");
+    cfgRazonamiento.value = "none";
+    formAjustes.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    expect(state.configIA.razonamiento).toBe("none");
     modalAjustes.close();
   });
 });
