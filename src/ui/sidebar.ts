@@ -16,7 +16,7 @@ import { esDragDeArchivos, renderHojas } from "./sheets";
 import { precalentarModelos, procesarCola } from "../pipeline/queue";
 import { extraerPendientes } from "../pipeline/extract";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
-import type { MotivoRechazo, PaginaPdf } from "../pipeline/pdf";
+import type { MotivoRechazo } from "../pipeline/pdf";
 import { normalizarImagen } from "../pipeline/imagen";
 import { getEl, sanear } from "../utils";
 
@@ -81,26 +81,44 @@ export async function agregarArchivos(
   hojaPedida = null;
   const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
   const esImagen = (f: File): boolean => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type);
-  const pdfs: File[] = lista.filter((f) => !esImagen(f) && esPdf(f));
   const avisos: AvisoRechazo[] = lista
     .filter((f) => !esImagen(f) && !esPdf(f))
     .map((f) => ({ archivo: sanear(f.name), motivo: "formato no soportado" }));
-  // Gate por archivo (independiente): tamaño sync + páginas async, en orden.
-  // Solo lo admitido se vuelve comprobante (sin blob URL para rechazados).
-  const veredictos = await Promise.all(pdfs.map((f) => admitirPdf(f, contarPaginasPdf)));
-  const pdfOk = new Set<File>();
-  pdfs.forEach((f, i) => {
-    const v = veredictos[i];
-    if (v?.admite === true) pdfOk.add(f);
-    else avisos.push({ archivo: sanear(f.name), motivo: textoMotivo(v?.motivo ?? "ilegible") });
-  });
-  // Fan-out PDF: cada página no-blanca = un comprobante "base p.i/N" (mismo
-  // blob para img+thumb; un render por página). Blancas en silencio; si no
-  // queda ninguna útil, aviso "no se pudo leer".
-  const expansiones: PaginaPdf[][] = await Promise.all(
-    pdfs.map((f) => (pdfOk.has(f) ? expandirPdf(f) : Promise.resolve([]))),
-  );
-  const nuevas: Comprobante[] = [];
+  // Commit incremental: cada archivo se pinta antes del siguiente. Los gaps
+  // async del decode/encode le dan al navegador ventanas de paint con DOM ya
+  // comprometido (antes solo había un render al final del lote: freeze).
+  let hoja = destino != null ? hojaPorId(destino) : undefined;
+  // Perezosa: el intake vacío o todo-rechazado no crea hojas (el test
+  // "null o vacío" lo exige; antes el return temprano lo garantizaba).
+  const asegurarHoja = (): NonNullable<typeof hoja> => {
+    if (!hoja) {
+      hoja =
+        state.hojas.find((h) => cuentaHoja(h) < layoutDe(h.layout).total) ??
+        state.hojas[state.hojas.length - 1] ??
+        crearHoja();
+      if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
+    }
+    return hoja;
+  };
+  const llenar = (slots: (Comprobante | null)[], resto: Comprobante[]): void => {
+    for (let j = 0; j < slots.length && resto.length; j++) {
+      if (!slots[j]) slots[j] = resto.shift() ?? null;
+    }
+  };
+  let colocados = 0;
+  const colocar = (items: Comprobante[]): void => {
+    if (items.length === 0) return;
+    let actual = asegurarHoja();
+    llenar(actual.slots, items);
+    while (items.length) {
+      actual = crearHoja(actual.layout);
+      hoja = actual;
+      state.hojas.push(actual);
+      llenar(actual.slots, items);
+    }
+    colocados += 1;
+    renderHojas();
+  };
   for (const f of lista) {
     if (esImagen(f)) {
       // Intake normalizado: JPEG único, EXIF derecha, tope 2000px.
@@ -108,69 +126,64 @@ export async function agregarArchivos(
       // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
       try {
         const blob = await normalizarImagen(f);
-        nuevas.push({
+        colocar([
+          {
+            id: nextComprobanteId(),
+            nombre: sanear(f.name),
+            file: blob,
+            imgUrl: URL.createObjectURL(blob),
+            thumbUrl: null,
+            textoOcr: "",
+            montoCents: null,
+            montoManual: false,
+            moneda: "USD",
+            estado: "pendiente",
+            posicion: 0,
+          },
+        ]);
+      } catch {
+        avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+      }
+      continue;
+    }
+    if (!esPdf(f)) continue;
+    // Gate + fan-out por archivo (secuencial): cada página no-blanca = un
+    // comprobante "base p.i/N". Blancas en silencio; sin útiles → aviso.
+    const veredicto = await admitirPdf(f, contarPaginasPdf);
+    if (veredicto?.admite !== true) {
+      avisos.push({
+        archivo: sanear(f.name),
+        motivo: textoMotivo(veredicto?.motivo ?? "ilegible"),
+      });
+      continue;
+    }
+    const pags = await expandirPdf(f);
+    if (pags.length === 0) {
+      avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+      continue;
+    }
+    const base = sanear(f.name).replace(/\.pdf$/i, "");
+    colocar(
+      pags.map((p) => {
+        const url = URL.createObjectURL(p.blob);
+        return {
           id: nextComprobanteId(),
-          nombre: sanear(f.name),
-          file: blob,
-          imgUrl: URL.createObjectURL(blob),
-          thumbUrl: null,
+          nombre: `${base} p.${p.indice}/${p.total}`,
+          imgUrl: url,
+          thumbUrl: url,
           textoOcr: "",
           montoCents: null,
           montoManual: false,
           moneda: "USD",
           estado: "pendiente",
           posicion: 0,
-        });
-      } catch {
-        avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
-      }
-      continue;
-    }
-    if (!pdfOk.has(f)) continue;
-    const pags = expansiones[pdfs.indexOf(f)] ?? [];
-    if (pags.length === 0) {
-      avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
-      continue;
-    }
-    const base = sanear(f.name).replace(/\.pdf$/i, "");
-    for (const p of pags) {
-      const url = URL.createObjectURL(p.blob);
-      nuevas.push({
-        id: nextComprobanteId(),
-        nombre: `${base} p.${p.indice}/${p.total}`,
-        imgUrl: url,
-        thumbUrl: url,
-        textoOcr: "",
-        montoCents: null,
-        montoManual: false,
-        moneda: "USD",
-        estado: "pendiente",
-        posicion: 0,
-      });
-    }
+        } satisfies Comprobante;
+      }),
+    );
   }
   avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
-  if (nuevas.length === 0) return;
+  if (colocados === 0) return;
 
-  let hoja = destino != null ? hojaPorId(destino) : undefined;
-  if (!hoja) {
-    hoja =
-      state.hojas.find((h) => cuentaHoja(h) < layoutDe(h.layout).total) ??
-      state.hojas[state.hojas.length - 1] ??
-      crearHoja();
-    if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
-  }
-  const llenar = (slots: (Comprobante | null)[], resto: Comprobante[]): void => {
-    for (let j = 0; j < slots.length && resto.length; j++) {
-      if (!slots[j]) slots[j] = resto.shift() ?? null;
-    }
-  };
-  llenar(hoja.slots, nuevas);
-  while (nuevas.length) {
-    hoja = crearHoja(hoja.layout);
-    state.hojas.push(hoja);
-    llenar(hoja.slots, nuevas);
-  }
   renderHojas();
   void procesarCola();
   // Fase 1: sin miniaturas tempranas — la cola genera la única (final, sobre
