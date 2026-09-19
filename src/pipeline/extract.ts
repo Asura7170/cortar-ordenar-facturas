@@ -139,12 +139,12 @@ export async function extraerTotalesLote(
             instructions: SISTEMA,
             input: construirPrompt(items),
             temperature: 0,
-            max_output_tokens: 1000,
+            max_output_tokens: 8000,
           }
         : {
             model: config.model,
             temperature: 0,
-            max_tokens: 1000,
+            max_tokens: 8000,
             messages: [
               { role: "system", content: SISTEMA },
               { role: "user", content: construirPrompt(items) },
@@ -260,6 +260,7 @@ export async function extraerPendientes(opciones?: {
   const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
   extrayendo = true;
   refrescarBoton();
+  avisar("IA: extrayendo totales…");
   try {
     let ok = 0;
     // ponytail: secuencial, no paralelo (una key, un rate-limit).
@@ -272,13 +273,15 @@ export async function extraerPendientes(opciones?: {
       }
     }
     if (ok > 0) renderHojas(); // badges + #montoTotal con suma local exacta
-    // Éxito total con aviso previo: se conserva (ej. rechazos del gate PDF).
+    // Éxito total con aviso previo: se restaura (el interino lo pisó).
     if (ok < items.length || avisoPrevio.trim() === "") {
       avisar(
         ok === items.length
           ? `IA: ${ok}/${items.length} totales.`
           : `IA: ${ok}/${items.length} totales, resto manual. Revisá Ajustes (URL, clave, CORS).`,
       );
+    } else {
+      avisar(avisoPrevio);
     }
   } finally {
     extrayendo = false;

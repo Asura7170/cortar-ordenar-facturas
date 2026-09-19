@@ -100,6 +100,7 @@ describe("extraerTotalesLote", () => {
       fetchFn as FetchFn,
     );
     expect(cuerpo).toContain("[#1]");
+    expect(cuerpo).toContain('"max_tokens":8000');
     expect(cuerpo).not.toContain("factura (2).png");
   });
 
@@ -185,7 +186,7 @@ describe("extraerTotalesLote", () => {
       fetchFn as FetchFn,
     );
     expect(cuerpo).toContain('"input"');
-    expect(cuerpo).toContain("max_output_tokens");
+    expect(cuerpo).toContain('"max_output_tokens":8000');
     expect(cuerpo).not.toContain("messages");
     expect(mapa.get(1)).toBe(999);
   });
@@ -213,6 +214,27 @@ describe("extraerTotalesLote", () => {
     );
     expect(url).toBe("/zen-go/v1/responses");
     expect(sesion.trim()).not.toBe("");
+  });
+
+  it("razonamiento que agota el presupuesto (length+null) → manual", async () => {
+    const { c1 } = lote2();
+    const fetchFn = vi.fn(
+      async (): Promise<Response> =>
+        ({
+          ok: true,
+          status: 200,
+          json: (): Promise<unknown> =>
+            Promise.resolve({
+              choices: [{ finish_reason: "length", message: { content: null } }],
+            }),
+        }) as Response,
+    );
+    const mapa = await extraerTotalesLote(
+      [{ idx: 1, id: c1.id, texto: "TOTAL 1.00" }],
+      state.configIA,
+      fetchFn,
+    );
+    expect(mapa.get(1)).toBeNull();
   });
 
   it("extraerContenido: chat y responses", () => {
