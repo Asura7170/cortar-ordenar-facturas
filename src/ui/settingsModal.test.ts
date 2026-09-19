@@ -16,6 +16,8 @@ const cfgModelManual = el<HTMLInputElement>("cfgModelManual");
 const btnRefrescarModelos = el<HTMLButtonElement>("btnRefrescarModelos");
 const estadoModelosIA = el("estadoModelosIA");
 const cfgApiKey = el<HTMLInputElement>("cfgApiKey");
+const btnProbarIA = el<HTMLButtonElement>("btnProbarIA");
+const estadoPruebaIA = el("estadoPruebaIA");
 const cfgMoneda = el<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes = el<HTMLButtonElement>("btnResetAjustes");
 const estadoModelos = el("estadoModelos");
@@ -282,6 +284,95 @@ describe("selector modelos LLM", () => {
     cfgModelManual.value = "custom-x";
     formAjustes.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     expect(state.configIA.model).toBe("custom-x");
+    modalAjustes.close();
+  });
+
+  it("CORS conserva lista previa y avisa", async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      ({
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> => Promise.resolve({ data: [{ id: "bueno-1" }] }),
+      }) as unknown as Response) as typeof fetch;
+    try {
+      state.configIA = {
+        baseUrl: "https://x.test/v1/chat/completions",
+        model: "viejo",
+        apiKey: "k",
+      };
+      btnAjustes.click();
+      btnRefrescarModelos.click();
+      await pausa();
+      globalThis.fetch = (async (): Promise<Response> => {
+        throw new TypeError("Failed to fetch");
+      }) as typeof fetch;
+      btnRefrescarModelos.click();
+      await pausa();
+      const valores = [...cfgModel.options].map((o) => o.value);
+      expect(valores).toContain("bueno-1");
+      expect(estadoModelosIA.textContent).toContain("CORS");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("zen muestra sugeridos sin red", () => {
+    state.configIA = {
+      baseUrl: "https://opencode.ai/zen/go/v1/chat/completions",
+      model: "",
+      apiKey: "k",
+    };
+    btnAjustes.click();
+    const valores = [...cfgModel.options].map((o) => o.value);
+    expect(valores).toContain("muse-spark-1.3-contributor");
+    modalAjustes.close();
+  });
+});
+
+describe("probar conexión", () => {
+  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+
+  it("sin key deshabilita y queda sin probar", () => {
+    state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "" };
+    btnAjustes.click();
+    expect(btnProbarIA.disabled).toBe(true);
+    expect(estadoPruebaIA.textContent).toBe("Sin probar.");
+    modalAjustes.close();
+  });
+
+  it("ok pinta ✓ y marca válido; error pinta ✗ e invalida", async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      ({ ok: true, status: 200 }) as Response) as typeof fetch;
+    try {
+      state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "k" };
+      btnAjustes.click();
+      btnProbarIA.click();
+      await pausa();
+      expect(estadoPruebaIA.textContent).toContain("✓ OK");
+      expect(cfgApiKey.getAttribute("aria-invalid")).toBe("false");
+      globalThis.fetch = (async (): Promise<Response> => {
+        throw new TypeError("Failed to fetch");
+      }) as typeof fetch;
+      btnProbarIA.click();
+      await pausa();
+      expect(estadoPruebaIA.textContent).toContain("✗");
+      expect(estadoPruebaIA.textContent).toContain("CORS");
+      expect(cfgApiKey.getAttribute("aria-invalid")).toBe("true");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("cambiar la key invalida la prueba", () => {
+    state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "k" };
+    btnAjustes.click();
+    cfgApiKey.value = "otra";
+    cfgApiKey.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(estadoPruebaIA.textContent).toBe("Sin probar.");
     modalAjustes.close();
   });
 });

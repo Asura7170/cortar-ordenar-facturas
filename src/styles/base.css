@@ -483,7 +483,8 @@ input::placeholder {
   padding: 0;
 }
 #estadoModelos,
-#estadoModelosIA {
+#estadoModelosIA,
+#estadoPruebaIA {
   display: block;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -494,6 +495,12 @@ input::placeholder {
 .fila-modelos {
   display: flex;
   gap: 10px;
+}
+#cfgApiKey[aria-invalid="true"] {
+  border-color: var(--sello);
+}
+#cfgApiKey[aria-invalid="false"] {
+  border-color: var(--verde-tinta);
 }
 
 /* Confirmación destructiva: reutiliza .modal; solo identidad de peligro. */

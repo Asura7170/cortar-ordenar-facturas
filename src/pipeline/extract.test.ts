@@ -190,6 +190,31 @@ describe("extraerTotalesLote", () => {
     expect(mapa.get(1)).toBe(999);
   });
 
+  it("zen postea vía proxy dev con sesión", async () => {
+    const { c1 } = lote2();
+    let url = "";
+    let sesion = "";
+    const fetchFn = vi.fn(async (u: unknown, o?: RequestInit): Promise<Response> => {
+      url = String(u);
+      sesion = String((o?.headers as Record<string, string>)?.["x-opencode-session"] ?? "");
+      return {
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> =>
+          Promise.resolve({
+            output: [{ content: [{ type: "output_text", text: '{"1":"1.00"}' }] }],
+          }),
+      } as Response;
+    });
+    await extraerTotalesLote(
+      [{ idx: 1, id: c1.id, texto: "TOTAL 1.00" }],
+      { baseUrl: "https://opencode.ai/zen/go/v1/responses", model: "m", apiKey: "k" },
+      fetchFn as FetchFn,
+    );
+    expect(url).toBe("/zen-go/v1/responses");
+    expect(sesion.trim()).not.toBe("");
+  });
+
   it("extraerContenido: chat y responses", () => {
     expect(extraerContenido({ choices: [{ message: { content: "hola" } }] })).toBe("hola");
     expect(extraerContenido({ output: [{ content: [{ text: "a" }, { text: "b" }] }] })).toBe("ab");

@@ -47,12 +47,27 @@ export default defineConfig({
   },
   server: {
     open: true,
+    // ponytail: zen/go no responde OPTIONS (preflight 404): mismo-origen en dev.
+    proxy: {
+      "/zen-go": {
+        target: "https://opencode.ai",
+        changeOrigin: true,
+        rewrite: (path: string): string => path.replace(/^\/zen-go/, "/zen/go"),
+      },
+    },
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "require-corp",
     },
   },
   preview: {
+    proxy: {
+      "/zen-go": {
+        target: "https://opencode.ai",
+        changeOrigin: true,
+        rewrite: (path: string): string => path.replace(/^\/zen-go/, "/zen/go"),
+      },
+    },
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "require-corp",

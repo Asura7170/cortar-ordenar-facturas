@@ -44,6 +44,8 @@ export const FIXTURE_HTML = `
   <button id="btnRefrescarModelos" type="button"></button>
   <output id="estadoModelosIA"></output>
   <input id="cfgApiKey" type="password">
+  <button id="btnProbarIA" type="button"></button>
+  <output id="estadoPruebaIA"></output>
   <select id="cfgMoneda">
     <option value="USD">USD</option><option value="ARS">ARS</option>
     <option value="EUR">EUR</option><option value="BOB">BOB</option>

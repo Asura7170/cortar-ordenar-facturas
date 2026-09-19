@@ -315,8 +315,8 @@
               style="margin-top: 5px"
             />
             <output id="estadoModelosIA" aria-live="polite"></output>
-            <label
-              >API Key
+            <label for="cfgApiKey">API Key</label>
+            <div class="fila-modelos">
               <input
                 type="password"
                 id="cfgApiKey"
@@ -324,7 +324,19 @@
                 autocomplete="off"
                 spellcheck="false"
                 placeholder="sk-..."
-            /></label>
+                style="flex: 1; min-width: 0"
+              />
+              <button
+                class="btn btn-ghost"
+                type="button"
+                id="btnProbarIA"
+                title="Probar endpoint y API key"
+                aria-label="Probar endpoint y API key"
+              >
+                Probar
+              </button>
+            </div>
+            <output id="estadoPruebaIA" aria-live="polite"></output>
             <label
               >Moneda
               <select id="cfgMoneda" name="cfgMoneda">

@@ -12,7 +12,13 @@ import { renderHojas } from "./sheets";
 import { getEl } from "../utils";
 import { borrarModelos, descargarPesos, tamanoModelos } from "../pipeline/docaligner";
 import { descargarPesosOcr } from "../pipeline/ocr";
-import { detectarTipo, listarModelos } from "../pipeline/modelos";
+import {
+  detectarTipo,
+  listarModelos,
+  probarConexion,
+  sugeridosZenGo,
+  urlProxy,
+} from "../pipeline/modelos";
 
 const modalAjustes: HTMLDialogElement = getEl<HTMLDialogElement>("modalAjustes");
 const btnAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnAjustes");
@@ -22,6 +28,8 @@ const cfgModel: HTMLSelectElement = getEl<HTMLSelectElement>("cfgModel");
 const cfgModelManual: HTMLInputElement = getEl<HTMLInputElement>("cfgModelManual");
 const btnRefrescarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnRefrescarModelos");
 const estadoModelosIA: HTMLElement = getEl("estadoModelosIA");
+const btnProbarIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnProbarIA");
+const estadoPruebaIA: HTMLElement = getEl("estadoPruebaIA");
 const cfgApiKey: HTMLInputElement = getEl<HTMLInputElement>("cfgApiKey");
 const cfgMoneda: HTMLSelectElement = getEl<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnResetAjustes");
@@ -30,6 +38,9 @@ const btnDescargarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnDesc
 const btnBorrarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarModelos");
 
 const MANUAL = "__manual__";
+
+/** Última lista viva: ante CORS se conserva en vez de vaciar el select. */
+let ultimaLista: string[] = [];
 
 function textoModelos(bytes: number): string {
   return bytes > 0
@@ -75,6 +86,36 @@ function modeloElegido(): string {
   return cfgModel.value === MANUAL ? cfgModelManual.value : cfgModel.value;
 }
 
+/** POST mínimo: verifica endpoint+key+modelo sin gastar. Nunca lanza. */
+async function probarConexionUI(): Promise<void> {
+  const base = cfgBaseUrl.value || CONFIG_IA_DEFAULT.baseUrl;
+  const key = cfgApiKey.value;
+  if (key.trim() === "") {
+    estadoPruebaIA.textContent = "Falta API key.";
+    btnProbarIA.disabled = true;
+    return;
+  }
+  btnProbarIA.disabled = true;
+  estadoPruebaIA.textContent = `Probando (${detectarTipo(base)})…`;
+  cfgApiKey.removeAttribute("aria-invalid");
+  const r = await probarConexion(base, key, modeloElegido() || CONFIG_IA_DEFAULT.model);
+  if (r.ok) {
+    const via = urlProxy(base) !== base ? ", proxy dev" : "";
+    estadoPruebaIA.textContent = `✓ OK (${r.tipo}${via}, ${r.ms}ms).`;
+    cfgApiKey.setAttribute("aria-invalid", "false");
+  } else {
+    estadoPruebaIA.textContent = `✗ ${r.mensaje}`;
+    cfgApiKey.setAttribute("aria-invalid", "true");
+  }
+  btnProbarIA.disabled = cfgApiKey.value.trim() === "";
+}
+
+/** Cambio en endpoint/key/modelo invalida la última prueba. */
+function invalidarPrueba(): void {
+  estadoPruebaIA.textContent = "Sin probar.";
+  cfgApiKey.removeAttribute("aria-invalid");
+}
+
 async function cargarModelos(forzado: boolean): Promise<void> {
   const base = cfgBaseUrl.value || CONFIG_IA_DEFAULT.baseUrl;
   const key = cfgApiKey.value;
@@ -87,19 +128,24 @@ async function cargarModelos(forzado: boolean): Promise<void> {
   btnRefrescarModelos.disabled = false;
   if (!forzado && cfgModel.options.length > 1) return; // ponytail: memoria del select, sin caché extra
   const actual = modeloElegido() || state.configIA.model;
+  const sugeridos = sugeridosZenGo(base);
   btnRefrescarModelos.disabled = true;
   estadoModelosIA.textContent = `Modelos (${tipo}): cargando…`;
   try {
     const lista = await listarModelos(base, key);
-    pintarOpciones(lista, actual);
+    ultimaLista = lista;
+    pintarOpciones([...sugeridos, ...lista], actual);
+    const total = new Set([...sugeridos, ...lista]).size;
     estadoModelosIA.textContent =
-      lista.length > 0
-        ? `Modelos (${tipo}): ${lista.length} disponibles.`
+      total > 0
+        ? `Modelos (${tipo}): ${total} disponibles.`
         : `Modelos (${tipo}): sin lista (revisá URL, clave, CORS).`;
   } catch (e: unknown) {
-    pintarOpciones([], actual);
-    estadoModelosIA.textContent =
-      `Modelos (${tipo}): no se pudo listar (` + (e instanceof Error ? e.message : "error") + ").";
+    pintarOpciones([...sugeridos, ...ultimaLista], actual);
+    const causa = e instanceof Error ? e.message : "error";
+    estadoModelosIA.textContent = causa.includes("CORS")
+      ? `Modelos (${tipo}): el servidor no lista desde navegador; elegí sugerido o pegá el ID manual. (${causa})`
+      : `Modelos (${tipo}): no se pudo listar (${causa}).`;
   } finally {
     btnRefrescarModelos.disabled = key.trim() === "";
   }
@@ -110,7 +156,10 @@ function pintarAjustes(): void {
   cfgApiKey.value = state.configIA.apiKey;
   cfgMoneda.value = state.moneda;
   cfgModelManual.value = "";
-  pintarOpciones([], state.configIA.model);
+  pintarOpciones([...sugeridosZenGo(state.configIA.baseUrl), ...ultimaLista], state.configIA.model);
+  estadoPruebaIA.textContent = "Sin probar.";
+  cfgApiKey.removeAttribute("aria-invalid");
+  btnProbarIA.disabled = state.configIA.apiKey.trim() === "";
   void pintarModelos();
   void cargarModelos(false);
 }
@@ -123,9 +172,17 @@ export function initSettings(): void {
   cfgModel.addEventListener("change", () => {
     cfgModelManual.hidden = cfgModel.value !== MANUAL;
     if (cfgModel.value === MANUAL) cfgModelManual.focus();
+    invalidarPrueba();
   });
+  cfgModelManual.addEventListener("input", invalidarPrueba);
+  cfgBaseUrl.addEventListener("input", invalidarPrueba);
   cfgApiKey.addEventListener("input", () => {
     btnRefrescarModelos.disabled = cfgApiKey.value.trim() === "";
+    btnProbarIA.disabled = cfgApiKey.value.trim() === "";
+    invalidarPrueba();
+  });
+  btnProbarIA.addEventListener("click", () => {
+    void probarConexionUI();
   });
   btnRefrescarModelos.addEventListener("click", () => {
     void cargarModelos(true);

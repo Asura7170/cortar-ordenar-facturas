@@ -7,7 +7,7 @@ import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
-import { detectarTipo } from "./modelos";
+import { detectarTipo, esZen, sesionIA, urlProxy } from "./modelos";
 
 export const MAX_TEXTO = 1800;
 export const MAX_CHARS_LOTE = 12000;
@@ -150,10 +150,12 @@ export async function extraerTotalesLote(
               { role: "user", content: construirPrompt(items) },
             ],
           };
-    const res = await fetchFn(config.baseUrl, {
+    const destino = urlProxy(config.baseUrl);
+    const res = await fetchFn(destino, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(esZen(destino) ? { "x-opencode-session": sesionIA() } : {}),
         Authorization: `Bearer ${config.apiKey}`,
       },
       body: JSON.stringify(cuerpo),
