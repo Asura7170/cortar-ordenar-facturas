@@ -186,7 +186,7 @@ export async function probarConexion(
   const tipo = detectarTipo(baseUrl);
   const cuerpo =
     tipo === "responses"
-      ? { model, input: "ping", temperature: 0, max_output_tokens: 5 }
+      ? { model, input: "ping", temperature: 0, max_output_tokens: 16 }
       : {
           model,
           temperature: 0,

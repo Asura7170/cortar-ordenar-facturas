@@ -165,7 +165,7 @@ describe("probarConexion", () => {
     });
     const r = await probarConexion("https://x.test/v1/responses", "k", "m", okFn);
     expect(r).toMatchObject({ ok: true, tipo: "responses" });
-    expect(cuerpo).toContain("max_output_tokens");
+    expect(cuerpo).toContain('"max_output_tokens":16');
     const malFn = vi.fn(async (): Promise<Response> => ({ ok: false, status: 401 }) as Response);
     expect(await probarConexion("https://x.test/v1", "k", "m", malFn)).toMatchObject({
       ok: false,
