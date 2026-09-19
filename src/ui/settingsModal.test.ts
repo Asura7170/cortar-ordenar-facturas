@@ -11,7 +11,10 @@ const modalAjustes = el<HTMLDialogElement>("modalAjustes");
 const btnAjustes = el<HTMLButtonElement>("btnAjustes");
 const formAjustes = el<HTMLFormElement>("formAjustes");
 const cfgBaseUrl = el<HTMLInputElement>("cfgBaseUrl");
-const cfgModel = el<HTMLInputElement>("cfgModel");
+const cfgModel = el<HTMLSelectElement>("cfgModel");
+const cfgModelManual = el<HTMLInputElement>("cfgModelManual");
+const btnRefrescarModelos = el<HTMLButtonElement>("btnRefrescarModelos");
+const estadoModelosIA = el("estadoModelosIA");
 const cfgApiKey = el<HTMLInputElement>("cfgApiKey");
 const cfgMoneda = el<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes = el<HTMLButtonElement>("btnResetAjustes");
@@ -39,6 +42,14 @@ describe("abrir", () => {
   });
 });
 
+function opcion(v: string): void {
+  const o = document.createElement("option");
+  o.value = v;
+  o.textContent = v;
+  cfgModel.append(o);
+  cfgModel.value = v;
+}
+
 describe("submit", () => {
   it("persiste config+moneda, deja el código intacto y repinta el total", () => {
     const h = crearHoja();
@@ -47,7 +58,7 @@ describe("submit", () => {
     state.codigoValor = "777";
     guardarCodigo();
     cfgBaseUrl.value = "http://nuevo";
-    cfgModel.value = "modelo-x";
+    opcion("modelo-x");
     cfgApiKey.value = "secreto";
     cfgMoneda.value = "ARS";
     enviar();
@@ -231,5 +242,46 @@ describe("Modelos", () => {
       if (realCaches === undefined) delete g["caches"];
       else g["caches"] = realCaches;
     }
+  });
+});
+
+describe("selector modelos LLM", () => {
+  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+
+  it("refresh lista y conserva el actual si falta", async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      ({
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> => Promise.resolve({ data: [{ id: "nuevo-1" }] }),
+      }) as unknown as Response) as typeof fetch;
+    try {
+      state.configIA = {
+        baseUrl: "https://x.test/v1/chat/completions",
+        model: "viejo",
+        apiKey: "k",
+      };
+      btnAjustes.click();
+      btnRefrescarModelos.click();
+      await pausa();
+      const valores = [...cfgModel.options].map((o) => o.value);
+      expect(valores).toContain("nuevo-1");
+      expect(valores).toContain("viejo");
+      expect(estadoModelosIA.textContent).toContain("(chat)");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("manual persiste el escrito", () => {
+    btnAjustes.click();
+    cfgModel.value = "__manual__";
+    cfgModel.dispatchEvent(new Event("change", { bubbles: true }));
+    cfgModelManual.value = "custom-x";
+    formAjustes.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    expect(state.configIA.model).toBe("custom-x");
+    modalAjustes.close();
   });
 });

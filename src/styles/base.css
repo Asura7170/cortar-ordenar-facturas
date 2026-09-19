@@ -482,7 +482,8 @@ input::placeholder {
   color: var(--modal-texto-suave);
   padding: 0;
 }
-#estadoModelos {
+#estadoModelos,
+#estadoModelosIA {
   display: block;
   font-size: 13px;
   font-variant-numeric: tabular-nums;

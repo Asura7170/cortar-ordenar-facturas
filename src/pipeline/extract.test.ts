@@ -12,6 +12,7 @@ const {
   aplicarTotales,
   candidatos,
   construirPrompt,
+  extraerContenido,
   extraerJsonContenido,
   extraerPendientes,
   extraerTotalesLote,
@@ -162,6 +163,37 @@ describe("extraerTotalesLote", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("responses: body con input/instructions y parsea output[]", async () => {
+    const { c1 } = lote2();
+    let cuerpo = "";
+    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpo = String(o?.body ?? "");
+      return {
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> =>
+          Promise.resolve({
+            output: [{ content: [{ type: "output_text", text: '{"1":"9.99"}' }] }],
+          }),
+      } as Response;
+    });
+    const mapa = await extraerTotalesLote(
+      [{ idx: 1, id: c1.id, texto: "TOTAL 9.99" }],
+      { baseUrl: "https://llm.test/v1/responses", model: "m", apiKey: "k" },
+      fetchFn as FetchFn,
+    );
+    expect(cuerpo).toContain('"input"');
+    expect(cuerpo).toContain("max_output_tokens");
+    expect(cuerpo).not.toContain("messages");
+    expect(mapa.get(1)).toBe(999);
+  });
+
+  it("extraerContenido: chat y responses", () => {
+    expect(extraerContenido({ choices: [{ message: { content: "hola" } }] })).toBe("hola");
+    expect(extraerContenido({ output: [{ content: [{ text: "a" }, { text: "b" }] }] })).toBe("ab");
+    expect(extraerContenido({})).toBeNull();
   });
 });
 

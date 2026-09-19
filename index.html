@@ -290,10 +290,31 @@
                 name="cfgBaseUrl"
                 placeholder="https://api.groq.com/openai/v1/chat/completions"
             /></label>
-            <label
-              >Modelo
-              <input type="text" id="cfgModel" name="cfgModel" placeholder="qwen/qwen3.8-27b"
-            /></label>
+            <label for="cfgModel">Modelo</label>
+            <div class="fila-modelos">
+              <select id="cfgModel" name="cfgModel" style="flex: 1; min-width: 0"></select>
+              <button
+                class="btn btn-ghost"
+                type="button"
+                id="btnRefrescarModelos"
+                title="Recargar lista de modelos"
+                aria-label="Recargar lista de modelos"
+              >
+                ↻
+              </button>
+            </div>
+            <input
+              type="text"
+              id="cfgModelManual"
+              name="cfgModelManual"
+              placeholder="otro-modelo…"
+              aria-label="Modelo personalizado"
+              spellcheck="false"
+              autocomplete="off"
+              hidden
+              style="margin-top: 5px"
+            />
+            <output id="estadoModelosIA" aria-live="polite"></output>
             <label
               >API Key
               <input

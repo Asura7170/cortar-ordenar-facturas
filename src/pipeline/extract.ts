@@ -7,6 +7,7 @@ import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
+import { detectarTipo } from "./modelos";
 
 export const MAX_TEXTO = 1800;
 export const MAX_CHARS_LOTE = 12000;
@@ -88,6 +89,38 @@ export function extraerJsonContenido(contenido: string): Record<string, unknown>
   return null;
 }
 
+/** Contenido textual: chat (`choices[0].message.content`) o responses (`output[]`). */
+export function extraerContenido(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const choices = (data as { choices?: unknown }).choices;
+  if (Array.isArray(choices)) {
+    const primero: unknown = choices[0];
+    if (typeof primero === "object" && primero !== null) {
+      const message = (primero as { message?: unknown }).message;
+      if (typeof message === "object" && message !== null) {
+        const content = (message as { content?: unknown }).content;
+        if (typeof content === "string") return content;
+      }
+    }
+  }
+  const output = (data as { output?: unknown }).output;
+  if (Array.isArray(output)) {
+    let texto = "";
+    for (const item of output) {
+      if (typeof item !== "object" || item === null) continue;
+      const content = (item as { content?: unknown }).content;
+      if (!Array.isArray(content)) continue;
+      for (const parte of content) {
+        if (typeof parte !== "object" || parte === null) continue;
+        const t = (parte as { text?: unknown }).text;
+        if (typeof t === "string") texto += t;
+      }
+    }
+    return texto !== "" ? texto : null;
+  }
+  return null;
+}
+
 /** Un chunk → mapa idx→cents (null = manual). Lanza solo si la red/HTTP falla. */
 export async function extraerTotalesLote(
   items: readonly ItemLote[],
@@ -99,34 +132,37 @@ export async function extraerTotalesLote(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
+    const cuerpo =
+      detectarTipo(config.baseUrl) === "responses"
+        ? {
+            model: config.model,
+            instructions: SISTEMA,
+            input: construirPrompt(items),
+            temperature: 0,
+            max_output_tokens: 1000,
+          }
+        : {
+            model: config.model,
+            temperature: 0,
+            max_tokens: 1000,
+            messages: [
+              { role: "system", content: SISTEMA },
+              { role: "user", content: construirPrompt(items) },
+            ],
+          };
     const res = await fetchFn(config.baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.apiKey}`,
       },
-      body: JSON.stringify({
-        model: config.model,
-        temperature: 0,
-        max_tokens: 1000,
-        messages: [
-          { role: "system", content: SISTEMA },
-          { role: "user", content: construirPrompt(items) },
-        ],
-      }),
+      body: JSON.stringify(cuerpo),
       signal: ctrl.signal,
     });
     if (!res.ok) throw new Error(`LLM ${res.status}`);
     const data: unknown = await res.json().catch((): null => null);
-    if (typeof data !== "object" || data === null) return salida;
-    const choices = (data as { choices?: unknown }).choices;
-    if (!Array.isArray(choices)) return salida;
-    const primero: unknown = choices[0];
-    if (typeof primero !== "object" || primero === null) return salida;
-    const message = (primero as { message?: unknown }).message;
-    if (typeof message !== "object" || message === null) return salida;
-    const content = (message as { content?: unknown }).content;
-    if (typeof content !== "string") return salida;
+    const content = extraerContenido(data);
+    if (content === null) return salida;
     const obj = extraerJsonContenido(content);
     if (!obj) return salida;
     for (const it of items) {

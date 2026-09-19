@@ -39,7 +39,10 @@ export const FIXTURE_HTML = `
 <button id="btnAjustes"></button>
 <form id="formAjustes" method="dialog">
   <input id="cfgBaseUrl">
-  <input id="cfgModel">
+  <select id="cfgModel"></select>
+  <input id="cfgModelManual">
+  <button id="btnRefrescarModelos" type="button"></button>
+  <output id="estadoModelosIA"></output>
   <input id="cfgApiKey" type="password">
   <select id="cfgMoneda">
     <option value="USD">USD</option><option value="ARS">ARS</option>
