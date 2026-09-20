@@ -219,7 +219,7 @@ describe("isPosicionCodigo", () => {
 });
 
 describe("restablecerAjustes", () => {
-  it("vuelve a defaults Groq/USD, lo persiste y deja el código intacto", () => {
+  it("vuelve a defaults Groq/BOB, lo persiste y deja el código intacto", () => {
     state.codigoValor = "4242";
     guardarCodigo();
     state.configIA = { baseUrl: "xxx", model: "yyy", apiKey: "zzz" };
@@ -228,9 +228,9 @@ describe("restablecerAjustes", () => {
     expect(state.configIA.baseUrl).toContain("groq");
     expect(state.configIA.model).toBe("qwen/qwen3.8-27b");
     expect(state.configIA.apiKey).toBe("");
-    expect(state.moneda).toBe("USD");
+    expect(state.moneda).toBe("BOB");
     const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "{}") as Record<string, unknown>;
-    expect(raw["moneda"]).toBe("USD");
+    expect(raw["moneda"]).toBe("BOB");
     expect(raw["codigoValor"]).toBe("4242");
   });
 });

@@ -30,7 +30,7 @@ export const CONFIG_IA_DEFAULT: ConfigIA = {
   apiKey: "",
   razonamiento: "auto",
 };
-export const MONEDA_DEFAULT: Moneda = "USD";
+export const MONEDA_DEFAULT: Moneda = "BOB";
 export const POSICION_DEFAULT: PosicionCodigo = "inf-der";
 
 export const state: EstadoApp = {

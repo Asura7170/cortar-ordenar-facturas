@@ -81,7 +81,7 @@ describe("submit", () => {
     expect(raw["codigoValor"]).toBe("777");
   });
 
-  it("vacíos caen a defaults Groq y moneda inválida a USD", () => {
+  it("vacíos caen a defaults Groq y moneda inválida a BOB", () => {
     cfgBaseUrl.value = "";
     cfgModel.value = "";
     cfgApiKey.value = "";
@@ -89,7 +89,7 @@ describe("submit", () => {
     enviar();
     expect(state.configIA.baseUrl).toContain("groq");
     expect(state.configIA.model).toBe("qwen/qwen3.8-27b");
-    expect(state.moneda).toBe("USD");
+    expect(state.moneda).toBe("BOB");
   });
 
   it("pegado con espacios se persiste recortado", () => {
@@ -108,11 +108,11 @@ describe("Predeterminado", () => {
     state.moneda = "EUR";
     btnResetAjustes.click();
     expect(state.configIA.baseUrl).toContain("groq");
-    expect(state.moneda).toBe("USD");
+    expect(state.moneda).toBe("BOB");
     expect(cfgBaseUrl.value).toContain("groq");
     expect(cfgModel.value).toBe("qwen/qwen3.8-27b");
     expect(cfgApiKey.value).toBe("");
-    expect(cfgMoneda.value).toBe("USD");
+    expect(cfgMoneda.value).toBe("BOB");
   });
 });
 
