@@ -372,6 +372,34 @@ describe("selector modelos LLM", () => {
     }
   });
 
+  it("fallo en B no ofrece la lista cacheada de A", async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (u: unknown): Promise<Response> => {
+      if (String(u).includes("a.test"))
+        return {
+          ok: true,
+          status: 200,
+          json: (): Promise<unknown> => Promise.resolve({ data: [{ id: "solo-a" }] }),
+        } as unknown as Response;
+      throw new TypeError("Failed to fetch");
+    }) as typeof fetch;
+    try {
+      state.configIA = { baseUrl: "https://a.test/v1/chat/completions", model: "m", apiKey: "k" };
+      btnAjustes.click();
+      await pausa();
+      modalAjustes.close();
+      state.configIA = { baseUrl: "https://b.test/v1/chat/completions", model: "m", apiKey: "k" };
+      btnAjustes.click();
+      await pausa();
+      const valores = [...cfgModel.options].map((o) => o.value);
+      expect(valores).not.toContain("solo-a");
+      expect(estadoModelosIA.textContent).toContain("no lista desde navegador");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
   it("cargas solapadas: solo escribe la última", async () => {
     const real = globalThis.fetch;
     let resolver!: (v: Response) => void;

@@ -207,7 +207,9 @@ async function cargarModelos(forzado: boolean): Promise<void> {
   } catch (e: unknown) {
     if (gen !== modelosGen) return;
     // ponytail: releer tras el await (igual que en el éxito: pudo cambiar en vuelo)
-    pintarOpciones([...sugeridos, ...cacheModelos.lista], modeloElegido() || state.configIA.model);
+    // ponytail: el caché ajeno no se ofrece — es del endpoint viejo, no de `base`
+    const cache = cacheModelos.endpoint === normalizarEndpoint(base) ? cacheModelos.lista : [];
+    pintarOpciones([...sugeridos, ...cache], modeloElegido() || state.configIA.model);
     refrescarRazonamiento();
     const causa = e instanceof Error ? e.message : "error";
     estadoModelosIA.textContent = causa.includes("CORS")

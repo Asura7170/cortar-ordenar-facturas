@@ -135,10 +135,14 @@ describe("sesion zen", () => {
   it("origen parecido no es zen (ni proxy ni sesión)", () => {
     expect(esZen("https://evil-opencode.ai/zen.evil.com")).toBe(false);
     expect(esZen("https://corp.example/zen/go/v1/responses")).toBe(false);
+    expect(esZen("https://opencode.ai/zen/gopher")).toBe(false);
+    expect(esZen("/zen-good")).toBe(false);
+    expect(esZen("xx opencode.ai/zen yy")).toBe(false);
     expect(urlProxy("https://corp.example/zen/go/v1/responses")).toBe(
       "https://corp.example/zen/go/v1/responses",
     );
     expect(urlProxy("https://opencode.ai/zen/go/v1/responses")).toBe("/zen-go/v1/responses");
+    expect(urlProxy("https://opencode.ai/zen/gopher")).toBe("https://opencode.ai/zen/gopher");
   });
 
   it("listar envía x-opencode-session solo en zen", async () => {

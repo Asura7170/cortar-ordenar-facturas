@@ -83,16 +83,19 @@ export const MODELOS_ZEN_GO: readonly string[] = [
 
 /** Origen zen exacto: el match laxo fugaba Authorization al proxy con otro origen. */
 function esOrigenZen(u: URL): boolean {
-  return u.origin === "https://opencode.ai" && u.pathname.startsWith("/zen/go");
+  return (
+    u.origin === "https://opencode.ai" &&
+    (u.pathname === "/zen/go" || u.pathname.startsWith("/zen/go/"))
+  );
 }
 
 /** True si la URL es zen (directa o vía proxy dev). */
 export function esZen(url: string): boolean {
-  if (url.startsWith("/zen-go")) return true;
+  if (url === "/zen-go" || url.startsWith("/zen-go/")) return true;
   try {
     return esOrigenZen(new URL(url));
   } catch {
-    return url.includes("opencode.ai/zen");
+    return false;
   }
 }
 
