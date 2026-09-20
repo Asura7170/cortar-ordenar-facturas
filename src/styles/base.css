@@ -459,6 +459,15 @@ input::placeholder {
   border-color: var(--modal-borde);
   margin-top: 5px;
 }
+/* Misma identidad en la fila modelo+razonamiento+key (fuera del label): sin
+   width (la fila flex reparte) ni margin extra. */
+.modal-body .fila-modelos input,
+.modal-body .fila-modelos select {
+  background: var(--modal-input-bg);
+  color: var(--modal-texto);
+  border-color: var(--modal-borde);
+  min-width: 0;
+}
 .modal-foot {
   padding: 14px 20px;
   border-top: 1px solid var(--modal-borde);

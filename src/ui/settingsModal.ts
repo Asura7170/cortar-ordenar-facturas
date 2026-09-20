@@ -47,6 +47,9 @@ const MANUAL = "__manual__";
 /** Última lista viva: ante CORS se conserva en vez de vaciar el select. */
 let ultimaLista: string[] = [];
 
+/** Generación de la prueba de conexión: descarta resoluciones rancias. */
+let pruebaGen = 0;
+
 function textoModelos(bytes: number): string {
   return bytes > 0
     ? `Modelos: ~${Math.round(bytes / 1048576)} MB en este navegador`
@@ -132,6 +135,7 @@ async function probarConexionUI(): Promise<void> {
   btnProbarIA.disabled = true;
   estadoPruebaIA.textContent = `Probando (${detectarTipo(base)})…`;
   cfgApiKey.removeAttribute("aria-invalid");
+  const gen = ++pruebaGen; // ponytail: la resolución rancia no pisa edición en vuelo
   const r = await probarConexion(
     base,
     key,
@@ -139,6 +143,7 @@ async function probarConexionUI(): Promise<void> {
     fetch,
     razonamientoElegido(),
   );
+  if (gen !== pruebaGen) return;
   if (r.ok) {
     const via = urlProxy(base) !== base ? ", proxy dev" : "";
     estadoPruebaIA.textContent = `✓ OK (${r.tipo}${via}, ${r.ms}ms).`;
@@ -166,15 +171,15 @@ async function cargarModelos(forzado: boolean): Promise<void> {
     return;
   }
   btnRefrescarModelos.disabled = false;
-  if (!forzado && cfgModel.options.length > 1) return; // ponytail: memoria del select, sin caché extra
-  const actual = modeloElegido() || state.configIA.model;
+  if (!forzado && ultimaLista.length > 0) return; // ponytail: memoria viva, no del select (siempre >1 tras pintar)
   const sugeridos = sugeridosZenGo(base);
   btnRefrescarModelos.disabled = true;
   estadoModelosIA.textContent = `Modelos (${tipo}): cargando…`;
   try {
     const lista = await listarModelos(base, key);
     ultimaLista = lista;
-    pintarOpciones([...sugeridos, ...lista], actual);
+    // ponytail: releer tras el await — el usuario pudo cambiar el modelo en vuelo
+    pintarOpciones([...sugeridos, ...lista], modeloElegido() || state.configIA.model);
     refrescarRazonamiento();
     const total = new Set([...sugeridos, ...lista]).size;
     estadoModelosIA.textContent =
@@ -182,7 +187,8 @@ async function cargarModelos(forzado: boolean): Promise<void> {
         ? `Modelos (${tipo}): ${total} disponibles.`
         : `Modelos (${tipo}): sin lista (revisá URL, clave, CORS).`;
   } catch (e: unknown) {
-    pintarOpciones([...sugeridos, ...ultimaLista], actual);
+    // ponytail: releer tras el await (igual que en el éxito: pudo cambiar en vuelo)
+    pintarOpciones([...sugeridos, ...ultimaLista], modeloElegido() || state.configIA.model);
     refrescarRazonamiento();
     const causa = e instanceof Error ? e.message : "error";
     estadoModelosIA.textContent = causa.includes("CORS")
@@ -274,8 +280,8 @@ export function initSettings(): void {
     );
   });
   formAjustes.addEventListener("submit", () => {
-    state.configIA.baseUrl = cfgBaseUrl.value || CONFIG_IA_DEFAULT.baseUrl;
-    state.configIA.model = modeloElegido() || CONFIG_IA_DEFAULT.model;
+    state.configIA.baseUrl = cfgBaseUrl.value.trim() || CONFIG_IA_DEFAULT.baseUrl;
+    state.configIA.model = modeloElegido().trim() || CONFIG_IA_DEFAULT.model;
     state.configIA.apiKey = cfgApiKey.value;
     state.configIA.razonamiento = razonamientoElegido();
     state.moneda = isMoneda(cfgMoneda.value) ? cfgMoneda.value : MONEDA_DEFAULT;

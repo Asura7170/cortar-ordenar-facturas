@@ -2,6 +2,16 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defineConfig } from "vite-plus";
 
+// ponytail: zen/go no responde OPTIONS (preflight 404): mismo-origen en dev.
+// El bloque de preview es inerte (urlProxy solo reescribe en DEV): se comparte por no duplicar.
+const proxyZenGo = {
+  "/zen-go": {
+    target: "https://opencode.ai",
+    changeOrigin: true,
+    rewrite: (path: string): string => path.replace(/^\/zen-go/, "/zen/go"),
+  },
+};
+
 // COOP/COEP: necesarios para onnxruntime-web WASM con threads (y futuro PaddleOCR).
 // server.open: abre el navegador en `pnpm dev`. build → dist/.
 export default defineConfig({
@@ -47,27 +57,14 @@ export default defineConfig({
   },
   server: {
     open: true,
-    // ponytail: zen/go no responde OPTIONS (preflight 404): mismo-origen en dev.
-    proxy: {
-      "/zen-go": {
-        target: "https://opencode.ai",
-        changeOrigin: true,
-        rewrite: (path: string): string => path.replace(/^\/zen-go/, "/zen/go"),
-      },
-    },
+    proxy: proxyZenGo,
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "require-corp",
     },
   },
   preview: {
-    proxy: {
-      "/zen-go": {
-        target: "https://opencode.ai",
-        changeOrigin: true,
-        rewrite: (path: string): string => path.replace(/^\/zen-go/, "/zen/go"),
-      },
-    },
+    proxy: proxyZenGo,
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",
       "Cross-Origin-Embedder-Policy": "require-corp",
