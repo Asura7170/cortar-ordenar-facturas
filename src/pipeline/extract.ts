@@ -7,6 +7,15 @@ import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
+import {
+  campoRazonamiento,
+  detectarTipo,
+  esZen,
+  sesionIA,
+  sinTemperatura,
+  urlProxy,
+} from "./modelos";
+import type { NivelRazonamiento } from "../types";
 
 export const MAX_TEXTO = 1800;
 export const MAX_CHARS_LOTE = 12000;
@@ -88,6 +97,49 @@ export function extraerJsonContenido(contenido: string): Record<string, unknown>
   return null;
 }
 
+/** Contenido textual: chat (`choices[0].message.content`) o responses (`output[]`). */
+export function extraerContenido(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+  const choices = (data as { choices?: unknown }).choices;
+  if (Array.isArray(choices)) {
+    const primero: unknown = choices[0];
+    if (typeof primero === "object" && primero !== null) {
+      const message = (primero as { message?: unknown }).message;
+      if (typeof message === "object" && message !== null) {
+        const content = (message as { content?: unknown }).content;
+        if (typeof content === "string") return content;
+        // ponytail: algunos proveedores mandan content array (reasoning/vision)
+        if (Array.isArray(content)) {
+          const t = content
+            .map((p): string => {
+              if (typeof p !== "object" || p === null) return "";
+              const texto = (p as { text?: unknown }).text;
+              return typeof texto === "string" ? texto : "";
+            })
+            .join("");
+          if (t !== "") return t;
+        }
+      }
+    }
+  }
+  const output = (data as { output?: unknown }).output;
+  if (Array.isArray(output)) {
+    let texto = "";
+    for (const item of output) {
+      if (typeof item !== "object" || item === null) continue;
+      const content = (item as { content?: unknown }).content;
+      if (!Array.isArray(content)) continue;
+      for (const parte of content) {
+        if (typeof parte !== "object" || parte === null) continue;
+        const t = (parte as { text?: unknown }).text;
+        if (typeof t === "string") texto += t;
+      }
+    }
+    return texto !== "" ? texto : null;
+  }
+  return null;
+}
+
 /** Un chunk → mapa idx→cents (null = manual). Lanza solo si la red/HTTP falla. */
 export async function extraerTotalesLote(
   items: readonly ItemLote[],
@@ -99,34 +151,53 @@ export async function extraerTotalesLote(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetchFn(config.baseUrl, {
+    const tipo = detectarTipo(config.baseUrl);
+    const nivel: NivelRazonamiento = config.razonamiento ?? "auto";
+    const armar = (nv: NivelRazonamiento): Record<string, unknown> =>
+      tipo === "responses"
+        ? {
+            model: config.model,
+            instructions: SISTEMA,
+            input: construirPrompt(items),
+            ...(sinTemperatura(nv) ? {} : { temperature: 0 }),
+            ...campoRazonamiento(tipo, nv),
+            max_output_tokens: 8000,
+          }
+        : {
+            model: config.model,
+            ...(sinTemperatura(nv) ? {} : { temperature: 0 }),
+            ...campoRazonamiento(tipo, nv),
+            max_tokens: 8000,
+            messages: [
+              { role: "system", content: SISTEMA },
+              { role: "user", content: construirPrompt(items) },
+            ],
+          };
+    const destino = urlProxy(config.baseUrl);
+    const headers = {
+      "Content-Type": "application/json",
+      ...(esZen(destino) ? { "x-opencode-session": sesionIA() } : {}),
+      Authorization: `Bearer ${config.apiKey}`,
+    };
+    let res = await fetchFn(destino, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: config.model,
-        temperature: 0,
-        max_tokens: 1000,
-        messages: [
-          { role: "system", content: SISTEMA },
-          { role: "user", content: construirPrompt(items) },
-        ],
-      }),
+      headers,
+      body: JSON.stringify(armar(nivel)),
       signal: ctrl.signal,
     });
+    // ponytail: 400 con nivel explícito → 1 reintento limpio (mismo criterio que el ping).
+    if (!res.ok && res.status === 400 && nivel !== "auto") {
+      res = await fetchFn(destino, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(armar("auto")),
+        signal: ctrl.signal,
+      });
+    }
     if (!res.ok) throw new Error(`LLM ${res.status}`);
     const data: unknown = await res.json().catch((): null => null);
-    if (typeof data !== "object" || data === null) return salida;
-    const choices = (data as { choices?: unknown }).choices;
-    if (!Array.isArray(choices)) return salida;
-    const primero: unknown = choices[0];
-    if (typeof primero !== "object" || primero === null) return salida;
-    const message = (primero as { message?: unknown }).message;
-    if (typeof message !== "object" || message === null) return salida;
-    const content = (message as { content?: unknown }).content;
-    if (typeof content !== "string") return salida;
+    const content = extraerContenido(data);
+    if (content === null) return salida;
     const obj = extraerJsonContenido(content);
     if (!obj) return salida;
     for (const it of items) {
@@ -222,6 +293,7 @@ export async function extraerPendientes(opciones?: {
   const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
   extrayendo = true;
   refrescarBoton();
+  avisar("IA: extrayendo totales…");
   try {
     let ok = 0;
     // ponytail: secuencial, no paralelo (una key, un rate-limit).
@@ -234,13 +306,15 @@ export async function extraerPendientes(opciones?: {
       }
     }
     if (ok > 0) renderHojas(); // badges + #montoTotal con suma local exacta
-    // Éxito total con aviso previo: se conserva (ej. rechazos del gate PDF).
+    // Éxito total con aviso previo: se restaura (el interino lo pisó).
     if (ok < items.length || avisoPrevio.trim() === "") {
       avisar(
         ok === items.length
           ? `IA: ${ok}/${items.length} totales.`
           : `IA: ${ok}/${items.length} totales, resto manual. Revisá Ajustes (URL, clave, CORS).`,
       );
+    } else {
+      avisar(avisoPrevio);
     }
   } finally {
     extrayendo = false;

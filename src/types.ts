@@ -68,11 +68,16 @@ export interface Hoja {
   slots: (Comprobante | null)[];
 }
 
+/** Nivel de razonamiento/thinking (wire: chat `reasoning_effort`, responses `reasoning.effort`). */
+export type NivelRazonamiento = "auto" | "none" | "minimal" | "low" | "medium" | "high" | "max";
+
 /** Config del LLM openai-compatible (futura extracción del TOTAL). */
 export interface ConfigIA {
   baseUrl: string;
   model: string;
   apiKey: string;
+  /** auto = omitir (default del proveedor); ausente en blobs legacy = auto. */
+  razonamiento?: NivelRazonamiento;
 }
 
 /** Esquina de la hoja donde va el código de pedido en el Word. */

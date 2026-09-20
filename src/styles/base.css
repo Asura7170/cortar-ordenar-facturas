@@ -459,6 +459,15 @@ input::placeholder {
   border-color: var(--modal-borde);
   margin-top: 5px;
 }
+/* Misma identidad en la fila modelo+razonamiento+key (fuera del label): sin
+   width (la fila flex reparte) ni margin extra. */
+.modal-body .fila-modelos input,
+.modal-body .fila-modelos select {
+  background: var(--modal-input-bg);
+  color: var(--modal-texto);
+  border-color: var(--modal-borde);
+  min-width: 0;
+}
 .modal-foot {
   padding: 14px 20px;
   border-top: 1px solid var(--modal-borde);
@@ -482,7 +491,9 @@ input::placeholder {
   color: var(--modal-texto-suave);
   padding: 0;
 }
-#estadoModelos {
+#estadoModelos,
+#estadoModelosIA,
+#estadoPruebaIA {
   display: block;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -493,6 +504,12 @@ input::placeholder {
 .fila-modelos {
   display: flex;
   gap: 10px;
+}
+#cfgApiKey[aria-invalid="true"] {
+  border-color: var(--sello);
+}
+#cfgApiKey[aria-invalid="false"] {
+  border-color: var(--verde-tinta);
 }
 
 /* Confirmación destructiva: reutiliza .modal; solo identidad de peligro. */

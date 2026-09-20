@@ -12,6 +12,7 @@ const {
   aplicarTotales,
   candidatos,
   construirPrompt,
+  extraerContenido,
   extraerJsonContenido,
   extraerPendientes,
   extraerTotalesLote,
@@ -99,6 +100,7 @@ describe("extraerTotalesLote", () => {
       fetchFn as FetchFn,
     );
     expect(cuerpo).toContain("[#1]");
+    expect(cuerpo).toContain('"max_tokens":8000');
     expect(cuerpo).not.toContain("factura (2).png");
   });
 
@@ -162,6 +164,142 @@ describe("extraerTotalesLote", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("responses: body con input/instructions y parsea output[]", async () => {
+    const { c1 } = lote2();
+    let cuerpo = "";
+    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpo = String(o?.body ?? "");
+      return {
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> =>
+          Promise.resolve({
+            output: [{ content: [{ type: "output_text", text: '{"1":"9.99"}' }] }],
+          }),
+      } as Response;
+    });
+    const mapa = await extraerTotalesLote(
+      [{ idx: 1, id: c1.id, texto: "TOTAL 9.99" }],
+      { baseUrl: "https://llm.test/v1/responses", model: "m", apiKey: "k" },
+      fetchFn as FetchFn,
+    );
+    expect(cuerpo).toContain('"input"');
+    expect(cuerpo).toContain('"max_output_tokens":8000');
+    expect(cuerpo).not.toContain("messages");
+    expect(mapa.get(1)).toBe(999);
+  });
+
+  it("zen postea vía proxy dev con sesión", async () => {
+    const { c1 } = lote2();
+    let url = "";
+    let sesion = "";
+    const fetchFn = vi.fn(async (u: unknown, o?: RequestInit): Promise<Response> => {
+      url = String(u);
+      sesion = String((o?.headers as Record<string, string>)?.["x-opencode-session"] ?? "");
+      return {
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> =>
+          Promise.resolve({
+            output: [{ content: [{ type: "output_text", text: '{"1":"1.00"}' }] }],
+          }),
+      } as Response;
+    });
+    await extraerTotalesLote(
+      [{ idx: 1, id: c1.id, texto: "TOTAL 1.00" }],
+      { baseUrl: "https://opencode.ai/zen/go/v1/responses", model: "m", apiKey: "k" },
+      fetchFn as FetchFn,
+    );
+    expect(url).toBe("/zen-go/v1/responses");
+    expect(sesion.trim()).not.toBe("");
+  });
+
+  it("razonamiento que agota el presupuesto (length+null) → manual", async () => {
+    const { c1 } = lote2();
+    const fetchFn = vi.fn(
+      async (): Promise<Response> =>
+        ({
+          ok: true,
+          status: 200,
+          json: (): Promise<unknown> =>
+            Promise.resolve({
+              choices: [{ finish_reason: "length", message: { content: null } }],
+            }),
+        }) as Response,
+    );
+    const mapa = await extraerTotalesLote(
+      [{ idx: 1, id: c1.id, texto: "TOTAL 1.00" }],
+      state.configIA,
+      fetchFn,
+    );
+    expect(mapa.get(1)).toBeNull();
+  });
+
+  it("razonamiento: auto omite, none envía effort, low omite temperature", async () => {
+    const { c1 } = lote2();
+    const cuerpos: string[] = [];
+    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpos.push(String(o?.body ?? ""));
+      return respuesta('{"1":"1.00"}');
+    });
+    const item = { idx: 1, id: c1.id, texto: "TOTAL 1.00" };
+    await extraerTotalesLote(
+      [item],
+      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k" },
+      fetchFn as FetchFn,
+    );
+    expect(cuerpos[0]).not.toContain("reasoning");
+    await extraerTotalesLote(
+      [item],
+      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "none" },
+      fetchFn as FetchFn,
+    );
+    expect(cuerpos[1]).toContain('"reasoning_effort":"none"');
+    expect(cuerpos[1]).toContain('"temperature":0');
+    await extraerTotalesLote(
+      [item],
+      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "low" },
+      fetchFn as FetchFn,
+    );
+    expect(cuerpos[2]).toContain('"reasoning_effort":"low"');
+    expect(cuerpos[2]).not.toContain("temperature");
+  });
+
+  it("razonamiento: 400 reintenta limpio una vez", async () => {
+    const { c1 } = lote2();
+    const cuerpos: string[] = [];
+    let n = 0;
+    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
+      cuerpos.push(String(o?.body ?? ""));
+      n++;
+      if (n === 1) return respuesta("x", false, 400);
+      return respuesta('{"1":"2.00"}');
+    });
+    const mapa = await extraerTotalesLote(
+      [{ idx: 1, id: c1.id, texto: "TOTAL 2.00" }],
+      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "low" },
+      fetchFn as FetchFn,
+    );
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(cuerpos[1]).not.toContain("reasoning");
+    expect(mapa.get(1)).toBe(200);
+  });
+
+  it("extraerContenido: chat y responses", () => {
+    expect(extraerContenido({ choices: [{ message: { content: "hola" } }] })).toBe("hola");
+    expect(extraerContenido({ output: [{ content: [{ text: "a" }, { text: "b" }] }] })).toBe("ab");
+    expect(extraerContenido({})).toBeNull();
+  });
+
+  it("extraerContenido: chat con content array", () => {
+    expect(
+      extraerContenido({
+        choices: [{ message: { content: [{ type: "text", text: '{"1":"12.50"}' }] } }],
+      }),
+    ).toBe('{"1":"12.50"}');
+    expect(extraerContenido({ choices: [{ message: { content: [] } }] })).toBeNull();
   });
 });
 

@@ -6,6 +6,7 @@ import type {
   Hoja,
   LayoutId,
   Moneda,
+  NivelRazonamiento,
   PersistedState,
   PosicionCodigo,
 } from "./types";
@@ -27,6 +28,7 @@ export const CONFIG_IA_DEFAULT: ConfigIA = {
   baseUrl: "https://api.groq.com/openai/v1/chat/completions",
   model: "qwen/qwen3.8-27b",
   apiKey: "",
+  razonamiento: "auto",
 };
 export const MONEDA_DEFAULT: Moneda = "USD";
 export const POSICION_DEFAULT: PosicionCodigo = "inf-der";
@@ -157,6 +159,17 @@ export function cargar(): void {
       if (typeof c["baseUrl"] === "string") state.configIA.baseUrl = c["baseUrl"];
       if (typeof c["model"] === "string") state.configIA.model = c["model"];
       if (typeof c["apiKey"] === "string") state.configIA.apiKey = c["apiKey"];
+      const nv = c["razonamiento"];
+      if (
+        nv === "auto" ||
+        nv === "none" ||
+        nv === "minimal" ||
+        nv === "low" ||
+        nv === "medium" ||
+        nv === "high" ||
+        nv === "max"
+      )
+        state.configIA.razonamiento = nv as NivelRazonamiento;
     }
   } catch {
     /* estado corrupto: ignorar */

@@ -218,11 +218,13 @@ export async function procesarCola(): Promise<void> {
           sig.montoCents = null;
           sig.estado = "ok";
           const entero = (v: number): number => Math.round(v);
-          console.info(
-            `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} minis=${entero(ms.minis)} ` +
-              `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
-              `${ms.diag} total=${entero(performance.now() - t0)}`,
-          );
+          // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
+          if (import.meta.env.DEV)
+            console.info(
+              `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} minis=${entero(ms.minis)} ` +
+                `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
+                `${ms.diag} total=${entero(performance.now() - t0)}`,
+            );
         } catch {
           // ponytail: ítem envenenado → celda de error visible; los hermanos
           // siguen (antes un throw dejaba a todos "cargando" para siempre).
