@@ -292,6 +292,15 @@ describe("extraerTotalesLote", () => {
     expect(extraerContenido({ output: [{ content: [{ text: "a" }, { text: "b" }] }] })).toBe("ab");
     expect(extraerContenido({})).toBeNull();
   });
+
+  it("extraerContenido: chat con content array", () => {
+    expect(
+      extraerContenido({
+        choices: [{ message: { content: [{ type: "text", text: '{"1":"12.50"}' }] } }],
+      }),
+    ).toBe('{"1":"12.50"}');
+    expect(extraerContenido({ choices: [{ message: { content: [] } }] })).toBeNull();
+  });
 });
 
 describe("aplicarTotales", () => {

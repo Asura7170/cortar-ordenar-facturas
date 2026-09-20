@@ -81,9 +81,19 @@ export const MODELOS_ZEN_GO: readonly string[] = [
   "omen-alpha",
 ];
 
+/** Origen zen exacto: el match laxo fugaba Authorization al proxy con otro origen. */
+function esOrigenZen(u: URL): boolean {
+  return u.origin === "https://opencode.ai" && u.pathname.startsWith("/zen/go");
+}
+
 /** True si la URL es zen (directa o vía proxy dev). */
 export function esZen(url: string): boolean {
-  return url.includes("opencode.ai/zen") || url.startsWith("/zen-go");
+  if (url.startsWith("/zen-go")) return true;
+  try {
+    return esOrigenZen(new URL(url));
+  } catch {
+    return url.includes("opencode.ai/zen");
+  }
 }
 
 const LS_SESION_IA = "libro-mayor-sesion-ia";
@@ -170,9 +180,13 @@ export function sugeridosZenGo(baseUrl: string): string[] {
     Solo en dev/preview con proxy; en dist estático va directo y rige el fallback. */
 export function urlProxy(url: string): string {
   if (!import.meta.env.DEV) return url;
-  const marca = "/zen/go";
-  const i = url.indexOf(marca);
-  return i < 0 ? url : `/zen-go${url.slice(i + marca.length)}`;
+  try {
+    const u = new URL(url);
+    if (!esOrigenZen(u)) return url;
+    return `/zen-go${u.pathname.slice("/zen/go".length)}${u.search}${u.hash}`;
+  } catch {
+    return url;
+  }
 }
 
 /** GET {base}/models con Bearer; lanza si red/HTTP falla. */

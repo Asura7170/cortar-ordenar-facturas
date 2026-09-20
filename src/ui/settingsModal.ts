@@ -44,11 +44,19 @@ const btnBorrarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarM
 
 const MANUAL = "__manual__";
 
-/** Última lista viva: ante CORS se conserva en vez de vaciar el select. */
-let ultimaLista: string[] = [];
+/** Última lista viva por endpoint: ante CORS se conserva en vez de vaciar el select. */
+let cacheModelos: { endpoint: string; lista: string[] } = { endpoint: "", lista: [] };
+
+/** Clave del caché: base sin espacios ni barras finales (como `detectarTipo`). */
+function normalizarEndpoint(base: string): string {
+  return base.trim().replace(/\/+$/, "");
+}
 
 /** Generación de la prueba de conexión: descarta resoluciones rancias. */
 let pruebaGen = 0;
+
+/** Generación de la carga de modelos: descarta resoluciones rancias. */
+let modelosGen = 0;
 
 function textoModelos(bytes: number): string {
   return bytes > 0
@@ -125,8 +133,9 @@ function refrescarRazonamiento(): void {
 
 /** POST mínimo: verifica endpoint+key+modelo sin gastar. Nunca lanza. */
 async function probarConexionUI(): Promise<void> {
-  const base = cfgBaseUrl.value || CONFIG_IA_DEFAULT.baseUrl;
-  const key = cfgApiKey.value;
+  // ponytail: recorte al leer — el pegado con espacios/ saltos rotos daba 401/CORS engañosos
+  const base = cfgBaseUrl.value.trim() || CONFIG_IA_DEFAULT.baseUrl;
+  const key = cfgApiKey.value.trim();
   if (key.trim() === "") {
     estadoPruebaIA.textContent = "Falta API key.";
     btnProbarIA.disabled = true;
@@ -155,15 +164,16 @@ async function probarConexionUI(): Promise<void> {
   btnProbarIA.disabled = cfgApiKey.value.trim() === "";
 }
 
-/** Cambio en endpoint/key/modelo invalida la última prueba. */
+/** Cambio en endpoint/key/modelo invalida la última prueba (y su vuelo). */
 function invalidarPrueba(): void {
+  ++pruebaGen;
   estadoPruebaIA.textContent = "Sin probar.";
   cfgApiKey.removeAttribute("aria-invalid");
 }
 
 async function cargarModelos(forzado: boolean): Promise<void> {
-  const base = cfgBaseUrl.value || CONFIG_IA_DEFAULT.baseUrl;
-  const key = cfgApiKey.value;
+  const base = cfgBaseUrl.value.trim() || CONFIG_IA_DEFAULT.baseUrl;
+  const key = cfgApiKey.value.trim();
   const tipo = detectarTipo(base);
   if (key.trim() === "") {
     estadoModelosIA.textContent = `Modelos (${tipo}): falta API key.`;
@@ -171,13 +181,21 @@ async function cargarModelos(forzado: boolean): Promise<void> {
     return;
   }
   btnRefrescarModelos.disabled = false;
-  if (!forzado && ultimaLista.length > 0) return; // ponytail: memoria viva, no del select (siempre >1 tras pintar)
+  // ponytail: caché por endpoint — la lista de otro proveedor no se reutiliza
+  if (
+    !forzado &&
+    cacheModelos.lista.length > 0 &&
+    cacheModelos.endpoint === normalizarEndpoint(base)
+  )
+    return;
   const sugeridos = sugeridosZenGo(base);
   btnRefrescarModelos.disabled = true;
   estadoModelosIA.textContent = `Modelos (${tipo}): cargando…`;
+  const gen = ++modelosGen; // ponytail: la resolución rancia no pisa (igual que la prueba)
   try {
     const lista = await listarModelos(base, key);
-    ultimaLista = lista;
+    if (gen !== modelosGen) return;
+    cacheModelos = { endpoint: normalizarEndpoint(base), lista };
     // ponytail: releer tras el await — el usuario pudo cambiar el modelo en vuelo
     pintarOpciones([...sugeridos, ...lista], modeloElegido() || state.configIA.model);
     refrescarRazonamiento();
@@ -187,15 +205,16 @@ async function cargarModelos(forzado: boolean): Promise<void> {
         ? `Modelos (${tipo}): ${total} disponibles.`
         : `Modelos (${tipo}): sin lista (revisá URL, clave, CORS).`;
   } catch (e: unknown) {
+    if (gen !== modelosGen) return;
     // ponytail: releer tras el await (igual que en el éxito: pudo cambiar en vuelo)
-    pintarOpciones([...sugeridos, ...ultimaLista], modeloElegido() || state.configIA.model);
+    pintarOpciones([...sugeridos, ...cacheModelos.lista], modeloElegido() || state.configIA.model);
     refrescarRazonamiento();
     const causa = e instanceof Error ? e.message : "error";
     estadoModelosIA.textContent = causa.includes("CORS")
       ? `Modelos (${tipo}): el servidor no lista desde navegador; elegí sugerido o pegá el ID manual. (${causa})`
       : `Modelos (${tipo}): no se pudo listar (${causa}).`;
   } finally {
-    btnRefrescarModelos.disabled = key.trim() === "";
+    if (gen === modelosGen) btnRefrescarModelos.disabled = key.trim() === "";
   }
 }
 
@@ -204,7 +223,10 @@ function pintarAjustes(): void {
   cfgApiKey.value = state.configIA.apiKey;
   cfgMoneda.value = state.moneda;
   cfgModelManual.value = "";
-  pintarOpciones([...sugeridosZenGo(state.configIA.baseUrl), ...ultimaLista], state.configIA.model);
+  // ponytail: el caché es por endpoint — el de otro proveedor no se mezcla
+  const cache =
+    cacheModelos.endpoint === normalizarEndpoint(state.configIA.baseUrl) ? cacheModelos.lista : [];
+  pintarOpciones([...sugeridosZenGo(state.configIA.baseUrl), ...cache], state.configIA.model);
   pintarRazonamiento(state.configIA.model, state.configIA.razonamiento ?? "auto");
   estadoPruebaIA.textContent = "Sin probar.";
   cfgApiKey.removeAttribute("aria-invalid");
@@ -229,8 +251,12 @@ export function initSettings(): void {
     invalidarPrueba();
   });
   cfgRazonamiento.addEventListener("change", invalidarPrueba);
-  cfgBaseUrl.addEventListener("input", invalidarPrueba);
+  cfgBaseUrl.addEventListener("input", () => {
+    ++modelosGen; // la lista en vuelo es del endpoint viejo
+    invalidarPrueba();
+  });
   cfgApiKey.addEventListener("input", () => {
+    ++modelosGen; // la lista en vuelo es de la key vieja
     btnRefrescarModelos.disabled = cfgApiKey.value.trim() === "";
     btnProbarIA.disabled = cfgApiKey.value.trim() === "";
     invalidarPrueba();
@@ -282,7 +308,7 @@ export function initSettings(): void {
   formAjustes.addEventListener("submit", () => {
     state.configIA.baseUrl = cfgBaseUrl.value.trim() || CONFIG_IA_DEFAULT.baseUrl;
     state.configIA.model = modeloElegido().trim() || CONFIG_IA_DEFAULT.model;
-    state.configIA.apiKey = cfgApiKey.value;
+    state.configIA.apiKey = cfgApiKey.value.trim();
     state.configIA.razonamiento = razonamientoElegido();
     state.moneda = isMoneda(cfgMoneda.value) ? cfgMoneda.value : MONEDA_DEFAULT;
     guardarAjustes();

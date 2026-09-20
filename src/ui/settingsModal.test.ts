@@ -91,6 +91,15 @@ describe("submit", () => {
     expect(state.configIA.model).toBe("qwen/qwen3.8-27b");
     expect(state.moneda).toBe("USD");
   });
+
+  it("pegado con espacios se persiste recortado", () => {
+    cfgBaseUrl.value = "  http://nuevo  ";
+    opcion("modelo-x");
+    cfgApiKey.value = "  secreto \n";
+    enviar();
+    expect(state.configIA.baseUrl).toBe("http://nuevo");
+    expect(state.configIA.apiKey).toBe("secreto");
+  });
 });
 
 describe("Predeterminado", () => {
@@ -330,6 +339,154 @@ describe("selector modelos LLM", () => {
     const valores = [...cfgModel.options].map((o) => o.value);
     expect(valores).toContain("muse-spark-1.3-contributor");
     modalAjustes.close();
+  });
+
+  it("cambiar de endpoint no mezcla la lista del anterior", async () => {
+    const real = globalThis.fetch;
+    const llamadas: string[] = [];
+    globalThis.fetch = (async (u: unknown): Promise<Response> => {
+      llamadas.push(String(u));
+      const id = String(u).includes("a.test") ? "solo-a" : "solo-b";
+      return {
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> => Promise.resolve({ data: [{ id }] }),
+      } as unknown as Response;
+    }) as typeof fetch;
+    try {
+      state.configIA = { baseUrl: "https://a.test/v1/chat/completions", model: "m", apiKey: "k" };
+      btnAjustes.click();
+      await pausa();
+      expect([...cfgModel.options].map((o) => o.value)).toContain("solo-a");
+      modalAjustes.close();
+      state.configIA = { baseUrl: "https://b.test/v1/chat/completions", model: "m", apiKey: "k" };
+      btnAjustes.click();
+      await pausa();
+      const valores = [...cfgModel.options].map((o) => o.value);
+      expect(valores).toContain("solo-b");
+      expect(valores).not.toContain("solo-a");
+      expect(llamadas.length).toBeGreaterThan(1); // refetcheó B, no reusó A
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("cargas solapadas: solo escribe la última", async () => {
+    const real = globalThis.fetch;
+    let resolver!: (v: Response) => void;
+    let n = 0;
+    const lista = (id: string): Response =>
+      ({
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> => Promise.resolve({ data: [{ id }] }),
+      }) as unknown as Response;
+    globalThis.fetch = (() => {
+      n += 1;
+      if (n === 1)
+        return new Promise<Response>((res) => {
+          resolver = res;
+        });
+      return Promise.resolve(lista("segundo"));
+    }) as typeof fetch;
+    try {
+      state.configIA = {
+        baseUrl: "https://race.test/v1/chat/completions",
+        model: "m",
+        apiKey: "k",
+      };
+      btnAjustes.click(); // carga #1 en vuelo
+      modalAjustes.close();
+      btnAjustes.click(); // carga #2 resuelve primero
+      await pausa();
+      resolver(lista("primero")); // la rancia llega tarde
+      await pausa();
+      const valores = [...cfgModel.options].map((o) => o.value);
+      expect(valores).toContain("segundo");
+      expect(valores).not.toContain("primero");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("probar recorta base y key antes del fetch", async () => {
+    const real = globalThis.fetch;
+    const vistos: { url: string; auth: string }[] = [];
+    let n = 0;
+    globalThis.fetch = (async (u: unknown, o?: RequestInit): Promise<Response> => {
+      n += 1;
+      if (n === 1)
+        return {
+          ok: true,
+          status: 200,
+          json: (): Promise<unknown> => Promise.resolve({ data: [] }),
+        } as unknown as Response;
+      vistos.push({
+        url: String(u),
+        auth: String((o?.headers as Record<string, string> | undefined)?.["Authorization"] ?? ""),
+      });
+      return {
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> => Promise.resolve({ choices: [] }),
+      } as unknown as Response;
+    }) as typeof fetch;
+    try {
+      state.configIA = { baseUrl: "https://t.test/v1/chat/completions", model: "m", apiKey: "k" };
+      btnAjustes.click();
+      await pausa();
+      cfgBaseUrl.value = "  https://t.test/v1/chat/completions  ";
+      cfgApiKey.value = "  k-secreta \n";
+      btnProbarIA.click();
+      await pausa();
+      expect(vistos).toHaveLength(1);
+      expect(vistos[0]?.url).toBe("https://t.test/v1/chat/completions");
+      expect(vistos[0]?.auth).toBe("Bearer k-secreta");
+      expect(estadoPruebaIA.textContent).toContain("✓");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("probar en vuelo se descarta si cambia la key", async () => {
+    const real = globalThis.fetch;
+    let resolver!: (v: Response) => void;
+    let n = 0;
+    const okVacio = (): Response =>
+      ({
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> => Promise.resolve({ data: [] }),
+      }) as unknown as Response;
+    globalThis.fetch = (() => {
+      n += 1;
+      if (n === 2)
+        return new Promise<Response>((res) => {
+          resolver = res;
+        });
+      return Promise.resolve(okVacio());
+    }) as typeof fetch;
+    try {
+      state.configIA = {
+        baseUrl: "https://ping.test/v1/chat/completions",
+        model: "m",
+        apiKey: "k1",
+      };
+      btnAjustes.click();
+      await pausa();
+      btnProbarIA.click(); // ping #1 en vuelo (fetch #2)
+      cfgApiKey.value = "k2";
+      cfgApiKey.dispatchEvent(new Event("input", { bubbles: true })); // invalida
+      resolver(okVacio());
+      await pausa();
+      expect(estadoPruebaIA.textContent).toBe("Sin probar.");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
   });
 
   it("razonamiento: kimi reducido, genérico completo, No segundo y persiste", () => {

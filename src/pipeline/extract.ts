@@ -108,6 +108,17 @@ export function extraerContenido(data: unknown): string | null {
       if (typeof message === "object" && message !== null) {
         const content = (message as { content?: unknown }).content;
         if (typeof content === "string") return content;
+        // ponytail: algunos proveedores mandan content array (reasoning/vision)
+        if (Array.isArray(content)) {
+          const t = content
+            .map((p): string => {
+              if (typeof p !== "object" || p === null) return "";
+              const texto = (p as { text?: unknown }).text;
+              return typeof texto === "string" ? texto : "";
+            })
+            .join("");
+          if (t !== "") return t;
+        }
       }
     }
   }

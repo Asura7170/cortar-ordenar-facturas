@@ -132,6 +132,15 @@ describe("sesion zen", () => {
     expect(esZen("https://api.groq.com/openai/v1")).toBe(false);
   });
 
+  it("origen parecido no es zen (ni proxy ni sesión)", () => {
+    expect(esZen("https://evil-opencode.ai/zen.evil.com")).toBe(false);
+    expect(esZen("https://corp.example/zen/go/v1/responses")).toBe(false);
+    expect(urlProxy("https://corp.example/zen/go/v1/responses")).toBe(
+      "https://corp.example/zen/go/v1/responses",
+    );
+    expect(urlProxy("https://opencode.ai/zen/go/v1/responses")).toBe("/zen-go/v1/responses");
+  });
+
   it("listar envía x-opencode-session solo en zen", async () => {
     let headers: Record<string, string> = {};
     const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
