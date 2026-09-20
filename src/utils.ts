@@ -12,20 +12,3 @@ export function sanear(s: unknown): string {
   // ponytail: solo string/number llegan al DOM; objetos → "" (nunca "[object Object]").
   return (typeof s === "string" ? s : typeof s === "number" ? String(s) : "").toWellFormed();
 }
-
-/** sleep cancelable por AbortSignal (Chrome 119+). */
-export function sleep(ms: number, opts?: { signal?: AbortSignal }): Promise<void> {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  const signal = opts?.signal;
-  if (signal?.aborted) return Promise.reject(signal.reason);
-  const t = setTimeout(resolve, ms);
-  signal?.addEventListener(
-    "abort",
-    () => {
-      clearTimeout(t);
-      resolve();
-    },
-    { once: true },
-  );
-  return promise;
-}

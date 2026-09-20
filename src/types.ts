@@ -69,7 +69,15 @@ export interface Hoja {
 }
 
 /** Nivel de razonamiento/thinking (wire: chat `reasoning_effort`, responses `reasoning.effort`). */
-export type NivelRazonamiento = "auto" | "none" | "minimal" | "low" | "medium" | "high" | "max";
+export type NivelRazonamiento =
+  | "auto"
+  | "none"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh"
+  | "max";
 
 /** Config del LLM openai-compatible (futura extracción del TOTAL). */
 export interface ConfigIA {
