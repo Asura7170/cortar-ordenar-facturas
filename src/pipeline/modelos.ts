@@ -132,19 +132,25 @@ function mensajeProveedor(json: unknown): string {
     Auto primero (omitir), No segundo (rápido). El GET /models no trae niveles. */
 export function nivelesPara(model: string): NivelRazonamiento[] {
   const m = model.toLowerCase();
-  if (/kimi|deepseek|gpt-oss|gpt_oss/.test(m)) return ["auto", "none", "low", "high", "max"];
-  return ["auto", "none", "minimal", "low", "medium", "high", "max"];
+  if (/kimi|deepseek|gpt-oss|gpt_oss/.test(m))
+    return ["auto", "none", "low", "high", "xhigh", "max"];
+  return ["auto", "none", "minimal", "low", "medium", "high", "xhigh", "max"];
 }
 
 /** Etiqueta ES del nivel para el select. */
+const ETIQUETAS_NIVEL: Record<NivelRazonamiento, string> = {
+  auto: "Auto",
+  none: "No razonar",
+  minimal: "Mínimo",
+  low: "Bajo",
+  medium: "Medio",
+  high: "Alto",
+  xhigh: "Extra alto",
+  max: "Máximo",
+};
+
 export function etiquetaNivel(n: NivelRazonamiento): string {
-  if (n === "auto") return "Auto";
-  if (n === "none") return "No razonar";
-  if (n === "minimal") return "Mínimo";
-  if (n === "low") return "Bajo";
-  if (n === "medium") return "Medio";
-  if (n === "high") return "Alto";
-  return "Máximo";
+  return ETIQUETAS_NIVEL[n];
 }
 
 /** Guard para blobs legacy / valor del select. */
@@ -156,6 +162,7 @@ export function esNivelRazonamiento(v: unknown): v is NivelRazonamiento {
     v === "low" ||
     v === "medium" ||
     v === "high" ||
+    v === "xhigh" ||
     v === "max"
   );
 }

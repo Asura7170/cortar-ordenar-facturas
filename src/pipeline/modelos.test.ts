@@ -226,8 +226,8 @@ describe("probarConexion", () => {
 
 describe("razonamiento", () => {
   it("reducido (kimi) 3+No, completo 5+No con No segundo", () => {
-    expect(nivelesPara("kimi-k3")).toEqual(["auto", "none", "low", "high", "max"]);
-    expect(nivelesPara("deepseek-v4-pro")).toEqual(["auto", "none", "low", "high", "max"]);
+    expect(nivelesPara("kimi-k3")).toEqual(["auto", "none", "low", "high", "xhigh", "max"]);
+    expect(nivelesPara("deepseek-v4-pro")).toEqual(["auto", "none", "low", "high", "xhigh", "max"]);
     expect(nivelesPara("muse-spark-1.3-contributor")).toEqual([
       "auto",
       "none",
@@ -235,6 +235,7 @@ describe("razonamiento", () => {
       "low",
       "medium",
       "high",
+      "xhigh",
       "max",
     ]);
     expect(nivelesPara("mimo-v2.5")[1]).toBe("none");

@@ -529,6 +529,7 @@ describe("selector modelos LLM", () => {
       "none",
       "low",
       "high",
+      "xhigh",
       "max",
     ]);
     expect(cfgRazonamiento.options[1]?.text).toBe("No razonar");

@@ -167,6 +167,7 @@ export function cargar(): void {
         nv === "low" ||
         nv === "medium" ||
         nv === "high" ||
+        nv === "xhigh" ||
         nv === "max"
       )
         state.configIA.razonamiento = nv as NivelRazonamiento;
