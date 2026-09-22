@@ -102,6 +102,8 @@ export interface EstadoApp {
   moneda: Moneda;
   colaEnProceso: boolean;
   modoOcr: boolean;
+  /** Lote IA en curso (botón o red del drenado): sin VT ni rebuilds por tick. Efímero, no persiste. */
+  loteEnCurso: boolean;
   /** Timestamp del último cierre del editor de recorte (el clic que cierra no reabre). Efímero, no persiste. */
   cierreRecorte: number;
 }

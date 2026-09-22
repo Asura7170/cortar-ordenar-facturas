@@ -357,10 +357,11 @@ describe("extraerPendientes con JEV", () => {
     const p = extraerPendientes();
     try {
       await new Promise((r) => setTimeout(r, 20));
-      // El rápido ya está aplicado y pintado aunque el lento siga en vuelo.
+      // El rápido ya está aplicado y parchado aunque el lento siga en vuelo
+      // (parche in-place: 0 rebuilds a mitad del lote).
       expect(c1.montoCents).toBe(1250);
       expect(c2.montoCents).toBeNull();
-      expect(vi.mocked(renderHojas).mock.calls.length).toBe(1);
+      expect(vi.mocked(renderHojas).mock.calls.length).toBe(0);
       expect(aviso.textContent).toContain("1/2");
       resolverLento(upstreamOk(cuerpoLento));
       await p;
@@ -368,7 +369,7 @@ describe("extraerPendientes con JEV", () => {
       globalThis.fetch = real;
     }
     expect(c2.montoCents).toBe(700);
-    expect(vi.mocked(renderHojas).mock.calls.length).toBe(2);
+    expect(vi.mocked(renderHojas).mock.calls.length).toBe(1);
   });
 });
 

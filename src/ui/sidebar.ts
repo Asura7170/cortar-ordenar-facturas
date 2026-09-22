@@ -106,6 +106,9 @@ export async function agregarArchivos(
     }
   };
   let colocados = 0;
+  // Telemetría del intake (solo DEV): pared vs costo de normalización por foto.
+  const tIntake = performance.now();
+  const msNorm: number[] = [];
   const colocar = (items: Comprobante[]): void => {
     if (items.length === 0) return;
     let actual = asegurarHoja();
@@ -125,7 +128,9 @@ export async function agregarArchivos(
       // Blanca/corrupta → aviso, sin tumbar el lote (igual que PDF).
       // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
       try {
+        const tN = performance.now();
         const blob = await normalizarImagen(f);
+        if (import.meta.env.DEV) msNorm.push(performance.now() - tN);
         colocar([
           {
             id: nextComprobanteId(),
@@ -179,6 +184,17 @@ export async function agregarArchivos(
           posicion: 0,
         } satisfies Comprobante;
       }),
+    );
+  }
+  if (import.meta.env.DEV && msNorm.length > 0) {
+    const ordenadas = [...msNorm].sort((a, b) => a - b);
+    const cuantil = (q: number): number =>
+      Math.round(
+        ordenadas[Math.min(ordenadas.length - 1, Math.ceil(q * ordenadas.length) - 1)] ?? 0,
+      );
+    console.info(
+      `intake ms pared=${Math.round(performance.now() - tIntake)} n=${msNorm.length} ` +
+        `normP50=${cuantil(0.5)} normMax=${cuantil(1)}`,
     );
   }
   avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.

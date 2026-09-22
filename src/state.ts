@@ -43,6 +43,7 @@ export const state: EstadoApp = {
   moneda: MONEDA_DEFAULT,
   colaEnProceso: false,
   modoOcr: false,
+  loteEnCurso: false,
   cierreRecorte: 0,
 };
 

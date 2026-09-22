@@ -5,7 +5,7 @@
 import { buscarSlot, state } from "../state";
 import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
-import { renderHojas } from "../ui/sheets";
+import { actualizarMontoCelda, renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
 import { getJevKey, llamarJev } from "./jev";
 import {
@@ -355,6 +355,7 @@ export async function extraerPendientes(opciones?: {
   const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
   const prefijo = jevKey !== "" ? "JEV:" : "IA:";
   extrayendo = true;
+  state.loteEnCurso = true; // sin VT ni rebuilds por tick (ver sheets.renderHojas)
   refrescarBoton();
   avisar(`${prefijo} extrayendo totales…`);
   try {
@@ -363,9 +364,9 @@ export async function extraerPendientes(opciones?: {
     if (jevKey !== "") {
       // ponytail: pool 50 (TypeSafe 1200/min, 250k tok/s): pared ~1s en vez de N×1s.
       // 1 request por factura (no mega-request: rompería state ≤32k y guards por ítem).
-      // Progresivo con throttle: cada éxito aplica al instante y programa 1 render por
-      // macrotask (misma oleada = 1 reflow); el aviso lleva el conteo. El retry 429/529
-      // corre dentro del slot.
+      // Progresivo con parche in-place: cada éxito aplica al instante y el tick
+      // pinta solo su celda (sin rebuild ni VT, ver loteEnCurso); el aviso lleva
+      // el conteo. El retry 429/529 corre dentro del slot.
       const cola = items.filter((it) => !enVuelo.has(it.id));
       for (const it of cola) enVuelo.add(it.id);
       // Telemetría del lote (solo DEV): pared vs percentiles por request +
@@ -375,23 +376,25 @@ export async function extraerPendientes(opciones?: {
       const latencias: number[] = [];
       let enCurso = 0;
       let concMax = 0;
-      let sucio = false;
+      const porPintar: number[] = [];
       let programado = false;
       let rendersProg = 0;
       const pintarProgreso = (): void => {
         programado = false;
-        if (!sucio) return;
-        sucio = false;
+        if (porPintar.length === 0) return;
+        // Parche in-place por celda (sin rebuild ni VT): O(1 nodo) por éxito.
+        const ids = porPintar.splice(0, porPintar.length);
         rendersProg++;
-        try {
-          renderHojas();
-        } catch {
-          /* el render nunca aborta el lote */
+        for (const id of ids) {
+          try {
+            actualizarMontoCelda(id);
+          } catch {
+            /* el parche nunca aborta el lote */
+          }
         }
         avisar(`${prefijo} ${okJev}/${items.length} totales…`);
       };
       const programaTick = (): void => {
-        sucio = true;
         if (programado) return;
         programado = true;
         setTimeout(pintarProgreso, 0);
@@ -407,6 +410,7 @@ export async function extraerPendientes(opciones?: {
             );
             if (aplicarTotales([it], new Map([[it.idx, cents]])) > 0) {
               okJev++;
+              porPintar.push(it.id);
               programaTick();
             }
           } catch {
@@ -426,6 +430,7 @@ export async function extraerPendientes(opciones?: {
         setTimeout(() => r(), 0);
       });
       pintarProgreso();
+      if (okJev > 0) renderHojas(); // cierre: totales y consistencia en 1 rebuild
       if (import.meta.env.DEV && latencias.length > 0) {
         const ordenadas = [...latencias].sort((a, b) => a - b);
         const cuantil = (q: number): number =>
@@ -481,6 +486,7 @@ export async function extraerPendientes(opciones?: {
       avisar(avisoPrevio);
     }
   } finally {
+    state.loteEnCurso = false;
     extrayendo = false;
     refrescarBoton();
   }

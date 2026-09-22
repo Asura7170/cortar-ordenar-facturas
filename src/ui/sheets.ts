@@ -278,23 +278,31 @@ export function renderHojas(): void {
     });
     restaurarSucios(sucios);
   };
-  // ponytail: sin ViewTransition con reduced-motion ni durante la carga
-  // inicial (los snapshots compiten con el drag/scroll); es solo un adorno.
+  // ponytail: sin ViewTransition con reduced-motion, durante la cola ni durante
+  // el lote IA (los snapshots compiten con el drag/scroll); es solo un adorno.
   const reduceMovimiento = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   // ponytail: con foco dentro de las hojas el render es síncrono (el swap
   // async pierde el foco y rompe la edición en curso).
   const focoDentro = sheetsEl.contains(document.activeElement);
-  if (
+  const usaVT =
     !borrador &&
     !focoDentro &&
     !reduceMovimiento &&
     !state.colaEnProceso &&
-    document.startViewTransition
-  ) {
+    !state.loteEnCurso &&
+    !!document.startViewTransition;
+  // ponytail: telemetría del render solo en dev (el callback VT corre async:
+  // este ms cubre el armado; el snapshot se ve en el Performance panel).
+  const tRender = import.meta.env.DEV ? performance.now() : 0;
+  if (usaVT) {
     const t = document.startViewTransition(render);
     t.ready?.catch(() => {});
     t.finished?.catch(() => {});
   } else render();
+  if (import.meta.env.DEV)
+    console.info(
+      `renderHojas ms=${Math.round(performance.now() - tRender)} vt=${usaVT ? "sí" : "no"}`,
+    );
 }
 
 export function soltarRenderPendiente(): void {
@@ -442,6 +450,32 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
   item.montoManual = true;
   renderHojas();
   return id;
+}
+
+// Repinta SOLO el monto de una celda (tick del lote IA) sin reconstruir la
+// grilla ni tocar la imagen: O(1 nodo) en vez de O(N imágenes + snapshot VT).
+// Nunca lanza (best-effort): false = lo cubre el render completo del final.
+export function actualizarMontoCelda(id: number): boolean {
+  if (state.modoOcr) return false; // en modo OCR la celda no lleva badge
+  const cell = cellById(id);
+  if (!cell) return false;
+  const item = obtenerComprobante(id);
+  if (!item || item.montoCents == null || item.id === editandoMonto) return false;
+  const activo = document.activeElement;
+  if (activo instanceof HTMLInputElement && cell.contains(activo)) return false; // edición en curso: no pisar
+  const viejo = cell.querySelector(".cell-badge, input.cell-monto");
+  const badge = document.createElement("button");
+  badge.type = "button";
+  badge.className = "cell-badge";
+  badge.dataset["accion"] = "corregir-monto";
+  badge.title = "Total (clic para corregir)";
+  badge.textContent = formatearMoneda(item.montoCents);
+  bajoMutandoHojas(() => {
+    if (viejo) viejo.replaceWith(badge);
+    else cell.append(badge);
+  });
+  renderMonto(); // total general con suma local exacta
+  return true;
 }
 
 // Repinta UNA celda (llegó su miniatura) sin reconstruir la grilla.
