@@ -262,9 +262,13 @@ function refrescarBoton(): void {
   if (btn instanceof HTMLButtonElement) btn.disabled = extrayendo;
 }
 
+/** Ids con JEV en vuelo: evita doble fetch (1×1 desacoplado + red del drenado). */
+const enVuelo = new Set<number>();
+
 /** JEV 1×1 progresivo para la cola: resuelve un comprobante y lo pinta al
     instante, sin esperar al lote. Nunca lanza (best-effort). */
 export async function extraerUnMonto(id: number, fetchFn: FetchFn = fetch): Promise<boolean> {
+  if (enVuelo.has(id)) return false;
   try {
     const key = getJevKey();
     if (key === "") return false;
@@ -274,21 +278,49 @@ export async function extraerUnMonto(id: number, fetchFn: FetchFn = fetch): Prom
       return false;
     const texto = limpiarTexto(actual.textoOcr);
     if (texto === "") return false;
-    const item: ItemLote = { idx: 1, id, texto };
-    let cents: Cents | null = null;
+    enVuelo.add(id);
     try {
-      cents = parsearMonto((await llamarJev({ id, contenido: texto }, key, fetchFn)).total);
-    } catch {
-      return false; // la red del drenado lo reintenta en lote
+      let cents: Cents | null = null;
+      try {
+        cents = parsearMonto((await llamarJev({ id, contenido: texto }, key, fetchFn)).total);
+      } catch {
+        return false; // la red del drenado lo reintenta en lote
+      }
+      const item: ItemLote = { idx: 1, id, texto };
+      if (aplicarTotales([item], new Map([[1, cents]])) === 0) return false;
+      renderHojas(); // progresivo: badge + total al instante
+      return true;
+    } finally {
+      enVuelo.delete(id);
     }
-    if (aplicarTotales([item], new Map([[1, cents]])) === 0) return false;
-    renderHojas(); // progresivo: badge + total al instante
-    return true;
   } catch {
     return false;
   }
 }
 
+/** Tope de vuelos JEV simultáneos por lote (TypeSafe: 1200 req/min, 250k tok/s). */
+const JEV_TOPE_PARALELO = 50;
+
+/** Pool con tope: N workers consumen índices; el worker decide errores (nunca lanza el pool). */
+async function mapConLimite<T>(
+  items: readonly T[],
+  tope: number,
+  fn: (it: T) => Promise<void>,
+): Promise<void> {
+  let i = 0;
+  const n = Math.max(1, Math.min(tope, items.length));
+  await Promise.all(
+    Array.from({ length: n }, async (): Promise<void> => {
+      for (;;) {
+        const k = i++;
+        if (k >= items.length) return;
+        const it = items[k];
+        if (it === undefined) return;
+        await fn(it);
+      }
+    }),
+  );
+}
 /** Orquestador: nunca lanza; sin key o sin pendientes sale en silencio (salvo forzado). */
 export async function extraerPendientes(opciones?: {
   forzado?: boolean;
@@ -329,19 +361,82 @@ export async function extraerPendientes(opciones?: {
     let okJev = 0;
     let pendientes: ItemLote[] = items;
     if (jevKey !== "") {
-      // ponytail: secuencial 1×1 con pintado progresivo (JEV barato/rápido):
-      // el monto se ve sin esperar al lote. Sin Promise.all a propósito.
-      for (const it of items) {
-        let cents: Cents | null = null;
+      // ponytail: pool 50 (TypeSafe 1200/min, 250k tok/s): pared ~1s en vez de N×1s.
+      // 1 request por factura (no mega-request: rompería state ≤32k y guards por ítem).
+      // Progresivo con throttle: cada éxito aplica al instante y programa 1 render por
+      // macrotask (misma oleada = 1 reflow); el aviso lleva el conteo. El retry 429/529
+      // corre dentro del slot.
+      const cola = items.filter((it) => !enVuelo.has(it.id));
+      for (const it of cola) enVuelo.add(it.id);
+      // Telemetría del lote (solo DEV): pared vs percentiles por request +
+      // concurrencia JS. OJO: concJS alto con waterfall de 6 en Network =
+      // el navegador dosifica (límite por origen), no el servidor.
+      const tLote = performance.now();
+      const latencias: number[] = [];
+      let enCurso = 0;
+      let concMax = 0;
+      let sucio = false;
+      let programado = false;
+      let rendersProg = 0;
+      const pintarProgreso = (): void => {
+        programado = false;
+        if (!sucio) return;
+        sucio = false;
+        rendersProg++;
         try {
-          cents = parsearMonto((await llamarJev({ id: it.id, contenido: it.texto }, jevKey)).total);
+          renderHojas();
         } catch {
-          continue; // este ítem cae al fallback; los hermanos siguen
+          /* el render nunca aborta el lote */
         }
-        if (aplicarTotales([it], new Map([[it.idx, cents]])) > 0) {
-          okJev++;
-          renderHojas(); // progresivo: badge + total al instante
-        }
+        avisar(`${prefijo} ${okJev}/${items.length} totales…`);
+      };
+      const programaTick = (): void => {
+        sucio = true;
+        if (programado) return;
+        programado = true;
+        setTimeout(pintarProgreso, 0);
+      };
+      try {
+        await mapConLimite(cola, JEV_TOPE_PARALELO, async (it): Promise<void> => {
+          const tReq = performance.now();
+          enCurso++;
+          concMax = Math.max(concMax, enCurso);
+          try {
+            const cents = parsearMonto(
+              (await llamarJev({ id: it.id, contenido: it.texto }, jevKey)).total,
+            );
+            if (aplicarTotales([it], new Map([[it.idx, cents]])) > 0) {
+              okJev++;
+              programaTick();
+            }
+          } catch {
+            /* este ítem cae al fallback; los hermanos siguen */
+          } finally {
+            latencias.push(performance.now() - tReq);
+            enCurso--;
+            enVuelo.delete(it.id);
+          }
+        });
+      } finally {
+        for (const it of cola) enVuelo.delete(it.id);
+      }
+      // Vacía el tick pendiente antes del conteo final (sin este await, el último
+      // render caería después del aviso final y lo pisaría).
+      await new Promise<void>((r) => {
+        setTimeout(() => r(), 0);
+      });
+      pintarProgreso();
+      if (import.meta.env.DEV && latencias.length > 0) {
+        const ordenadas = [...latencias].sort((a, b) => a - b);
+        const cuantil = (q: number): number =>
+          Math.round(
+            ordenadas[Math.min(ordenadas.length - 1, Math.ceil(q * ordenadas.length) - 1)] ?? 0,
+          );
+        const entero = (v: number): number => Math.round(v);
+        console.info(
+          `JEV lote ms pared=${entero(performance.now() - tLote)} n=${cola.length} ok=${okJev} ` +
+            `concJS=${concMax} min=${cuantil(0)} p50=${cuantil(0.5)} p99=${cuantil(0.99)} renders=${rendersProg}`,
+        );
       }
       if (okJev === items.length) {
         if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okJev}/${items.length} totales.`);
@@ -351,6 +446,7 @@ export async function extraerPendientes(opciones?: {
       const restantes = candidatos();
       pendientes = [];
       restantes.forEach((c, i) => {
+        if (enVuelo.has(c.id)) return; // en vuelo: lo cubre su propia promesa
         const texto = limpiarTexto(c.textoOcr);
         if (texto !== "") pendientes.push({ idx: i + 1, id: c.id, texto });
       });

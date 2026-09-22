@@ -266,7 +266,7 @@ describe("extraerPendientes con JEV", () => {
     expect(c1.montoCents).toBe(9999);
   });
 
-  it("JEV va secuencial en orden y pinta progresivo (1 render por éxito)", async () => {
+  it("JEV en paralelo resuelve todo con 1 render coalescado (orden de llegada libre)", async () => {
     const h = crearHoja();
     const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
     const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00" });
@@ -274,14 +274,14 @@ describe("extraerPendientes con JEV", () => {
     h.slots[1] = c2;
     state.hojas.push(h);
     setJevKey("apik-k");
-    const orden: string[] = [];
+    const vistos: string[] = [];
     const real = globalThis.fetch;
     globalThis.fetch = (async (u: unknown, o?: RequestInit): Promise<Response> => {
       if (String(u) === "/api/jev") {
         const cuerpo = JSON.parse(String(o?.body ?? "{}")) as {
           state?: { contenido?: unknown };
         };
-        orden.push(String(cuerpo.state?.contenido ?? ""));
+        vistos.push(String(cuerpo.state?.contenido ?? ""));
         return upstreamOk(o?.body);
       }
       throw new Error("no debe llamar al OpenAI si JEV resuelve todo");
@@ -291,8 +291,82 @@ describe("extraerPendientes con JEV", () => {
     } finally {
       globalThis.fetch = real;
     }
-    expect(orden).toEqual(["TOTAL 12.50", "TOTAL 7.00"]);
+    expect(vistos.sort()).toEqual(["TOTAL 12.50", "TOTAL 7.00"].sort());
     expect(c1.montoCents).toBe(1250);
+    expect(c2.montoCents).toBe(700);
+    expect(vi.mocked(renderHojas).mock.calls.length).toBe(1);
+  });
+
+  it("pool con tope 50: 60 ítems resuelven todos sin superar el tope", async () => {
+    for (let n = 0; n < 60; n++) {
+      const h = crearHoja();
+      h.slots[0] = comprobante({ estado: "ok", textoOcr: `TOTAL ${n + 1}.00` });
+      state.hojas.push(h);
+    }
+    setJevKey("apik-k");
+    let activos = 0;
+    let maximo = 0;
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (u: unknown, o?: RequestInit): Promise<Response> => {
+      if (String(u) !== "/api/jev") throw new Error("no debe llamar al OpenAI");
+      activos++;
+      maximo = Math.max(maximo, activos);
+      try {
+        await new Promise((r) => setTimeout(r, 5));
+        return upstreamOk(o?.body);
+      } finally {
+        activos--;
+      }
+    }) as typeof fetch;
+    try {
+      await extraerPendientes();
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(maximo).toBeGreaterThan(1); // realmente en paralelo
+    expect(maximo).toBeLessThanOrEqual(50);
+    const sinMonto = state.hojas
+      .flatMap((hh) => hh.slots)
+      .filter((c) => c && c.montoCents === null);
+    expect(sinMonto.length).toBe(0);
+    expect(aviso.textContent).toContain("JEV: 60/60");
+  });
+
+  it("progresivo: los rápidos se pintan sin esperar al lento", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00" });
+    h.slots[0] = c1;
+    h.slots[1] = c2;
+    state.hojas.push(h);
+    setJevKey("apik-k");
+    let cuerpoLento = "";
+    let resolverLento: (r: Response) => void = () => {};
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (u: unknown, o?: RequestInit): Promise<Response> => {
+      if (String(u) !== "/api/jev") throw new Error("no debe llamar al OpenAI");
+      const cuerpo = String(o?.body ?? "");
+      if (cuerpo.includes("7.00")) {
+        cuerpoLento = cuerpo;
+        return new Promise<Response>((res) => {
+          resolverLento = res;
+        });
+      }
+      return upstreamOk(cuerpo);
+    }) as typeof fetch;
+    const p = extraerPendientes();
+    try {
+      await new Promise((r) => setTimeout(r, 20));
+      // El rápido ya está aplicado y pintado aunque el lento siga en vuelo.
+      expect(c1.montoCents).toBe(1250);
+      expect(c2.montoCents).toBeNull();
+      expect(vi.mocked(renderHojas).mock.calls.length).toBe(1);
+      expect(aviso.textContent).toContain("1/2");
+      resolverLento(upstreamOk(cuerpoLento));
+      await p;
+    } finally {
+      globalThis.fetch = real;
+    }
     expect(c2.montoCents).toBe(700);
     expect(vi.mocked(renderHojas).mock.calls.length).toBe(2);
   });
@@ -376,5 +450,30 @@ describe("extraerUnMonto (1×1 de la cola)", () => {
     const fetchFn = vi.fn();
     expect(await extraerUnMonto(c1.id, fetchFn as FetchFn)).toBe(false);
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("segundo llamado en vuelo no duplica fetch", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    h.slots[0] = c1;
+    state.hojas.push(h);
+    setJevKey("apik-k");
+    let cuerpo = "";
+    let resolver: (r: Response) => void = () => {};
+    const fetchFn = vi.fn(
+      (u: unknown, o?: RequestInit): Promise<Response> =>
+        new Promise<Response>((res) => {
+          cuerpo = String(o?.body ?? "");
+          resolver = res;
+        }),
+    );
+    const p1 = extraerUnMonto(c1.id, fetchFn as FetchFn);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(await extraerUnMonto(c1.id, fetchFn as FetchFn)).toBe(false);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    resolver(upstreamOk(cuerpo));
+    expect(await p1).toBe(true);
+    expect(c1.montoCents).toBe(1250);
   });
 });

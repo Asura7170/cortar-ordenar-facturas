@@ -95,7 +95,9 @@ export async function procesarCola(): Promise<void> {
   state.colaEnProceso = true;
   try {
     // ponytail: drenado por pendiente, no snapshot; token generación si el MOCK se vuelve concurrente.
-    // Fase 1: el "procesando" se pinta por ítem (feedback), el "ok" una vez al drenar.
+    // Fase 1: el "procesando" y el "ok" (imagen) se pintan por ítem; el monto cae progresivo.
+    // JEV vuela desacoplado (nube): el OCR del siguiente no espera al monto del actual.
+    const vuelos: Promise<boolean>[] = [];
     for (;;) {
       let tocada = false;
       for (;;) {
@@ -218,9 +220,16 @@ export async function procesarCola(): Promise<void> {
           if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
           sig.montoCents = null;
           sig.estado = "ok";
-          // JEV 1×1 progresivo: el monto se pinta sin esperar al lote.
+          try {
+            renderHojas(); // imagen visible al instante, sin esperar al JEV (~1s/factura)
+          } catch {
+            /* el render nunca aborta la cola */
+          }
+          // JEV desacoplado: vuela en paralelo al OCR del siguiente; el monto cae progresivo.
           // Best-effort (nunca lanza): lo no resuelto cae a la red del drenado.
-          await extraerUnMonto(sig.id);
+          // ponytail: Promise.resolve envuelve el mock de tests tras restoreAllMocks (devuelve
+          // undefined sin impl); en prod extraerUnMonto siempre es Promise<boolean>.
+          vuelos.push(Promise.resolve(extraerUnMonto(sig.id)).catch((): boolean => false));
           const entero = (v: number): number => Math.round(v);
           // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
           if (import.meta.env.DEV)
@@ -241,6 +250,9 @@ export async function procesarCola(): Promise<void> {
         tocada = true;
       }
       if (!tocada) break;
+      // Espera a los JEV en vuelo antes de la red (evita doble fetch); la red cubre lo pendiente.
+      await Promise.allSettled(vuelos);
+      vuelos.length = 0;
       // Red del drenado: lo que el 1×1 no resolvió va en lote (best-effort, nunca tumba la cola).
       const mod = await import("./extract").catch((): null => null);
       await Promise.resolve(mod?.extraerPendientes({ desdeCola: true })).catch(() => {});
