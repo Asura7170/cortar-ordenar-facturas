@@ -243,6 +243,25 @@ describe("celdas", () => {
     expect(document.querySelector(".cell-badge")).toBeNull();
   });
 
+  it("actualizarMontoCelda no pisa el borrador sin foco", () => {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: null });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    // La celda propia es la última (el rebuild pinta en orden de hojas).
+    const celdas = document.querySelectorAll(".cell");
+    const cell = celdas.item(celdas.length - 1);
+    if (!(cell instanceof HTMLElement)) throw new Error("sin celda propia");
+    const input = cell.querySelector("input.cell-monto");
+    if (!(input instanceof HTMLInputElement)) throw new Error("sin input de monto");
+    input.value = "abc"; // borrador inválido tras blur, sin foco
+    c.montoCents = 1250; // como lo deja aplicarTotales
+    expect(actualizarMontoCelda(c.id)).toBe(false);
+    expect(cell.querySelector("input.cell-monto")).not.toBeNull();
+    expect(cell.querySelector(".cell-badge")).toBeNull();
+  });
+
   it("con loteEnCurso no usa ViewTransition (sin snapshots)", () => {
     const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
     const spy = vi.fn((cb: () => void): Record<string, unknown> => {

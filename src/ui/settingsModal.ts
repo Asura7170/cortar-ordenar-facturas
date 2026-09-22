@@ -337,6 +337,7 @@ export function initSettings(): void {
     invalidarJev();
   });
   btnBorrarJev.addEventListener("click", () => {
+    ++pruebaJevGen; // el probe en vuelo ya no revive la key borrada
     clearJevKey();
     pintarJev();
   });
@@ -344,6 +345,7 @@ export function initSettings(): void {
     void cargarModelos(true);
   });
   btnResetAjustes.addEventListener("click", () => {
+    ++pruebaJevGen; // idem: el probe en vuelo no revive tras Predeterminado
     restablecerAjustes();
     clearJevKey(); // Predeterminado también apaga el gasto JEV (no vive en state)
     pintarAjustes();

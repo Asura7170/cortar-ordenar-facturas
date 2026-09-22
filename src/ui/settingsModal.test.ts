@@ -688,6 +688,45 @@ describe("JEV", () => {
     }
   });
 
+  it("borrar durante el probe en vuelo no revive la key", async () => {
+    const { getJevKey, clearJevKey } = await import("../pipeline/jev");
+    clearJevKey();
+    const real = globalThis.fetch;
+    let resolver!: (v: Response) => void;
+    const okJev = (): Response =>
+      ({
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        json: (): Promise<unknown> =>
+          Promise.resolve({ answers: { total: { choice: "none" } }, model: "jev-x" }),
+      }) as unknown as Response;
+    // Solo /api/jev queda en vuelo; el resto (lista de modelos) resuelve al acto.
+    globalThis.fetch = ((u: unknown): Promise<Response> => {
+      if (String(u) === "/api/jev") return new Promise<Response>((res) => (resolver = res));
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> => Promise.resolve({ data: [] }),
+      } as unknown as Response);
+    }) as typeof fetch;
+    try {
+      btnAjustes.click();
+      cfgJevKey.value = "apik-k";
+      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
+      btnConectarJev.click(); // probe en vuelo
+      btnBorrarJev.click(); // borra e invalida el vuelo
+      resolver(okJev()); // el probe resuelve tarde
+      await pausa();
+      expect(getJevKey()).toBe("");
+      expect(cfgJevKey.value).toBe("");
+      expect(estadoJev.textContent).toContain("modo local");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
   it("papelera del LLM vacía el input e invalida (Guardar confirma)", () => {
     state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "k" };
     btnAjustes.click();

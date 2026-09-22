@@ -70,6 +70,9 @@ function textoMotivo(m: MotivoRechazo): string {
 
 // Si hojaId se indica, rellena los huecos de ESA hoja (y crea al final si
 // sobran); si no, usa la última hoja con hueco.
+// ponytail: contador, no booleano — dos intakes solapados (paste durante un
+// PDF largo) no sueltan loteEnCurso a mitad del otro.
+let intakesActivos = 0;
 export async function agregarArchivos(
   files: FileList | readonly File[] | null | undefined,
   hojaId: number | null = null,
@@ -135,6 +138,7 @@ export async function agregarArchivos(
   };
   // Sin VT ni rebuilds por archivo durante el intake (ver sheets.renderHojas):
   // el flag cubre todo el loop y el finally lo suelta aunque un PDF falle.
+  intakesActivos++;
   state.loteEnCurso = true;
   try {
     for (const f of lista) {
@@ -203,7 +207,8 @@ export async function agregarArchivos(
       );
     }
   } finally {
-    state.loteEnCurso = false;
+    intakesActivos--;
+    state.loteEnCurso = intakesActivos > 0;
   }
   if (import.meta.env.DEV && msNorm.length > 0) {
     const ordenadas = [...msNorm].sort((a, b) => a - b);

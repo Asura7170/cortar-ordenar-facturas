@@ -376,6 +376,7 @@ export async function extraerPendientes(opciones?: {
       const latencias: number[] = [];
       let enCurso = 0;
       let concMax = 0;
+      let r429 = 0; // DEV: cuántos slots toparon rate-limit (pacing solo con evidencia)
       const porPintar: number[] = [];
       let programado = false;
       let rendersProg = 0;
@@ -413,7 +414,9 @@ export async function extraerPendientes(opciones?: {
               porPintar.push(it.id);
               programaTick();
             }
-          } catch {
+          } catch (e: unknown) {
+            const m = e instanceof Error ? e.message : "";
+            if (m.includes("429") || m.includes("529")) r429++;
             /* este ítem cae al fallback; los hermanos siguen */
           } finally {
             latencias.push(performance.now() - tReq);
@@ -440,7 +443,7 @@ export async function extraerPendientes(opciones?: {
         const entero = (v: number): number => Math.round(v);
         console.info(
           `JEV lote ms pared=${entero(performance.now() - tLote)} n=${cola.length} ok=${okJev} ` +
-            `concJS=${concMax} min=${cuantil(0)} p50=${cuantil(0.5)} p99=${cuantil(0.99)} renders=${rendersProg}`,
+            `concJS=${concMax} min=${cuantil(0)} p50=${cuantil(0.5)} p99=${cuantil(0.99)} renders=${rendersProg} r429=${r429}`,
         );
       }
       if (okJev === items.length) {

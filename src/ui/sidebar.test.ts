@@ -131,6 +131,17 @@ describe("agregarArchivos", () => {
     expect(state.loteEnCurso).toBe(false);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean).length).toBe(antes + 2);
   });
+
+  it("dos intakes solapados no sueltan el flag a medias", async () => {
+    // p1 (1 archivo) termina antes que p2 (2 archivos): al resolver p1, p2
+    // sigue en vuelo y el flag debe seguir arriba hasta que p2 termine.
+    const p1 = agregarArchivos([archivo("a.png", "image/png")]);
+    const p2 = agregarArchivos([archivo("b.png", "image/png"), archivo("c.png", "image/png")]);
+    await p1;
+    expect(state.loteEnCurso).toBe(true);
+    await p2;
+    expect(state.loteEnCurso).toBe(false);
+  });
 });
 
 describe("fileInput / canvas / paste", () => {

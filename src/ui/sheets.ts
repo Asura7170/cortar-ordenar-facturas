@@ -463,6 +463,8 @@ export function actualizarMontoCelda(id: number): boolean {
   if (!item || item.montoCents == null || item.id === editandoMonto) return false;
   const activo = document.activeElement;
   if (activo instanceof HTMLInputElement && cell.contains(activo)) return false; // edición en curso: no pisar
+  const borrador = cell.querySelector("input.cell-monto");
+  if (borrador instanceof HTMLInputElement && borrador.value !== "") return false; // borrador sin foco: no pisar
   const viejo = cell.querySelector(".cell-badge, input.cell-monto");
   const badge = document.createElement("button");
   badge.type = "button";
