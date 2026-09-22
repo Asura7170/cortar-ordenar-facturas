@@ -208,6 +208,31 @@ describe("llamarJev", () => {
     expect(r.total).toBe("12.50");
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
+
+  it("retry-after gigante se topa a 5s (no cuelga el lote)", async () => {
+    vi.useFakeTimers();
+    try {
+      let n = 0;
+      const fetchFn = vi.fn(async (u: unknown, o?: RequestInit): Promise<Response> => {
+        n++;
+        if (n === 1)
+          return {
+            ok: false,
+            status: 429,
+            headers: { get: (): string => "9999" },
+            json: (): Promise<unknown> => Promise.resolve({}),
+          } as unknown as Response;
+        return upstreamOk(o?.body);
+      });
+      const promesa = llamarJev({ id: 1, contenido: "TOTAL 12.50" }, "k", fetchFn as FetchFn);
+      await vi.advanceTimersByTimeAsync(5000);
+      const r = await promesa;
+      expect(r.total).toBe("12.50");
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("extraerPendientes con JEV", () => {

@@ -240,7 +240,7 @@ function pintarJev(): void {
   btnConectarJev.disabled = getJevKey() === "";
 }
 
-/** Sonda JEV real (1 inferencia mínima): guarda, mide ms y pinta ✓/✗ + borde. Nunca lanza. */
+/** Sonda JEV real (1 inferencia mínima): verifica, guarda, mide ms y pinta ✓/✗. Nunca lanza. */
 async function probarConexionJevUI(): Promise<void> {
   // ponytail: recorte al leer — igual que la key del LLM en probarConexionUI
   const key = cfgJevKey.value.trim();
@@ -249,7 +249,6 @@ async function probarConexionJevUI(): Promise<void> {
     btnConectarJev.disabled = true;
     return;
   }
-  setJevKey(key); // Conectar también guarda (el submit ya no es la única vía)
   btnConectarJev.disabled = true;
   estadoJev.textContent = "Conectando…";
   cfgJevKey.removeAttribute("aria-invalid");
@@ -257,6 +256,7 @@ async function probarConexionJevUI(): Promise<void> {
   const r = await probarJev(key);
   if (gen !== pruebaJevGen) return;
   if (r.ok) {
+    setJevKey(key); // solo la key verificada persiste (la mala no contamina el store)
     estadoJev.textContent = `✓ OK (${r.modelo}, ${r.ms}ms).`;
     estadoJev.dataset.estado = "ok";
     cfgJevKey.setAttribute("aria-invalid", "false");
@@ -345,6 +345,7 @@ export function initSettings(): void {
   });
   btnResetAjustes.addEventListener("click", () => {
     restablecerAjustes();
+    clearJevKey(); // Predeterminado también apaga el gasto JEV (no vive en state)
     pintarAjustes();
     renderMonto();
     renderHojas();

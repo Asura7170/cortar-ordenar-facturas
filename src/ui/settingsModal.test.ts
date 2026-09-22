@@ -114,6 +114,17 @@ describe("Predeterminado", () => {
     expect(cfgApiKey.value).toBe("");
     expect(cfgMoneda.value).toBe("BOB");
   });
+
+  it("también borra la key JEV (apaga su gasto)", async () => {
+    const { setJevKey, getJevKey } = await import("../pipeline/jev");
+    setJevKey("apik-rancia");
+    btnAjustes.click();
+    btnResetAjustes.click();
+    expect(getJevKey()).toBe("");
+    expect(localStorage.getItem("jev-api-key")).toBeNull();
+    expect(el<HTMLInputElement>("cfgJevKey").value).toBe("");
+    modalAjustes.close();
+  });
 });
 
 describe("Modelos", () => {
@@ -643,6 +654,7 @@ describe("JEV", () => {
       expect(estadoJev.textContent).toContain("ms");
       expect(estadoJev.dataset.estado).toBe("ok");
       expect(cfgJevKey.getAttribute("aria-invalid")).toBe("false");
+      expect(localStorage.getItem("jev-api-key")).toBe("apik-k");
     } finally {
       globalThis.fetch = real;
       modalAjustes.close();
@@ -651,6 +663,8 @@ describe("JEV", () => {
 
   it("conectar con 401 pinta ✗ y borde rojo", async () => {
     const real = globalThis.fetch;
+    const { clearJevKey } = await import("../pipeline/jev");
+    clearJevKey();
     globalThis.fetch = (async (): Promise<Response> =>
       ({
         ok: false,
@@ -667,6 +681,7 @@ describe("JEV", () => {
       expect(estadoJev.textContent).toContain("401");
       expect(estadoJev.dataset.estado).toBe("error");
       expect(cfgJevKey.getAttribute("aria-invalid")).toBe("true");
+      expect(localStorage.getItem("jev-api-key")).toBeNull(); // la mala no persiste
     } finally {
       globalThis.fetch = real;
       modalAjustes.close();

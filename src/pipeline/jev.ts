@@ -7,7 +7,6 @@ import { parsearMonto } from "../ui/monto";
 export const JEV_MODEL = "jev-latest";
 export const JEV_TIMEOUT_MS = 15_000;
 export const JEV_MAX_CANDIDATOS = 40;
-export const JEV_STATE_MAX = 32_000;
 export const JEV_KEY_SS = "jev-api-key";
 
 /** Formato X,XXX.XX exigido antes de mostrar (nunca se pinta basura). */
@@ -179,7 +178,7 @@ export function clearJevKey(): void {
 
 /** POST mismo-origen /api/jev (Pages `_redirects` en prod, proxy vite en dev)
     con Bearer del usuario; `buildRequest` congela el prompt en cliente.
-    Valida X,XXX.XX; 1 reintento 429/529 honrando retry-after. */
+    Valida X,XXX.XX; 1 reintento 429/529 honrando retry-after (tope 5s). */
 export async function llamarJev(
   factura: FacturaJev,
   apiKey: string,
@@ -189,15 +188,8 @@ export async function llamarJev(
   const key = apiKey.trim();
   if (key === "") throw new Error("sin key JEV");
   const req = buildRequest(factura);
-  // ponytail: state ≤32k; recorte duro de cola si crece (el proxy no valida).
-  const cuerpo =
-    JSON.stringify(req.state).length > JEV_STATE_MAX
-      ? {
-          state: { contenido: req.state.contenido.slice(-JEV_STATE_MAX), candidatos: [] },
-          model: req.model,
-          questions: req.questions,
-        }
-      : { state: req.state, model: req.model, questions: req.questions };
+  // ponytail: sin recorte de state — el texto ya viene topado (limpiarTexto ≤1800).
+  const cuerpo = { state: req.state, model: req.model, questions: req.questions };
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), JEV_TIMEOUT_MS);
   try {
@@ -208,7 +200,8 @@ export async function llamarJev(
       signal: ctrl.signal,
     });
     if ((res.status === 429 || res.status === 529) && reintento) {
-      const espera = Number(res.headers.get("retry-after")) * 1000 || 1000;
+      // ponytail: tope 5s — un retry-after gigante no cuelga el lote
+      const espera = Math.min(Number(res.headers.get("retry-after")) * 1000 || 1000, 5000);
       await new Promise((r) => setTimeout(r, espera));
       clearTimeout(t);
       return llamarJev(factura, key, fetchFn, false);
