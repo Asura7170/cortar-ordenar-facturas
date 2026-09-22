@@ -2,12 +2,12 @@
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture, el } from "../test/fixture";
 
-vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
+vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn(), actualizarMontoCelda: vi.fn() }));
 
 montarFixture();
 const { crearHoja, state } = await import("../state");
 const { comprobante } = await import("../test/factoria");
-const { renderHojas } = await import("../ui/sheets");
+const { actualizarMontoCelda, renderHojas } = await import("../ui/sheets");
 const {
   MONTO_RE,
   buildRequest,
@@ -58,6 +58,7 @@ beforeEach(() => {
     /* sin sessionStorage */
   }
   vi.mocked(renderHojas).mockClear();
+  vi.mocked(actualizarMontoCelda).mockReset().mockReturnValue(true);
 });
 
 describe("pipeline prototipo", () => {
@@ -442,6 +443,27 @@ describe("extraerUnMonto (1×1 de la cola)", () => {
     h.slots[0] = c1;
     state.hojas.push(h);
     setJevKey("apik-k");
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (u: unknown, o?: RequestInit): Promise<Response> =>
+      upstreamOk(o?.body)) as typeof fetch;
+    try {
+      expect(await extraerUnMonto(c1.id)).toBe(true);
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(c1.montoCents).toBe(1250);
+    // Parche in-place, sin rebuild: el render completo solo cubre el fallo.
+    expect(vi.mocked(actualizarMontoCelda)).toHaveBeenCalledWith(c1.id);
+    expect(vi.mocked(renderHojas)).not.toHaveBeenCalled();
+  });
+
+  it("si el parche falla, el render completo lo cubre", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    h.slots[0] = c1;
+    state.hojas.push(h);
+    setJevKey("apik-k");
+    vi.mocked(actualizarMontoCelda).mockReturnValueOnce(false);
     const real = globalThis.fetch;
     globalThis.fetch = (async (u: unknown, o?: RequestInit): Promise<Response> =>
       upstreamOk(o?.body)) as typeof fetch;

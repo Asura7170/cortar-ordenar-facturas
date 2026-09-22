@@ -288,7 +288,12 @@ export async function extraerUnMonto(id: number, fetchFn: FetchFn = fetch): Prom
       }
       const item: ItemLote = { idx: 1, id, texto };
       if (aplicarTotales([item], new Map([[1, cents]])) === 0) return false;
-      renderHojas(); // progresivo: badge + total al instante
+      // Progresivo sin rebuild: parche in-place; el render completo cubre el fallo.
+      try {
+        if (!actualizarMontoCelda(id)) renderHojas();
+      } catch {
+        renderHojas();
+      }
       return true;
     } finally {
       enVuelo.delete(id);
@@ -355,6 +360,7 @@ export async function extraerPendientes(opciones?: {
   const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
   const prefijo = jevKey !== "" ? "JEV:" : "IA:";
   extrayendo = true;
+  const previoLote = state.loteEnCurso; // el lote no pisa un intake en curso
   state.loteEnCurso = true; // sin VT ni rebuilds por tick (ver sheets.renderHojas)
   refrescarBoton();
   avisar(`${prefijo} extrayendo totales…`);
@@ -489,7 +495,7 @@ export async function extraerPendientes(opciones?: {
       avisar(avisoPrevio);
     }
   } finally {
-    state.loteEnCurso = false;
+    state.loteEnCurso = previoLote; // restaura: no suelta un intake solapado
     extrayendo = false;
     refrescarBoton();
   }
