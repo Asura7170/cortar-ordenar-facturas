@@ -23,6 +23,7 @@ import {
   urlProxy,
 } from "../pipeline/modelos";
 import type { NivelRazonamiento } from "../types";
+import { clearJevKey, getJevKey, setJevKey } from "../pipeline/jev";
 
 const modalAjustes: HTMLDialogElement = getEl<HTMLDialogElement>("modalAjustes");
 const btnAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnAjustes");
@@ -36,6 +37,10 @@ const estadoModelosIA: HTMLElement = getEl("estadoModelosIA");
 const btnProbarIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnProbarIA");
 const estadoPruebaIA: HTMLElement = getEl("estadoPruebaIA");
 const cfgApiKey: HTMLInputElement = getEl<HTMLInputElement>("cfgApiKey");
+const cfgJevKey: HTMLInputElement = getEl<HTMLInputElement>("cfgJevKey");
+const btnGuardarJev: HTMLButtonElement = getEl<HTMLButtonElement>("btnGuardarJev");
+const btnBorrarJev: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarJev");
+const estadoJev: HTMLElement = getEl("estadoJev");
 const cfgMoneda: HTMLSelectElement = getEl<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnResetAjustes");
 const estadoModelos: HTMLElement = getEl("estadoModelos");
@@ -220,9 +225,15 @@ async function cargarModelos(forzado: boolean): Promise<void> {
   }
 }
 
+function pintarJev(): void {
+  cfgJevKey.value = getJevKey();
+  estadoJev.textContent = getJevKey() !== "" ? "Guardada ✓" : "Sin key (modo local)";
+}
+
 function pintarAjustes(): void {
   cfgBaseUrl.value = state.configIA.baseUrl;
   cfgApiKey.value = state.configIA.apiKey;
+  pintarJev();
   cfgMoneda.value = state.moneda;
   cfgModelManual.value = "";
   // ponytail: el caché es por endpoint — el de otro proveedor no se mezcla
@@ -265,6 +276,14 @@ export function initSettings(): void {
   });
   btnProbarIA.addEventListener("click", () => {
     void probarConexionUI();
+  });
+  btnGuardarJev.addEventListener("click", () => {
+    setJevKey(cfgJevKey.value);
+    pintarJev();
+  });
+  btnBorrarJev.addEventListener("click", () => {
+    clearJevKey();
+    pintarJev();
   });
   btnRefrescarModelos.addEventListener("click", () => {
     void cargarModelos(true);

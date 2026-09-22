@@ -1,13 +1,14 @@
 /* Cola secuencial de procesamiento — DocAligner recorta, PP-OCRv6_small extrae
    texto (import dinámico: dict+onnx solo bajan con el primer comprobante).
-   Al drenar, el LLM completa los montos en lote (extract.ts); sin TOTAL o sin
-   key el monto queda manual. */
+   Cada ítem extrae su monto 1×1 al completar (extract.ts, pintado progresivo);
+   al drenar, el lote cubre lo pendiente; sin TOTAL o sin key el monto queda manual. */
 import { buscarSlot, state } from "../state";
 import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
 import { detectarYRecortar, obtenerSesion } from "./docaligner";
+import { extraerUnMonto } from "./extract";
 import { CALIDAD_JPEG } from "./imagen";
 import type { Enderezado } from "./ocr";
 import { diagVacio } from "./ocr";
@@ -217,6 +218,9 @@ export async function procesarCola(): Promise<void> {
           if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
           sig.montoCents = null;
           sig.estado = "ok";
+          // JEV 1×1 progresivo: el monto se pinta sin esperar al lote.
+          // Best-effort (nunca lanza): lo no resuelto cae a la red del drenado.
+          await extraerUnMonto(sig.id);
           const entero = (v: number): number => Math.round(v);
           // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
           if (import.meta.env.DEV)
@@ -237,7 +241,7 @@ export async function procesarCola(): Promise<void> {
         tocada = true;
       }
       if (!tocada) break;
-      // Auto IA en lote (1 llamada): best-effort, nunca tumba la cola.
+      // Red del drenado: lo que el 1×1 no resolvió va en lote (best-effort, nunca tumba la cola).
       const mod = await import("./extract").catch((): null => null);
       await Promise.resolve(mod?.extraerPendientes({ desdeCola: true })).catch(() => {});
       try {

@@ -344,6 +344,37 @@
               </button>
             </div>
             <output id="estadoPruebaIA" aria-live="polite"></output>
+            <label for="cfgJevKey">API Key JEV</label>
+            <div class="fila-modelos">
+              <input
+                type="password"
+                id="cfgJevKey"
+                name="cfgJevKey"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="apik-..."
+                style="flex: 1; min-width: 0"
+              />
+              <button
+                class="btn btn-ghost"
+                type="button"
+                id="btnGuardarJev"
+                title="Guardar key JEV en este navegador"
+                aria-label="Guardar key JEV"
+              >
+                Guardar
+              </button>
+              <button
+                class="btn btn-ghost"
+                type="button"
+                id="btnBorrarJev"
+                title="Borrar key JEV de este navegador"
+                aria-label="Borrar key JEV"
+              >
+                Borrar
+              </button>
+            </div>
+            <output id="estadoJev" aria-live="polite"></output>
             <label
               >Moneda
               <select id="cfgMoneda" name="cfgMoneda">
