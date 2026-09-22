@@ -23,7 +23,7 @@ import {
   urlProxy,
 } from "../pipeline/modelos";
 import type { NivelRazonamiento } from "../types";
-import { clearJevKey, getJevKey, setJevKey } from "../pipeline/jev";
+import { clearJevKey, getJevKey, probarJev, setJevKey } from "../pipeline/jev";
 
 const modalAjustes: HTMLDialogElement = getEl<HTMLDialogElement>("modalAjustes");
 const btnAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnAjustes");
@@ -38,7 +38,7 @@ const btnProbarIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnProbarIA");
 const estadoPruebaIA: HTMLElement = getEl("estadoPruebaIA");
 const cfgApiKey: HTMLInputElement = getEl<HTMLInputElement>("cfgApiKey");
 const cfgJevKey: HTMLInputElement = getEl<HTMLInputElement>("cfgJevKey");
-const btnGuardarJev: HTMLButtonElement = getEl<HTMLButtonElement>("btnGuardarJev");
+const btnConectarJev: HTMLButtonElement = getEl<HTMLButtonElement>("btnConectarJev");
 const btnBorrarJev: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarJev");
 const estadoJev: HTMLElement = getEl("estadoJev");
 const cfgMoneda: HTMLSelectElement = getEl<HTMLSelectElement>("cfgMoneda");
@@ -59,6 +59,9 @@ function normalizarEndpoint(base: string): string {
 
 /** Generación de la prueba de conexión: descarta resoluciones rancias. */
 let pruebaGen = 0;
+
+/** Generación de la sonda JEV: descarta resoluciones rancias. */
+let pruebaJevGen = 0;
 
 /** Generación de la carga de modelos: descarta resoluciones rancias. */
 let modelosGen = 0;
@@ -228,6 +231,41 @@ async function cargarModelos(forzado: boolean): Promise<void> {
 function pintarJev(): void {
   cfgJevKey.value = getJevKey();
   estadoJev.textContent = getJevKey() !== "" ? "Guardada ✓" : "Sin key (modo local)";
+  cfgJevKey.removeAttribute("aria-invalid");
+  btnConectarJev.disabled = getJevKey() === "";
+}
+
+/** Sonda JEV real (1 inferencia mínima): guarda, mide ms y pinta ✓/✗ + borde. Nunca lanza. */
+async function probarConexionJevUI(): Promise<void> {
+  // ponytail: recorte al leer — igual que la key del LLM en probarConexionUI
+  const key = cfgJevKey.value.trim();
+  if (key === "") {
+    estadoJev.textContent = "Falta API key JEV.";
+    btnConectarJev.disabled = true;
+    return;
+  }
+  setJevKey(key); // Conectar también guarda (el submit ya no es la única vía)
+  btnConectarJev.disabled = true;
+  estadoJev.textContent = "Conectando…";
+  cfgJevKey.removeAttribute("aria-invalid");
+  const gen = ++pruebaJevGen; // ponytail: la resolución rancia no pisa edición en vuelo
+  const r = await probarJev(key);
+  if (gen !== pruebaJevGen) return;
+  if (r.ok) {
+    estadoJev.textContent = `✓ OK (${r.modelo}, ${r.ms}ms).`;
+    cfgJevKey.setAttribute("aria-invalid", "false");
+  } else {
+    estadoJev.textContent = `✗ ${r.mensaje}`;
+    cfgJevKey.setAttribute("aria-invalid", "true");
+  }
+  btnConectarJev.disabled = cfgJevKey.value.trim() === "";
+}
+
+/** Cambio en la key JEV invalida la última prueba (y su vuelo). */
+function invalidarJev(): void {
+  ++pruebaJevGen;
+  estadoJev.textContent = "Sin probar.";
+  cfgJevKey.removeAttribute("aria-invalid");
 }
 
 function pintarAjustes(): void {
@@ -277,9 +315,12 @@ export function initSettings(): void {
   btnProbarIA.addEventListener("click", () => {
     void probarConexionUI();
   });
-  btnGuardarJev.addEventListener("click", () => {
-    setJevKey(cfgJevKey.value);
-    pintarJev();
+  btnConectarJev.addEventListener("click", () => {
+    void probarConexionJevUI();
+  });
+  cfgJevKey.addEventListener("input", () => {
+    btnConectarJev.disabled = cfgJevKey.value.trim() === "";
+    invalidarJev();
   });
   btnBorrarJev.addEventListener("click", () => {
     clearJevKey();
@@ -330,6 +371,7 @@ export function initSettings(): void {
     state.configIA.baseUrl = cfgBaseUrl.value.trim() || CONFIG_IA_DEFAULT.baseUrl;
     state.configIA.model = modeloElegido().trim() || CONFIG_IA_DEFAULT.model;
     state.configIA.apiKey = cfgApiKey.value.trim();
+    setJevKey(cfgJevKey.value); // el Guardar grande también guarda la key JEV
     state.configIA.razonamiento = razonamientoElegido();
     state.moneda = isMoneda(cfgMoneda.value) ? cfgMoneda.value : MONEDA_DEFAULT;
     guardarAjustes();

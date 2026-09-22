@@ -18,6 +18,7 @@ const {
   formatMonto,
   getJevKey,
   llamarJev,
+  probarJev,
   resolveTotal,
   setJevKey,
 } = await import("./jev");
@@ -105,14 +106,50 @@ describe("pipeline prototipo", () => {
 });
 
 describe("key JEV", () => {
-  it("vive en sessionStorage, nunca en localStorage", () => {
+  it("persiste en localStorage, nunca en el state", () => {
+    localStorage.removeItem("jev-api-key");
     setJevKey("apik-prueba");
     expect(getJevKey()).toBe("apik-prueba");
-    expect(sessionStorage.getItem("jev-api-key")).toBe("apik-prueba");
+    expect(localStorage.getItem("jev-api-key")).toBe("apik-prueba");
     const raw = localStorage.getItem("libro-mayor-state") ?? "";
     expect(raw).not.toContain("apik-prueba");
     clearJevKey();
     expect(getJevKey()).toBe("");
+    expect(localStorage.getItem("jev-api-key")).toBeNull();
+  });
+
+  it("migra la key vieja de sessionStorage en la primera lectura", async () => {
+    localStorage.removeItem("jev-api-key");
+    sessionStorage.setItem("jev-api-key", "apik-vieja");
+    vi.resetModules(); // módulo fresco: cargada=false, relee las tiendas
+    const fresco = await import("./jev");
+    expect(fresco.getJevKey()).toBe("apik-vieja");
+    fresco.clearJevKey();
+  });
+});
+
+describe("probarJev", () => {
+  it("ok devuelve modelo y ms sin lanzar", async () => {
+    const r = await probarJev("apik-k", (async (u: unknown, o?: RequestInit) =>
+      upstreamOk(o?.body, "jev-1.13.0")) as FetchFn);
+    expect(r.ok).toBe(true);
+    expect(r.modelo).toBe("jev:jev-1.13.0");
+    expect(r.ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it("sin key y 401 devuelven mensaje sin lanzar", async () => {
+    expect((await probarJev("  ")).ok).toBe(false);
+    const r401 = await probarJev(
+      "apik-mala",
+      (async () =>
+        ({
+          ok: false,
+          status: 401,
+          headers: { get: (): null => null },
+        }) as unknown as Response) as FetchFn,
+    );
+    expect(r401.ok).toBe(false);
+    expect(r401.mensaje).toContain("401");
   });
 });
 

@@ -48,7 +48,7 @@ export const FIXTURE_HTML = `
   <button id="btnProbarIA" type="button"></button>
   <output id="estadoPruebaIA"></output>
   <input id="cfgJevKey" type="password">
-  <button id="btnGuardarJev" type="button"></button>
+  <button id="btnConectarJev" type="button"></button>
   <button id="btnBorrarJev" type="button"></button>
   <output id="estadoJev"></output>
   <select id="cfgMoneda">

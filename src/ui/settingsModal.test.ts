@@ -588,3 +588,92 @@ describe("probar conexión", () => {
     modalAjustes.close();
   });
 });
+
+describe("JEV", () => {
+  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+  const cfgJevKey = el<HTMLInputElement>("cfgJevKey");
+  const btnConectarJev = el<HTMLButtonElement>("btnConectarJev");
+  const btnBorrarJev = el<HTMLButtonElement>("btnBorrarJev");
+  const estadoJev = el("estadoJev");
+
+  it("el submit grande también guarda la key JEV (no se pierde)", async () => {
+    const { getJevKey, clearJevKey } = await import("../pipeline/jev");
+    clearJevKey();
+    cfgJevKey.value = "apik-submit";
+    enviar();
+    expect(getJevKey()).toBe("apik-submit");
+    expect(localStorage.getItem("jev-api-key")).toBe("apik-submit");
+    modalAjustes.close();
+  });
+
+  it("abrir repuebla el input (se ve guardada)", async () => {
+    const { setJevKey } = await import("../pipeline/jev");
+    setJevKey("apik-guardada");
+    btnAjustes.click();
+    expect(cfgJevKey.value).toBe("apik-guardada");
+    expect(estadoJev.textContent).toContain("Guardada");
+    modalAjustes.close();
+  });
+
+  it("conectar ok pinta ✓ con ms y borde verde", async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      ({
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        json: (): Promise<unknown> =>
+          Promise.resolve({ answers: { total: { choice: "none" } }, model: "jev-x" }),
+      }) as unknown as Response) as typeof fetch;
+    try {
+      btnAjustes.click();
+      cfgJevKey.value = "apik-k";
+      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
+      btnConectarJev.click();
+      await pausa();
+      expect(estadoJev.textContent).toContain("✓ OK");
+      expect(estadoJev.textContent).toContain("ms");
+      expect(cfgJevKey.getAttribute("aria-invalid")).toBe("false");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("conectar con 401 pinta ✗ y borde rojo", async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      ({
+        ok: false,
+        status: 401,
+        headers: { get: (): null => null },
+      }) as unknown as Response) as typeof fetch;
+    try {
+      btnAjustes.click();
+      cfgJevKey.value = "apik-mala";
+      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
+      btnConectarJev.click();
+      await pausa();
+      expect(estadoJev.textContent).toContain("✗");
+      expect(estadoJev.textContent).toContain("401");
+      expect(cfgJevKey.getAttribute("aria-invalid")).toBe("true");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("editar invalida y borrar limpia", async () => {
+    const { setJevKey, getJevKey } = await import("../pipeline/jev");
+    setJevKey("apik-k");
+    btnAjustes.click();
+    cfgJevKey.value = "otra";
+    cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(estadoJev.textContent).toBe("Sin probar.");
+    btnBorrarJev.click();
+    expect(getJevKey()).toBe("");
+    expect(cfgJevKey.value).toBe("");
+    expect(estadoJev.textContent).toContain("modo local");
+    modalAjustes.close();
+  });
+});

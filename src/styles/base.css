@@ -505,10 +505,12 @@ input::placeholder {
   display: flex;
   gap: 10px;
 }
-#cfgApiKey[aria-invalid="true"] {
+#cfgApiKey[aria-invalid="true"],
+#cfgJevKey[aria-invalid="true"] {
   border-color: var(--sello);
 }
-#cfgApiKey[aria-invalid="false"] {
+#cfgApiKey[aria-invalid="false"],
+#cfgJevKey[aria-invalid="false"] {
   border-color: var(--verde-tinta);
 }
 

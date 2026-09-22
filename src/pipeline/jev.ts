@@ -135,7 +135,8 @@ export function extractTotalOfflineCents(factura: FacturaJev): Cents | null {
   return parsearMonto(extractTotalOffline(factura) ?? "");
 }
 
-/* Key JEV: solo memoria + sessionStorage, nunca localStorage ni logs. */
+/* Key JEV: persiste en localStorage como la del LLM (ver state.guardarAjustes);
+   sessionStorage solo como migración de la época anterior; nunca logs. */
 let memoria = "";
 let cargada = false;
 
@@ -143,7 +144,7 @@ export function getJevKey(): string {
   if (!cargada) {
     cargada = true;
     try {
-      memoria = sessionStorage.getItem(JEV_KEY_SS) ?? "";
+      memoria = localStorage.getItem(JEV_KEY_SS) ?? sessionStorage.getItem(JEV_KEY_SS) ?? "";
     } catch {
       memoria = "";
     }
@@ -155,8 +156,11 @@ export function setJevKey(key: string): void {
   memoria = key.trim();
   cargada = true;
   try {
-    if (memoria !== "") sessionStorage.setItem(JEV_KEY_SS, memoria);
-    else sessionStorage.removeItem(JEV_KEY_SS);
+    if (memoria !== "") localStorage.setItem(JEV_KEY_SS, memoria);
+    else {
+      localStorage.removeItem(JEV_KEY_SS);
+      sessionStorage.removeItem(JEV_KEY_SS);
+    }
   } catch {
     /* sin almacenamiento: queda en memoria */
   }
@@ -166,6 +170,7 @@ export function clearJevKey(): void {
   memoria = "";
   cargada = true;
   try {
+    localStorage.removeItem(JEV_KEY_SS);
     sessionStorage.removeItem(JEV_KEY_SS);
   } catch {
     /* sin almacenamiento */
@@ -216,5 +221,41 @@ export async function llamarJev(
     return { total, source: `jev:${modelo}` };
   } finally {
     clearTimeout(t);
+  }
+}
+
+export interface ResultadoJev {
+  readonly ok: boolean;
+  readonly modelo: string;
+  readonly ms: number;
+  readonly total: string;
+  readonly mensaje: string;
+}
+
+/** Sonda mínima (1 inferencia real con factura sintética): valida la key y mide
+    ms para el botón Conectar. Nunca lanza; la key jamás va a logs. */
+export async function probarJev(apiKey: string, fetchFn: FetchFn = fetch): Promise<ResultadoJev> {
+  const key = apiKey.trim();
+  if (key === "") return { ok: false, modelo: "", ms: 0, total: "", mensaje: "Falta API key JEV." };
+  const ini = performance.now();
+  try {
+    const r = await llamarJev({ id: 0, contenido: "Total: 1.00" }, key, fetchFn);
+    return {
+      ok: true,
+      modelo: r.source,
+      ms: Math.round(performance.now() - ini),
+      total: r.total,
+      mensaje: "",
+    };
+  } catch (e: unknown) {
+    const ms = Math.round(performance.now() - ini);
+    if (e instanceof DOMException && e.name === "AbortError")
+      return { ok: false, modelo: "", ms, total: "", mensaje: "timeout (15s)" };
+    const m = e instanceof Error ? e.message : "error";
+    if (m.includes("401"))
+      return { ok: false, modelo: "", ms, total: "", mensaje: "clave inválida (401)" };
+    if (m.includes("Failed to fetch"))
+      return { ok: false, modelo: "", ms, total: "", mensaje: "sin red/CORS" };
+    return { ok: false, modelo: "", ms, total: "", mensaje: m };
   }
 }
