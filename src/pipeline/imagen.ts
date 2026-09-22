@@ -20,7 +20,7 @@ const BLANCO_RATIO = 0.995;
  */
 // ponytail: umbral fijo 245/99.5%; conteo por texto/OCR si hay falsos positivos en tickets ralos.
 export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
-  const ctx = lienzo.getContext("2d");
+  const ctx = ctxLectura(lienzo);
   if (!ctx || lienzo.width < 1 || lienzo.height < 1) return false;
   let datos: Uint8ClampedArray;
   try {
@@ -57,7 +57,7 @@ const NEGRO_RATIO = 0.995;
  */
 // ponytail: espejo de esPaginaBlanca, no abstracción; el umbral vive aquí, no en config.
 export function esPaginaNegra(lienzo: HTMLCanvasElement): boolean {
-  const ctx = lienzo.getContext("2d");
+  const ctx = ctxLectura(lienzo);
   if (!ctx || lienzo.width < 1 || lienzo.height < 1) return false;
   let datos: Uint8ClampedArray;
   try {
@@ -93,6 +93,11 @@ export const cargarReal: CargarBitmap = (f, opc) => createImageBitmap(f, opc);
 /** Fábrica real de lienzo (compartida con docaligner para no duplicarla). */
 export const crearReal: CrearLienzo = () => document.createElement("canvas");
 
+/** Contexto 2D para lienzos que se leen (el atributo evita stalls GPU→CPU en readbacks). */
+function ctxLectura(lienzo: HTMLCanvasElement): CanvasRenderingContext2D | null {
+  return lienzo.getContext("2d", { willReadFrequently: true }) ?? lienzo.getContext("2d");
+}
+
 /** Distancia máxima por canal al color del borde (medido: fila digital ≤6). */
 const TOL_LADO = 15;
 /** Margen alrededor del bbox (0: recorte exacto, sin franja blanca). */
@@ -113,7 +118,7 @@ export function recortarMargenesBlancos(
   const ancho = src.width;
   const alto = src.height;
   if (ancho < 1 || alto < 1) return src;
-  const ctx = src.getContext("2d");
+  const ctx = ctxLectura(src);
   if (!ctx) return src;
   let datos: Uint8ClampedArray;
   try {
@@ -227,7 +232,7 @@ export async function normalizarImagen(
     const lienzo = crear();
     lienzo.width = Math.max(1, Math.round(bmp.width * escala));
     lienzo.height = Math.max(1, Math.round(bmp.height * escala));
-    const ctx = lienzo.getContext("2d");
+    const ctx = ctxLectura(lienzo);
     if (!ctx) throw new Error("ilegible");
     ctx.drawImage(bmp, 0, 0, lienzo.width, lienzo.height);
     // ponytail: mismo recorte que el PDF (el aire tuerce el quad de DocAligner).

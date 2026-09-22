@@ -365,22 +365,27 @@
 }
 
 /* Esqueleto mientras llega el thumb: mismo hueco que la foto, cero decodificación. */
+/* ponytail: sweep por transform en pseudo-elemento (compositor), no por
+   background-position (repintaba N esqueletos por frame y saturaba el raster). */
 .cell-skel {
   width: 100%;
   height: 100%;
   border-radius: 2px;
-  background: linear-gradient(
-    100deg,
-    var(--papel-sombra) 30%,
-    var(--papel-brillo) 50%,
-    var(--papel-sombra) 70%
-  );
-  background-size: 200% 100%;
+  background: var(--papel-sombra);
+  overflow: hidden;
+  position: relative;
+}
+.cell-skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, var(--papel-brillo) 50%, transparent 70%);
+  transform: translateX(-100%);
   animation: skel-sweep 1.2s linear infinite;
 }
 @keyframes skel-sweep {
   to {
-    background-position: -200% 0;
+    transform: translateX(100%);
   }
 }
 

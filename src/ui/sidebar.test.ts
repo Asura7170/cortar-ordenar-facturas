@@ -124,6 +124,13 @@ describe("agregarArchivos", () => {
     expect(state.colaEnProceso).toBe(true);
     expect(state.hojas[0]?.slots[0]?.estado).toBe("procesando");
   });
+
+  it("el intake suelta loteEnCurso al terminar (sin VT atascado)", async () => {
+    const antes = state.hojas.flatMap((h) => h.slots).filter(Boolean).length;
+    await agregarArchivos([archivo("f.png", "image/png"), archivo("g.png", "image/png")]);
+    expect(state.loteEnCurso).toBe(false);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean).length).toBe(antes + 2);
+  });
 });
 
 describe("fileInput / canvas / paste", () => {
