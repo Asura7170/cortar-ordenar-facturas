@@ -595,6 +595,14 @@ describe("JEV", () => {
   const btnConectarJev = el<HTMLButtonElement>("btnConectarJev");
   const btnBorrarJev = el<HTMLButtonElement>("btnBorrarJev");
   const estadoJev = el("estadoJev");
+  const btnBorrarApiKey = el<HTMLButtonElement>("btnBorrarApiKey");
+
+  it("agrupa en 3 secciones visibles", () => {
+    const leyendas = [...formAjustes.querySelectorAll("fieldset.grupo-modelos > legend")].map(
+      (l) => l.textContent,
+    );
+    expect(leyendas).toEqual(["Modelos IA", "Moneda", "Modelos en este equipo"]);
+  });
 
   it("el submit grande también guarda la key JEV (no se pierde)", async () => {
     const { getJevKey, clearJevKey } = await import("../pipeline/jev");
@@ -633,6 +641,7 @@ describe("JEV", () => {
       await pausa();
       expect(estadoJev.textContent).toContain("✓ OK");
       expect(estadoJev.textContent).toContain("ms");
+      expect(estadoJev.dataset.estado).toBe("ok");
       expect(cfgJevKey.getAttribute("aria-invalid")).toBe("false");
     } finally {
       globalThis.fetch = real;
@@ -656,11 +665,25 @@ describe("JEV", () => {
       await pausa();
       expect(estadoJev.textContent).toContain("✗");
       expect(estadoJev.textContent).toContain("401");
+      expect(estadoJev.dataset.estado).toBe("error");
       expect(cfgJevKey.getAttribute("aria-invalid")).toBe("true");
     } finally {
       globalThis.fetch = real;
       modalAjustes.close();
     }
+  });
+
+  it("papelera del LLM vacía el input e invalida (Guardar confirma)", () => {
+    state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "k" };
+    btnAjustes.click();
+    expect(btnProbarIA.disabled).toBe(false);
+    btnBorrarApiKey.click();
+    expect(cfgApiKey.value).toBe("");
+    expect(btnProbarIA.disabled).toBe(true);
+    expect(estadoPruebaIA.textContent).toBe("Sin probar.");
+    enviar();
+    expect(state.configIA.apiKey).toBe("");
+    modalAjustes.close();
   });
 
   it("editar invalida y borrar limpia", async () => {
@@ -670,6 +693,7 @@ describe("JEV", () => {
     cfgJevKey.value = "otra";
     cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
     expect(estadoJev.textContent).toBe("Sin probar.");
+    expect(estadoJev.dataset.estado).toBeUndefined();
     btnBorrarJev.click();
     expect(getJevKey()).toBe("");
     expect(cfgJevKey.value).toBe("");

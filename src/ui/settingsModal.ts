@@ -36,6 +36,7 @@ const btnRefrescarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnRefr
 const estadoModelosIA: HTMLElement = getEl("estadoModelosIA");
 const btnProbarIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnProbarIA");
 const estadoPruebaIA: HTMLElement = getEl("estadoPruebaIA");
+const btnBorrarApiKey: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarApiKey");
 const cfgApiKey: HTMLInputElement = getEl<HTMLInputElement>("cfgApiKey");
 const cfgJevKey: HTMLInputElement = getEl<HTMLInputElement>("cfgJevKey");
 const btnConectarJev: HTMLButtonElement = getEl<HTMLButtonElement>("btnConectarJev");
@@ -164,9 +165,11 @@ async function probarConexionUI(): Promise<void> {
   if (r.ok) {
     const via = urlProxy(base) !== base ? ", proxy dev" : "";
     estadoPruebaIA.textContent = `✓ OK (${r.tipo}${via}, ${r.ms}ms).`;
+    estadoPruebaIA.dataset.estado = "ok";
     cfgApiKey.setAttribute("aria-invalid", "false");
   } else {
     estadoPruebaIA.textContent = `✗ ${r.mensaje}`;
+    estadoPruebaIA.dataset.estado = "error";
     cfgApiKey.setAttribute("aria-invalid", "true");
   }
   btnProbarIA.disabled = cfgApiKey.value.trim() === "";
@@ -176,6 +179,7 @@ async function probarConexionUI(): Promise<void> {
 function invalidarPrueba(): void {
   ++pruebaGen;
   estadoPruebaIA.textContent = "Sin probar.";
+  delete estadoPruebaIA.dataset.estado;
   cfgApiKey.removeAttribute("aria-invalid");
 }
 
@@ -231,6 +235,7 @@ async function cargarModelos(forzado: boolean): Promise<void> {
 function pintarJev(): void {
   cfgJevKey.value = getJevKey();
   estadoJev.textContent = getJevKey() !== "" ? "Guardada ✓" : "Sin key (modo local)";
+  delete estadoJev.dataset.estado;
   cfgJevKey.removeAttribute("aria-invalid");
   btnConectarJev.disabled = getJevKey() === "";
 }
@@ -253,9 +258,11 @@ async function probarConexionJevUI(): Promise<void> {
   if (gen !== pruebaJevGen) return;
   if (r.ok) {
     estadoJev.textContent = `✓ OK (${r.modelo}, ${r.ms}ms).`;
+    estadoJev.dataset.estado = "ok";
     cfgJevKey.setAttribute("aria-invalid", "false");
   } else {
     estadoJev.textContent = `✗ ${r.mensaje}`;
+    estadoJev.dataset.estado = "error";
     cfgJevKey.setAttribute("aria-invalid", "true");
   }
   btnConectarJev.disabled = cfgJevKey.value.trim() === "";
@@ -265,6 +272,7 @@ async function probarConexionJevUI(): Promise<void> {
 function invalidarJev(): void {
   ++pruebaJevGen;
   estadoJev.textContent = "Sin probar.";
+  delete estadoJev.dataset.estado;
   cfgJevKey.removeAttribute("aria-invalid");
 }
 
@@ -314,6 +322,12 @@ export function initSettings(): void {
   });
   btnProbarIA.addEventListener("click", () => {
     void probarConexionUI();
+  });
+  // ponytail: vaciar + evento input reutiliza el listener (deshabilita, invalida).
+  // Solo prepara el borrado: el Guardar grande lo confirma (igual que la key).
+  btnBorrarApiKey.addEventListener("click", () => {
+    cfgApiKey.value = "";
+    cfgApiKey.dispatchEvent(new Event("input", { bubbles: true }));
   });
   btnConectarJev.addEventListener("click", () => {
     void probarConexionJevUI();
