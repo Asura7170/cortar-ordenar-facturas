@@ -449,7 +449,7 @@ input::placeholder {
   display: block;
   font-size: 13px;
   color: var(--modal-texto-suave);
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 }
 .modal-body label input,
 .modal-body label select {
@@ -458,6 +458,9 @@ input::placeholder {
   color: var(--modal-texto);
   border-color: var(--modal-borde);
   margin-top: 5px;
+}
+.base_section {
+  margin-top: 16px;
 }
 /* Misma identidad en la fila modelo+razonamiento+key (fuera del label): sin
    width (la fila flex reparte) ni margin extra. */
@@ -491,9 +494,15 @@ input::placeholder {
   color: var(--modal-texto-suave);
   padding: 0;
 }
+/* La primera sección no duplica la línea del header del modal. */
+.grupo-modelos:first-child {
+  border-top: none;
+  padding-top: 0;
+}
 #estadoModelos,
 #estadoModelosIA,
-#estadoPruebaIA {
+#estadoPruebaIA,
+#estadoJev {
   display: block;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -501,14 +510,29 @@ input::placeholder {
   min-height: 20px;
   margin: 8px 0 10px;
 }
+/* Retroalimentación de las sondas: mismo par ok/error del libro (sidebar). */
+#estadoPruebaIA[data-estado="ok"],
+#estadoJev[data-estado="ok"] {
+  color: light-dark(var(--verde-tinta), limegreen);
+}
+#estadoPruebaIA[data-estado="error"],
+#estadoJev[data-estado="error"] {
+  color: light-dark(var(--sello), tan);
+}
 .fila-modelos {
   display: flex;
   gap: 10px;
 }
-#cfgApiKey[aria-invalid="true"] {
+/* Botón solo-icono: sin hueco de línea base bajo el SVG. */
+.fila-modelos .btn svg {
+  display: block;
+}
+#cfgApiKey[aria-invalid="true"],
+#cfgJevKey[aria-invalid="true"] {
   border-color: var(--sello);
 }
-#cfgApiKey[aria-invalid="false"] {
+#cfgApiKey[aria-invalid="false"],
+#cfgJevKey[aria-invalid="false"] {
   border-color: var(--verde-tinta);
 }
 

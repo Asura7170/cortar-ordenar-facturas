@@ -490,6 +490,21 @@ describe("extraerPendientes", () => {
       state.colaEnProceso = false;
     }
   });
+
+  it("restaura loteEnCurso previo (no suelta un intake solapado)", async () => {
+    lote2();
+    state.loteEnCurso = true; // intake en curso durante el lote manual
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      respuesta('{"1":"12.50","2":"7.00"}')) as typeof fetch;
+    try {
+      await extraerPendientes();
+      expect(state.loteEnCurso).toBe(true);
+    } finally {
+      globalThis.fetch = real;
+      state.loteEnCurso = false;
+    }
+  });
 });
 
 describe("utilidades", () => {

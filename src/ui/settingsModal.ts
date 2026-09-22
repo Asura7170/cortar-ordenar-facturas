@@ -23,6 +23,7 @@ import {
   urlProxy,
 } from "../pipeline/modelos";
 import type { NivelRazonamiento } from "../types";
+import { clearJevKey, getJevKey, probarJev, setJevKey } from "../pipeline/jev";
 
 const modalAjustes: HTMLDialogElement = getEl<HTMLDialogElement>("modalAjustes");
 const btnAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnAjustes");
@@ -35,7 +36,12 @@ const btnRefrescarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnRefr
 const estadoModelosIA: HTMLElement = getEl("estadoModelosIA");
 const btnProbarIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnProbarIA");
 const estadoPruebaIA: HTMLElement = getEl("estadoPruebaIA");
+const btnBorrarApiKey: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarApiKey");
 const cfgApiKey: HTMLInputElement = getEl<HTMLInputElement>("cfgApiKey");
+const cfgJevKey: HTMLInputElement = getEl<HTMLInputElement>("cfgJevKey");
+const btnConectarJev: HTMLButtonElement = getEl<HTMLButtonElement>("btnConectarJev");
+const btnBorrarJev: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarJev");
+const estadoJev: HTMLElement = getEl("estadoJev");
 const cfgMoneda: HTMLSelectElement = getEl<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnResetAjustes");
 const estadoModelos: HTMLElement = getEl("estadoModelos");
@@ -54,6 +60,9 @@ function normalizarEndpoint(base: string): string {
 
 /** Generación de la prueba de conexión: descarta resoluciones rancias. */
 let pruebaGen = 0;
+
+/** Generación de la sonda JEV: descarta resoluciones rancias. */
+let pruebaJevGen = 0;
 
 /** Generación de la carga de modelos: descarta resoluciones rancias. */
 let modelosGen = 0;
@@ -156,9 +165,11 @@ async function probarConexionUI(): Promise<void> {
   if (r.ok) {
     const via = urlProxy(base) !== base ? ", proxy dev" : "";
     estadoPruebaIA.textContent = `✓ OK (${r.tipo}${via}, ${r.ms}ms).`;
+    estadoPruebaIA.dataset.estado = "ok";
     cfgApiKey.setAttribute("aria-invalid", "false");
   } else {
     estadoPruebaIA.textContent = `✗ ${r.mensaje}`;
+    estadoPruebaIA.dataset.estado = "error";
     cfgApiKey.setAttribute("aria-invalid", "true");
   }
   btnProbarIA.disabled = cfgApiKey.value.trim() === "";
@@ -168,6 +179,7 @@ async function probarConexionUI(): Promise<void> {
 function invalidarPrueba(): void {
   ++pruebaGen;
   estadoPruebaIA.textContent = "Sin probar.";
+  delete estadoPruebaIA.dataset.estado;
   cfgApiKey.removeAttribute("aria-invalid");
 }
 
@@ -220,9 +232,54 @@ async function cargarModelos(forzado: boolean): Promise<void> {
   }
 }
 
+function pintarJev(): void {
+  cfgJevKey.value = getJevKey();
+  estadoJev.textContent = getJevKey() !== "" ? "Guardada ✓" : "Sin key (modo local)";
+  delete estadoJev.dataset.estado;
+  cfgJevKey.removeAttribute("aria-invalid");
+  btnConectarJev.disabled = getJevKey() === "";
+}
+
+/** Sonda JEV real (1 inferencia mínima): verifica, guarda, mide ms y pinta ✓/✗. Nunca lanza. */
+async function probarConexionJevUI(): Promise<void> {
+  // ponytail: recorte al leer — igual que la key del LLM en probarConexionUI
+  const key = cfgJevKey.value.trim();
+  if (key === "") {
+    estadoJev.textContent = "Falta API key JEV.";
+    btnConectarJev.disabled = true;
+    return;
+  }
+  btnConectarJev.disabled = true;
+  estadoJev.textContent = "Conectando…";
+  cfgJevKey.removeAttribute("aria-invalid");
+  const gen = ++pruebaJevGen; // ponytail: la resolución rancia no pisa edición en vuelo
+  const r = await probarJev(key);
+  if (gen !== pruebaJevGen) return;
+  if (r.ok) {
+    setJevKey(key); // solo la key verificada persiste (la mala no contamina el store)
+    estadoJev.textContent = `✓ OK (${r.modelo}, ${r.ms}ms).`;
+    estadoJev.dataset.estado = "ok";
+    cfgJevKey.setAttribute("aria-invalid", "false");
+  } else {
+    estadoJev.textContent = `✗ ${r.mensaje}`;
+    estadoJev.dataset.estado = "error";
+    cfgJevKey.setAttribute("aria-invalid", "true");
+  }
+  btnConectarJev.disabled = cfgJevKey.value.trim() === "";
+}
+
+/** Cambio en la key JEV invalida la última prueba (y su vuelo). */
+function invalidarJev(): void {
+  ++pruebaJevGen;
+  estadoJev.textContent = "Sin probar.";
+  delete estadoJev.dataset.estado;
+  cfgJevKey.removeAttribute("aria-invalid");
+}
+
 function pintarAjustes(): void {
   cfgBaseUrl.value = state.configIA.baseUrl;
   cfgApiKey.value = state.configIA.apiKey;
+  pintarJev();
   cfgMoneda.value = state.moneda;
   cfgModelManual.value = "";
   // ponytail: el caché es por endpoint — el de otro proveedor no se mezcla
@@ -266,11 +323,31 @@ export function initSettings(): void {
   btnProbarIA.addEventListener("click", () => {
     void probarConexionUI();
   });
+  // ponytail: vaciar + evento input reutiliza el listener (deshabilita, invalida).
+  // Solo prepara el borrado: el Guardar grande lo confirma (igual que la key).
+  btnBorrarApiKey.addEventListener("click", () => {
+    cfgApiKey.value = "";
+    cfgApiKey.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  btnConectarJev.addEventListener("click", () => {
+    void probarConexionJevUI();
+  });
+  cfgJevKey.addEventListener("input", () => {
+    btnConectarJev.disabled = cfgJevKey.value.trim() === "";
+    invalidarJev();
+  });
+  btnBorrarJev.addEventListener("click", () => {
+    ++pruebaJevGen; // el probe en vuelo ya no revive la key borrada
+    clearJevKey();
+    pintarJev();
+  });
   btnRefrescarModelos.addEventListener("click", () => {
     void cargarModelos(true);
   });
   btnResetAjustes.addEventListener("click", () => {
+    ++pruebaJevGen; // idem: el probe en vuelo no revive tras Predeterminado
     restablecerAjustes();
+    clearJevKey(); // Predeterminado también apaga el gasto JEV (no vive en state)
     pintarAjustes();
     renderMonto();
     renderHojas();
@@ -311,6 +388,7 @@ export function initSettings(): void {
     state.configIA.baseUrl = cfgBaseUrl.value.trim() || CONFIG_IA_DEFAULT.baseUrl;
     state.configIA.model = modeloElegido().trim() || CONFIG_IA_DEFAULT.model;
     state.configIA.apiKey = cfgApiKey.value.trim();
+    setJevKey(cfgJevKey.value); // el Guardar grande también guarda la key JEV
     state.configIA.razonamiento = razonamientoElegido();
     state.moneda = isMoneda(cfgMoneda.value) ? cfgMoneda.value : MONEDA_DEFAULT;
     guardarAjustes();

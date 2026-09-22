@@ -70,11 +70,13 @@ function textoMotivo(m: MotivoRechazo): string {
 
 // Si hojaId se indica, rellena los huecos de ESA hoja (y crea al final si
 // sobran); si no, usa la última hoja con hueco.
+// ponytail: contador, no booleano — dos intakes solapados (paste durante un
+// PDF largo) no sueltan loteEnCurso a mitad del otro.
+let intakesActivos = 0;
 export async function agregarArchivos(
   files: FileList | readonly File[] | null | undefined,
   hojaId: number | null = null,
 ): Promise<void> {
-  precalentarModelos(); // warm-up en serie (cubre picker, drop y pegar)
   // Cualquier intake consume la hoja pedida (picker, drop, paste): si no, la
   // pendiente sobrevive y el próximo picker cae en una hoja abandonada.
   const destino = hojaId ?? hojaPedida;
@@ -106,6 +108,16 @@ export async function agregarArchivos(
     }
   };
   let colocados = 0;
+  let ultimoRender = 0;
+  // ponytail: cede el turno por archivo (scheduler.yield en Chrome = ventana de
+  // paint/scroll; microtask en tests/jsdom para no colgar los timers falsos).
+  const cederTurno = (): Promise<void> =>
+    (
+      globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
+    ).scheduler?.yield?.() ?? Promise.resolve();
+  // Telemetría del intake (solo DEV): pared vs costo de normalización por foto.
+  const tIntake = performance.now();
+  const msNorm: number[] = [];
   const colocar = (items: Comprobante[]): void => {
     if (items.length === 0) return;
     let actual = asegurarHoja();
@@ -117,74 +129,103 @@ export async function agregarArchivos(
       llenar(actual.slots, items);
     }
     colocados += 1;
-    renderHojas();
+    const ahora = performance.now();
+    // ponytail: 1ª foto al instante (feedback); luego 1 render cada 300ms + 1 final.
+    if (colocados === 1 || ahora - ultimoRender >= 300) {
+      ultimoRender = ahora;
+      renderHojas();
+    }
   };
-  for (const f of lista) {
-    if (esImagen(f)) {
-      // Intake normalizado: JPEG único, EXIF derecha, tope 2000px.
-      // Blanca/corrupta → aviso, sin tumbar el lote (igual que PDF).
-      // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
-      try {
-        const blob = await normalizarImagen(f);
-        colocar([
-          {
+  // Sin VT ni rebuilds por archivo durante el intake (ver sheets.renderHojas):
+  // el flag cubre todo el loop y el finally lo suelta aunque un PDF falle.
+  intakesActivos++;
+  state.loteEnCurso = true;
+  try {
+    for (const f of lista) {
+      await cederTurno();
+      if (esImagen(f)) {
+        // Intake normalizado: JPEG único, EXIF derecha, tope 2000px.
+        // Blanca/corrupta → aviso, sin tumbar el lote (igual que PDF).
+        // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
+        try {
+          const tN = performance.now();
+          const blob = await normalizarImagen(f);
+          if (import.meta.env.DEV) msNorm.push(performance.now() - tN);
+          colocar([
+            {
+              id: nextComprobanteId(),
+              nombre: sanear(f.name),
+              file: blob,
+              imgUrl: URL.createObjectURL(blob),
+              thumbUrl: null,
+              textoOcr: "",
+              montoCents: null,
+              montoManual: false,
+              moneda: "USD",
+              estado: "pendiente",
+              posicion: 0,
+            },
+          ]);
+        } catch {
+          avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+        }
+        continue;
+      }
+      if (!esPdf(f)) continue;
+      // Gate + fan-out por archivo (secuencial): cada página no-blanca = un
+      // comprobante "base p.i/N". Blancas en silencio; sin útiles → aviso.
+      const veredicto = await admitirPdf(f, contarPaginasPdf);
+      if (veredicto?.admite !== true) {
+        avisos.push({
+          archivo: sanear(f.name),
+          motivo: textoMotivo(veredicto?.motivo ?? "ilegible"),
+        });
+        continue;
+      }
+      const pags = await expandirPdf(f);
+      if (pags.length === 0) {
+        avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+        continue;
+      }
+      const base = sanear(f.name).replace(/\.pdf$/i, "");
+      colocar(
+        pags.map((p) => {
+          const url = URL.createObjectURL(p.blob);
+          return {
             id: nextComprobanteId(),
-            nombre: sanear(f.name),
-            file: blob,
-            imgUrl: URL.createObjectURL(blob),
-            thumbUrl: null,
+            nombre: `${base} p.${p.indice}/${p.total}`,
+            imgUrl: url,
+            thumbUrl: url,
             textoOcr: "",
             montoCents: null,
             montoManual: false,
             moneda: "USD",
             estado: "pendiente",
             posicion: 0,
-          },
-        ]);
-      } catch {
-        avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
-      }
-      continue;
+          } satisfies Comprobante;
+        }),
+      );
     }
-    if (!esPdf(f)) continue;
-    // Gate + fan-out por archivo (secuencial): cada página no-blanca = un
-    // comprobante "base p.i/N". Blancas en silencio; sin útiles → aviso.
-    const veredicto = await admitirPdf(f, contarPaginasPdf);
-    if (veredicto?.admite !== true) {
-      avisos.push({
-        archivo: sanear(f.name),
-        motivo: textoMotivo(veredicto?.motivo ?? "ilegible"),
-      });
-      continue;
-    }
-    const pags = await expandirPdf(f);
-    if (pags.length === 0) {
-      avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
-      continue;
-    }
-    const base = sanear(f.name).replace(/\.pdf$/i, "");
-    colocar(
-      pags.map((p) => {
-        const url = URL.createObjectURL(p.blob);
-        return {
-          id: nextComprobanteId(),
-          nombre: `${base} p.${p.indice}/${p.total}`,
-          imgUrl: url,
-          thumbUrl: url,
-          textoOcr: "",
-          montoCents: null,
-          montoManual: false,
-          moneda: "USD",
-          estado: "pendiente",
-          posicion: 0,
-        } satisfies Comprobante;
-      }),
+  } finally {
+    intakesActivos--;
+    state.loteEnCurso = intakesActivos > 0;
+  }
+  if (import.meta.env.DEV && msNorm.length > 0) {
+    const ordenadas = [...msNorm].sort((a, b) => a - b);
+    const cuantil = (q: number): number =>
+      Math.round(
+        ordenadas[Math.min(ordenadas.length - 1, Math.ceil(q * ordenadas.length) - 1)] ?? 0,
+      );
+    console.info(
+      `intake ms pared=${Math.round(performance.now() - tIntake)} n=${msNorm.length} ` +
+        `normP50=${cuantil(0.5)} normMax=${cuantil(1)}`,
     );
   }
   avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
   if (colocados === 0) return;
 
   renderHojas();
+  precalentarModelos(); // warm-up tras el intake: sin competir con los decodes
   void procesarCola();
   // Fase 1: sin miniaturas tempranas — la cola genera la única (final, sobre
   // la imagen definitiva post-recorte). Un decode+resize+JPEG menos por foto.

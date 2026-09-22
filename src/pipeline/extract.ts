@@ -1,12 +1,13 @@
-/* Extracción del TOTAL con LLM openai-compatible — 1 llamada por lote.
+/* Extracción del TOTAL: JEV 1×1 secuencial primero, fallback openai-compatible en lote.
    Auto al drenar la cola + botón Reintentar IA. Solo completa montos en
    null no-manuales: lo manual siempre gana (incluso si se escribe durante el fetch).
    La suma total la hace el código (sumaTotal); al LLM nunca se le pide sumar. */
 import { buscarSlot, state } from "../state";
 import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
-import { renderHojas } from "../ui/sheets";
+import { actualizarMontoCelda, renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
+import { getJevKey, llamarJev } from "./jev";
 import {
   campoRazonamiento,
   detectarTipo,
@@ -261,6 +262,70 @@ function refrescarBoton(): void {
   if (btn instanceof HTMLButtonElement) btn.disabled = extrayendo;
 }
 
+/** Ids con JEV en vuelo: evita doble fetch (1×1 desacoplado + red del drenado). */
+const enVuelo = new Set<number>();
+
+/** JEV 1×1 progresivo para la cola: resuelve un comprobante y lo pinta al
+    instante, sin esperar al lote. Nunca lanza (best-effort). */
+export async function extraerUnMonto(id: number, fetchFn: FetchFn = fetch): Promise<boolean> {
+  if (enVuelo.has(id)) return false;
+  try {
+    const key = getJevKey();
+    if (key === "") return false;
+    const slot = buscarSlot(id);
+    const actual = slot?.hoja.slots[slot.idx];
+    if (!actual || actual.estado !== "ok" || actual.montoCents !== null || actual.montoManual)
+      return false;
+    const texto = limpiarTexto(actual.textoOcr);
+    if (texto === "") return false;
+    enVuelo.add(id);
+    try {
+      let cents: Cents | null = null;
+      try {
+        cents = parsearMonto((await llamarJev({ id, contenido: texto }, key, fetchFn)).total);
+      } catch {
+        return false; // la red del drenado lo reintenta en lote
+      }
+      const item: ItemLote = { idx: 1, id, texto };
+      if (aplicarTotales([item], new Map([[1, cents]])) === 0) return false;
+      // Progresivo sin rebuild: parche in-place; el render completo cubre el fallo.
+      try {
+        if (!actualizarMontoCelda(id)) renderHojas();
+      } catch {
+        renderHojas();
+      }
+      return true;
+    } finally {
+      enVuelo.delete(id);
+    }
+  } catch {
+    return false;
+  }
+}
+
+/** Tope de vuelos JEV simultáneos por lote (TypeSafe: 1200 req/min, 250k tok/s). */
+const JEV_TOPE_PARALELO = 50;
+
+/** Pool con tope: N workers consumen índices; el worker decide errores (nunca lanza el pool). */
+async function mapConLimite<T>(
+  items: readonly T[],
+  tope: number,
+  fn: (it: T) => Promise<void>,
+): Promise<void> {
+  let i = 0;
+  const n = Math.max(1, Math.min(tope, items.length));
+  await Promise.all(
+    Array.from({ length: n }, async (): Promise<void> => {
+      for (;;) {
+        const k = i++;
+        if (k >= items.length) return;
+        const it = items[k];
+        if (it === undefined) return;
+        await fn(it);
+      }
+    }),
+  );
+}
 /** Orquestador: nunca lanza; sin key o sin pendientes sale en silencio (salvo forzado). */
 export async function extraerPendientes(opciones?: {
   forzado?: boolean;
@@ -280,7 +345,9 @@ export async function extraerPendientes(opciones?: {
     if (opciones?.forzado) avisar("IA: sin pendientes (todo ya tiene total o es manual).");
     return;
   }
-  if (state.configIA.apiKey.trim() === "") {
+  const jevKey = getJevKey();
+  const openaiKey = state.configIA.apiKey.trim();
+  if (jevKey === "" && openaiKey === "") {
     if (opciones?.forzado) avisar("IA: configurá la API key en Ajustes.");
     return;
   }
@@ -291,32 +358,144 @@ export async function extraerPendientes(opciones?: {
   });
   if (items.length === 0) return;
   const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
+  const prefijo = jevKey !== "" ? "JEV:" : "IA:";
   extrayendo = true;
+  const previoLote = state.loteEnCurso; // el lote no pisa un intake en curso
+  state.loteEnCurso = true; // sin VT ni rebuilds por tick (ver sheets.renderHojas)
   refrescarBoton();
-  avisar("IA: extrayendo totales…");
+  avisar(`${prefijo} extrayendo totales…`);
   try {
-    let ok = 0;
-    // ponytail: secuencial, no paralelo (una key, un rate-limit).
-    for (const chunk of partirLote(items)) {
+    let okJev = 0;
+    let pendientes: ItemLote[] = items;
+    if (jevKey !== "") {
+      // ponytail: pool 50 (TypeSafe 1200/min, 250k tok/s): pared ~1s en vez de N×1s.
+      // 1 request por factura (no mega-request: rompería state ≤32k y guards por ítem).
+      // Progresivo con parche in-place: cada éxito aplica al instante y el tick
+      // pinta solo su celda (sin rebuild ni VT, ver loteEnCurso); el aviso lleva
+      // el conteo. El retry 429/529 corre dentro del slot.
+      const cola = items.filter((it) => !enVuelo.has(it.id));
+      for (const it of cola) enVuelo.add(it.id);
+      // Telemetría del lote (solo DEV): pared vs percentiles por request +
+      // concurrencia JS. OJO: concJS alto con waterfall de 6 en Network =
+      // el navegador dosifica (límite por origen), no el servidor.
+      const tLote = performance.now();
+      const latencias: number[] = [];
+      let enCurso = 0;
+      let concMax = 0;
+      let r429 = 0; // DEV: cuántos slots toparon rate-limit (pacing solo con evidencia)
+      const porPintar: number[] = [];
+      let programado = false;
+      let rendersProg = 0;
+      const pintarProgreso = (): void => {
+        programado = false;
+        if (porPintar.length === 0) return;
+        // Parche in-place por celda (sin rebuild ni VT): O(1 nodo) por éxito.
+        const ids = porPintar.splice(0, porPintar.length);
+        rendersProg++;
+        for (const id of ids) {
+          try {
+            actualizarMontoCelda(id);
+          } catch {
+            /* el parche nunca aborta el lote */
+          }
+        }
+        avisar(`${prefijo} ${okJev}/${items.length} totales…`);
+      };
+      const programaTick = (): void => {
+        if (programado) return;
+        programado = true;
+        setTimeout(pintarProgreso, 0);
+      };
       try {
-        ok += aplicarTotales(chunk, await extraerTotalesLote(chunk, state.configIA));
-      } catch (e: unknown) {
-        console.warn(`IA: lote omitido (${e instanceof Error ? e.message : String(e)})`);
-        continue; // el chunk queda manual; el conteo final lo refleja
+        await mapConLimite(cola, JEV_TOPE_PARALELO, async (it): Promise<void> => {
+          const tReq = performance.now();
+          enCurso++;
+          concMax = Math.max(concMax, enCurso);
+          try {
+            const cents = parsearMonto(
+              (await llamarJev({ id: it.id, contenido: it.texto }, jevKey)).total,
+            );
+            if (aplicarTotales([it], new Map([[it.idx, cents]])) > 0) {
+              okJev++;
+              porPintar.push(it.id);
+              programaTick();
+            }
+          } catch (e: unknown) {
+            const m = e instanceof Error ? e.message : "";
+            if (m.includes("429") || m.includes("529")) r429++;
+            /* este ítem cae al fallback; los hermanos siguen */
+          } finally {
+            latencias.push(performance.now() - tReq);
+            enCurso--;
+            enVuelo.delete(it.id);
+          }
+        });
+      } finally {
+        for (const it of cola) enVuelo.delete(it.id);
+      }
+      // Vacía el tick pendiente antes del conteo final (sin este await, el último
+      // render caería después del aviso final y lo pisaría).
+      await new Promise<void>((r) => {
+        setTimeout(() => r(), 0);
+      });
+      pintarProgreso();
+      if (okJev > 0) renderHojas(); // cierre: totales y consistencia en 1 rebuild
+      if (import.meta.env.DEV && latencias.length > 0) {
+        const ordenadas = [...latencias].sort((a, b) => a - b);
+        const cuantil = (q: number): number =>
+          Math.round(
+            ordenadas[Math.min(ordenadas.length - 1, Math.ceil(q * ordenadas.length) - 1)] ?? 0,
+          );
+        const entero = (v: number): number => Math.round(v);
+        console.info(
+          `JEV lote ms pared=${entero(performance.now() - tLote)} n=${cola.length} ok=${okJev} ` +
+            `concJS=${concMax} min=${cuantil(0)} p50=${cuantil(0.5)} p99=${cuantil(0.99)} renders=${rendersProg} r429=${r429}`,
+        );
+      }
+      if (okJev === items.length) {
+        if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okJev}/${items.length} totales.`);
+        else avisar(avisoPrevio);
+        return;
+      }
+      const restantes = candidatos();
+      pendientes = [];
+      restantes.forEach((c, i) => {
+        if (enVuelo.has(c.id)) return; // en vuelo: lo cubre su propia promesa
+        const texto = limpiarTexto(c.textoOcr);
+        if (texto !== "") pendientes.push({ idx: i + 1, id: c.id, texto });
+      });
+      if (pendientes.length === 0) {
+        if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okJev}/${items.length} totales.`);
+        else avisar(avisoPrevio);
+        return;
       }
     }
+    let okIA = 0;
+    if (openaiKey !== "") {
+      // ponytail: secuencial, no paralelo (una key, un rate-limit).
+      for (const chunk of partirLote(pendientes)) {
+        try {
+          okIA += aplicarTotales(chunk, await extraerTotalesLote(chunk, state.configIA));
+        } catch (e: unknown) {
+          console.warn(`IA: lote omitido (${e instanceof Error ? e.message : String(e)})`);
+          continue; // el chunk queda manual; el conteo final lo refleja
+        }
+      }
+    }
+    const ok = okJev + okIA;
     if (ok > 0) renderHojas(); // badges + #montoTotal con suma local exacta
     // Éxito total con aviso previo: se restaura (el interino lo pisó).
     if (ok < items.length || avisoPrevio.trim() === "") {
       avisar(
         ok === items.length
-          ? `IA: ${ok}/${items.length} totales.`
-          : `IA: ${ok}/${items.length} totales, resto manual. Revisá Ajustes (URL, clave, CORS).`,
+          ? `${prefijo} ${ok}/${items.length} totales.`
+          : `${prefijo} ${ok}/${items.length} totales, resto manual. Revisá Ajustes (URL, clave, CORS).`,
       );
     } else {
       avisar(avisoPrevio);
     }
   } finally {
+    state.loteEnCurso = previoLote; // restaura: no suelta un intake solapado
     extrayendo = false;
     refrescarBoton();
   }

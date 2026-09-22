@@ -13,6 +13,7 @@ montarFixture();
 const { state, crearHoja } = await import("../state");
 const {
   actualizarMiniatura,
+  actualizarMontoCelda,
   aplicarATodas,
   cambiarLayoutHoja,
   esDragDeArchivos,
@@ -211,6 +212,77 @@ describe("celdas", () => {
   it("actualizarMiniatura con id inexistente no tira", () => {
     sembrar("u4x2", [100]);
     expect(() => actualizarMiniatura(-1)).not.toThrow();
+  });
+
+  it("actualizarMontoCelda pinta el badge sin tocar la imagen", () => {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: null, thumbUrl: "blob:thumb" });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    const cell = document.querySelector(".cell");
+    const imgAntes = cell?.querySelector("img");
+    expect(imgAntes).not.toBeNull();
+    c.montoCents = 1250; // como lo deja aplicarTotales
+    expect(actualizarMontoCelda(c.id)).toBe(true);
+    expect(document.querySelector(".cell-badge")?.textContent).toContain("12.50");
+    expect(document.querySelector("input.cell-monto")).toBeNull();
+    expect(cell?.querySelector("img")).toBe(imgAntes);
+  });
+
+  it("actualizarMontoCelda no pisa el input enfocado", () => {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: null });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    document.querySelector<HTMLInputElement>("input.cell-monto")?.focus();
+    c.montoCents = 1250;
+    expect(actualizarMontoCelda(c.id)).toBe(false);
+    expect(document.querySelector("input.cell-monto")).not.toBeNull();
+    expect(document.querySelector(".cell-badge")).toBeNull();
+  });
+
+  it("actualizarMontoCelda no pisa el borrador sin foco", () => {
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: null });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    // La celda propia es la última (el rebuild pinta en orden de hojas).
+    const celdas = document.querySelectorAll(".cell");
+    const cell = celdas.item(celdas.length - 1);
+    if (!(cell instanceof HTMLElement)) throw new Error("sin celda propia");
+    const input = cell.querySelector("input.cell-monto");
+    if (!(input instanceof HTMLInputElement)) throw new Error("sin input de monto");
+    input.value = "abc"; // borrador inválido tras blur, sin foco
+    c.montoCents = 1250; // como lo deja aplicarTotales
+    expect(actualizarMontoCelda(c.id)).toBe(false);
+    expect(cell.querySelector("input.cell-monto")).not.toBeNull();
+    expect(cell.querySelector(".cell-badge")).toBeNull();
+  });
+
+  it("con loteEnCurso no usa ViewTransition (sin snapshots)", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
+    const spy = vi.fn((cb: () => void): Record<string, unknown> => {
+      cb();
+      return {};
+    });
+    Object.defineProperty(document, "startViewTransition", { value: spy, configurable: true });
+    try {
+      sembrar("u1", [100]);
+      spy.mockClear();
+      state.loteEnCurso = true;
+      renderHojas();
+      expect(spy).not.toHaveBeenCalled();
+      state.loteEnCurso = false;
+      renderHojas();
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      state.loteEnCurso = false;
+      if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
+      else Reflect.deleteProperty(document, "startViewTransition");
+    }
   });
 });
 

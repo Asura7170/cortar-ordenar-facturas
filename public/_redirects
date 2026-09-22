@@ -1,0 +1,3 @@
+# Proxy sin backend: el navegador llama mismo-origen (sin CORS) y Pages
+# reenvía al upstream con método, body y headers (incluido Authorization).
+/api/jev https://api.typesafe.ai/v1/systemone 200

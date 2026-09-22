@@ -3,12 +3,19 @@ import { join } from "node:path";
 import { defineConfig } from "vite-plus";
 
 // ponytail: zen/go no responde OPTIONS (preflight 404): mismo-origen en dev.
+// JEV va igual: el navegador no tiene CORS contra TypeSafe (ver consola →
+// Failed to fetch en directo), así que /api/jev se proxea al upstream.
 // El bloque de preview es inerte (urlProxy solo reescribe en DEV): se comparte por no duplicar.
 const proxyZenGo = {
   "/zen-go": {
     target: "https://opencode.ai",
     changeOrigin: true,
     rewrite: (path: string): string => path.replace(/^\/zen-go/, "/zen/go"),
+  },
+  "/api/jev": {
+    target: "https://api.typesafe.ai",
+    changeOrigin: true,
+    rewrite: (path: string): string => path.replace(/^\/api\/jev/, "/v1/systemone"),
   },
 };
 

@@ -114,6 +114,17 @@ describe("Predeterminado", () => {
     expect(cfgApiKey.value).toBe("");
     expect(cfgMoneda.value).toBe("BOB");
   });
+
+  it("también borra la key JEV (apaga su gasto)", async () => {
+    const { setJevKey, getJevKey } = await import("../pipeline/jev");
+    setJevKey("apik-rancia");
+    btnAjustes.click();
+    btnResetAjustes.click();
+    expect(getJevKey()).toBe("");
+    expect(localStorage.getItem("jev-api-key")).toBeNull();
+    expect(el<HTMLInputElement>("cfgJevKey").value).toBe("");
+    modalAjustes.close();
+  });
 });
 
 describe("Modelos", () => {
@@ -585,6 +596,162 @@ describe("probar conexión", () => {
     cfgApiKey.value = "otra";
     cfgApiKey.dispatchEvent(new Event("input", { bubbles: true }));
     expect(estadoPruebaIA.textContent).toBe("Sin probar.");
+    modalAjustes.close();
+  });
+});
+
+describe("JEV", () => {
+  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+  const cfgJevKey = el<HTMLInputElement>("cfgJevKey");
+  const btnConectarJev = el<HTMLButtonElement>("btnConectarJev");
+  const btnBorrarJev = el<HTMLButtonElement>("btnBorrarJev");
+  const estadoJev = el("estadoJev");
+  const btnBorrarApiKey = el<HTMLButtonElement>("btnBorrarApiKey");
+
+  it("agrupa en 3 secciones visibles", () => {
+    const leyendas = [...formAjustes.querySelectorAll("fieldset.grupo-modelos > legend")].map(
+      (l) => l.textContent,
+    );
+    expect(leyendas).toEqual(["Modelos IA", "Moneda", "Modelos en este equipo"]);
+  });
+
+  it("el submit grande también guarda la key JEV (no se pierde)", async () => {
+    const { getJevKey, clearJevKey } = await import("../pipeline/jev");
+    clearJevKey();
+    cfgJevKey.value = "apik-submit";
+    enviar();
+    expect(getJevKey()).toBe("apik-submit");
+    expect(localStorage.getItem("jev-api-key")).toBe("apik-submit");
+    modalAjustes.close();
+  });
+
+  it("abrir repuebla el input (se ve guardada)", async () => {
+    const { setJevKey } = await import("../pipeline/jev");
+    setJevKey("apik-guardada");
+    btnAjustes.click();
+    expect(cfgJevKey.value).toBe("apik-guardada");
+    expect(estadoJev.textContent).toContain("Guardada");
+    modalAjustes.close();
+  });
+
+  it("conectar ok pinta ✓ con ms y borde verde", async () => {
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      ({
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        json: (): Promise<unknown> =>
+          Promise.resolve({ answers: { total: { choice: "none" } }, model: "jev-x" }),
+      }) as unknown as Response) as typeof fetch;
+    try {
+      btnAjustes.click();
+      cfgJevKey.value = "apik-k";
+      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
+      btnConectarJev.click();
+      await pausa();
+      expect(estadoJev.textContent).toContain("✓ OK");
+      expect(estadoJev.textContent).toContain("ms");
+      expect(estadoJev.dataset.estado).toBe("ok");
+      expect(cfgJevKey.getAttribute("aria-invalid")).toBe("false");
+      expect(localStorage.getItem("jev-api-key")).toBe("apik-k");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("conectar con 401 pinta ✗ y borde rojo", async () => {
+    const real = globalThis.fetch;
+    const { clearJevKey } = await import("../pipeline/jev");
+    clearJevKey();
+    globalThis.fetch = (async (): Promise<Response> =>
+      ({
+        ok: false,
+        status: 401,
+        headers: { get: (): null => null },
+      }) as unknown as Response) as typeof fetch;
+    try {
+      btnAjustes.click();
+      cfgJevKey.value = "apik-mala";
+      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
+      btnConectarJev.click();
+      await pausa();
+      expect(estadoJev.textContent).toContain("✗");
+      expect(estadoJev.textContent).toContain("401");
+      expect(estadoJev.dataset.estado).toBe("error");
+      expect(cfgJevKey.getAttribute("aria-invalid")).toBe("true");
+      expect(localStorage.getItem("jev-api-key")).toBeNull(); // la mala no persiste
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("borrar durante el probe en vuelo no revive la key", async () => {
+    const { getJevKey, clearJevKey } = await import("../pipeline/jev");
+    clearJevKey();
+    const real = globalThis.fetch;
+    let resolver!: (v: Response) => void;
+    const okJev = (): Response =>
+      ({
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        json: (): Promise<unknown> =>
+          Promise.resolve({ answers: { total: { choice: "none" } }, model: "jev-x" }),
+      }) as unknown as Response;
+    // Solo /api/jev queda en vuelo; el resto (lista de modelos) resuelve al acto.
+    globalThis.fetch = ((u: unknown): Promise<Response> => {
+      if (String(u) === "/api/jev") return new Promise<Response>((res) => (resolver = res));
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: (): Promise<unknown> => Promise.resolve({ data: [] }),
+      } as unknown as Response);
+    }) as typeof fetch;
+    try {
+      btnAjustes.click();
+      cfgJevKey.value = "apik-k";
+      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
+      btnConectarJev.click(); // probe en vuelo
+      btnBorrarJev.click(); // borra e invalida el vuelo
+      resolver(okJev()); // el probe resuelve tarde
+      await pausa();
+      expect(getJevKey()).toBe("");
+      expect(cfgJevKey.value).toBe("");
+      expect(estadoJev.textContent).toContain("modo local");
+    } finally {
+      globalThis.fetch = real;
+      modalAjustes.close();
+    }
+  });
+
+  it("papelera del LLM vacía el input e invalida (Guardar confirma)", () => {
+    state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "k" };
+    btnAjustes.click();
+    expect(btnProbarIA.disabled).toBe(false);
+    btnBorrarApiKey.click();
+    expect(cfgApiKey.value).toBe("");
+    expect(btnProbarIA.disabled).toBe(true);
+    expect(estadoPruebaIA.textContent).toBe("Sin probar.");
+    enviar();
+    expect(state.configIA.apiKey).toBe("");
+    modalAjustes.close();
+  });
+
+  it("editar invalida y borrar limpia", async () => {
+    const { setJevKey, getJevKey } = await import("../pipeline/jev");
+    setJevKey("apik-k");
+    btnAjustes.click();
+    cfgJevKey.value = "otra";
+    cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(estadoJev.textContent).toBe("Sin probar.");
+    expect(estadoJev.dataset.estado).toBeUndefined();
+    btnBorrarJev.click();
+    expect(getJevKey()).toBe("");
+    expect(cfgJevKey.value).toBe("");
+    expect(estadoJev.textContent).toContain("modo local");
     modalAjustes.close();
   });
 });

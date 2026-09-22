@@ -5,7 +5,10 @@ import { montarFixture } from "../test/fixture";
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
 // El auto IA real haría fetch: stub (cada test lo ajusta).
-vi.mock("./extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
+vi.mock("./extract", () => ({
+  extraerPendientes: vi.fn(async () => {}),
+  extraerUnMonto: vi.fn(async () => false),
+}));
 // OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
 // jsdom); cada test simula giro/texto/girarBlob.
 vi.mock("./ocr", async (importOriginal) => {
@@ -28,7 +31,7 @@ const { buscarSlot, crearHoja, state } = await import("../state");
 const { asignarMiniatura, procesarCola } = await import("./queue");
 const { comprobante } = await import("../test/factoria");
 const { renderHojas } = await import("../ui/sheets");
-const { extraerPendientes } = await import("./extract");
+const { extraerPendientes, extraerUnMonto } = await import("./extract");
 
 beforeEach(() => {
   // Sin file ni imgUrl real el recorte falla al blob y sigue con el original: se avanza igual.
@@ -78,7 +81,7 @@ describe("procesarCola", () => {
     expect(linea).toMatch(/cajas=\d+ batch=\[\d+,\d+\] fallback=(sí|no) recRuns=\d+ total=\d+/);
   });
 
-  it("lote de 3: 3 renders de estado + 1 final (coalescado, Fase 1)", async () => {
+  it("lote de 3: 3 procesando + 3 ok inmediato + 1 final (imagen primero, JEV desacoplado)", async () => {
     for (const n of ["a.png", "b.png", "c.png"]) {
       const h = crearHoja();
       h.slots[0] = comprobante({ nombre: n });
@@ -88,8 +91,8 @@ describe("procesarCola", () => {
     const p = procesarCola();
     await vi.advanceTimersByTimeAsync(5000);
     await p;
-    // Sin coalescar serían 6 (2 por ítem); con coalescado 3+1.
-    expect(vi.mocked(renderHojas).mock.calls.length - antes).toBe(4);
+    // 2 por ítem (procesando + ok con imagen) + 1 final del drenado.
+    expect(vi.mocked(renderHojas).mock.calls.length - antes).toBe(7);
   });
 
   it("al drenar dispara el auto IA con desdeCola", async () => {
@@ -101,6 +104,54 @@ describe("procesarCola", () => {
     await vi.advanceTimersByTimeAsync(2000);
     await p;
     expect(vi.mocked(extraerPendientes)).toHaveBeenCalledWith({ desdeCola: true });
+  });
+
+  it("al completar cada ítem extrae su monto 1×1 (desacoplado, sin bloquear)", async () => {
+    vi.mocked(extraerUnMonto).mockClear().mockResolvedValue(false);
+    const h1 = crearHoja();
+    const a = comprobante({ nombre: "a.png" });
+    h1.slots[0] = a;
+    const h2 = crearHoja();
+    const b = comprobante({ nombre: "b.png" });
+    h2.slots[0] = b;
+    state.hojas.push(h1, h2);
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(3000);
+    await p;
+    expect(vi.mocked(extraerUnMonto)).toHaveBeenCalledWith(a.id);
+    expect(vi.mocked(extraerUnMonto)).toHaveBeenCalledWith(b.id);
+    expect(vi.mocked(extraerUnMonto).mock.calls.length).toBe(2);
+  });
+
+  it("la imagen se pinta antes de que el JEV resuelva (no bloquea el ok)", async () => {
+    let resolver: (v: boolean) => void = () => {};
+    vi.mocked(extraerUnMonto)
+      .mockClear()
+      .mockImplementation(
+        (): Promise<boolean> =>
+          new Promise<boolean>((res) => {
+            resolver = res;
+          }),
+      );
+    try {
+      const h = crearHoja();
+      const c = comprobante({ nombre: "t.png" });
+      h.slots[0] = c;
+      state.hojas.push(h);
+      const antes = vi.mocked(renderHojas).mock.calls.length;
+      const p = procesarCola();
+      await vi.advanceTimersByTimeAsync(2000);
+      // OCR terminó y la imagen ya está en ok aunque el JEV siga en vuelo.
+      expect(c.estado).toBe("ok");
+      expect(vi.mocked(extraerUnMonto)).toHaveBeenCalledWith(c.id);
+      expect(vi.mocked(renderHojas).mock.calls.length - antes).toBeGreaterThanOrEqual(2);
+      resolver(false);
+      await vi.advanceTimersByTimeAsync(1000);
+      await p;
+      expect(state.colaEnProceso).toBe(false);
+    } finally {
+      vi.mocked(extraerUnMonto).mockResolvedValue(false);
+    }
   });
 
   it("pendiente entrado durante la IA también se drena (no huérfano)", async () => {

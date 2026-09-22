@@ -12,6 +12,7 @@ dist/
 .firecrawl/
 .playwright-mcp/
 .vite/
+.wrangler/
 archivos-test/
 
 # Referencia local generada (cheatsheets)
