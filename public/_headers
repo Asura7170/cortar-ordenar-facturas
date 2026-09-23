@@ -1,3 +1,4 @@
+# ponytail: sin COEP require-corp — bloqueaba el peso DocAligner cross-origin (HF no envía CORP);
+# CORS (ACAO: *) basta para el fetch. COOP solo no bloquea subrecursos.
 /*
   Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
