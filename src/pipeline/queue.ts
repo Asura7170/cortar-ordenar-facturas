@@ -9,6 +9,7 @@ import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
 import { detectarYRecortar, obtenerSesion } from "./docaligner";
 import { extraerUnMonto } from "./extract";
+import { extraerRapidoCents } from "./jev";
 import { CALIDAD_JPEG } from "./imagen";
 import type { Enderezado } from "./ocr";
 import { diagVacio } from "./ocr";
@@ -220,6 +221,9 @@ export async function procesarCola(): Promise<void> {
           if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
           sig.montoCents = null;
           sig.estado = "ok";
+          // ponytail: fast-path offline — 1 distinto se fija sin red; el resto vuela a JEV.
+          const rapido = extraerRapidoCents(sig.textoOcr ?? "");
+          if (rapido !== null) sig.montoCents = rapido;
           try {
             renderHojas(); // imagen visible al instante, sin esperar al JEV (~1s/factura)
           } catch {
@@ -229,7 +233,8 @@ export async function procesarCola(): Promise<void> {
           // Best-effort (nunca lanza): lo no resuelto cae a la red del drenado.
           // ponytail: Promise.resolve envuelve el mock de tests tras restoreAllMocks (devuelve
           // undefined sin impl); en prod extraerUnMonto siempre es Promise<boolean>.
-          vuelos.push(Promise.resolve(extraerUnMonto(sig.id)).catch((): boolean => false));
+          if (rapido === null)
+            vuelos.push(Promise.resolve(extraerUnMonto(sig.id)).catch((): boolean => false));
           const entero = (v: number): number => Math.round(v);
           // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
           if (import.meta.env.DEV)

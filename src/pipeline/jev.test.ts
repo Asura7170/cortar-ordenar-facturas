@@ -13,6 +13,7 @@ const {
   buildRequest,
   clearJevKey,
   extractCandidates,
+  extraerRapidoCents,
   extractTotalOffline,
   extractTotalOfflineCents,
   formatMonto,
@@ -83,6 +84,13 @@ describe("pipeline prototipo", () => {
       "Sub-Total: 4,702.80 Descuento: 0.00 ICE: 450.79 Total: 4,702.80 TOTAL A COBRAR: 4,252.01";
     expect(extractTotalOffline({ id: 8, contenido })).toBe("4,252.01");
     expect(extractTotalOfflineCents({ id: 8, contenido })).toBe(425201);
+  });
+
+  it("rápido: 1 distinto resuelve, repetido vale, 2 distintos van a JEV", () => {
+    expect(extraerRapidoCents("TOTAL 12.50")).toBe(1250);
+    expect(extraerRapidoCents("TOTAL 1,234.56 ... total 1234.56")).toBe(123456);
+    expect(extraerRapidoCents("TOTAL 12.50 PROPINA 1.00")).toBeNull();
+    expect(extraerRapidoCents("sin montos")).toBeNull();
   });
 
   it("buildRequest: type minúsculas, ≤40, state con contenido+candidatos", () => {
@@ -331,8 +339,8 @@ describe("extraerPendientes con JEV", () => {
 
   it("JEV en paralelo resuelve todo con 1 render coalescado (orden de llegada libre)", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
-    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 12.50" });
+    const c2 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 7.00" });
     h.slots[0] = c1;
     h.slots[1] = c2;
     state.hojas.push(h);
@@ -354,7 +362,7 @@ describe("extraerPendientes con JEV", () => {
     } finally {
       globalThis.fetch = real;
     }
-    expect(vistos.sort()).toEqual(["TOTAL 12.50", "TOTAL 7.00"].sort());
+    expect(vistos.sort()).toEqual(["PROPINA 1.00 TOTAL 12.50", "PROPINA 1.00 TOTAL 7.00"].sort());
     expect(c1.montoCents).toBe(1250);
     expect(c2.montoCents).toBe(700);
     expect(vi.mocked(renderHojas).mock.calls.length).toBe(1);
@@ -363,7 +371,7 @@ describe("extraerPendientes con JEV", () => {
   it("pool con tope 50: 60 ítems resuelven todos sin superar el tope", async () => {
     for (let n = 0; n < 60; n++) {
       const h = crearHoja();
-      h.slots[0] = comprobante({ estado: "ok", textoOcr: `TOTAL ${n + 1}.00` });
+      h.slots[0] = comprobante({ estado: "ok", textoOcr: `PROPINA 1.00 TOTAL ${n + 10}.00` });
       state.hojas.push(h);
     }
     setJevKey("apik-k");
@@ -397,8 +405,8 @@ describe("extraerPendientes con JEV", () => {
 
   it("progresivo: los rápidos se pintan sin esperar al lento", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
-    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 12.50" });
+    const c2 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 7.00" });
     h.slots[0] = c1;
     h.slots[1] = c2;
     state.hojas.push(h);
@@ -478,7 +486,7 @@ describe("extraerUnMonto (1×1 de la cola)", () => {
 
   it("sin key no hace fetch y devuelve false", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 12.50" });
     h.slots[0] = c1;
     state.hojas.push(h);
     const real = globalThis.fetch;
@@ -495,7 +503,7 @@ describe("extraerUnMonto (1×1 de la cola)", () => {
 
   it("JEV caído devuelve false sin romper (la red del drenado lo intenta)", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 12.50" });
     h.slots[0] = c1;
     state.hojas.push(h);
     setJevKey("apik-k");
@@ -539,7 +547,7 @@ describe("extraerUnMonto (1×1 de la cola)", () => {
 
   it("segundo llamado en vuelo no duplica fetch", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 12.50" });
     h.slots[0] = c1;
     state.hojas.push(h);
     setJevKey("apik-k");

@@ -126,6 +126,20 @@ export function extractTotalOffline(factura: FacturaJev): string | null {
   return formatMonto(fallbackValor(pickPool(extractCandidates(String(factura.contenido ?? "")))));
 }
 
+// ponytail: fast-path offline — 1 único distinto (repetido N veces vale) => total sin red.
+export function extraerRapidoCents(contenido = ""): Cents | null {
+  let unico: Cents | null = null;
+  let vistos = 0;
+  for (const c of extractCandidates(contenido)) {
+    const cents = parsearMonto(c.valor);
+    if (cents === null) continue;
+    if (vistos === 0) unico = cents;
+    else if (unico !== cents) return null;
+    vistos++;
+  }
+  return vistos > 0 ? unico : null;
+}
+
 export function resolveTotalCents(req: JevRequest, answer: unknown): Cents | null {
   return parsearMonto(resolveTotal(req, answer) ?? "");
 }

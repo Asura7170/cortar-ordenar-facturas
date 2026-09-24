@@ -7,7 +7,7 @@ import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
 import { actualizarMontoCelda, renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
-import { getJevKey, llamarJev } from "./jev";
+import { extraerRapidoCents, getJevKey, llamarJev } from "./jev";
 import {
   campoRazonamiento,
   detectarTipo,
@@ -278,6 +278,18 @@ export async function extraerUnMonto(id: number, fetchFn: FetchFn = fetch): Prom
       return false;
     const texto = limpiarTexto(actual.textoOcr);
     if (texto === "") return false;
+    // ponytail: fast-path offline — 1 distinto => total sin red ni key.
+    const rapido = extraerRapidoCents(texto);
+    if (rapido !== null) {
+      const item: ItemLote = { idx: 1, id, texto };
+      if (aplicarTotales([item], new Map([[1, rapido]])) === 0) return false;
+      try {
+        if (!actualizarMontoCelda(id)) renderHojas();
+      } catch {
+        renderHojas();
+      }
+      return true;
+    }
     enVuelo.add(id);
     try {
       let cents: Cents | null = null;
@@ -347,10 +359,6 @@ export async function extraerPendientes(opciones?: {
   }
   const jevKey = getJevKey();
   const openaiKey = state.configIA.apiKey.trim();
-  if (jevKey === "" && openaiKey === "") {
-    if (opciones?.forzado) avisar("IA: configurá la API key en Ajustes.");
-    return;
-  }
   const items: ItemLote[] = [];
   lista.forEach((c, i) => {
     const texto = limpiarTexto(c.textoOcr);
@@ -359,6 +367,39 @@ export async function extraerPendientes(opciones?: {
   if (items.length === 0) return;
   const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
   const prefijo = jevKey !== "" ? "JEV:" : "IA:";
+  // ponytail: fast-path offline — 1 distinto => total sin red ni tokens (sin key también).
+  const mapaRapido = new Map<number, Cents | null>();
+  const ambiguos: ItemLote[] = [];
+  for (const it of items) {
+    const r = extraerRapidoCents(it.texto);
+    if (r === null) ambiguos.push(it);
+    else mapaRapido.set(it.idx, r);
+  }
+  let okRapido = 0;
+  if (mapaRapido.size > 0) {
+    okRapido = aplicarTotales(items, mapaRapido);
+    for (const it of items) {
+      if (mapaRapido.get(it.idx) != null) {
+        try {
+          actualizarMontoCelda(it.id);
+        } catch {
+          /* el parche nunca aborta el lote */
+        }
+      }
+    }
+    if (ambiguos.length === 0) {
+      if (okRapido > 0) renderHojas();
+      if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okRapido}/${items.length} totales.`);
+      else avisar(avisoPrevio);
+      return;
+    }
+  }
+  if (jevKey === "" && openaiKey === "") {
+    if (okRapido > 0) renderHojas();
+    if (opciones?.forzado) avisar("IA: configurá la API key en Ajustes.");
+    else if (okRapido > 0) avisar(`${prefijo} ${okRapido}/${items.length} totales.`);
+    return;
+  }
   extrayendo = true;
   const previoLote = state.loteEnCurso; // el lote no pisa un intake en curso
   state.loteEnCurso = true; // sin VT ni rebuilds por tick (ver sheets.renderHojas)
@@ -366,14 +407,14 @@ export async function extraerPendientes(opciones?: {
   avisar(`${prefijo} extrayendo totales…`);
   try {
     let okJev = 0;
-    let pendientes: ItemLote[] = items;
+    let pendientes: ItemLote[] = ambiguos;
     if (jevKey !== "") {
       // ponytail: pool 50 (TypeSafe 1200/min, 250k tok/s): pared ~1s en vez de N×1s.
       // 1 request por factura (no mega-request: rompería state ≤32k y guards por ítem).
       // Progresivo con parche in-place: cada éxito aplica al instante y el tick
       // pinta solo su celda (sin rebuild ni VT, ver loteEnCurso); el aviso lleva
       // el conteo. El retry 429/529 corre dentro del slot.
-      const cola = items.filter((it) => !enVuelo.has(it.id));
+      const cola = ambiguos.filter((it) => !enVuelo.has(it.id));
       for (const it of cola) enVuelo.add(it.id);
       // Telemetría del lote (solo DEV): pared vs percentiles por request +
       // concurrencia JS. OJO: concJS alto con waterfall de 6 en Network =
@@ -399,7 +440,7 @@ export async function extraerPendientes(opciones?: {
             /* el parche nunca aborta el lote */
           }
         }
-        avisar(`${prefijo} ${okJev}/${items.length} totales…`);
+        avisar(`${prefijo} ${okRapido + okJev}/${items.length} totales…`);
       };
       const programaTick = (): void => {
         if (programado) return;
@@ -452,8 +493,9 @@ export async function extraerPendientes(opciones?: {
             `concJS=${concMax} min=${cuantil(0)} p50=${cuantil(0.5)} p99=${cuantil(0.99)} renders=${rendersProg} r429=${r429}`,
         );
       }
-      if (okJev === items.length) {
-        if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okJev}/${items.length} totales.`);
+      if (okRapido + okJev === items.length) {
+        if (avisoPrevio.trim() === "")
+          avisar(`${prefijo} ${okRapido + okJev}/${items.length} totales.`);
         else avisar(avisoPrevio);
         return;
       }
@@ -465,7 +507,8 @@ export async function extraerPendientes(opciones?: {
         if (texto !== "") pendientes.push({ idx: i + 1, id: c.id, texto });
       });
       if (pendientes.length === 0) {
-        if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okJev}/${items.length} totales.`);
+        if (avisoPrevio.trim() === "")
+          avisar(`${prefijo} ${okRapido + okJev}/${items.length} totales.`);
         else avisar(avisoPrevio);
         return;
       }
@@ -482,7 +525,7 @@ export async function extraerPendientes(opciones?: {
         }
       }
     }
-    const ok = okJev + okIA;
+    const ok = okRapido + okJev + okIA;
     if (ok > 0) renderHojas(); // badges + #montoTotal con suma local exacta
     // Éxito total con aviso previo: se restaura (el interino lo pisó).
     if (ok < items.length || avisoPrevio.trim() === "") {
