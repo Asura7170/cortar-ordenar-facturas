@@ -10,58 +10,13 @@ import { sanear } from "../utils";
 import { detectarYRecortar, obtenerSesion } from "./docaligner";
 import { extraerUnMonto } from "./extract";
 import { extraerRapidoCents } from "./jev";
-import { CALIDAD_JPEG } from "./imagen";
 import type { Enderezado } from "./ocr";
 import { diagVacio } from "./ocr";
-
-const THUMB_MAX = 800; // ≈ 2× la celda real en pantallas 2x
-
-/** Miniatura JPEG; null si no decodificable (se muestra el original). */
-export async function generarMiniatura(file: Blob): Promise<string | null> {
-  try {
-    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
-    const escala = Math.min(1, THUMB_MAX / Math.max(bmp.width, bmp.height));
-    let red = bmp;
-    if (escala < 1) {
-      red = await createImageBitmap(bmp, {
-        resizeWidth: Math.max(1, Math.round(bmp.width * escala)),
-        resizeHeight: Math.max(1, Math.round(bmp.height * escala)),
-        resizeQuality: "high",
-      });
-      bmp.close();
-    }
-    const canvas = document.createElement("canvas");
-    canvas.width = red.width;
-    canvas.height = red.height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      red.close();
-      return null;
-    }
-    ctx.drawImage(red, 0, 0);
-    red.close();
-    const blob = await new Promise<Blob | null>((res) =>
-      canvas.toBlob(res, "image/jpeg", CALIDAD_JPEG),
-    );
-    return blob ? URL.createObjectURL(blob) : null;
-  } catch {
-    return null;
-  }
-}
 /** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
 async function blobDeItem(sig: Comprobante): Promise<Blob> {
   if (sig.file) return sig.file;
   const res = await fetch(sig.imgUrl);
   return res.blob();
-}
-
-/**
- * Fija la miniatura final sin revocar el imgUrl: en PDF ambos campos aliasan
- * la misma URL y revocar el thumb mataba la vista previa. Puro salvo el revoke.
- */
-export function asignarMiniatura(sig: Comprobante, thumbNueva: string): void {
-  if (sig.thumbUrl && sig.thumbUrl !== sig.imgUrl) URL.revokeObjectURL(sig.thumbUrl);
-  sig.thumbUrl = thumbNueva;
 }
 
 /**
@@ -114,7 +69,7 @@ export async function procesarCola(): Promise<void> {
           }
           // L0: tiempos por etapa (medir antes de optimizar).
           const t0 = performance.now();
-          const ms = { recorte: 0, minis: 0, enderezar: 0, extraer: 0, diag: "" };
+          const ms = { recorte: 0, enderezar: 0, extraer: 0, diag: "" };
           try {
             const t = performance.now();
             const original = await blobDeItem(sig);
@@ -123,7 +78,6 @@ export async function procesarCola(): Promise<void> {
             if (recortada !== original) {
               // ponytail: commit tras el await — si se limpió durante la espera, se
               // revocan las nuevas y el guard de abajo evita resucitar.
-              // L1: la miniatura se genera una sola vez al final (no aquí).
               const imgNueva = URL.createObjectURL(recortada);
               if (!buscarSlot(sig.id)) {
                 URL.revokeObjectURL(imgNueva);
@@ -208,17 +162,8 @@ export async function procesarCola(): Promise<void> {
           } catch {
             sig.textoOcr = "";
           }
-          // L1: una sola miniatura al final, sobre la imagen definitiva.
-          if (blob) {
-            const tm = performance.now();
-            const thumbNueva = await generarMiniatura(blob);
-            ms.minis += performance.now() - tm;
-            if (thumbNueva) {
-              if (!buscarSlot(sig.id)) URL.revokeObjectURL(thumbNueva);
-              else asignarMiniatura(sig, thumbNueva);
-            }
-          }
-          if (!buscarSlot(sig.id)) continue; // limpiado durante la miniatura: no resucita
+          // L1: sin miniatura (la celda pinta el full-res con lazy).
+          if (!buscarSlot(sig.id)) continue; // limpiado durante el OCR: no resucita
           sig.montoCents = null;
           sig.estado = "ok";
           // ponytail: fast-path offline — 1 distinto se fija sin red; el resto vuela a JEV.
@@ -239,7 +184,7 @@ export async function procesarCola(): Promise<void> {
           // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
           if (import.meta.env.DEV)
             console.info(
-              `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} minis=${entero(ms.minis)} ` +
+              `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} ` +
                 `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
                 `${ms.diag} total=${entero(performance.now() - t0)}`,
             );

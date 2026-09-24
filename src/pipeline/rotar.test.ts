@@ -11,11 +11,6 @@ vi.mock("./ocr", async (importOriginal) => {
 });
 // El lote post-giro no debe pegar a la red en tests.
 vi.mock("./extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
-// Thumb controlable por test (asignarMiniatura sigue real).
-vi.mock("./queue", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./queue")>();
-  return { ...real, generarMiniatura: vi.fn(async () => "blob:thumb") };
-});
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
@@ -23,14 +18,12 @@ const { girarYReleer, releerTrasEdicion } = await import("./rotar");
 const { extraerTexto } = await import("./ocr");
 const { extraerPendientes } = await import("./extract");
 const { comprobante } = await import("../test/factoria");
-const { generarMiniatura } = await import("./queue");
 const { renderHojas } = await import("../ui/sheets");
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.mocked(extraerPendientes).mockClear();
   vi.mocked(extraerTexto).mockClear();
-  vi.mocked(generarMiniatura).mockClear();
   vi.mocked(renderHojas).mockClear();
   vi.useRealTimers();
 });
@@ -174,17 +167,17 @@ describe("girarYReleer", () => {
     );
   });
 
-  it("sin thumb muestra el giro nuevo (sin esqueleto permanente)", async () => {
+  it("el giro commitea file e imgUrl nuevos al instante", async () => {
     vi.useFakeTimers();
     const { deps } = depsGiro();
-    vi.mocked(generarMiniatura).mockResolvedValueOnce(null);
     const h = crearHoja();
     const c = comprobante({ estado: "ok", file: new Blob(["foto"]) });
-    c.thumbUrl = null; // imagen sin thumb (falló en la cola)
+    const urlAntes = c.imgUrl;
     h.slots[0] = c;
     state.hojas.push(h);
     await girarYReleer(c.id, 90, deps);
-    expect(c.thumbUrl).toBe(c.imgUrl);
+    expect(c.file).toBeInstanceOf(Blob);
+    expect(c.imgUrl).not.toBe(urlAntes);
   });
 
   it("doble giro rápido: 2 giros al instante + 1 solo OCR", async () => {
@@ -284,21 +277,36 @@ describe("girarYReleer", () => {
     expect(c.imgUrl).toBe(urlAntes); // el giro huérfano se descarta
   });
 
-  it("thumb huérfana se revoca si el slot muere en la ventana", async () => {
+  it("giro huérfano revoca el imgUrl nuevo (sin fuga)", async () => {
     const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    const crearUrl = vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:nuevo");
     try {
-      const { deps } = depsGiro();
+      let soltar: ((b: ImageBitmap) => void) | undefined;
+      const bmp = { width: 10, height: 20, close: vi.fn() };
       const c = sembrar();
-      const thumbVieja = c.thumbUrl;
-      vi.mocked(generarMiniatura).mockImplementationOnce(async () => {
-        state.hojas = [crearHoja()]; // Limpiar durante el await.
-        return "blob:thumb";
+      const urlAntes = c.imgUrl;
+      const p = girarYReleer(c.id, 90, {
+        cargar: () =>
+          new Promise<ImageBitmap>((res) => {
+            soltar = res;
+          }),
+        crear: () =>
+          ({
+            width: 0,
+            height: 0,
+            getContext: () => ({ setTransform: () => {}, drawImage: () => {} }),
+            toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
+          }) as unknown as HTMLCanvasElement,
       });
-      await girarYReleer(c.id, 90, deps);
-      expect(revocar).toHaveBeenCalledWith("blob:thumb");
-      expect(c.thumbUrl).toBe(thumbVieja);
+      for (let i = 0; i < 100 && !soltar; i++) await Promise.resolve();
+      soltar?.(bmp as unknown as ImageBitmap);
+      state.hojas = [crearHoja()]; // Limpiar durante el await.
+      await p;
+      expect(revocar).toHaveBeenCalledWith("blob:nuevo");
+      expect(c.imgUrl).toBe(urlAntes);
     } finally {
       revocar.mockRestore();
+      crearUrl.mockRestore();
     }
   });
 
@@ -326,21 +334,6 @@ describe("girarYReleer", () => {
     expect(c.imgUrl).toBe(urlVieja);
     expect(c.previoDocAligner).toBe(previoViejo);
     expect(document.getElementById("aviso")?.textContent).toBe("No se pudo girar la imagen.");
-  });
-
-  it("sin thumb se revoca la thumb vieja distinta (sin fuga)", async () => {
-    const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    try {
-      const { deps } = depsGiro();
-      vi.mocked(generarMiniatura).mockResolvedValueOnce(null);
-      const c = sembrar();
-      c.thumbUrl = "blob:thumb-vieja";
-      await girarYReleer(c.id, 90, deps);
-      expect(revocar).toHaveBeenCalledWith("blob:thumb-vieja");
-      expect(c.thumbUrl).toBe(c.imgUrl);
-    } finally {
-      revocar.mockRestore();
-    }
   });
 
   it("timer rancio no relee si otro editor commitió después", async () => {
@@ -407,9 +400,6 @@ describe("girarYReleer", () => {
           toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["recorte"])),
         })),
       };
-      vi.mocked(generarMiniatura)
-        .mockImplementationOnce(async (f: Blob) => `thumb:${f.size}`)
-        .mockImplementationOnce(async (f: Blob) => `thumb:${f.size}`);
       const c = sembrar();
       c.previoDocAligner = previoBlob;
       const pg = girarYReleer(c.id, 90, depsGiro as never);
@@ -429,7 +419,6 @@ describe("girarYReleer", () => {
       // El giro terminó último: todo G ("girado" 6B), nada de C ("recorte" 7B).
       expect(await (c.file as Blob).text()).toBe("girado");
       expect(c.imgUrl).toBe("blob:6");
-      expect(c.thumbUrl).toBe("thumb:6");
       const modal = document.getElementById("modalRecorte") as HTMLDialogElement | null;
       if (modal?.open) modal.close();
     } finally {

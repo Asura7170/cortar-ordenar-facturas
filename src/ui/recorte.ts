@@ -1,8 +1,7 @@
 /* Recorte manual por comprobante: modal con la imagen fija en el canvas base
    y 8 tiradores (4 lados + 4 esquinas) sobre el overlay. Confirmar commitea
-   el recorte como JPEG y relee el OCR (igual que el giro). Estado efímero. */
+   el recorte como WebP y relee el OCR (igual que el giro). Estado efímero. */
 import { buscarSlot, obtenerComprobante, state } from "../state";
-import { asignarMiniatura, generarMiniatura } from "../pipeline/queue";
 import { releerTrasEdicion, cancelarRelecturaProgramada } from "../pipeline/rotar";
 import { CALIDAD_WEBP, cargarReal, crearReal } from "../pipeline/imagen";
 import type { DepsOcr } from "../pipeline/ocr";
@@ -319,16 +318,9 @@ async function confirmar(): Promise<void> {
       modal.close();
       return;
     }
-    const thumb = await generarMiniatura(recortado);
-    // ponytail: sesión cruzada tras el segundo await (la thumb huérfana se revoca).
-    if (sesion !== miSesion) {
-      if (thumb) URL.revokeObjectURL(thumb);
-      return;
-    }
     // ponytail: commit atómico (giro en vuelo: mutar partido mezclaba imágenes).
-    // Sin dueño o descarte en vuelo se cierra y la thumb huérfana se revoca.
+    // Sin dueño o descarte en vuelo se cierra.
     if (idAbierto !== id || !buscarSlot(id)) {
-      if (thumb) URL.revokeObjectURL(thumb);
       modal.close();
       return;
     }
@@ -337,13 +329,6 @@ async function confirmar(): Promise<void> {
     item.file = recortado;
     // ponytail: el previo se conserva (cada sesión parte de la imagen más
     // ancha: así un sobre-recorte siempre se puede rectificar ensanchando).
-    if (thumb) asignarMiniatura(item, thumb);
-    // ponytail: sin thumb se muestra el recorte nuevo (alias revocado o esqueleto mienten).
-    // La thumb vieja distinta se revoca (igual que asignarMiniatura).
-    else {
-      if (item.thumbUrl && item.thumbUrl !== item.imgUrl) URL.revokeObjectURL(item.thumbUrl);
-      item.thumbUrl = item.imgUrl;
-    }
     // ponytail: import antes del close (si falla, el catch dice la verdad:
     // nada se commiteó todavía). Sesión cruzada: el diálogo nuevo sigue abierto.
     const { renderHojas } = await import("./sheets");

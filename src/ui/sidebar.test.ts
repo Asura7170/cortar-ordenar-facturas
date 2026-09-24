@@ -354,14 +354,14 @@ describe("gate PDF (tamaño + páginas)", () => {
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
   });
 
-  it("pdf de 3 páginas (1 blanca) → 2 comprobantes p.1/3 y p.3/3 con thumb", async () => {
+  it("pdf de 3 páginas (1 blanca) → 2 comprobantes p.1/3 y p.3/3 con img", async () => {
     aviso.textContent = "";
     expansionSimulada = [paginaSimulada(1, 3), paginaSimulada(3, 3)];
     await agregarArchivos([archivo("fac.pdf", "application/pdf")]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
     expect(nombres).toEqual(["fac p.1/3", "fac p.3/3", null, null]);
-    const thumbs = state.hojas.flatMap((h) => h.slots.map((c) => c?.thumbUrl ?? null));
-    expect(thumbs.slice(0, 2).every((t) => t?.startsWith("blob:mock-") ?? false)).toBe(true);
+    const imgs = state.hojas.flatMap((h) => h.slots.map((c) => c?.imgUrl ?? null));
+    expect(imgs.slice(0, 2).every((t) => t?.startsWith("blob:mock-") ?? false)).toBe(true);
     expect(aviso.textContent).toBe("");
   });
 
@@ -502,8 +502,8 @@ describe("código de pedido", () => {
 describe("modalLimpiar", () => {
   it("confirmar vacía a una hoja fresca y revoca URLs", () => {
     const h = crearHoja();
-    h.slots[0] = comprobante({ imgUrl: "blob:img", thumbUrl: "blob:thumb" });
-    h.slots[1] = comprobante({ imgUrl: "blob:img2", thumbUrl: null });
+    h.slots[0] = comprobante({ imgUrl: "blob:img" });
+    h.slots[1] = comprobante({ imgUrl: "blob:img2" });
     state.hojas.push(h);
     const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     modalLimpiar.returnValue = "ok";
@@ -511,7 +511,6 @@ describe("modalLimpiar", () => {
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]?.slots.every((c) => c === null)).toBe(true);
     expect(revoke).toHaveBeenCalledWith("blob:img");
-    expect(revoke).toHaveBeenCalledWith("blob:thumb");
     expect(revoke).toHaveBeenCalledWith("blob:img2");
   });
 

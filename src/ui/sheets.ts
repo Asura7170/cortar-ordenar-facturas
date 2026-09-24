@@ -123,24 +123,9 @@ function pintarCelda(
     r.textContent = "✂";
     div.append(r);
   }
-  if (item.thumbUrl) {
+  if (item.imgUrl) {
     const img = document.createElement("img");
-    img.src = item.thumbUrl; // solo el thumb: el full-res nunca se decodifica en la grilla
-    img.alt = sanear(item.nombre);
-    img.draggable = false;
-    img.loading = "lazy";
-    img.decoding = "async";
-    div.append(img, btn);
-  } else if (item.file && /^image\//i.test(item.file.type)) {
-    // Thumb aún en camino: esqueleto con el mismo hueco (cero decodificación).
-    const skel = document.createElement("div");
-    skel.className = "cell-skel";
-    skel.setAttribute("aria-hidden", "true");
-    div.append(skel, btn);
-  } else {
-    // PDF u otro sin miniatura: fallback al original.
-    const img = document.createElement("img");
-    img.src = item.imgUrl; // blob interno de la app, no entrada del usuario
+    img.src = item.imgUrl; // full-res con lazy: sin miniaturas (medido: más rápido y liviano)
     img.alt = sanear(item.nombre);
     img.draggable = false;
     img.loading = "lazy";
@@ -339,7 +324,6 @@ export function quitarComprobante(id: number): void {
       const c = h.slots[idx];
       if (c) {
         URL.revokeObjectURL(c.imgUrl);
-        if (c.thumbUrl) URL.revokeObjectURL(c.thumbUrl);
       }
       h.slots[idx] = null;
       break;
@@ -480,21 +464,6 @@ export function actualizarMontoCelda(id: number): boolean {
   return true;
 }
 
-// Repinta UNA celda (llegó su miniatura) sin reconstruir la grilla.
-export function actualizarMiniatura(id: number): void {
-  const cell = cellById(id);
-  if (!cell) return;
-  const slot = buscarSlot(id);
-  if (!slot) return;
-  // ponytail: la mini no pisa el borrador en curso de esa celda (y el
-  // replaceChildren bajo el flag no commitea el borrador vía change).
-  const b = borradorEnEdicion();
-  bajoMutandoHojas(() => {
-    pintarCelda(cell, slot.hoja.slots[slot.idx] ?? null, slot.idx, slot.hoja.id);
-  });
-  if (b && b.id === id) restaurarBorrador(b);
-}
-
 /* ---------- Drag entre casillas (Pointer Events: mover/swap) ---------- */
 
 interface DragState {
@@ -551,7 +520,7 @@ function zoomCentrado(factor: number): void {
   zoomEn(base.left + base.width / 2, base.top + base.height / 2, factor);
 }
 
-// ponytail: lupa con el thumb de la grilla como fuente (sincrónica y exacta;
+// ponytail: lupa sobre la imagen de la grilla (sincrónica y exacta;
 // full-res bajo demanda cuando el blur a 2.5x lo justifique). Estado efímero.
 const LUPA_L = 200;
 const LUPA_ZOOM = 2.5;
@@ -726,7 +695,7 @@ function iniciarGhost(d: DragState, x: number, y: number): void {
   if (d.ghost) return;
   const celdaOrigen = cellById(d.id);
   if (!celdaOrigen) return;
-  // Thumb en camino (esqueleto sin <img>): fantasma desde la caja para no
+  // Sin <img> (celda vacía): fantasma desde la caja para no
   // dejar el drag muerto en lotes grandes.
   const img = celdaOrigen.querySelector("img");
   const fuente = img ?? celdaOrigen;

@@ -99,7 +99,7 @@ async function medirImagen(blob: Blob): Promise<{ readonly w: number; readonly h
 }
 
 // ponytail: blobDe local (6 líneas); importar queue.ts arrastraría onnxruntime a este módulo y sus tests.
-/** Blob full-res del comprobante (nunca el thumb): file, o el imgUrl local. */
+/** Blob full-res del comprobante: file, o el imgUrl local. */
 async function blobDe(c: Comprobante): Promise<Blob> {
   if (c.file) return c.file;
   return await (await fetch(c.imgUrl)).blob();

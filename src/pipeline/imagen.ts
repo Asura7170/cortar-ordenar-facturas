@@ -6,7 +6,7 @@
 /** Lado mayor máximo tras normalizar (más píxeles no ayudan al OCR). */
 export const LADO_MAX_IMAGEN: number = 2000;
 
-/** Calidad JPEG única (miniaturas de display + conversión de salida a Word). */
+/** Calidad JPEG única (conversión de salida a Word). */
 export const CALIDAD_JPEG: number = 0.9;
 
 /** Calidad WebP del pipeline (intake, warp, giros, recortes, páginas PDF). */

@@ -28,7 +28,7 @@ vi.mock("./docaligner", async (importOriginal) => {
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
-const { asignarMiniatura, procesarCola } = await import("./queue");
+const { procesarCola } = await import("./queue");
 const { comprobante } = await import("../test/factoria");
 const { renderHojas } = await import("../ui/sheets");
 const { extraerPendientes, extraerUnMonto } = await import("./extract");
@@ -67,7 +67,7 @@ describe("procesarCola", () => {
     expect(state.colaEnProceso).toBe(false);
   });
 
-  it("informa tiempos por etapa (L0: recorte/minis/enderezar/extraer/total)", async () => {
+  it("informa tiempos por etapa (L0: recorte/enderezar/extraer/total)", async () => {
     const h = crearHoja();
     const c = comprobante({ nombre: "t.png" });
     h.slots[0] = c;
@@ -77,7 +77,7 @@ describe("procesarCola", () => {
     await vi.advanceTimersByTimeAsync(2000);
     await p;
     const linea = info.mock.calls.map((a) => String(a[0])).find((s) => s.startsWith("OCR ms"));
-    expect(linea).toMatch(/recorte=\d+ minis=\d+ enderezar=\d+ extraer=\d+/);
+    expect(linea).toMatch(/recorte=\d+ enderezar=\d+ extraer=\d+/);
     expect(linea).toMatch(/cajas=\d+ batch=\[\d+,\d+\] fallback=(sí|no) recRuns=\d+ total=\d+/);
   });
 
@@ -262,22 +262,5 @@ describe("procesarCola", () => {
     await p;
     expect(c.file).toBe(intake);
     expect(c.previoDocAligner).toBeUndefined();
-  });
-
-  it("asignarMiniatura no revoca el imgUrl aliased (PDF, hilo #1 PR9)", () => {
-    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const pdf = comprobante({ imgUrl: "blob:x", thumbUrl: "blob:x" });
-    asignarMiniatura(pdf, "blob:thumb-nueva");
-    expect(revoke).not.toHaveBeenCalled(); // sin el fix revocaba "blob:x"
-    expect(pdf.thumbUrl).toBe("blob:thumb-nueva");
-    expect(pdf.imgUrl).toBe("blob:x");
-  });
-
-  it("asignarMiniatura revoca el thumb viejo distinto", () => {
-    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const img = comprobante({ imgUrl: "blob:img", thumbUrl: "blob:vieja" });
-    asignarMiniatura(img, "blob:thumb-nueva");
-    expect(revoke).toHaveBeenCalledWith("blob:vieja");
-    expect(img.thumbUrl).toBe("blob:thumb-nueva");
   });
 });

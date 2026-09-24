@@ -364,31 +364,6 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
 }
 
-/* Esqueleto mientras llega el thumb: mismo hueco que la foto, cero decodificación. */
-/* ponytail: sweep por transform en pseudo-elemento (compositor), no por
-   background-position (repintaba N esqueletos por frame y saturaba el raster). */
-.cell-skel {
-  width: 100%;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--papel-sombra);
-  overflow: hidden;
-  position: relative;
-}
-.cell-skel::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(100deg, transparent 30%, var(--papel-brillo) 50%, transparent 70%);
-  transform: translateX(-100%);
-  animation: skel-sweep 1.2s linear infinite;
-}
-@keyframes skel-sweep {
-  to {
-    transform: translateX(100%);
-  }
-}
-
 /* Fantasma del comprobante mientras se arrastra (Pointer Events).
    JS lo mueve únicamente con transform (compositor): left/top quedan en 0. */
 .drag-ghost {
