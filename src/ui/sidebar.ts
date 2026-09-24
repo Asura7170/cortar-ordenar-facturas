@@ -144,8 +144,8 @@ export async function agregarArchivos(
     for (const f of lista) {
       await cederTurno();
       if (esImagen(f)) {
-        // Intake normalizado: JPEG único, EXIF derecha, tope 2000px.
-        // Blanca/corrupta → aviso, sin tumbar el lote (igual que PDF).
+        // Intake: jpg/png/webp sin nada que corregir pasa crudo (0 gens);
+        // lo demás se empaqueta a WebP. Blanca/corrupta → aviso, sin tumbar el lote.
         // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
         try {
           const tN = performance.now();

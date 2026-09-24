@@ -340,7 +340,7 @@ describe("girarBlob", () => {
     return { lienzo, pedidos };
   }
 
-  it("90° rota 10x20 → JPEG en lienzo 20x10", async () => {
+  it("90° rota 10x20 → WebP en lienzo 20x10", async () => {
     const { lienzo, pedidos } = caso((cb) => cb(new Blob(["g"])));
     const fuera = await girarBlob(
       new Blob(["f"]),
@@ -351,7 +351,7 @@ describe("girarBlob", () => {
     expect(fuera).toBeInstanceOf(Blob);
     expect(lienzo.width).toBe(20);
     expect(lienzo.height).toBe(10);
-    expect(pedidos).toEqual([{ tipo: "image/jpeg", calidad: 0.9 }]);
+    expect(pedidos).toEqual([{ tipo: "image/webp", calidad: 0.85 }]);
   });
 
   it("sin contexto o sin blob → null sin lanzar", async () => {

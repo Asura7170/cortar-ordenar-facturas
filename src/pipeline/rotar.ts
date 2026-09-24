@@ -6,7 +6,7 @@
 import { buscarSlot, obtenerComprobante, state } from "../state";
 import { sanear } from "../utils";
 import { asignarMiniatura, generarMiniatura } from "./queue";
-import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
+import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
 import type { DepsOcr } from "./ocr";
 import { girarBlob, lienzoGirado } from "./ocr";
 
@@ -51,12 +51,12 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
     const cargar = deps?.cargar ?? cargarReal;
     const crear = deps?.crear ?? crearReal;
     const original = item.file ?? (await (await fetch(item.imgUrl)).blob());
-    const bmp = await cargar(original);
+    const bmp = await cargar(original, { imageOrientation: "from-image" });
     try {
       const lienzo = lienzoGirado(bmp, grados, crear);
       if (!lienzo) throw new Error("sin contexto 2d");
       const girado = await new Promise<Blob | null>((res) =>
-        lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
       );
       if (!girado) throw new Error("sin blob girado");
       // ponytail: el previo acompaña al giro (con orientación rancia el próximo

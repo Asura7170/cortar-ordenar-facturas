@@ -19,6 +19,7 @@ import {
 } from "docx";
 import { state } from "../state";
 import type { Comprobante, Hoja, LayoutId, PosicionCodigo } from "../types";
+import { CALIDAD_JPEG } from "../pipeline/imagen";
 import { layoutDe } from "../ui/layout";
 import { totalItems } from "../ui/monto";
 import { getEl } from "../utils";
@@ -91,7 +92,7 @@ export function encajar(
 
 /** Dimensiones del blob sin mostrarlo (cierra el bitmap). */
 async function medirImagen(blob: Blob): Promise<{ readonly w: number; readonly h: number }> {
-  const bmp = await createImageBitmap(blob);
+  const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
   const dims = { w: bmp.width, h: bmp.height };
   bmp.close();
   return dims;
@@ -102,6 +103,30 @@ async function medirImagen(blob: Blob): Promise<{ readonly w: number; readonly h
 async function blobDe(c: Comprobante): Promise<Blob> {
   if (c.file) return c.file;
   return await (await fetch(c.imgUrl)).blob();
+}
+
+/** Bytes para el docx (declara jpg): lo no-jpeg se convierte aquí, no en el pipeline. */
+async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
+  if (blob.type === "image/jpeg") return blob.arrayBuffer();
+  try {
+    const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+    try {
+      const lienzo = document.createElement("canvas");
+      lienzo.width = bmp.width;
+      lienzo.height = bmp.height;
+      const ctx = lienzo.getContext("2d");
+      if (!ctx) return blob.arrayBuffer();
+      ctx.drawImage(bmp, 0, 0);
+      const jpg = await new Promise<Blob | null>((res) =>
+        lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+      );
+      return (jpg ?? blob).arrayBuffer();
+    } finally {
+      bmp.close();
+    }
+  } catch {
+    return blob.arrayBuffer();
+  }
 }
 
 function parrafoCodigo(codigo: string, posicion: PosicionCodigo): Paragraph {
@@ -126,7 +151,7 @@ async function parrafoHoja(hoja: Hoja, posicion: PosicionCodigo): Promise<Paragr
     runs.push(
       new ImageRun({
         type: "jpg",
-        data: await blob.arrayBuffer(),
+        data: await blobAjpg(blob),
         transformation: { width: t.w, height: t.h },
         floating: {
           horizontalPosition: {

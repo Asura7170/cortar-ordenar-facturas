@@ -2,7 +2,7 @@
    Geometría y decode portados de andor83/ml-web-scanner (MIT — ver public/models/NOTICE.txt);
    pesos DocAligner de DocsaidLab (Apache-2.0 — ver public/models/NOTICE.txt).
    Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + recorte + vacías). Fallo → blob original. */
-import { CALIDAD_JPEG, cargarReal, crearReal, recortarMargenesBlancos } from "./imagen";
+import { CALIDAD_WEBP, cargarReal, crearReal, recortarMargenesBlancos } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 /** Punto en píxeles de la imagen original. */
@@ -403,7 +403,7 @@ export async function detectarEsquinas(
   return esQuadPlausible(quad, confianzas, bmp.width, bmp.height) ? quad : null;
 }
 
-/** Recorta el quad a JPEG (misma calidad única del pipeline). Lanza si no hay contexto/blob. */
+/** Recorta el quad a WebP (misma calidad única del pipeline). Lanza si no hay contexto/blob. */
 export async function rectificar(
   bmp: ImageBitmap,
   quad: Quad,
@@ -431,7 +431,7 @@ export async function rectificar(
   // ponytail: el warp deja cuñas blancas si el quad se salió de la foto; el mismo recorte las quita.
   const limpio = recortarMargenesBlancos(lienzo, crear);
   const blob = await new Promise<Blob | null>((res) =>
-    limpio.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+    limpio.toBlob(res, "image/webp", CALIDAD_WEBP),
   );
   if (!blob) throw new Error("rectificar: sin blob");
   return blob;

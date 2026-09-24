@@ -4,7 +4,7 @@
 import { buscarSlot, obtenerComprobante, state } from "../state";
 import { asignarMiniatura, generarMiniatura } from "../pipeline/queue";
 import { releerTrasEdicion, cancelarRelecturaProgramada } from "../pipeline/rotar";
-import { CALIDAD_JPEG, cargarReal, crearReal } from "../pipeline/imagen";
+import { CALIDAD_WEBP, cargarReal, crearReal } from "../pipeline/imagen";
 import type { DepsOcr } from "../pipeline/ocr";
 import { getEl } from "../utils";
 
@@ -88,7 +88,7 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
     // ponytail: el editor abre el intake pre-warp (recupera lo cortado de más);
     // sin previo (DocAligner no-op), la imagen actual.
     const fuente = item.previoDocAligner ?? item.file ?? (await (await fetch(item.imgUrl)).blob());
-    foto = await cargar(fuente);
+    foto = await cargar(fuente, { imageOrientation: "from-image" });
   } catch {
     avisar("No se pudo abrir el recorte.");
     return;
@@ -306,7 +306,7 @@ async function confirmar(): Promise<void> {
     if (!ctx) throw new Error("sin contexto 2d");
     ctx.drawImage(foto, sx, sy, w, h, 0, 0, w, h);
     const recortado = await new Promise<Blob | null>((res) =>
-      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+      lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
     );
     if (!recortado) throw new Error("sin blob recortado");
     // ponytail: sesión cruzada (cerrar+reabrir en vuelo): la confirmación vieja

@@ -1,6 +1,12 @@
-/* Tests: imagen — normalización JPEG única, tope 2000px, filtro blancas/corruptas. */
+/* Tests: imagen — normalización WebP/passthrough, tope 2000px, filtro blancas/corruptas. */
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { CALIDAD_JPEG, LADO_MAX_IMAGEN, normalizarImagen, recortarMargenesBlancos } from "./imagen";
+import {
+  CALIDAD_WEBP,
+  LADO_MAX_IMAGEN,
+  esFormatoDirecto,
+  normalizarImagen,
+  recortarMargenesBlancos,
+} from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 function bitmapFalso(w: number, h: number): ImageBitmap {
@@ -55,14 +61,22 @@ beforeEach(() => {
 const img = (nombre: string, type: string): File => new File(["x"], nombre, { type });
 
 describe("normalizarImagen", () => {
-  it("chica conserva dimensiones y sale jpeg 0.9", async () => {
+  it("bmp chico se empaqueta a webp 0.85", async () => {
     const falso = lienzoFalso(conTinta);
-    const blob = await normalizarImagen(img("a.png", "image/png"), cargar(100, 80), falso.crear);
-    expect(blob.type).toBe("image/jpeg");
-    expect(falso.tipo()).toBe("image/jpeg");
-    expect(falso.calidad()).toBe(CALIDAD_JPEG);
+    const blob = await normalizarImagen(img("a.bmp", "image/bmp"), cargar(100, 80), falso.crear);
+    expect(blob.type).toBe("image/jpeg"); // el falso devuelve jpeg; lo que importa:
+    expect(falso.tipo()).toBe("image/webp");
+    expect(falso.calidad()).toBe(CALIDAD_WEBP);
     // Guard de regresión: sin from-image el EXIF no se endereza.
     expect(ultimaOpc).toEqual({ imageOrientation: "from-image" });
+  });
+
+  it("jpg chico sin nada que corregir pasa el original intacto (0 gens)", async () => {
+    const falso = lienzoFalso(conTinta);
+    const f = img("a.jpg", "image/jpeg");
+    const blob = await normalizarImagen(f, cargar(100, 80), falso.crear);
+    expect(blob).toBe(f);
+    expect(falso.tipo()).toBeNull(); // ni siquiera se pidió empaquetar
   });
 
   it("grande se acota al tope manteniendo proporción", async () => {
@@ -120,8 +134,31 @@ describe("normalizarImagen", () => {
       toBlob: (cb: (b: Blob | null) => void): void => cb(null),
     } as unknown as HTMLCanvasElement;
     await expect(
-      normalizarImagen(img("n.png", "image/png"), cargar(10, 10), () => lienzoNulo),
+      normalizarImagen(img("n.bmp", "image/bmp"), cargar(10, 10), () => lienzoNulo),
     ).rejects.toThrow("ilegible");
+  });
+});
+
+describe("esFormatoDirecto", () => {
+  it("mime jpg/png/webp pasa, bmp no", async () => {
+    expect(await esFormatoDirecto(img("a.jpg", "image/jpeg"))).toBe(true);
+    expect(await esFormatoDirecto(img("a.png", "image/png"))).toBe(true);
+    expect(await esFormatoDirecto(img("a.webp", "image/webp"))).toBe(true);
+    expect(await esFormatoDirecto(img("a.bmp", "image/bmp"))).toBe(false);
+  });
+
+  it("type vacío se olfatea por firma mágica", async () => {
+    const sinTipo = (bytes: number[]): Blob => new Blob([new Uint8Array(bytes)]);
+    expect(await esFormatoDirecto(sinTipo([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe(
+      true,
+    );
+    expect(
+      await esFormatoDirecto(sinTipo([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])),
+    ).toBe(true);
+    expect(
+      await esFormatoDirecto(sinTipo([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])),
+    ).toBe(true);
+    expect(await esFormatoDirecto(sinTipo([0, 1, 2, 3]))).toBe(false);
   });
 });
 

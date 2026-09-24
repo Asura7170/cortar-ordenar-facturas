@@ -15,7 +15,7 @@ import {
   REC_ALTO,
 } from "./ocrRec";
 import type { LineaNorm, TextoRec } from "./ocrRec";
-import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
+import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 const RUTA_DET = `${import.meta.env.BASE_URL}models/ocr/det.onnx`;
@@ -287,7 +287,7 @@ export function lienzoGirado(
   return lienzo;
 }
 
-/** Rota un blob ±90°/180° a JPEG (null si no se puede). Nunca lanza. */
+/** Rota un blob ±90°/180° a WebP (null si no se puede). Nunca lanza. */
 export async function girarBlob(
   fuente: Blob,
   grados: Giro,
@@ -295,12 +295,12 @@ export async function girarBlob(
   crear: CrearLienzo = crearReal,
 ): Promise<Blob | null> {
   try {
-    const bmp = await cargar(fuente);
+    const bmp = await cargar(fuente, { imageOrientation: "from-image" });
     try {
       const lienzo = lienzoGirado(bmp, grados, crear);
       if (!lienzo) return null;
       return await new Promise<Blob | null>((res) =>
-        lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
       );
     } finally {
       bmp.close();
@@ -310,11 +310,11 @@ export async function girarBlob(
   }
 }
 
-/** Lienzo → JPEG (misma calidad que el intake). Null si no codifica. */
+/** Lienzo → WebP (misma calidad que el intake). Null si no codifica. */
 function blobDeLienzo(lienzo: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((res) => {
     try {
-      lienzo.toBlob((b) => res(b), "image/jpeg", CALIDAD_JPEG);
+      lienzo.toBlob((b) => res(b), "image/webp", CALIDAD_WEBP);
     } catch {
       res(null);
     }

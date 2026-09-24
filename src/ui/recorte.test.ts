@@ -189,7 +189,7 @@ describe("abrirRecorte", () => {
       c.previoDocAligner = previo;
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(true);
-      expect(deps.cargar).toHaveBeenCalledWith(previo);
+      expect(deps.cargar).toHaveBeenCalledWith(previo, { imageOrientation: "from-image" });
       btnOk.click();
       await vaciar();
       // El previo sobrevive: la próxima sesión puede volver a ensanchar.
