@@ -1,4 +1,4 @@
-/* Factorías para tests (evitan repetir los 11 campos del comprobante). */
+/* Factorías para tests (evitan repetir los campos del comprobante). */
 import { nextComprobanteId } from "../state";
 import type { Comprobante } from "../types";
 
@@ -7,7 +7,6 @@ export function comprobante(parc?: Partial<Comprobante>): Comprobante {
     id: nextComprobanteId(),
     nombre: "factura.png",
     imgUrl: "blob:mock-1",
-    thumbUrl: null,
     textoOcr: "",
     montoCents: null,
     montoManual: false,

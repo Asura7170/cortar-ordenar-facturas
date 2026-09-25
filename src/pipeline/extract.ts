@@ -1,4 +1,5 @@
-/* Extracción del TOTAL: JEV 1×1 secuencial primero, fallback openai-compatible en lote.
+/* Extracción del TOTAL: regex offline primero (1 distinto = ok sin red,
+   0 = manual), JEV 1×1 para lo ambiguo (>1), fallback openai-compatible en lote.
    Auto al drenar la cola + botón Reintentar IA. Solo completa montos en
    null no-manuales: lo manual siempre gana (incluso si se escribe durante el fetch).
    La suma total la hace el código (sumaTotal); al LLM nunca se le pide sumar. */
@@ -7,7 +8,7 @@ import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
 import { actualizarMontoCelda, renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
-import { getJevKey, llamarJev } from "./jev";
+import { extraerRapidoCents, extractCandidates, getJevKey, llamarJev } from "./jev";
 import {
   campoRazonamiento,
   detectarTipo,
@@ -44,12 +45,19 @@ export function candidatos(): Comprobante[] {
 
 /** Ruido fuera + cap por ticket (el TOTAL sobrevive; si no, queda manual). */
 export function limpiarTexto(s: string): string {
-  return sanear(s).replace(/\s+/g, " ").trim().slice(0, MAX_TEXTO);
+  return limpiarTextoCompleto(s).slice(0, MAX_TEXTO);
+}
+
+/** Mismo normalizado sin el tope: clasificar montos sobre el texto completo
+    (un TOTAL tras el char 1800 también cuenta; el tope es solo para la red). */
+export function limpiarTextoCompleto(s: string): string {
+  return sanear(s).replace(/\s+/g, " ").trim();
 }
 
 /** Ids cortos 1..N (nunca nombres de archivo: ahorra tokens y no rompe el parser). */
 export function construirPrompt(items: readonly Pick<ItemLote, "idx" | "texto">[]): string {
-  return `${SISTEMA}\n\n${items.map((it) => `[#${it.idx}]\n${it.texto}`).join("\n\n")}`;
+  // ponytail: el tope vive aquí (payload de red), no en la clasificación.
+  return `${SISTEMA}\n\n${items.map((it) => `[#${it.idx}]\n${limpiarTexto(it.texto)}`).join("\n\n")}`;
 }
 
 // ponytail: chunks secuenciales por presupuesto de contexto, no 1 llamada por ticket.
@@ -242,8 +250,8 @@ export function aplicarTotales(
     if (!slot) continue; // limpiado/quitado durante el fetch: no resucita
     const actual = slot.hoja.slots[slot.idx];
     if (!actual || actual.montoCents !== null) continue; // manual ganó durante el fetch
-    // it.texto va limpio (limpiarTexto): se compara en el mismo espacio.
-    if (limpiarTexto(actual.textoOcr) !== it.texto) continue; // girado durante el fetch: rancio
+    // it.texto va completo sin tope: se compara en el mismo espacio.
+    if (limpiarTextoCompleto(actual.textoOcr) !== it.texto) continue; // girado durante el fetch: rancio
     actual.montoCents = cents;
     aplicados++;
   }
@@ -266,23 +274,41 @@ function refrescarBoton(): void {
 const enVuelo = new Set<number>();
 
 /** JEV 1×1 progresivo para la cola: resuelve un comprobante y lo pinta al
-    instante, sin esperar al lote. Nunca lanza (best-effort). */
+    instante, sin esperar al lote. Nunca lanza (best-effort). Flujo: 1 distinto
+    = ok sin red ni key; 0 = manual sin JEV; >1 = JEV (falla → lote). */
 export async function extraerUnMonto(id: number, fetchFn: FetchFn = fetch): Promise<boolean> {
   if (enVuelo.has(id)) return false;
   try {
-    const key = getJevKey();
-    if (key === "") return false;
     const slot = buscarSlot(id);
     const actual = slot?.hoja.slots[slot.idx];
     if (!actual || actual.estado !== "ok" || actual.montoCents !== null || actual.montoManual)
       return false;
-    const texto = limpiarTexto(actual.textoOcr);
+    const texto = limpiarTextoCompleto(actual.textoOcr);
     if (texto === "") return false;
+    // ponytail: fast-path offline — 1 distinto => total sin red ni key.
+    const rapido = extraerRapidoCents(texto);
+    if (rapido !== null) {
+      const item: ItemLote = { idx: 1, id, texto };
+      if (aplicarTotales([item], new Map([[1, rapido]])) === 0) return false;
+      try {
+        if (!actualizarMontoCelda(id)) renderHojas();
+      } catch {
+        renderHojas();
+      }
+      return true;
+    }
+    // 0 candidatos → manual (típico: mal recorte; el usuario recorta y re-dispara).
+    if (extractCandidates(texto).length === 0) return false;
+    const key = getJevKey();
+    if (key === "") return false;
     enVuelo.add(id);
     try {
       let cents: Cents | null = null;
       try {
-        cents = parsearMonto((await llamarJev({ id, contenido: texto }, key, fetchFn)).total);
+        // ponytail: el tope es del payload de red, no de la clasificación.
+        cents = parsearMonto(
+          (await llamarJev({ id, contenido: limpiarTexto(texto) }, key, fetchFn)).total,
+        );
       } catch {
         return false; // la red del drenado lo reintenta en lote
       }
@@ -342,23 +368,65 @@ export async function extraerPendientes(opciones?: {
   }
   const lista = candidatos();
   if (lista.length === 0) {
-    if (opciones?.forzado) avisar("IA: sin pendientes (todo ya tiene total o es manual).");
+    if (opciones?.forzado) avisar("Sin pendientes (todo ya tiene total o es manual).");
     return;
   }
   const jevKey = getJevKey();
   const openaiKey = state.configIA.apiKey.trim();
-  if (jevKey === "" && openaiKey === "") {
-    if (opciones?.forzado) avisar("IA: configurá la API key en Ajustes.");
-    return;
-  }
   const items: ItemLote[] = [];
   lista.forEach((c, i) => {
-    const texto = limpiarTexto(c.textoOcr);
+    const texto = limpiarTextoCompleto(c.textoOcr);
     if (texto !== "") items.push({ idx: i + 1, id: c.id, texto });
   });
   if (items.length === 0) return;
   const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
-  const prefijo = jevKey !== "" ? "JEV:" : "IA:";
+  const prefijo = jevKey !== "" ? "JEV:" : openaiKey !== "" ? "IA:" : "Local:";
+  // ponytail: fast-path offline — 1 distinto => total sin red ni tokens (sin key también).
+  // 0 candidatos => manual directo (sin JEV ni LLM); >1 => ambiguos a JEV.
+  const mapaRapido = new Map<number, Cents | null>();
+  const ambiguos: ItemLote[] = [];
+  for (const it of items) {
+    const r = extraerRapidoCents(it.texto);
+    if (r !== null) mapaRapido.set(it.idx, r);
+    else if (extractCandidates(it.texto).length > 0) ambiguos.push(it);
+  }
+  let okRapido = 0;
+  if (mapaRapido.size > 0) {
+    okRapido = aplicarTotales(items, mapaRapido);
+    for (const it of items) {
+      if (mapaRapido.get(it.idx) != null) {
+        try {
+          actualizarMontoCelda(it.id);
+        } catch {
+          /* el parche nunca aborta el lote */
+        }
+      }
+    }
+    if (ambiguos.length === 0) {
+      if (okRapido > 0) renderHojas();
+      // Todo offline: la red no resolvió nada (ni se intentó).
+      if (avisoPrevio.trim() === "") avisar(`Local: ${okRapido}/${items.length} totales.`);
+      else avisar(avisoPrevio);
+      return;
+    }
+  }
+  if (jevKey === "" && openaiKey === "") {
+    if (okRapido > 0) renderHojas();
+    // 0 candidatos en todo: ninguna key los resuelve (ni JEV ni LLM los reciben).
+    if (ambiguos.length === 0) {
+      if (opciones?.forzado)
+        avisar("Sin totales para leer: revisá manualmente o recortá de nuevo.");
+      return;
+    }
+    if (opciones?.forzado)
+      avisar(
+        okRapido > 0
+          ? `${prefijo} ${okRapido}/${items.length} totales, resto manual. Revisá Ajustes (URL, clave, CORS).`
+          : `${prefijo} configurá la API key en Ajustes.`,
+      );
+    else if (okRapido > 0) avisar(`${prefijo} ${okRapido}/${items.length} totales.`);
+    return;
+  }
   extrayendo = true;
   const previoLote = state.loteEnCurso; // el lote no pisa un intake en curso
   state.loteEnCurso = true; // sin VT ni rebuilds por tick (ver sheets.renderHojas)
@@ -366,14 +434,14 @@ export async function extraerPendientes(opciones?: {
   avisar(`${prefijo} extrayendo totales…`);
   try {
     let okJev = 0;
-    let pendientes: ItemLote[] = items;
+    let pendientes: ItemLote[] = ambiguos;
     if (jevKey !== "") {
       // ponytail: pool 50 (TypeSafe 1200/min, 250k tok/s): pared ~1s en vez de N×1s.
       // 1 request por factura (no mega-request: rompería state ≤32k y guards por ítem).
       // Progresivo con parche in-place: cada éxito aplica al instante y el tick
       // pinta solo su celda (sin rebuild ni VT, ver loteEnCurso); el aviso lleva
       // el conteo. El retry 429/529 corre dentro del slot.
-      const cola = items.filter((it) => !enVuelo.has(it.id));
+      const cola = ambiguos.filter((it) => !enVuelo.has(it.id));
       for (const it of cola) enVuelo.add(it.id);
       // Telemetría del lote (solo DEV): pared vs percentiles por request +
       // concurrencia JS. OJO: concJS alto con waterfall de 6 en Network =
@@ -399,7 +467,7 @@ export async function extraerPendientes(opciones?: {
             /* el parche nunca aborta el lote */
           }
         }
-        avisar(`${prefijo} ${okJev}/${items.length} totales…`);
+        avisar(`${prefijo} ${okRapido + okJev}/${items.length} totales…`);
       };
       const programaTick = (): void => {
         if (programado) return;
@@ -413,7 +481,7 @@ export async function extraerPendientes(opciones?: {
           concMax = Math.max(concMax, enCurso);
           try {
             const cents = parsearMonto(
-              (await llamarJev({ id: it.id, contenido: it.texto }, jevKey)).total,
+              (await llamarJev({ id: it.id, contenido: limpiarTexto(it.texto) }, jevKey)).total,
             );
             if (aplicarTotales([it], new Map([[it.idx, cents]])) > 0) {
               okJev++;
@@ -452,8 +520,9 @@ export async function extraerPendientes(opciones?: {
             `concJS=${concMax} min=${cuantil(0)} p50=${cuantil(0.5)} p99=${cuantil(0.99)} renders=${rendersProg} r429=${r429}`,
         );
       }
-      if (okJev === items.length) {
-        if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okJev}/${items.length} totales.`);
+      if (okRapido + okJev === items.length) {
+        if (avisoPrevio.trim() === "")
+          avisar(`${prefijo} ${okRapido + okJev}/${items.length} totales.`);
         else avisar(avisoPrevio);
         return;
       }
@@ -461,11 +530,14 @@ export async function extraerPendientes(opciones?: {
       pendientes = [];
       restantes.forEach((c, i) => {
         if (enVuelo.has(c.id)) return; // en vuelo: lo cubre su propia promesa
-        const texto = limpiarTexto(c.textoOcr);
-        if (texto !== "") pendientes.push({ idx: i + 1, id: c.id, texto });
+        const texto = limpiarTextoCompleto(c.textoOcr);
+        // El LLM es fallback de JEV: 0 candidatos sigue manual.
+        if (texto !== "" && extractCandidates(texto).length > 0)
+          pendientes.push({ idx: i + 1, id: c.id, texto });
       });
       if (pendientes.length === 0) {
-        if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okJev}/${items.length} totales.`);
+        if (avisoPrevio.trim() === "")
+          avisar(`${prefijo} ${okRapido + okJev}/${items.length} totales.`);
         else avisar(avisoPrevio);
         return;
       }
@@ -482,7 +554,7 @@ export async function extraerPendientes(opciones?: {
         }
       }
     }
-    const ok = okJev + okIA;
+    const ok = okRapido + okJev + okIA;
     if (ok > 0) renderHojas(); // badges + #montoTotal con suma local exacta
     // Éxito total con aviso previo: se restaura (el interino lo pisó).
     if (ok < items.length || avisoPrevio.trim() === "") {

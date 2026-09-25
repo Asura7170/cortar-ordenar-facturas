@@ -1,12 +1,55 @@
-/* Normalización de imágenes de entrada — JPEG único, EXIF derecha, tope 2000px.
-   Toda imagen aceptada (jpeg/png/webp/bmp/gif) sale como JPEG CALIDAD_JPEG:
-   una sola generación lossy; el exportador embebe el blob sin reconvertir. */
+/* Normalización de imágenes de entrada — WebP único, EXIF derecha, tope 2000px.
+   Toda imagen aceptada que haya que corregir sale como WebP CALIDAD_WEBP;
+   si ya es jpg/png/webp y no hay nada que corregir, pasa el original intacto
+   (0 generaciones). El exportador convierte a JPEG al embeber en el docx. */
 
 /** Lado mayor máximo tras normalizar (más píxeles no ayudan al OCR). */
 export const LADO_MAX_IMAGEN: number = 2000;
 
-/** Calidad JPEG única del pipeline (intake, páginas PDF y miniaturas). */
+/** Calidad JPEG única (conversión de salida a Word). */
 export const CALIDAD_JPEG: number = 0.9;
+
+/** Calidad WebP del pipeline (intake, warp, giros, recortes, páginas PDF). */
+export const CALIDAD_WEBP: number = 0.85;
+
+/** Formatos que pasan crudos si no hay nada que corregir (sin recompresión). */
+const TIPOS_DIRECTOS: ReadonlySet<string> = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** true si el blob ya es jpg/png/webp (por MIME o firma mágica si el type viene vacío). */
+export async function esFormatoDirecto(f: Blob): Promise<boolean> {
+  const t = (f.type ?? "").toLowerCase().trim();
+  if (t !== "") return TIPOS_DIRECTOS.has(t);
+  // ponytail: type vacío (algunos Android): firma de 12 bytes, sin decode.
+  let head: Uint8Array;
+  try {
+    head = new Uint8Array(await f.slice(0, 12).arrayBuffer());
+  } catch {
+    return false;
+  }
+  if (head.length < 4) return false;
+  const jpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+  const png =
+    head.length >= 8 &&
+    head[0] === 0x89 &&
+    head[1] === 0x50 &&
+    head[2] === 0x4e &&
+    head[3] === 0x47 &&
+    head[4] === 0x0d &&
+    head[5] === 0x0a &&
+    head[6] === 0x1a &&
+    head[7] === 0x0a;
+  const webp =
+    head.length >= 12 &&
+    head[0] === 0x52 &&
+    head[1] === 0x49 &&
+    head[2] === 0x46 &&
+    head[3] === 0x46 &&
+    head[8] === 0x57 &&
+    head[9] === 0x45 &&
+    head[10] === 0x42 &&
+    head[11] === 0x50;
+  return jpeg || png || webp;
+}
 
 /** Canal >245 = blanco (antes 250: el gris app #f7f8fa también vacía); píxeles muestreados cada 4px. */
 const BLANCO_UMBRAL = 245;
@@ -211,8 +254,10 @@ export function recortarMargenesBlancos(
 /** Por qué se rechazó una imagen (para el aviso; el llamador mapea a texto). */
 export type MotivoImagen = "blanca" | "ilegible";
 
-/** Normaliza un File a JPEG: EXIF enderezada, tope de lado, recorte de fondo y sin vacías.
-    Lanza Error(MotivoImagen) si es corrupta o vacía (negra incluida: mismo aviso). */
+/** Normaliza un File: EXIF enderezada, tope de lado, recorte de fondo y sin vacías.
+    Si ya es jpg/png/webp y no hay nada que corregir, devuelve el original intacto.
+    Si hay que corregir, empaqueta la copia a WebP. Lanza Error(MotivoImagen) si
+    es corrupta o vacía (negra incluida: mismo aviso). */
 // ponytail: se decodifica antes de medir; Chrome rechaza dimensiones absurdas
 // con error (→ "ilegible", el lote sigue). Parser de headers pre-decode solo
 // si aparece un caso real de bomba de descompresión.
@@ -223,6 +268,7 @@ export async function normalizarImagen(
 ): Promise<Blob> {
   let bmp: ImageBitmap | null = null;
   try {
+    const directo = await esFormatoDirecto(f);
     try {
       bmp = await cargar(f, { imageOrientation: "from-image" });
     } catch {
@@ -238,8 +284,11 @@ export async function normalizarImagen(
     // ponytail: mismo recorte que el PDF (el aire tuerce el quad de DocAligner).
     const recortado = recortarMargenesBlancos(lienzo, crear);
     if (esPaginaBlanca(recortado) || esPaginaNegra(recortado)) throw new Error("blanca");
+    // ponytail: sin nada que corregir el original pasa intacto (0 generaciones);
+    // si no, la copia ya corregida se empaqueta a WebP (más liviano que PNG).
+    if (directo && escala === 1 && recortado === lienzo) return f;
     const blob = await new Promise<Blob | null>((res) =>
-      recortado.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+      recortado.toBlob(res, "image/webp", CALIDAD_WEBP),
     );
     if (!blob) throw new Error("ilegible");
     return blob;

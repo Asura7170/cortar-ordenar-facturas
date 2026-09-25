@@ -144,8 +144,8 @@ export async function agregarArchivos(
     for (const f of lista) {
       await cederTurno();
       if (esImagen(f)) {
-        // Intake normalizado: JPEG único, EXIF derecha, tope 2000px.
-        // Blanca/corrupta → aviso, sin tumbar el lote (igual que PDF).
+        // Intake: jpg/png/webp sin nada que corregir pasa crudo (0 gens);
+        // lo demás se empaqueta a WebP. Blanca/corrupta → aviso, sin tumbar el lote.
         // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
         try {
           const tN = performance.now();
@@ -157,7 +157,6 @@ export async function agregarArchivos(
               nombre: sanear(f.name),
               file: blob,
               imgUrl: URL.createObjectURL(blob),
-              thumbUrl: null,
               textoOcr: "",
               montoCents: null,
               montoManual: false,
@@ -195,7 +194,6 @@ export async function agregarArchivos(
             id: nextComprobanteId(),
             nombre: `${base} p.${p.indice}/${p.total}`,
             imgUrl: url,
-            thumbUrl: url,
             textoOcr: "",
             montoCents: null,
             montoManual: false,
@@ -227,8 +225,6 @@ export async function agregarArchivos(
   renderHojas();
   precalentarModelos(); // warm-up tras el intake: sin competir con los decodes
   void procesarCola();
-  // Fase 1: sin miniaturas tempranas — la cola genera la única (final, sobre
-  // la imagen definitiva post-recorte). Un decode+resize+JPEG menos por foto.
 }
 
 export function renderCodigo(): void {
@@ -369,7 +365,6 @@ export function initSidebar(): void {
     for (const h of state.hojas)
       for (const c of itemsDe(h)) {
         URL.revokeObjectURL(c.imgUrl);
-        if (c.thumbUrl) URL.revokeObjectURL(c.thumbUrl);
       }
     state.hojas = [crearHoja()];
     // ponytail: cada lote trae código distinto; solo el número, resto intacto.

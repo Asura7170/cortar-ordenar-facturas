@@ -19,6 +19,7 @@ import {
 } from "docx";
 import { state } from "../state";
 import type { Comprobante, Hoja, LayoutId, PosicionCodigo } from "../types";
+import { CALIDAD_JPEG } from "../pipeline/imagen";
 import { layoutDe } from "../ui/layout";
 import { totalItems } from "../ui/monto";
 import { getEl } from "../utils";
@@ -91,17 +92,42 @@ export function encajar(
 
 /** Dimensiones del blob sin mostrarlo (cierra el bitmap). */
 async function medirImagen(blob: Blob): Promise<{ readonly w: number; readonly h: number }> {
-  const bmp = await createImageBitmap(blob);
+  const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
   const dims = { w: bmp.width, h: bmp.height };
   bmp.close();
   return dims;
 }
 
 // ponytail: blobDe local (6 líneas); importar queue.ts arrastraría onnxruntime a este módulo y sus tests.
-/** Blob full-res del comprobante (nunca el thumb): file, o el imgUrl local. */
+/** Blob full-res del comprobante: file, o el imgUrl local. */
 async function blobDe(c: Comprobante): Promise<Blob> {
   if (c.file) return c.file;
   return await (await fetch(c.imgUrl)).blob();
+}
+
+/** JPEG para el docx (declara jpg): todo pasa por decode con EXIF + re-encode.
+    Sin early-return jpeg: el passthrough conserva EXIF y Word lo ignora (imagen
+    girada + aspecto cambiado). Falla fuerte antes que bytes no-JPEG. */
+async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
+  // Falla fuerte: devolver bytes no-JPEG con type jpg rompía el docx en silencio.
+  const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
+  try {
+    const lienzo = document.createElement("canvas");
+    lienzo.width = bmp.width;
+    lienzo.height = bmp.height;
+    const ctx = lienzo.getContext("2d");
+    if (!ctx) throw new Error("sin contexto 2d");
+    ctx.fillStyle = "#fff"; // JPEG sin alfa: sin fondo el transparente sale negro
+    ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+    ctx.drawImage(bmp, 0, 0);
+    const jpg = await new Promise<Blob | null>((res) =>
+      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+    );
+    if (!jpg) throw new Error("sin blob jpeg");
+    return jpg.arrayBuffer();
+  } finally {
+    bmp.close();
+  }
 }
 
 function parrafoCodigo(codigo: string, posicion: PosicionCodigo): Paragraph {
@@ -126,7 +152,7 @@ async function parrafoHoja(hoja: Hoja, posicion: PosicionCodigo): Promise<Paragr
     runs.push(
       new ImageRun({
         type: "jpg",
-        data: await blob.arrayBuffer(),
+        data: await blobAjpg(blob),
         transformation: { width: t.w, height: t.h },
         floating: {
           horizontalPosition: {

@@ -45,6 +45,7 @@
     color-mix(in srgb, #fff 5%, transparent)
   );
   --monto-valor: light-dark(#2f6b3a, #cfe6c2);
+  --celda-alto-intrinseco: 240px; /* alto estimado para content-visibility */
   --dropzone-borde: light-dark(
     color-mix(in srgb, #2c3a28 30%, transparent),
     color-mix(in srgb, #f0ead9 30%, transparent)

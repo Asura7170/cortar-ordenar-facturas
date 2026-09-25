@@ -5,8 +5,7 @@
    intacto; no-manual se reabre y el lote lo relee. Nunca lanza. */
 import { buscarSlot, obtenerComprobante, state } from "../state";
 import { sanear } from "../utils";
-import { asignarMiniatura, generarMiniatura } from "./queue";
-import { CALIDAD_JPEG, cargarReal, crearReal } from "./imagen";
+import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
 import type { DepsOcr } from "./ocr";
 import { girarBlob, lienzoGirado } from "./ocr";
 
@@ -40,7 +39,7 @@ export async function girarYReleer(id: number, grados: GiroManual, deps?: DepsOc
   }
 }
 
-/** Fase instantánea: gira blob+thumb, pinta y (re)programa el OCR. Nunca lanza. */
+/** Fase instantánea: gira el blob, pinta y (re)programa el OCR. Nunca lanza. */
 async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
   if (!item || item.estado !== "ok") return;
@@ -51,12 +50,12 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
     const cargar = deps?.cargar ?? cargarReal;
     const crear = deps?.crear ?? crearReal;
     const original = item.file ?? (await (await fetch(item.imgUrl)).blob());
-    const bmp = await cargar(original);
+    const bmp = await cargar(original, { imageOrientation: "from-image" });
     try {
       const lienzo = lienzoGirado(bmp, grados, crear);
       if (!lienzo) throw new Error("sin contexto 2d");
       const girado = await new Promise<Blob | null>((res) =>
-        lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
       );
       if (!girado) throw new Error("sin blob girado");
       // ponytail: el previo acompaña al giro (con orientación rancia el próximo
@@ -65,26 +64,17 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
         ? await girarBlob(item.previoDocAligner, grados, cargar, crear)
         : null;
       if (item.previoDocAligner && !giradoPrevio) throw new Error("sin previo girado");
-      const thumb = await generarMiniatura(girado);
       const imgNueva = URL.createObjectURL(girado);
       // ponytail: commit atómico tras los awaits (giro vs recorte en vuelo:
-      // mutar partido mezclaba imgUrl de uno con file/thumb del otro).
+      // mutar partido mezclaba imgUrl de uno con file del otro).
       if (!buscarSlot(id)) {
         URL.revokeObjectURL(imgNueva);
-        if (thumb) URL.revokeObjectURL(thumb);
         return;
       }
       URL.revokeObjectURL(item.imgUrl);
       item.imgUrl = imgNueva;
       item.file = girado;
       if (giradoPrevio) item.previoDocAligner = giradoPrevio;
-      if (thumb) asignarMiniatura(item, thumb);
-      // ponytail: sin thumb se muestra el giro nuevo (alias revocado o esqueleto mienten).
-      // La thumb vieja distinta se revoca (igual que asignarMiniatura).
-      else {
-        if (item.thumbUrl && item.thumbUrl !== item.imgUrl) URL.revokeObjectURL(item.thumbUrl);
-        item.thumbUrl = item.imgUrl;
-      }
       renderHojas();
       clearTimeout(relecturas.get(id));
       relecturas.set(

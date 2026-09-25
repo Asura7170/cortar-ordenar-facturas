@@ -17,6 +17,7 @@ const {
   extraerPendientes,
   extraerTotalesLote,
   limpiarTexto,
+  limpiarTextoCompleto,
   partirLote,
   TIMEOUT_MS,
 } = await import("./extract");
@@ -36,8 +37,12 @@ function respuesta(contenido: string, ok = true, status = 200): Response {
 
 function lote2(): { c1: ReturnType<typeof comprobante>; c2: ReturnType<typeof comprobante> } {
   const h = crearHoja();
-  const c1 = comprobante({ nombre: "factura (2).png", estado: "ok", textoOcr: "TOTAL 12.50" });
-  const c2 = comprobante({ nombre: "otra.png", estado: "ok", textoOcr: "TOTAL 7.00" });
+  const c1 = comprobante({
+    nombre: "factura (2).png",
+    estado: "ok",
+    textoOcr: "PROPINA 1.00 TOTAL 12.50",
+  });
+  const c2 = comprobante({ nombre: "otra.png", estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 7.00" });
   h.slots[0] = c1;
   h.slots[1] = c2;
   state.hojas.push(h);
@@ -77,8 +82,8 @@ describe("extraerTotalesLote", () => {
     const { c1, c2 } = lote2();
     const fetchFn = vi.fn(async (): Promise<Response> => respuesta('{"1":"12.50","2":null}'));
     const items: ItemLote[] = [
-      { idx: 1, id: c1.id, texto: "TOTAL 12.50" },
-      { idx: 2, id: c2.id, texto: "TOTAL 7.00" },
+      { idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" },
+      { idx: 2, id: c2.id, texto: "PROPINA 1.00 TOTAL 7.00" },
     ];
     const n = aplicarTotales(items, await extraerTotalesLote(items, state.configIA, fetchFn));
     expect(fetchFn).toHaveBeenCalledTimes(1);
@@ -324,7 +329,7 @@ describe("aplicarTotales", () => {
 
   it("texto cambiado durante el fetch (giro manual): no aplica el rancio", () => {
     const { c1 } = lote2();
-    const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
+    const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" }];
     c1.textoOcr = "TOTAL 99.99"; // girado a mitad del fetch
     expect(aplicarTotales(items, new Map([[1, 1250]]))).toBe(0);
     expect(c1.montoCents).toBeNull();
@@ -342,7 +347,7 @@ describe("aplicarTotales", () => {
     document.body.append(cell);
     input.focus();
     try {
-      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
+      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" }];
       expect(aplicarTotales(items, new Map([[1, 4200]]))).toBe(0);
       expect(c1.montoCents).toBeNull();
     } finally {
@@ -362,7 +367,7 @@ describe("aplicarTotales", () => {
     cell.append(input);
     document.body.append(cell);
     try {
-      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
+      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" }];
       expect(aplicarTotales(items, new Map([[1, 4200]]))).toBe(0);
       expect(c1.montoCents).toBeNull();
     } finally {
@@ -381,7 +386,7 @@ describe("aplicarTotales", () => {
     cell.append(input);
     document.body.append(cell);
     try {
-      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
+      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" }];
       expect(aplicarTotales(items, new Map([[1, 4200]]))).toBe(1);
       expect(c1.montoCents).toBe(4200);
     } finally {
@@ -505,12 +510,58 @@ describe("extraerPendientes", () => {
       state.loteEnCurso = false;
     }
   });
+
+  it("todo rápido sin keys avisa Local sin red", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00" });
+    h.slots[0] = c1;
+    h.slots[1] = c2;
+    state.hojas.push(h);
+    state.configIA.apiKey = "  ";
+    const real = globalThis.fetch;
+    const espia = vi.fn(real);
+    globalThis.fetch = espia;
+    try {
+      await extraerPendientes();
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(c1.montoCents).toBe(1250);
+    expect(c2.montoCents).toBe(700);
+    expect(espia).not.toHaveBeenCalled();
+    expect(aviso.textContent).toBe("Local: 2/2 totales.");
+  });
+
+  it("todo sin candidatos y forzado avisa revisión manual (ninguna key resuelve)", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "recorte malo sin números" });
+    h.slots[0] = c1;
+    state.hojas.push(h);
+    state.configIA.apiKey = "  ";
+    const real = globalThis.fetch;
+    const espia = vi.fn(real);
+    globalThis.fetch = espia;
+    try {
+      await extraerPendientes({ forzado: true });
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(c1.montoCents).toBeNull();
+    expect(espia).not.toHaveBeenCalled();
+    expect(aviso.textContent).toBe("Sin totales para leer: revisá manualmente o recortá de nuevo.");
+  });
 });
 
 describe("utilidades", () => {
   it("limpiarTexto colapsa y capa a MAX_TEXTO", () => {
     expect(limpiarTexto("  TOTAL   12.50\n\nIVA 1 ")).toBe("TOTAL 12.50 IVA 1");
     expect(limpiarTexto("x".repeat(5000))).toHaveLength(1800);
+  });
+
+  it("limpiarTextoCompleto no capa (clasificación sobre texto completo)", () => {
+    expect(limpiarTextoCompleto("  TOTAL   12.50\n\nIVA 1 ")).toBe("TOTAL 12.50 IVA 1");
+    expect(limpiarTextoCompleto("x".repeat(5000))).toHaveLength(5000);
   });
 
   it("partirLote corta por cantidad (25+5)", () => {

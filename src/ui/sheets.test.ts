@@ -12,7 +12,6 @@ vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn(async () => {})
 montarFixture();
 const { state, crearHoja } = await import("../state");
 const {
-  actualizarMiniatura,
   actualizarMontoCelda,
   aplicarATodas,
   cambiarLayoutHoja,
@@ -88,10 +87,10 @@ describe("cambiarLayoutHoja / aplicarATodas", () => {
 });
 
 describe("quitarComprobante", () => {
-  it("quita, revoca img+thumb y elimina la hoja vaciada", () => {
+  it("quita, revoca img y elimina la hoja vaciada", () => {
     const a = sembrar("u4x2", [null]);
     const b = crearHoja();
-    const c = comprobante({ imgUrl: "blob:img", thumbUrl: "blob:thumb" });
+    const c = comprobante({ imgUrl: "blob:img" });
     b.slots[0] = c;
     state.hojas.push(b);
     renderHojas();
@@ -100,7 +99,6 @@ describe("quitarComprobante", () => {
     expect(a.slots.every((s) => s === null)).toBe(true);
     expect(state.hojas).toHaveLength(1);
     expect(revoke).toHaveBeenCalledWith("blob:img");
-    expect(revoke).toHaveBeenCalledWith("blob:thumb");
   });
 
   it("id inexistente no tira", () => {
@@ -197,26 +195,17 @@ describe("celdas", () => {
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,234.56");
   });
 
-  it("actualizarMiniatura pinta el thumb sin reconstruir", () => {
+  it("pinta el full-res de la celda", () => {
     const h = sembrar("u4x2", [null]);
-    // Con file de imagen y sin thumb: esqueleto, sin <img>.
     const c = comprobante({ imgUrl: "blob:full", file: archivo("f.png", "image/png") });
     h.slots[0] = c;
     renderHojas();
-    expect(document.querySelector(".cell img")).toBeNull();
-    c.thumbUrl = "blob:thumb";
-    actualizarMiniatura(c.id);
-    expect(document.querySelector<HTMLImageElement>(".cell img")?.src).toContain("blob:thumb");
-  });
-
-  it("actualizarMiniatura con id inexistente no tira", () => {
-    sembrar("u4x2", [100]);
-    expect(() => actualizarMiniatura(-1)).not.toThrow();
+    expect(document.querySelector<HTMLImageElement>(".cell img")?.src).toContain("blob:full");
   });
 
   it("actualizarMontoCelda pinta el badge sin tocar la imagen", () => {
     const h = crearHoja("u1");
-    const c = comprobante({ estado: "ok", montoCents: null, thumbUrl: "blob:thumb" });
+    const c = comprobante({ estado: "ok", montoCents: null });
     h.slots[0] = c;
     state.hojas.push(h);
     renderHojas();
@@ -350,13 +339,12 @@ describe("monto manual", () => {
     expect(esEcoDeRemocion(input)).toBe(true);
   });
 
-  it("miniatura en vuelo no commitea ni pisa el borrador enfocado", () => {
+  it("render de fondo no commitea ni pisa el borrador enfocado", () => {
     const c = sembrarOk();
     const input = inputMonto();
     input.value = "45";
     input.focus();
-    c.thumbUrl = "blob:thumb-nueva";
-    actualizarMiniatura(c.id);
+    renderHojas();
     expect(c.montoCents).toBeNull();
     expect(c.montoManual).toBe(false);
     const deNuevo = inputMonto();
@@ -814,10 +802,10 @@ describe("lupa", () => {
 });
 
 describe("giro manual", () => {
-  /** Tarjeta ok en modo imagen (thumb falso: no se decodifica en el test). */
+  /** Tarjeta ok en modo imagen (no se decodifica en el test). */
   function sembrarGirable(): Comprobante {
     const h = crearHoja("u1");
-    const c = comprobante({ estado: "ok", thumbUrl: "blob:thumb" });
+    const c = comprobante({ estado: "ok" });
     h.slots[0] = c;
     state.hojas.push(h);
     renderHojas();

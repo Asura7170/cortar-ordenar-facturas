@@ -88,7 +88,7 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 ## 7. Motion
 
 - Solo `transform` y `opacity` (el fantasma de drag se mueve solo con
-  transform). Excepción: esqueleto `skel-sweep` 1.2s linear infinite.
+  transform).
 - Todo respeta `prefers-reduced-motion`. Transiciones 0.15s en hover.
 
 ## 8. Components

@@ -54,7 +54,7 @@ Nombre: `{codigo}-comprobante.{docx|pdf}` (`sincodigo-` sin código).
 
 ## Límites
 
-`lado max 2000px`, `JPEG 0.9`, `det 960px`, `DocAligner 256px + borde 100px`, `EP 30s webgpu→wasm single-thread`, `LLM 60s / 1800 chars por item / 25 items`, `miniaturas 800/720px`.
+`lado max 2000px`, `WebP 0.85` (passthrough jpg/png/webp intacto), `det 960px`, `DocAligner 256px + borde 100px`, `EP 30s webgpu→wasm single-thread`, `LLM 60s / 1800 chars por item / 25 items`, grilla full-res con lazy (sin miniaturas).
 
 ## Troubleshooting
 

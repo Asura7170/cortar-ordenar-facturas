@@ -67,6 +67,15 @@ const bitmapFalso = (async (): Promise<ImageBitmap> =>
   }) as unknown as ImageBitmap) as typeof createImageBitmap;
 globalThis.createImageBitmap = bitmapFalso;
 
+// jsdom tampoco implementa canvas 2d ni toBlob: fakes globales con bytes JPEG
+// reales (blobAjpg siempre convierte; el test webp ajusta toBlob por caso).
+const ctxFalso = { fillRect: (): void => {}, drawImage: (): void => {} };
+HTMLCanvasElement.prototype.getContext = (() =>
+  ctxFalso) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+HTMLCanvasElement.prototype.toBlob = ((cb: BlobCallback): void => {
+  cb(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], { type: "image/jpeg" }));
+}) as unknown as typeof HTMLCanvasElement.prototype.toBlob;
+
 document.body.innerHTML =
   '<div id="montoTotal"></div><p id="aviso"></p><button id="btnDescargar2"></button><button id="btnPdf"></button><button id="btnImprimir"></button><div id="zonaPrint" hidden></div>';
 const { state, crearHoja } = await import("../state");
@@ -287,6 +296,36 @@ describe("construirDocumento (docx mockeado)", () => {
     expect(sec["footers"]).toBeDefined();
     expect(sec["headers"]).toBeUndefined();
     expect(deTipo("PageBreak")).toHaveLength(0);
+  });
+
+  it("webp se convierte a JPEG real (magic bytes FF D8 FF)", async () => {
+    state.hojas = [];
+    const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+    const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
+      this: HTMLCanvasElement,
+      cb: BlobCallback,
+    ): void {
+      cb(new Blob([jpg], { type: "image/jpeg" }));
+    });
+    try {
+      const h = crearHoja();
+      h.slots[0] = comprobante({ file: new Blob(["webp"], { type: "image/webp" }) });
+      state.hojas.push(h);
+      await construirDocumento(state.hojas, "", "inf-der");
+      const imgs = deTipo("ImageRun");
+      expect(imgs).toHaveLength(1);
+      const data = (imgs[0]?.opc as { data: ArrayBuffer }).data;
+      const bytes = new Uint8Array(data).slice(0, 3);
+      expect(bytes).toEqual(new Uint8Array([0xff, 0xd8, 0xff]));
+      expect(toBlob).toHaveBeenCalledWith(expect.any(Function), "image/jpeg", expect.any(Number));
+    } finally {
+      ctx.mockRestore();
+      toBlob.mockRestore();
+    }
   });
 
   it("sup-izq: header (no footer) alineado a la izquierda", async () => {

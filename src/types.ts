@@ -42,10 +42,8 @@ export type Cents = number;
 export interface Comprobante {
   readonly id: number;
   readonly nombre: string;
-  /** Blob URL de la imagen normalizada JPEG (revocar con URL.revokeObjectURL al quitar; PDF: render JPEG de la página, no el PDF entero). Mutable: el pipeline la reemplaza por el recorte. */
+  /** Blob URL de la imagen (revocar con URL.revokeObjectURL al quitar; PDF: render de la página, no el PDF entero). Mutable: el pipeline la reemplaza por el recorte. */
   imgUrl: string;
-  /** Miniatura JPEG o null (→ esqueleto) hasta que se genere (PDF: mismo blob que imgUrl). */
-  thumbUrl: string | null;
   /** Texto OCR (PP-OCRv6_small; "" si nada o si falló). */
   textoOcr: string;
   /** Total en cents o null si aún no se extrajo. */

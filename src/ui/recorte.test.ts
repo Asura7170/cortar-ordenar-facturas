@@ -11,11 +11,6 @@ vi.mock("../pipeline/ocr", async (importOriginal) => {
 });
 // El lote post-recorte no debe pegar a la red en tests.
 vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
-// Thumb controlable por test (asignarMiniatura sigue real).
-vi.mock("../pipeline/queue", async (importOriginal) => {
-  const real = await importOriginal<typeof import("../pipeline/queue")>();
-  return { ...real, generarMiniatura: vi.fn(async () => "blob:thumb") };
-});
 
 montarFixture();
 const { crearHoja, state } = await import("../state");
@@ -189,7 +184,7 @@ describe("abrirRecorte", () => {
       c.previoDocAligner = previo;
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(true);
-      expect(deps.cargar).toHaveBeenCalledWith(previo);
+      expect(deps.cargar).toHaveBeenCalledWith(previo, { imageOrientation: "from-image" });
       btnOk.click();
       await vaciar();
       // El previo sobrevive: la próxima sesión puede volver a ensanchar.
@@ -401,50 +396,23 @@ describe("abrirRecorte", () => {
     }
   });
 
-  it("thumb huérfana se revoca si el slot muere en la ventana", async () => {
+  it("slot muerto en la ventana no commitea", async () => {
     const ctx = vi
       .spyOn(HTMLCanvasElement.prototype, "getContext")
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
-    const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const { generarMiniatura } = await import("../pipeline/queue");
     try {
       const { deps } = depsRecorte();
       const c = sembrar();
-      const thumbVieja = c.thumbUrl;
-      vi.mocked(generarMiniatura).mockImplementationOnce(async () => {
-        state.hojas.length = 0; // Limpiar durante el await.
-        return "blob:thumb";
-      });
+      const fileAntes = c.file;
+      const urlAntes = c.imgUrl;
       await abrirRecorte(c.id, deps as never);
+      state.hojas.length = 0; // Limpiar tras abrir, antes de confirmar.
       btnOk.click();
       await vaciar();
-      expect(revocar).toHaveBeenCalledWith("blob:thumb");
-      expect(c.thumbUrl).toBe(thumbVieja);
+      expect(c.file).toBe(fileAntes);
+      expect(c.imgUrl).toBe(urlAntes);
     } finally {
       ctx.mockRestore();
-      revocar.mockRestore();
-    }
-  });
-
-  it("sin thumb se revoca la thumb vieja distinta (sin fuga)", async () => {
-    const ctx = vi
-      .spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
-    const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const { generarMiniatura } = await import("../pipeline/queue");
-    try {
-      const { deps } = depsRecorte();
-      vi.mocked(generarMiniatura).mockResolvedValueOnce(null);
-      const c = sembrar();
-      c.thumbUrl = "blob:thumb-vieja";
-      await abrirRecorte(c.id, deps as never);
-      btnOk.click();
-      await vaciar();
-      expect(revocar).toHaveBeenCalledWith("blob:thumb-vieja");
-      expect(c.thumbUrl).toBe(c.imgUrl);
-    } finally {
-      ctx.mockRestore();
-      revocar.mockRestore();
     }
   });
 

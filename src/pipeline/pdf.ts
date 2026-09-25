@@ -4,7 +4,7 @@
    Todo rechazo se avisa y se descarta sin crear comprobante ni blob URL. */
 import workerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
 import {
-  CALIDAD_JPEG,
+  CALIDAD_WEBP,
   crearReal,
   esPaginaBlanca,
   esPaginaNegra,
@@ -166,7 +166,7 @@ export async function expandirPdf(
         const lienzo = recortarMargenesBlancos(original, crear);
         if (esPaginaBlanca(lienzo) || esPaginaNegra(lienzo)) continue;
         const blob = await new Promise<Blob | null>((res) =>
-          lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+          lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
         );
         if (blob) utiles.push({ indice: i, total, blob });
       } catch {

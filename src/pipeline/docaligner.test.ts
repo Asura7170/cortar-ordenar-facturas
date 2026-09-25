@@ -112,7 +112,7 @@ function lienzoFalso(pixeles: Uint8ClampedArray): {
     toBlob: (cb: (b: Blob | null) => void, t?: string, q?: unknown): void => {
       tipo = t ?? null;
       calidad = q;
-      cb(new Blob(["x"], { type: "image/jpeg" }));
+      cb(new Blob(["x"], { type: t ?? "" }));
     },
   } as unknown as HTMLCanvasElement;
   return {
@@ -305,10 +305,10 @@ describe("bitmapATensor/rectificar", () => {
     expect(t[n]).toBe(0);
   });
 
-  it("rectificar emite el warp en jpeg", async () => {
+  it("rectificar emite el warp en webp", async () => {
     const falso = lienzoFalso(blanco(10, 8));
     const blob = await rectificar(bitmapFalso(10, 8), esquinas(10, 8), falso.crear);
-    expect(blob.type).toBe("image/jpeg");
+    expect(blob.type).toBe("image/webp");
     const p = falso.puesto();
     expect(p?.w).toBe(9);
     expect(p?.h).toBe(7);
@@ -337,7 +337,7 @@ describe("bitmapATensor/rectificar", () => {
       ],
       falso.crear,
     );
-    expect(blob.type).toBe("image/jpeg");
+    expect(blob.type).toBe("image/webp");
     const d = falso.dibujo();
     expect(d?.[1]).toBe(1);
     expect(d?.[2]).toBe(4);
@@ -366,7 +366,7 @@ describe("detectarYRecortar", () => {
         [2, 5],
       ],
     },
-  ])("con picos $celdas devuelve el recorte jpeg", async ({ celdas }) => {
+  ])("con picos $celdas devuelve el recorte webp", async ({ celdas }) => {
     const L = 8;
     const sesion: SesionDetectora = {
       inferir: async (): Promise<{ datos: Float32Array; dims: readonly number[] }> => ({
@@ -382,7 +382,7 @@ describe("detectarYRecortar", () => {
       sesion: async () => sesion,
     });
     expect(fuera).not.toBe(original);
-    expect(fuera.type).toBe("image/jpeg");
+    expect(fuera.type).toBe("image/webp");
   });
 
   it("sin esquinas o con error devuelve el original", async () => {
