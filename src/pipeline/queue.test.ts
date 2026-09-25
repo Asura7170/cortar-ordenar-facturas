@@ -4,11 +4,16 @@ import { montarFixture } from "../test/fixture";
 
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
-// El auto IA real haría fetch: stub (cada test lo ajusta).
-vi.mock("./extract", () => ({
-  extraerPendientes: vi.fn(async () => {}),
-  extraerUnMonto: vi.fn(async () => false),
-}));
+// El auto IA real haría fetch: stub (cada test lo ajusta); aplicarTotales y
+// limpiarTexto siguen reales (la rama rápida de la cola los usa).
+vi.mock("./extract", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./extract")>();
+  return {
+    ...real,
+    extraerPendientes: vi.fn(async () => {}),
+    extraerUnMonto: vi.fn(async () => false),
+  };
+});
 // OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
 // jsdom); cada test simula giro/texto/girarBlob.
 vi.mock("./ocr", async (importOriginal) => {
@@ -32,6 +37,7 @@ const { procesarCola } = await import("./queue");
 const { comprobante } = await import("../test/factoria");
 const { renderHojas } = await import("../ui/sheets");
 const { extraerPendientes, extraerUnMonto } = await import("./extract");
+const { extraerTexto } = await import("./ocr");
 
 beforeEach(() => {
   // Sin file ni imgUrl real el recorte falla al blob y sigue con el original: se avanza igual.
@@ -65,6 +71,22 @@ describe("procesarCola", () => {
     expect(nuevo.textoOcr).toBe("");
     expect(nuevo.montoCents).toBeNull();
     expect(state.colaEnProceso).toBe(false);
+  });
+
+  it("rápido fija el monto por aplicarTotales sin JEV (1 distinto, sin key)", async () => {
+    state.hojas = [];
+    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 12.50");
+    const h = crearHoja();
+    const c = comprobante({ nombre: "rapida.png", file: new Blob(["foto"]) });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const vuelosAntes = vi.mocked(extraerUnMonto).mock.calls.length;
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(c.textoOcr).toBe("TOTAL 12.50");
+    expect(c.montoCents).toBe(1250);
+    expect(vi.mocked(extraerUnMonto).mock.calls.length).toBe(vuelosAntes);
   });
 
   it("informa tiempos por etapa (L0: recorte/enderezar/extraer/total)", async () => {

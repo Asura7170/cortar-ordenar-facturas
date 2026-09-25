@@ -8,7 +8,7 @@ import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
 import { detectarYRecortar, obtenerSesion } from "./docaligner";
-import { extraerUnMonto } from "./extract";
+import { aplicarTotales, extraerUnMonto, limpiarTexto } from "./extract";
 import { extraerRapidoCents } from "./jev";
 import type { Enderezado } from "./ocr";
 import { diagVacio } from "./ocr";
@@ -166,9 +166,12 @@ export async function procesarCola(): Promise<void> {
           if (!buscarSlot(sig.id)) continue; // limpiado durante el OCR: no resucita
           sig.montoCents = null;
           sig.estado = "ok";
-          // ponytail: fast-path offline — 1 distinto se fija sin red; el resto vuela a JEV.
-          const rapido = extraerRapidoCents(sig.textoOcr ?? "");
-          if (rapido !== null) sig.montoCents = rapido;
+          // ponytail: fast-path offline — 1 distinto se fija sin red (vía aplicarTotales:
+          // borrador en curso, manual y texto rancio ganan); el resto vuela a JEV.
+          const textoLimpio = limpiarTexto(sig.textoOcr ?? "");
+          const rapido = extraerRapidoCents(textoLimpio);
+          if (rapido !== null)
+            aplicarTotales([{ idx: 1, id: sig.id, texto: textoLimpio }], new Map([[1, rapido]]));
           try {
             renderHojas(); // imagen visible al instante, sin esperar al JEV (~1s/factura)
           } catch {

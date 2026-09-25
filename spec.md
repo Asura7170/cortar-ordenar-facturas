@@ -78,7 +78,7 @@ facturas/
 Una fuente (`state.hojas` + layout + `codigoPosicion`): la vista carta es lo que sale. Gate `codigoValido()+≥1` (`salidas.ts:44`), nombre `nombreArchivo=sincodigo-comprobante.ext` (`:49`), carta `8.5×11 MARGEN=0.3 BANDA=0.3 GUTTER=0.15` (`:34-39`), `EMU_POR_PULGADA=914400` (`:41-42`).
 
 - **Word `docx` `:150,195`:** flotantes EMU + `wrap SQUARE`, `header` si `sup-*` sino `footer` en `codigoPosicion`, `PageBreak` por hoja. Validar en Word y LibreOffice.
-- **PDF/Imprimir `:354,359`:** `zonaPrint+window.print`, `@media print` oculta UI, `@page` carta, 1 `.sheet`=1 página, full-res (no thumbs), `printEnVuelo` anti-doble, revoke thumbs a los 30s.
+- **PDF/Imprimir `:354,359`:** `zonaPrint+window.print`, `@media print` oculta UI, `@page` carta, 1 `.sheet`=1 página, full-res (no thumbs), `printEnVuelo` anti-doble.
 
 ## 6. Dev / Prod / Tests
 

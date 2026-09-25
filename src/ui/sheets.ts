@@ -123,15 +123,13 @@ function pintarCelda(
     r.textContent = "✂";
     div.append(r);
   }
-  if (item.imgUrl) {
-    const img = document.createElement("img");
-    img.src = item.imgUrl; // full-res con lazy: sin miniaturas (medido: más rápido y liviano)
-    img.alt = sanear(item.nombre);
-    img.draggable = false;
-    img.loading = "lazy";
-    img.decoding = "async";
-    div.append(img, btn);
-  }
+  const img = document.createElement("img");
+  img.src = item.imgUrl; // full-res con lazy, sin miniaturas
+  img.alt = sanear(item.nombre);
+  img.draggable = false;
+  img.loading = "lazy";
+  img.decoding = "async";
+  div.append(img, btn);
   // En corrección se edita el valor previo (apertura no destructiva); fuera de
   // ok no hay input que mostrar y el badge queda como estaba.
   if (item.montoCents != null && item.id !== editandoMonto) {

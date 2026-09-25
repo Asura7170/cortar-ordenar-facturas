@@ -358,7 +358,7 @@ export async function extraerPendientes(opciones?: {
   }
   const lista = candidatos();
   if (lista.length === 0) {
-    if (opciones?.forzado) avisar("IA: sin pendientes (todo ya tiene total o es manual).");
+    if (opciones?.forzado) avisar("Sin pendientes (todo ya tiene total o es manual).");
     return;
   }
   const jevKey = getJevKey();
@@ -394,7 +394,8 @@ export async function extraerPendientes(opciones?: {
     }
     if (ambiguos.length === 0) {
       if (okRapido > 0) renderHojas();
-      if (avisoPrevio.trim() === "") avisar(`${prefijo} ${okRapido}/${items.length} totales.`);
+      // Todo offline: la red no resolvió nada (ni se intentó).
+      if (avisoPrevio.trim() === "") avisar(`Local: ${okRapido}/${items.length} totales.`);
       else avisar(avisoPrevio);
       return;
     }
@@ -405,7 +406,7 @@ export async function extraerPendientes(opciones?: {
       avisar(
         okRapido > 0
           ? `${prefijo} ${okRapido}/${items.length} totales, resto manual. Revisá Ajustes (URL, clave, CORS).`
-          : "IA: configurá la API key en Ajustes.",
+          : `${prefijo} configurá la API key en Ajustes.`,
       );
     else if (okRapido > 0) avisar(`${prefijo} ${okRapido}/${items.length} totales.`);
     return;

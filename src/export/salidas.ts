@@ -105,27 +105,25 @@ async function blobDe(c: Comprobante): Promise<Blob> {
   return await (await fetch(c.imgUrl)).blob();
 }
 
-/** Bytes para el docx (declara jpg): lo no-jpeg se convierte aquí, no en el pipeline. */
+/** Bytes JPEG para el docx (declara jpg): lo no-jpeg se convierte aquí, no en el pipeline. */
 async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
   if (blob.type === "image/jpeg") return blob.arrayBuffer();
+  // Falla fuerte: devolver bytes no-JPEG con type jpg rompía el docx en silencio.
+  const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
   try {
-    const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
-    try {
-      const lienzo = document.createElement("canvas");
-      lienzo.width = bmp.width;
-      lienzo.height = bmp.height;
-      const ctx = lienzo.getContext("2d");
-      if (!ctx) return blob.arrayBuffer();
-      ctx.drawImage(bmp, 0, 0);
-      const jpg = await new Promise<Blob | null>((res) =>
-        lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
-      );
-      return (jpg ?? blob).arrayBuffer();
-    } finally {
-      bmp.close();
-    }
-  } catch {
-    return blob.arrayBuffer();
+    const lienzo = document.createElement("canvas");
+    lienzo.width = bmp.width;
+    lienzo.height = bmp.height;
+    const ctx = lienzo.getContext("2d");
+    if (!ctx) throw new Error("sin contexto 2d");
+    ctx.drawImage(bmp, 0, 0);
+    const jpg = await new Promise<Blob | null>((res) =>
+      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
+    );
+    if (!jpg) throw new Error("sin blob jpeg");
+    return jpg.arrayBuffer();
+  } finally {
+    bmp.close();
   }
 }
 

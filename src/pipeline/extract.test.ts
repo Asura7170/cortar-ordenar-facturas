@@ -509,6 +509,28 @@ describe("extraerPendientes", () => {
       state.loteEnCurso = false;
     }
   });
+
+  it("todo rápido sin keys avisa Local sin red", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00" });
+    h.slots[0] = c1;
+    h.slots[1] = c2;
+    state.hojas.push(h);
+    state.configIA.apiKey = "  ";
+    const real = globalThis.fetch;
+    const espia = vi.fn(real);
+    globalThis.fetch = espia;
+    try {
+      await extraerPendientes();
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(c1.montoCents).toBe(1250);
+    expect(c2.montoCents).toBe(700);
+    expect(espia).not.toHaveBeenCalled();
+    expect(aviso.textContent).toBe("Local: 2/2 totales.");
+  });
 });
 
 describe("utilidades", () => {

@@ -289,6 +289,33 @@ describe("construirDocumento (docx mockeado)", () => {
     expect(deTipo("PageBreak")).toHaveLength(0);
   });
 
+  it("webp se convierte a JPEG real (magic bytes FF D8 FF)", async () => {
+    state.hojas = [];
+    const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
+      this: HTMLCanvasElement,
+      cb: BlobCallback,
+    ): void {
+      cb(new Blob([jpg], { type: "image/jpeg" }));
+    });
+    try {
+      const h = crearHoja();
+      h.slots[0] = comprobante({ file: new Blob(["webp"], { type: "image/webp" }) });
+      state.hojas.push(h);
+      await construirDocumento(state.hojas, "", "inf-der");
+      const imgs = deTipo("ImageRun");
+      expect(imgs).toHaveLength(1);
+      const data = (imgs[0]?.opc as { data: ArrayBuffer }).data;
+      expect(new Uint8Array(data).slice(0, 3)).toEqual([0xff, 0xd8, 0xff]);
+    } finally {
+      ctx.mockRestore();
+      toBlob.mockRestore();
+    }
+  });
+
   it("sup-izq: header (no footer) alineado a la izquierda", async () => {
     hojaCon(1);
     await construirDocumento(state.hojas, "123456", "sup-izq");

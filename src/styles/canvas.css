@@ -336,6 +336,8 @@
   min-height: 0;
   overflow: hidden;
   user-select: none; /* nada de texto seleccionable en la casilla: ni el monto ni el × */
+  content-visibility: auto; /* celdas fuera de vista no se renderizan (grilla full-res) */
+  contain-intrinsic-size: auto 240px; /* alto estimado: sin saltos de scroll al revelar */
 }
 .cell.cell-ocr,
 .cell.cell-ocr * {
