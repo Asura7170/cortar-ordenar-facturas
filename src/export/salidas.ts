@@ -105,9 +105,10 @@ async function blobDe(c: Comprobante): Promise<Blob> {
   return await (await fetch(c.imgUrl)).blob();
 }
 
-/** Bytes JPEG para el docx (declara jpg): lo no-jpeg se convierte aquí, no en el pipeline. */
+/** JPEG para el docx (declara jpg): todo pasa por decode con EXIF + re-encode.
+    Sin early-return jpeg: el passthrough conserva EXIF y Word lo ignora (imagen
+    girada + aspecto cambiado). Falla fuerte antes que bytes no-JPEG. */
 async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
-  if (blob.type === "image/jpeg") return blob.arrayBuffer();
   // Falla fuerte: devolver bytes no-JPEG con type jpg rompía el docx en silencio.
   const bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
   try {
@@ -116,6 +117,8 @@ async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
     lienzo.height = bmp.height;
     const ctx = lienzo.getContext("2d");
     if (!ctx) throw new Error("sin contexto 2d");
+    ctx.fillStyle = "#fff"; // JPEG sin alfa: sin fondo el transparente sale negro
+    ctx.fillRect(0, 0, lienzo.width, lienzo.height);
     ctx.drawImage(bmp, 0, 0);
     const jpg = await new Promise<Blob | null>((res) =>
       lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),

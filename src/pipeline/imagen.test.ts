@@ -32,7 +32,7 @@ function lienzoFalso(pixeles: number[]): {
     toBlob: (cb: (b: Blob | null) => void, t?: string, q?: unknown): void => {
       tipo = t ?? null;
       calidad = q;
-      cb(new Blob(["x"], { type: "image/jpeg" }));
+      cb(new Blob(["x"], { type: t ?? "" }));
     },
   } as unknown as HTMLCanvasElement;
   return {
@@ -64,7 +64,7 @@ describe("normalizarImagen", () => {
   it("bmp chico se empaqueta a webp 0.85", async () => {
     const falso = lienzoFalso(conTinta);
     const blob = await normalizarImagen(img("a.bmp", "image/bmp"), cargar(100, 80), falso.crear);
-    expect(blob.type).toBe("image/jpeg"); // el falso devuelve jpeg; lo que importa:
+    expect(blob.type).toBe("image/webp"); // el falso hace eco del tipo pedido; lo que importa:
     expect(falso.tipo()).toBe("image/webp");
     expect(falso.calidad()).toBe(CALIDAD_WEBP);
     // Guard de regresión: sin from-image el EXIF no se endereza.

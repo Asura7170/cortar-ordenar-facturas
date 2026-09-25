@@ -5,7 +5,7 @@ import { montarFixture } from "../test/fixture";
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
 // El auto IA real haría fetch: stub (cada test lo ajusta); aplicarTotales y
-// limpiarTexto siguen reales (la rama rápida de la cola los usa).
+// limpiarTextoCompleto siguen reales (la rama rápida de la cola los usa).
 vi.mock("./extract", async (importOriginal) => {
   const real = await importOriginal<typeof import("./extract")>();
   return {

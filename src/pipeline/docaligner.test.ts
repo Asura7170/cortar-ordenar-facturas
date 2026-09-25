@@ -112,7 +112,7 @@ function lienzoFalso(pixeles: Uint8ClampedArray): {
     toBlob: (cb: (b: Blob | null) => void, t?: string, q?: unknown): void => {
       tipo = t ?? null;
       calidad = q;
-      cb(new Blob(["x"], { type: "image/webp" }));
+      cb(new Blob(["x"], { type: t ?? "" }));
     },
   } as unknown as HTMLCanvasElement;
   return {

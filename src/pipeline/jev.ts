@@ -20,6 +20,8 @@ export interface CandidatoJev {
   readonly contexto: string;
   readonly posPct: number;
   readonly nearMoney: "yes" | "no";
+  /** `-`/`(` justo antes del match: el fast-path lo rechaza (nota de crédito). */
+  readonly previo: string;
 }
 
 export interface FacturaJev {
@@ -65,6 +67,7 @@ export function extractCandidates(contenido = ""): CandidatoJev[] {
       contexto,
       posPct: Math.round((pos / Math.max(1, contenido.length)) * 100),
       nearMoney: NEAR_RE.test(contexto) ? "yes" : "no",
+      previo: /([-(])\s*$/.exec(contenido.slice(0, m.index))?.[1] ?? "",
     });
   }
   return out;
@@ -117,10 +120,12 @@ export function resolveTotal(req: JevRequest, answer: unknown): string | null {
 }
 
 // ponytail: fast-path offline — 1 único distinto (repetido N veces vale) => total sin red.
+// Con signo previo (- o paréntesis contable) no auto-fija: lo decide JEV/LLM.
 export function extraerRapidoCents(contenido = ""): Cents | null {
   let unico: Cents | null = null;
   let vistos = 0;
   for (const c of extractCandidates(contenido)) {
+    if (c.previo !== "") return null;
     const cents = parsearMonto(c.valor);
     if (cents === null) continue;
     if (vistos === 0) unico = cents;

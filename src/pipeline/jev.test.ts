@@ -95,6 +95,19 @@ describe("pipeline prototipo", () => {
     expect(extraerRapidoCents("1.23")).toBe(123);
   });
 
+  it("rápido clasifica sobre el texto completo (TOTAL tras el char 1800 cuenta)", () => {
+    const largo = `SUBTOTAL 45.00 ${"x ".repeat(1000)}TOTAL 50.00`;
+    expect(largo.length).toBeGreaterThan(1800);
+    expect(extraerRapidoCents(largo)).toBeNull(); // 2 distintos: va a JEV
+    expect(extraerRapidoCents(`TOTAL 50.00 ${"x ".repeat(1000)}`)).toBe(5000);
+  });
+
+  it("rápido rechaza signo previo (nota de crédito la decide JEV)", () => {
+    expect(extraerRapidoCents("TOTAL -12.50")).toBeNull();
+    expect(extraerRapidoCents("TOTAL (12.50)")).toBeNull();
+    expect(extraerRapidoCents("TOTAL 12.50")).toBe(1250);
+  });
+
   it("buildRequest: type minúsculas, ≤40, state con contenido+candidatos", () => {
     const req = buildRequest({ id: 1, contenido: "TOTAL 12.50" });
     expect(req.questions.total.type).toBe("choice");
