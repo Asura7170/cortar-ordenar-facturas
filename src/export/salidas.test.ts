@@ -309,7 +309,8 @@ describe("construirDocumento (docx mockeado)", () => {
       const imgs = deTipo("ImageRun");
       expect(imgs).toHaveLength(1);
       const data = (imgs[0]?.opc as { data: ArrayBuffer }).data;
-      expect(new Uint8Array(data).slice(0, 3)).toEqual([0xff, 0xd8, 0xff]);
+      const bytes = new Uint8Array(data).slice(0, 3);
+      expect(bytes).toEqual(new Uint8Array([0xff, 0xd8, 0xff]));
     } finally {
       ctx.mockRestore();
       toBlob.mockRestore();
