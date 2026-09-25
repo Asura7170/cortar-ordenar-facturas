@@ -1,4 +1,5 @@
-/* Extracción del TOTAL: JEV 1×1 secuencial primero, fallback openai-compatible en lote.
+/* Extracción del TOTAL: regex offline primero (1 distinto = ok sin red,
+   0 = manual), JEV 1×1 para lo ambiguo (>1), fallback openai-compatible en lote.
    Auto al drenar la cola + botón Reintentar IA. Solo completa montos en
    null no-manuales: lo manual siempre gana (incluso si se escribe durante el fetch).
    La suma total la hace el código (sumaTotal); al LLM nunca se le pide sumar. */
@@ -7,7 +8,7 @@ import type { Cents, Comprobante, ConfigIA } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
 import { actualizarMontoCelda, renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
-import { extraerRapidoCents, getJevKey, llamarJev } from "./jev";
+import { extraerRapidoCents, extractCandidates, getJevKey, llamarJev } from "./jev";
 import {
   campoRazonamiento,
   detectarTipo,
@@ -266,12 +267,11 @@ function refrescarBoton(): void {
 const enVuelo = new Set<number>();
 
 /** JEV 1×1 progresivo para la cola: resuelve un comprobante y lo pinta al
-    instante, sin esperar al lote. Nunca lanza (best-effort). */
+    instante, sin esperar al lote. Nunca lanza (best-effort). Flujo: 1 distinto
+    = ok sin red ni key; 0 = manual sin JEV; >1 = JEV (falla → lote). */
 export async function extraerUnMonto(id: number, fetchFn: FetchFn = fetch): Promise<boolean> {
   if (enVuelo.has(id)) return false;
   try {
-    const key = getJevKey();
-    if (key === "") return false;
     const slot = buscarSlot(id);
     const actual = slot?.hoja.slots[slot.idx];
     if (!actual || actual.estado !== "ok" || actual.montoCents !== null || actual.montoManual)
@@ -290,6 +290,10 @@ export async function extraerUnMonto(id: number, fetchFn: FetchFn = fetch): Prom
       }
       return true;
     }
+    // 0 candidatos → manual (típico: mal recorte; el usuario recorta y re-dispara).
+    if (extractCandidates(texto).length === 0) return false;
+    const key = getJevKey();
+    if (key === "") return false;
     enVuelo.add(id);
     try {
       let cents: Cents | null = null;
@@ -366,14 +370,15 @@ export async function extraerPendientes(opciones?: {
   });
   if (items.length === 0) return;
   const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
-  const prefijo = jevKey !== "" ? "JEV:" : "IA:";
+  const prefijo = jevKey !== "" ? "JEV:" : openaiKey !== "" ? "IA:" : "Local:";
   // ponytail: fast-path offline — 1 distinto => total sin red ni tokens (sin key también).
+  // 0 candidatos => manual directo (sin JEV ni LLM); >1 => ambiguos a JEV.
   const mapaRapido = new Map<number, Cents | null>();
   const ambiguos: ItemLote[] = [];
   for (const it of items) {
     const r = extraerRapidoCents(it.texto);
-    if (r === null) ambiguos.push(it);
-    else mapaRapido.set(it.idx, r);
+    if (r !== null) mapaRapido.set(it.idx, r);
+    else if (extractCandidates(it.texto).length > 0) ambiguos.push(it);
   }
   let okRapido = 0;
   if (mapaRapido.size > 0) {
@@ -396,7 +401,12 @@ export async function extraerPendientes(opciones?: {
   }
   if (jevKey === "" && openaiKey === "") {
     if (okRapido > 0) renderHojas();
-    if (opciones?.forzado) avisar("IA: configurá la API key en Ajustes.");
+    if (opciones?.forzado)
+      avisar(
+        okRapido > 0
+          ? `${prefijo} ${okRapido}/${items.length} totales, resto manual. Revisá Ajustes (URL, clave, CORS).`
+          : "IA: configurá la API key en Ajustes.",
+      );
     else if (okRapido > 0) avisar(`${prefijo} ${okRapido}/${items.length} totales.`);
     return;
   }
@@ -504,7 +514,9 @@ export async function extraerPendientes(opciones?: {
       restantes.forEach((c, i) => {
         if (enVuelo.has(c.id)) return; // en vuelo: lo cubre su propia promesa
         const texto = limpiarTexto(c.textoOcr);
-        if (texto !== "") pendientes.push({ idx: i + 1, id: c.id, texto });
+        // El LLM es fallback de JEV: 0 candidatos sigue manual.
+        if (texto !== "" && extractCandidates(texto).length > 0)
+          pendientes.push({ idx: i + 1, id: c.id, texto });
       });
       if (pendientes.length === 0) {
         if (avisoPrevio.trim() === "")

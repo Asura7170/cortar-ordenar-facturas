@@ -636,13 +636,17 @@ describe("JEV", () => {
 
   it("conectar ok pinta ✓ con ms y borde verde", async () => {
     const real = globalThis.fetch;
+    // La sonda usa factura sintética de 1 candidato (id c0): choice válido.
     globalThis.fetch = (async (): Promise<Response> =>
       ({
         ok: true,
         status: 200,
         headers: { get: (): null => null },
         json: (): Promise<unknown> =>
-          Promise.resolve({ answers: { total: { choice: "none" } }, model: "jev-x" }),
+          Promise.resolve({
+            answers: { total: { choice: "c0", confidence: 0.95 } },
+            model: "jev-x",
+          }),
       }) as unknown as Response) as typeof fetch;
     try {
       btnAjustes.click();

@@ -14,8 +14,6 @@ const {
   clearJevKey,
   extractCandidates,
   extraerRapidoCents,
-  extractTotalOffline,
-  extractTotalOfflineCents,
   formatMonto,
   getJevKey,
   llamarJev,
@@ -31,8 +29,14 @@ const aviso = el("aviso");
 
 /** Responde como el upstream: elige el primer candidato del body (conf 0.95). */
 function upstreamOk(body: unknown, modelo = "jev-1.13.0"): Response {
-  const candidatos =
-    (body as { state?: { candidatos?: { id?: unknown }[] } })?.state?.candidatos ?? [];
+  let candidatos: { id?: unknown }[] = [];
+  try {
+    candidatos =
+      (JSON.parse(String(body)) as { state?: { candidatos?: { id?: unknown }[] } })?.state
+        ?.candidatos ?? [];
+  } catch {
+    candidatos = [];
+  }
   const primero = candidatos[0]?.id;
   return {
     ok: true,
@@ -79,18 +83,16 @@ describe("pipeline prototipo", () => {
     expect(MONTO_RE.test("abc")).toBe(false);
   });
 
-  it("offline elige TOTAL A COBRAR sobre Sub-Total/ICE (oracle id 8)", () => {
-    const contenido =
-      "Sub-Total: 4,702.80 Descuento: 0.00 ICE: 450.79 Total: 4,702.80 TOTAL A COBRAR: 4,252.01";
-    expect(extractTotalOffline({ id: 8, contenido })).toBe("4,252.01");
-    expect(extractTotalOfflineCents({ id: 8, contenido })).toBe(425201);
-  });
-
   it("rápido: 1 distinto resuelve, repetido vale, 2 distintos van a JEV", () => {
     expect(extraerRapidoCents("TOTAL 12.50")).toBe(1250);
     expect(extraerRapidoCents("TOTAL 1,234.56 ... total 1234.56")).toBe(123456);
     expect(extraerRapidoCents("TOTAL 12.50 PROPINA 1.00")).toBeNull();
     expect(extraerRapidoCents("sin montos")).toBeNull();
+  });
+
+  it("rápido: 1 solo aunque huela a parcial es ok (el flujo no pide etiqueta TOTAL)", () => {
+    expect(extraerRapidoCents("SUBTOTAL 45.00")).toBe(4500);
+    expect(extraerRapidoCents("1.23")).toBe(123);
   });
 
   it("buildRequest: type minúsculas, ≤40, state con contenido+candidatos", () => {
@@ -105,12 +107,12 @@ describe("pipeline prototipo", () => {
     expect(buildRequest({ id: 1, contenido }).meta.pool.length).toBeLessThanOrEqual(40);
   });
 
-  it("resolveTotal: choice válido, sin confianza baja ni none", () => {
+  it("resolveTotal: choice válido ok; none o confianza baja → null (cae al LLM)", () => {
     const req = buildRequest({ id: 8, contenido: "TOTAL A COBRAR: 4,252.01" });
     const id = req.meta.pool[0]?.id ?? "c0";
     expect(resolveTotal(req, { choice: id, confidence: 0.9 })).toBe("4,252.01");
-    expect(resolveTotal(req, { choice: id, confidence: 0.2 })).toBe("4,252.01"); // fallback al mismo pool
-    expect(resolveTotal(req, { choice: "none" })).toBe("4,252.01");
+    expect(resolveTotal(req, { choice: id, confidence: 0.2 })).toBeNull();
+    expect(resolveTotal(req, { choice: "none" })).toBeNull();
   });
 });
 
@@ -247,8 +249,8 @@ describe("llamarJev", () => {
 describe("extraerPendientes con JEV", () => {
   it("JEV-primero aplica en paralelo y no llama al OpenAI si todo resuelve", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
-    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50 PROPINA 1.00" });
+    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00 PROPINA 1.00" });
     h.slots[0] = c1;
     h.slots[1] = c2;
     state.hojas.push(h);
@@ -278,7 +280,7 @@ describe("extraerPendientes con JEV", () => {
 
   it("JEV caído → fallback OpenAI intacto", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50 PROPINA 1.00" });
     h.slots[0] = c1;
     state.hojas.push(h);
     setJevKey("apik-k");
@@ -307,7 +309,7 @@ describe("extraerPendientes con JEV", () => {
 
   it("sin key JEV el flujo OpenAI anterior sigue igual", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50 PROPINA 1.00" });
     h.slots[0] = c1;
     state.hojas.push(h);
     const real = globalThis.fetch;
@@ -339,8 +341,8 @@ describe("extraerPendientes con JEV", () => {
 
   it("JEV en paralelo resuelve todo con 1 render coalescado (orden de llegada libre)", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 12.50" });
-    const c2 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 7.00" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50 PROPINA 1.00" });
+    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00 PROPINA 1.00" });
     h.slots[0] = c1;
     h.slots[1] = c2;
     state.hojas.push(h);
@@ -362,7 +364,7 @@ describe("extraerPendientes con JEV", () => {
     } finally {
       globalThis.fetch = real;
     }
-    expect(vistos.sort()).toEqual(["PROPINA 1.00 TOTAL 12.50", "PROPINA 1.00 TOTAL 7.00"].sort());
+    expect(vistos.sort()).toEqual(["TOTAL 12.50 PROPINA 1.00", "TOTAL 7.00 PROPINA 1.00"].sort());
     expect(c1.montoCents).toBe(1250);
     expect(c2.montoCents).toBe(700);
     expect(vi.mocked(renderHojas).mock.calls.length).toBe(1);
@@ -371,7 +373,7 @@ describe("extraerPendientes con JEV", () => {
   it("pool con tope 50: 60 ítems resuelven todos sin superar el tope", async () => {
     for (let n = 0; n < 60; n++) {
       const h = crearHoja();
-      h.slots[0] = comprobante({ estado: "ok", textoOcr: `PROPINA 1.00 TOTAL ${n + 10}.00` });
+      h.slots[0] = comprobante({ estado: "ok", textoOcr: `TOTAL ${n + 10}.00 PROPINA 1.00` });
       state.hojas.push(h);
     }
     setJevKey("apik-k");
@@ -405,8 +407,8 @@ describe("extraerPendientes con JEV", () => {
 
   it("progresivo: los rápidos se pintan sin esperar al lento", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 12.50" });
-    const c2 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 7.00" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50 PROPINA 1.00" });
+    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00 PROPINA 1.00" });
     h.slots[0] = c1;
     h.slots[1] = c2;
     state.hojas.push(h);
@@ -442,12 +444,32 @@ describe("extraerPendientes con JEV", () => {
     expect(c2.montoCents).toBe(700);
     expect(vi.mocked(renderHojas).mock.calls.length).toBe(1);
   });
+  it("0 candidatos en lote queda manual sin pegar a JEV ni al LLM", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "recorte malo sin números" });
+    h.slots[0] = c1;
+    state.hojas.push(h);
+    setJevKey("apik-k");
+    const llamadas: string[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (u: unknown): Promise<Response> => {
+      llamadas.push(String(u));
+      throw new Error("no debe haber red para 0 candidatos");
+    }) as typeof fetch;
+    try {
+      await extraerPendientes();
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(c1.montoCents).toBeNull();
+    expect(llamadas).toHaveLength(0);
+  });
 });
 
 describe("extraerUnMonto (1×1 de la cola)", () => {
   it("aplica y pinta al instante", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50 PROPINA 1.00" });
     h.slots[0] = c1;
     state.hojas.push(h);
     setJevKey("apik-k");
@@ -467,7 +489,7 @@ describe("extraerUnMonto (1×1 de la cola)", () => {
 
   it("si el parche falla, el render completo lo cubre", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50 PROPINA 1.00" });
     h.slots[0] = c1;
     state.hojas.push(h);
     setJevKey("apik-k");
@@ -498,6 +520,29 @@ describe("extraerUnMonto (1×1 de la cola)", () => {
       globalThis.fetch = real;
     }
     expect(espia).not.toHaveBeenCalled();
+    expect(c1.montoCents).toBeNull();
+  });
+
+  it("rápido sin key resuelve en 1×1 sin fetch (factura 1 y 3)", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
+    h.slots[0] = c1;
+    state.hojas.push(h);
+    const fetchFn = vi.fn();
+    expect(await extraerUnMonto(c1.id, fetchFn as FetchFn)).toBe(true);
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(c1.montoCents).toBe(1250);
+  });
+
+  it("0 candidatos queda manual sin JEV ni fetch (factura 2)", async () => {
+    const h = crearHoja();
+    const c1 = comprobante({ estado: "ok", textoOcr: "recorte malo sin números" });
+    h.slots[0] = c1;
+    state.hojas.push(h);
+    setJevKey("apik-k");
+    const fetchFn = vi.fn();
+    expect(await extraerUnMonto(c1.id, fetchFn as FetchFn)).toBe(false);
+    expect(fetchFn).not.toHaveBeenCalled();
     expect(c1.montoCents).toBeNull();
   });
 
@@ -547,7 +592,7 @@ describe("extraerUnMonto (1×1 de la cola)", () => {
 
   it("segundo llamado en vuelo no duplica fetch", async () => {
     const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 12.50" });
+    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50 PROPINA 1.00" });
     h.slots[0] = c1;
     state.hojas.push(h);
     setJevKey("apik-k");

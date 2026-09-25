@@ -1,6 +1,6 @@
-/* JEV (TypeSafe System One) — primera vía de extracción del TOTAL.
-   Pipeline del prototipo (`extractCandidates → buildRequest → resolveTotal /
-   extractTotalOffline`) + contrato POST /api/jev. Sin dependencias nuevas. */
+/* JEV (TypeSafe System One) — vía de desempate cuando el regex ve >1 distinto.
+   Flujo: ocr → regex (1 distinto = ok sin red, 0 = manual, >1 = JEV → LLM en lote).
+   JEV siempre recibe >1 candidato, nunca 0/1. Sin dependencias nuevas. */
 import type { Cents } from "../types";
 import { parsearMonto } from "../ui/monto";
 
@@ -102,12 +102,6 @@ export function formatMonto(valor: unknown): string | null {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function fallbackValor(pool: readonly CandidatoJev[]): string | null {
-  if (pool.length === 0) return null;
-  const tier1 = pool.filter((c) => c.nearMoney === "yes");
-  return (tier1.length > 0 ? tier1[tier1.length - 1] : pool[pool.length - 1])?.valor ?? null;
-}
-
 export function resolveTotal(req: JevRequest, answer: unknown): string | null {
   const byId = new Map(req.meta.pool.map((c) => [c.id, c.valor] as const));
   const choice = (answer as { choice?: unknown } | null)?.choice;
@@ -118,12 +112,8 @@ export function resolveTotal(req: JevRequest, answer: unknown): string | null {
       if (v !== undefined) return formatMonto(v);
     }
   }
-  return formatMonto(fallbackValor(req.meta.pool));
-}
-
-// Offline: mismo pipeline sin red — JEV solo refina cuando hay API key.
-export function extractTotalOffline(factura: FacturaJev): string | null {
-  return formatMonto(fallbackValor(pickPool(extractCandidates(String(factura.contenido ?? "")))));
+  // Sin elección válida no se adivina: null → "respuesta inválida" → cae al LLM.
+  return null;
 }
 
 // ponytail: fast-path offline — 1 único distinto (repetido N veces vale) => total sin red.
@@ -138,14 +128,6 @@ export function extraerRapidoCents(contenido = ""): Cents | null {
     vistos++;
   }
   return vistos > 0 ? unico : null;
-}
-
-export function resolveTotalCents(req: JevRequest, answer: unknown): Cents | null {
-  return parsearMonto(resolveTotal(req, answer) ?? "");
-}
-
-export function extractTotalOfflineCents(factura: FacturaJev): Cents | null {
-  return parsearMonto(extractTotalOffline(factura) ?? "");
 }
 
 /* Key JEV: persiste en localStorage como la del LLM (ver state.guardarAjustes);

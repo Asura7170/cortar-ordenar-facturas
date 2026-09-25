@@ -6,7 +6,7 @@ App frontend-only, Chrome desktop-only. TypeScript + Vite+ (toolchain VoidZero: 
 
 ## 1. Resumen
 
-Pegar/subir/arrastrar imágenes y PDFs → normalizar (`imagen.ts`) → recorte DocAligner heatmap/fastvit_sa24 vía onnxruntime-web + warp canvas → enderezar por confianza OCR → OCR propio det+rec ONNX (PP-OCRv6_small) → extracción de TOTAL con LLM openai-compatible en lote (o monto manual) → grilla carta N-up con 10 plantillas (default `u4x2`, arrastre libre tipo Word) → salidas Word real (.docx) / PDF (print-to-PDF) / Imprimir, con código de pedido en esquina.
+Pegar/subir/arrastrar imágenes y PDFs → normalizar (`imagen.ts`) → recorte DocAligner heatmap/fastvit_sa24 vía onnxruntime-web + warp canvas → enderezar por confianza OCR → OCR propio det+rec ONNX (PP-OCRv6_small) → extracción del TOTAL en cascada: regex offline (1 distinto = ok sin red, 0 = manual) → JEV solo con >1 distinto → fallback LLM openai-compatible en lote (o monto manual) → grilla carta N-up con 10 plantillas (default `u4x2`, arrastre libre tipo Word) → salidas Word real (.docx) / PDF (print-to-PDF) / Imprimir, con código de pedido en esquina.
 
 ## 2. Estructura real
 
@@ -35,7 +35,7 @@ facturas/
    │  ├─ ocrMode.ts      # toggle chkOcr (no persiste) + renderHojas
    │  └─ settingsModal.ts# baseUrl/model/apiKey/moneda + restablecerAjustes
    ├─ pipeline/
-   │  ├─ imagen.ts       # JPEG único, LADO_MAX 2000, JPEG 0.9, recorte por lado uniforme, vacías 99.5%
+   │  ├─ imagen.ts       # passthrough jpg/png/webp + WebP 0.85, LADO_MAX 2000, vacías 99.5%
    │  ├─ docaligner.ts   # 256px/borde100/conf 0.3, EP webgpu→wasm 30s + latch, threads 1
    │  ├─ ocr.ts          # det 960 + enderezar [0,270,90,180] + rec chunks 16
    │  ├─ ocrDb.ts        # cajasDesdeMapa (bin 0.2, caja 0.45, max 3000, unclip 1.4)
@@ -43,7 +43,8 @@ facturas/
    │  ├─ ocrDict.ts      # DICT 18710 + blank
    │  ├─ rotar.ts        # giro ±90°, QUIETUD 1500ms, releer tolerante
    │  ├─ pdf.ts          # gate ≤5MB ≤10p, MINI 720, vistaSegura, fan-out
-   │  ├─ extract.ts      # lote JSON {"1":"12.50"}, 1800/12000/25/60s, auto al drenar
+   │  ├─ extract.ts      # cascada regex→JEV→LLM: 1800/12000/25/60s, auto al drenar
+   │  ├─ jev.ts         # regex MONEY_RE + JEV /api/jev (solo >1 distinto) + fast-path 1 distinto
    │  └─ queue.ts        # drenado pendiente + precalentar + timings
    └─ export/
       └─ salidas.ts      # docx EMU+SQUARE+header/footer + print zonaPrint
@@ -53,13 +54,13 @@ facturas/
 
 ## 3. Pipeline
 
-- **imagen `imagen.ts:6,9,12-15`:** `LADO_MAX_IMAGEN=2000`, `CALIDAD_JPEG=0.9`, `BLANCO_UMBRAL=245/MUESTRA=4/RATIO=0.995` (+ `esPaginaNegra` mismo ratio). `normalizarImagen` → recorte fondo + JPEG único; `recortarMargenesBlancos` (bbox por lado uniforme del color que sea: refs por mediana de borde, `TOL_LADO=15`, esquinas por franja perpendicular; guarda 15% si ralo `AREA_MINIMA=0.15`); error tipado `blanca|ilegible` (negra reuse `blanca`).
+- **imagen `imagen.ts`:** `LADO_MAX_IMAGEN=2000`, `CALIDAD_WEBP=0.85`, `BLANCO_UMBRAL=245/MUESTRA=4/RATIO=0.995` (+ `esPaginaNegra` mismo ratio). `normalizarImagen` → passthrough jpg/png/webp intacto si nada que corregir, si no WebP; `recortarMargenesBlancos` (bbox por lado uniforme del color que sea: refs por mediana de borde, `TOL_LADO=15`, esquinas por franja perpendicular; guarda 15% si ralo `AREA_MINIMA=0.15`); error tipado `blanca|ilegible` (negra reuse `blanca`).
 - **docaligner `docaligner.ts:25,34,38,461,514`:** `LADO_MODELO=256`, `PAD_BORDE=100` (extrapola esquinas cortadas), `UMBRAL_HEATMAP=0.3`, `RUTA_MODELO=local en dev, HuggingFace /resolve/ en prod (Pages rechaza >25MB)`, `TIMEOUT_MODELO_MS=300s` + `descargarConCache` en caché `modelos` (una descarga por navegador y clave, dedup en vuelo, mínimo 50MB anti-corruptos, `put` con warn), `tamanoModelos/borrarModelos/olvidarSesionFallida` en Ajustes, `TIMEOUT_EP_MS=30s` + `conTimeout` + latch `epCaidos` + `reintentarEps`, singleton `obtenerSesion/crearSesion`, `wasmPaths=BASE_URL ort/`, `numThreads=1`, EPs `["webgpu","wasm"]`. Sin quad plausible → imagen completa, la cola sigue. `rectificar` pasa el warp por `recortarMargenesBlancos` (2º pase: quita cuñas blancas del quad salido).
 - **ocr `ocr.ts:21-22,65,205`:** `RUTA_DET/REC=BASE_URL models/ocr/*.onnx`, `TIMEOUT_OCR_MS=120s`, `LADO_DET_MAX=960`, `DET_MEDIA/STD` ImageNet, `MULTIPLO=32`, `UMBRAL_MAPA_VACIO=0.0005`, `UMBRAL_REC_OK=0.9`, `TOP_CAJAS_GIRO=2`, `GIROS=[0,270,90,180]`, `CHUNK_REC=16`. `enderezar()` prueba giros y queda con mejor confianza; det solo recorta líneas. `det/rec` también en caché `modelos` (`descargarPesosOcr` precarga sin sesiones).
 - **queue `queue.ts`:** `precalentarModelos()` al agregar, fases `detectarYRecortar→enderezar→extraerTexto→ok` (la celda pinta el full-res con lazy, sin miniaturas), guards `buscarSlot` no-resucita, `console.info` timings, auto `extraerPendientes({desdeCola:true})` al drenar.
 - **rotar `rotar.ts:16,29`:** `QUIETUD_GIRO_MS=1500`, `girarYReleer(id,90|270)` con debounce; relee OCR y reabre si era manual.
 - **pdf `pdf.ts:10,13,73,91`:** `PDF_MAX_BYTES=5MiB`, `PDF_MAX_PAGINAS=10` (por archivo), `ANCHO_MINI_PDF=720`, `vistaSegura=alto≤4000 && area≤8M`. `esPdf` por MIME+ext, `admitirPdf` con avisos sin `innerHTML`. Cada página no-blanca/no-negra = comprobante; blancas y negras se omiten.
-- **extract `extract.ts:11-13,15,17-18,46,92,177`:** `MAX_TEXTO=1800`, `MAX_CHARS_LOTE=12000`, `MAX_ITEMS=25`, `TIMEOUT=60s`, `temperature:0/max_tokens:1000`, prompt `SOLO JSON {"1":"12.50","2":null}`, `partirLote` en chunks, `extraerPendientes({forzado?,desdeCola?})` + botón `btnIA`. `parsearMonto` US estricto rechaza `1,234` sin decimal. Monto manual en tarjeta siempre gana y sí suma.
+- **extract `extract.ts` + jev `jev.ts`:** cascada `regex → JEV → LLM`. `MAX_TEXTO=1800`, `MAX_CHARS_LOTE=12000`, `MAX_ITEMS=25`, `TIMEOUT=60s`. `extraerRapidoCents` (1 distinto = total sin red ni key, repetido N veces vale; 0 = manual sin JEV ni LLM); `>1 distinto` va a JEV (`llamarJev`, 1 request por factura, pool ≤40, `JEV_TOPE_PARALELO=50`, retry 429/529 tope 5s; `none`/confianza baja = respuesta inválida → cae al LLM, nunca adivina offline); el LLM en lote (`prompt SOLO JSON {"1":"12.50","2":null}`, `partirLote` en chunks) es fallback del drenado. `extraerUnMonto` (1×1 progresivo) y `extraerPendientes({forzado?,desdeCola?})` + botón `btnIA`. `parsearMonto` US estricto rechaza `1,234` sin decimal. Monto manual en tarjeta siempre gana y sí suma.
 - **Entrada `sidebar.ts:83,87`:** regex `image/(jpeg|png|webp|bmp|gif)`, resto (incl. HEIC) → `formato no soportado`, no rompe cola. PDF con `>5MB/>10p/protegido/ilegible` → aviso en entrada sin entrar a cola.
 
 ## 4. UI / Estado
@@ -100,8 +101,8 @@ flowchart TD
     A["Pegar / Subir / Arrastrar / Ctrl+V"] --> B{"¿Formato válido?<br/>jpg · png · webp · bmp · gif · pdf"}
     B -- "No (incl. HEIC)" --> B1["Aviso: formato no soportado"]
     B -- "Sí" --> C{"¿PDF o imagen?"}
-    C -- "PDF" --> D["pdf.js gate ≤5MB ≤10p<br/>raster MINI 720 · JPEG .9 · vistaSegura<br/>blancas y negras se omiten · fan-out 1 pág=1 comprobante"]
-    C -- "Imagen" --> E["createImageBitmap + EXIF<br/>normalizar JPEG .9 · resize si >2000px"]
+    C -- "PDF" --> D["pdf.js gate ≤5MB ≤10p<br/>raster MINI 720 · WebP · vistaSegura<br/>blancas y negras se omiten · fan-out 1 pág=1 comprobante"]
+    C -- "Imagen" --> E["createImageBitmap + EXIF<br/>passthrough o WebP .85 · resize si >2000px"]
     D --> F["precalentarModelos + Cola FIFO<br/>estado por item: procesando/OK/error"]
     E --> F
     F --> G["DocAligner fastvit_sa24<br/>256px + borde100 → heatmap → 4 esquinas → warp canvas"]
@@ -111,12 +112,19 @@ flowchart TD
     I --> K["Enderezar [0,270,90,180]<br/>mejor confianza rec"]
     J --> K
     K --> L["OCR det 960 → cajas → rec<br/>PP-OCRv6_small det/rec ONNX"]
-    L --> M["Texto OCR + miniatura 800px"]
-    M --> N{"¿IA configurada?"}
-    N -- "No" --> O["Monto manual en tarjeta"]
-    N -- "Sí" --> P["LLM lote JSON 1800/25/60s<br/>texto → cents"]
+    L --> M["Texto OCR + full-res lazy (sin miniaturas)"]
+    M --> N{"¿Regex cuántos<br/>distintos?"}
+    N -- "1" --> Q["Suma exacta en cents<br/>badge + total"]
+    N -- "0" --> O["Monto manual en tarjeta<br/>(típico: mal recorte → recorte manual)"]
+    N -- ">1" --> P1{"¿JEV configurado?"}
+    P1 -- "No" --> P2{"¿LLM configurado?"}
+    P2 -- "No" --> O
+    P2 -- "Sí" --> P["LLM lote JSON 1800/25/60s<br/>texto → cents"]
+    P1 -- "Sí" --> JV["JEV 1×1 + lote<br/>desempata entre candidatos"]
+    JV -- "Total" --> Q
+    JV -- "Sin TOTAL / error" --> P2
     P -- "Sin TOTAL / error" --> O
-    P -- "Total" --> Q["Suma exacta en cents<br/>badge + total"]
+    P -- "Total" --> Q
     O --> R["Hoja carta N-up (u4x2 default)<br/>10 plantillas · scroll vertical"]
     Q --> R
     R --> S["Arrastre libre % + z-order<br/>orden estable · giro ±90° debounce 1500ms"]
