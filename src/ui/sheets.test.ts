@@ -251,6 +251,22 @@ describe("celdas", () => {
     expect(cell.querySelector(".cell-badge")).toBeNull();
   });
 
+  it("actualizarMontoCelda early-returns: modoOcr, id inexistente y monto null", () => {
+    state.modoOcr = true;
+    try {
+      expect(actualizarMontoCelda(999999)).toBe(false);
+    } finally {
+      state.modoOcr = false;
+    }
+    expect(actualizarMontoCelda(999999)).toBe(false);
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: null });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    expect(actualizarMontoCelda(c.id)).toBe(false);
+  });
+
   it("con loteEnCurso no usa ViewTransition (sin snapshots)", () => {
     const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
     const spy = vi.fn((cb: () => void): Record<string, unknown> => {

@@ -286,3 +286,38 @@ describe("procesarCola", () => {
     expect(c.previoDocAligner).toBeUndefined();
   });
 });
+
+describe("precalentarModelos", () => {
+  it("doble llamada: la segunda es no-op (fallback setTimeout)", async () => {
+    const w = window as unknown as Record<string, unknown>;
+    const previa = w["requestIdleCallback"];
+    delete w["requestIdleCallback"];
+    try {
+      vi.resetModules();
+      const q = await import("./queue");
+      q.precalentarModelos();
+      q.precalentarModelos();
+      await vi.advanceTimersByTimeAsync(100);
+    } finally {
+      if (previa !== undefined) w["requestIdleCallback"] = previa;
+    }
+  });
+
+  it("usa requestIdleCallback cuando existe", async () => {
+    const w = window as unknown as Record<string, unknown>;
+    const previa = w["requestIdleCallback"];
+    w["requestIdleCallback"] = (cb: () => void): number => {
+      cb();
+      return 1;
+    };
+    try {
+      vi.resetModules();
+      const q = await import("./queue");
+      q.precalentarModelos();
+      await vi.advanceTimersByTimeAsync(100);
+    } finally {
+      if (previa === undefined) delete w["requestIdleCallback"];
+      else w["requestIdleCallback"] = previa;
+    }
+  });
+});

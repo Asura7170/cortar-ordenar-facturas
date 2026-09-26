@@ -581,4 +581,78 @@ describe("abrirRecorte", () => {
       ctx.mockRestore();
     }
   });
+
+  it("bitmap tiny (<2px) no abre y libera", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps } = depsRecorte();
+      const cerrar = vi.fn();
+      deps.cargar = vi.fn(async () => ({ width: 1, height: 1, close: cerrar }));
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      expect(modal.open).toBe(false);
+      expect(cerrar).toHaveBeenCalled();
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("sin contexto 2d avisa y no abre", async () => {
+    const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    try {
+      const { deps } = depsRecorte();
+      const c = sembrar();
+      await abrirRecorte(c.id, deps as never);
+      expect(modal.open).toBe(false);
+      expect(document.getElementById("aviso")?.textContent).toBe("No se pudo abrir el recorte.");
+      expect(c.file).toBeDefined();
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("rect bajo el mínimo natural no commitea", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    try {
+      const { deps } = depsRecorte(5, 5);
+      const c = sembrar();
+      const antes = c.file;
+      await abrirRecorte(c.id, deps as never);
+      expect(modal.open).toBe(true);
+      btnOk.click(); // rect completo 5x5 < MIN_NATURAL 8
+      await vaciar();
+      expect(c.file).toBe(antes);
+      expect(document.getElementById("aviso")?.textContent).toBe(
+        "El recorte es demasiado pequeño.",
+      );
+      expect(modal.open).toBe(true);
+    } finally {
+      ctx.mockRestore();
+    }
+  });
+
+  it("sin #aviso el fallo de carga no lanza", async () => {
+    const ctx = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
+    document.getElementById("aviso")?.remove();
+    try {
+      const { deps } = depsRecorte();
+      deps.cargar = vi.fn(async () => {
+        throw new Error("decode");
+      });
+      const c = sembrar();
+      await expect(abrirRecorte(c.id, deps as never)).resolves.toBeUndefined();
+      expect(modal.open).toBe(false);
+    } finally {
+      ctx.mockRestore();
+      document
+        .getElementById("sheets")
+        ?.insertAdjacentHTML("beforebegin", '<p id="aviso" role="status"></p>');
+    }
+  });
 });
