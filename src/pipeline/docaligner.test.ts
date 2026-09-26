@@ -288,6 +288,22 @@ describe("decodificarHeatmap", () => {
     const { quad } = decodificarHeatmap(new Float32Array(4 * 8 * 8), [1, 4, 8, 8], 80, 80);
     expect(quad).toBeNull();
   });
+
+  it("expansión a vecinos cubre bordes del mapa (x=0, x=w-1, y=0, y=h-1)", () => {
+    const L = 8;
+    const heat = heatConPicos(L, [
+      [0, 0],
+      [7, 1],
+      [6, 7],
+      [1, 6],
+    ]);
+    // El pico del canal 0 se extiende a derecha (1) y abajo (L) → ramas vecinas true.
+    heat[1] = 0.9;
+    heat[L] = 0.9;
+    const { quad, confianzas } = decodificarHeatmap(heat, [1, 4, L, L], 80, 80);
+    expect(confianzas).toEqual([1, 1, 1, 1]);
+    expect(quad).not.toBeNull();
+  });
 });
 
 describe("bitmapATensor/rectificar", () => {

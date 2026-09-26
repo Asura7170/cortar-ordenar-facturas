@@ -182,6 +182,17 @@ describe("expandirQuad", () => {
       ]),
     ).toBeNull();
   });
+
+  it("arista de longitud cero → null (mod===0)", () => {
+    expect(
+      expandirQuad([
+        [0, 0],
+        [0, 0],
+        [10, 10],
+        [0, 10],
+      ]),
+    ).toBeNull();
+  });
 });
 
 describe("cajasDesdeMapa", () => {
@@ -269,5 +280,8 @@ describe("cajasDesdeMapa", () => {
   it("entradas inválidas → sin cajas sin lanzar", () => {
     expect(cajasDesdeMapa(new Float32Array(4), 10, 10, { ancho: 40, alto: 20 })).toEqual([]);
     expect(cajasDesdeMapa(new Float32Array(100), 0, 10, { ancho: 40, alto: 20 })).toEqual([]);
+    expect(cajasDesdeMapa(new Float32Array(100), 10, 0, { ancho: 40, alto: 20 })).toEqual([]);
+    expect(cajasDesdeMapa(new Float32Array(100), 10, 10, { ancho: 0, alto: 20 })).toEqual([]);
+    expect(cajasDesdeMapa(new Float32Array(100), 10, 10, { ancho: 40, alto: 0 })).toEqual([]);
   });
 });

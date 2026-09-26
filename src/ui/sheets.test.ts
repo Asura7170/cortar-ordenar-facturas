@@ -1,6 +1,6 @@
 /* Tests P1: hojas — layouts, quitar, clic delegado, drop y celdas (DOM aislado). */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { montarFixture, el, eventoDrop, eventoDragover } from "../test/fixture";
+import { montarFixture, el, eventoDrop, eventoDragover, eventoDragleave } from "../test/fixture";
 
 // El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
 vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
@@ -37,6 +37,15 @@ afterEach(() => {
   pedirArchivos.mockClear();
   vi.mocked(extraerPendientes).mockClear();
 });
+
+/** Polling con timeout (en vez de sleeps fijos: resuelve en cuanto se cumple). */
+async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
+  const t0 = Date.now();
+  while (!cond()) {
+    if (Date.now() - t0 > ms) throw new Error("timeout esperando condición");
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
 
 /** Siembra una hoja con montos (null = casilla vacía) y la pinta. */
 function sembrar(layout: LayoutId, montos: (number | null)[]): Hoja {
@@ -176,6 +185,22 @@ describe("clic delegado", () => {
     }
   });
 
+  it("⧉ writeText que rechaza marca fallo", async () => {
+    state.modoOcr = true;
+    const h = crearHoja();
+    h.slots[0] = comprobante({ textoOcr: "HOLA" });
+    state.hojas.push(h);
+    renderHojas();
+    const write = vi
+      .spyOn(navigator.clipboard, "writeText")
+      .mockRejectedValue(new Error("denegado"));
+    const btn = boton("copiar-ocr");
+    btn.click();
+    await esperar(() => btn.title.includes("Copiar falló"));
+    expect(write).toHaveBeenCalledWith("HOLA");
+    expect(btn.title).toContain("Copiar falló");
+  });
+
   it("sin modo OCR no hay botón ⧉", () => {
     sembrar("u4x2", [100]);
     expect(document.querySelector('[data-accion="copiar-ocr"]')).toBeNull();
@@ -249,6 +274,22 @@ describe("celdas", () => {
     expect(actualizarMontoCelda(c.id)).toBe(false);
     expect(cell.querySelector("input.cell-monto")).not.toBeNull();
     expect(cell.querySelector(".cell-badge")).toBeNull();
+  });
+
+  it("actualizarMontoCelda early-returns: modoOcr, id inexistente y monto null", () => {
+    state.modoOcr = true;
+    try {
+      expect(actualizarMontoCelda(999999)).toBe(false);
+    } finally {
+      state.modoOcr = false;
+    }
+    expect(actualizarMontoCelda(999999)).toBe(false);
+    const h = crearHoja("u1");
+    const c = comprobante({ estado: "ok", montoCents: null });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    renderHojas();
+    expect(actualizarMontoCelda(c.id)).toBe(false);
   });
 
   it("con loteEnCurso no usa ViewTransition (sin snapshots)", () => {
@@ -539,6 +580,35 @@ describe("monto manual", () => {
     document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
   });
 
+  it("Enter inválido conserva el borrador y reenfoca sin robar", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "abc";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(inputMonto().value).toBe("abc");
+    expect(document.querySelector(".cell-badge")).toBeNull();
+  });
+
+  it("sin nodo previo el badge se agrega a la celda", () => {
+    const c = sembrarOk();
+    renderHojas();
+    const cell = document.querySelector(".cell");
+    if (!(cell instanceof HTMLElement)) throw new Error("sin celda");
+    cell.querySelector("input.cell-monto")?.remove();
+    c.montoCents = 1250;
+    expect(actualizarMontoCelda(c.id)).toBe(true);
+    expect(cell.querySelector(".cell-badge")?.textContent).toContain("12.50");
+  });
+
+  it("tecla M escribiendo no alterna la lupa", () => {
+    sembrarOk();
+    const btn = document.querySelector<HTMLButtonElement>("#btnLupa");
+    inputMonto().dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+    );
+    expect(btn?.getAttribute("aria-pressed")).toBe("false");
+  });
+
   it("monto entero se muestra con 2 decimales (500 → US$ 500.00)", () => {
     state.moneda = "USD";
     const c = sembrarOk();
@@ -590,6 +660,63 @@ describe("drop de archivos sobre hojas", () => {
     sheet.dispatchEvent(e);
     expect(sheet.classList.contains("file-drop")).toBe(false);
     expect(e.defaultPrevented).toBe(false);
+  });
+
+  it("dragover entre hojas mueve el resaltado; la zona muerta no scrollea", () => {
+    sembrar("u1", [10]);
+    sembrar("u1", [20]);
+    const hojas = [...document.querySelectorAll(".sheet")];
+    // Canvas con alto real: clientY=400 cae en la zona muerta del autoscroll.
+    const rect = vi.spyOn(el("canvas"), "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 1200,
+      height: 800,
+      right: 1200,
+      bottom: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    try {
+      const sobre = (sheet: Element, y: number): void => {
+        sheet.dispatchEvent(
+          Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
+            dataTransfer: { files: [], types: ["Files"] },
+            clientX: 10,
+            clientY: y,
+          }),
+        );
+      };
+      sobre(hojas[0] as Element, 10);
+      expect((hojas[0] as Element).classList.contains("file-drop")).toBe(true);
+      sobre(hojas[1] as Element, 400);
+      expect((hojas[0] as Element).classList.contains("file-drop")).toBe(false);
+      expect((hojas[1] as Element).classList.contains("file-drop")).toBe(true);
+    } finally {
+      rect.mockRestore();
+    }
+  });
+
+  it("dragleave quita el resaltado y para el scroll", () => {
+    sembrar("u1", [10]);
+    const sheet = document.querySelector(".sheet");
+    if (!(sheet instanceof HTMLElement)) throw new Error("sin .sheet");
+    sheet.dispatchEvent(
+      Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
+        dataTransfer: { files: [], types: ["Files"] },
+        clientX: 10,
+        clientY: 10,
+      }),
+    );
+    expect(sheet.classList.contains("file-drop")).toBe(true);
+    sheet.dispatchEvent(Object.assign(eventoDragleave(), { relatedTarget: document.body }));
+    expect(sheet.classList.contains("file-drop")).toBe(false);
+  });
+
+  it("scroll invalida el caché de rects sin tirar", () => {
+    sembrar("u4x2", [100]);
+    expect(() => el("canvas").dispatchEvent(new Event("scroll"))).not.toThrow();
   });
 });
 
@@ -652,6 +779,22 @@ describe("zoom ctrl+rueda (layout, scroll sincronizado)", () => {
     );
     expect(el("sheets").style.getPropertyValue("zoom")).toBe("");
     expect(el<HTMLButtonElement>("btnZoom").hidden).toBe(true);
+  });
+
+  it("Ctrl++/Ctrl+- ajustan por teclado", () => {
+    const sheets = el("sheets");
+    const btn = el<HTMLButtonElement>("btnZoom");
+    const tecla = (key: string): void => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key }),
+      );
+    };
+    tecla("=");
+    expect(sheets.style.getPropertyValue("zoom")).not.toBe("");
+    tecla("=");
+    expect(sheets.style.getPropertyValue("zoom")).not.toBe("");
+    tecla("-");
+    expect(btn.hidden).toBe(false);
   });
 });
 
@@ -768,6 +911,24 @@ describe("lupa", () => {
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     tecla("m");
     expect(btn.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("pointerleave oculta y pointerenter restaura la muestra", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const zona = el("canvas");
+    const mover = (tipo: string): void => {
+      zona.dispatchEvent(
+        Object.assign(new Event(tipo, { bubbles: true }), { clientX: 200, clientY: 200 }),
+      );
+    };
+    mover("pointerenter"); // apagada: no hace nada
+    expect(el("lupa").style.opacity).toBe("0");
+    btn.click();
+    mover("pointermove");
+    mover("pointerleave");
+    expect(el("lupa").style.opacity).toBe("0");
+    mover("pointerenter");
+    expect(el("lupa").style.opacity).toBe("1");
   });
 
   it("keydown y pointercancel purgan la supresión (click posterior pasa)", () => {
@@ -924,5 +1085,305 @@ describe("giro manual", () => {
     botonGiro("girar-izq").dispatchEvent(ev);
     expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
     expect(ev.defaultPrevented).toBe(false);
+  });
+});
+
+describe("drag: render pendiente y cancelaciones", () => {
+  function pressImg(x = 10, y = 10): void {
+    const img = document.querySelector(".cell img");
+    if (!img) throw new Error("sin imagen");
+    img.dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: x,
+        clientY: y,
+      }),
+    );
+  }
+
+  function moverDoc(x: number, y: number): void {
+    document.dispatchEvent(
+      Object.assign(new Event("pointermove", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: x,
+        clientY: y,
+      }),
+    );
+  }
+
+  function soltarDoc(x: number, y: number): void {
+    document.dispatchEvent(
+      Object.assign(new Event("pointerup", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: x,
+        clientY: y,
+      }),
+    );
+  }
+
+  it("render durante el drag se pospone hasta soltar", () => {
+    sembrar("u4x2", [100]);
+    pressImg();
+    renderHojas(); // pospuesto: la grilla no se reconstruye en arrastre
+    soltarDoc(10, 10);
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
+  });
+
+  it("doble pointerdown reinicia el drag", () => {
+    sembrar("u4x2", [100]);
+    pressImg();
+    pressImg();
+    expect(document.querySelector(".sheet-grid.dragging")).not.toBeNull();
+    soltarDoc(10, 10);
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+  });
+
+  it("movimiento mínimo no activa y soltar no mueve", () => {
+    const h = sembrar("u4x2", [100, 200]);
+    pressImg();
+    moverDoc(11, 11);
+    soltarDoc(11, 11);
+    expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+  });
+
+  it("lostpointercapture cierra el drag", () => {
+    sembrar("u4x2", [100]);
+    pressImg();
+    el("sheets").dispatchEvent(
+      Object.assign(new Event("lostpointercapture", { bubbles: true }), { isPrimary: true }),
+    );
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+  });
+
+  it("Escape con drag iniciado cancela", () => {
+    sembrar("u4x2", [100]);
+    pressImg();
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" }),
+    );
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+  });
+});
+
+describe("drag entre celdas (swap)", () => {
+  /** Geometría determinista: celdas en fila de 100px + matchMedia para saltar el FLIP. */
+  function stubGeometria(flip = true, vuelos?: number[]): () => void {
+    const mm = (window as unknown as Record<string, unknown>)["matchMedia"];
+    (window as unknown as Record<string, unknown>)["matchMedia"] = vi.fn(() => ({
+      matches: flip,
+    }));
+    // jsdom no trae Element.animate: se define por test (el FLIP la llama si el vuelo supera 2px).
+    Object.defineProperty(Element.prototype, "animate", {
+      value: vi.fn(() => {
+        vuelos?.push(1);
+      }),
+      configurable: true,
+      writable: true,
+    });
+    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
+      this: Element,
+    ) {
+      const cells = [...document.querySelectorAll(".cell")];
+      const host = this.closest?.(".cell") ?? this;
+      const i = cells.indexOf(host as Element);
+      const left = i < 0 ? 0 : i * 120;
+      return {
+        left,
+        top: 0,
+        width: 100,
+        height: 100,
+        right: left + 100,
+        bottom: 100,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
+    return () => {
+      rect.mockRestore();
+      delete (Element.prototype as unknown as Record<string, unknown>)["animate"];
+      if (mm === undefined) delete (window as unknown as Record<string, unknown>)["matchMedia"];
+      else (window as unknown as Record<string, unknown>)["matchMedia"] = mm;
+    };
+  }
+
+  /** Espera N frames reales (los rAF pendientes van primero: moveRaf/paso corren antes de volver). */
+  async function esperarRaf(n = 2): Promise<void> {
+    for (let i = 0; i < n; i++) {
+      await new Promise<void>((r) => {
+        requestAnimationFrame(() => r());
+      });
+    }
+  }
+
+  function pressCelda(idx: number, x: number, y: number): void {
+    const img = document.querySelectorAll(".cell img").item(idx);
+    if (!(img instanceof Element)) throw new Error("sin imagen");
+    img.dispatchEvent(
+      Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: x,
+        clientY: y,
+      }),
+    );
+  }
+
+  function moverDoc(x: number, y: number): void {
+    document.dispatchEvent(
+      Object.assign(new Event("pointermove", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: x,
+        clientY: y,
+      }),
+    );
+  }
+
+  function soltarDoc(x: number, y: number): void {
+    document.dispatchEvent(
+      Object.assign(new Event("pointerup", { bubbles: true, cancelable: true }), {
+        button: 0,
+        isPrimary: true,
+        pointerId: 1,
+        clientX: x,
+        clientY: y,
+      }),
+    );
+  }
+
+  /** jsdom no trae elementFromPoint: se define por test y se borra al salir. */
+  function stubPunto(valor: Element | null): () => void {
+    Object.defineProperty(document, "elementFromPoint", {
+      value: vi.fn(() => valor),
+      configurable: true,
+    });
+    return () => {
+      delete (document as unknown as Record<string, unknown>)["elementFromPoint"];
+    };
+  }
+
+  it("soltar sobre otra celda intercambia", async () => {
+    const restaurar = stubGeometria();
+    const punto = stubPunto(null);
+    try {
+      const h = sembrar("u4x2", [100, 200]);
+      pressCelda(0, 10, 10);
+      moverDoc(170, 50);
+      await esperarRaf(); // moveRaf: resalta destino + autoscroll en vuelo
+      moverDoc(171, 51);
+      soltarDoc(170, 50);
+      expect(h.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      expect(document.querySelector(".drag-ghost")).toBeNull();
+    } finally {
+      punto();
+      restaurar();
+      document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    }
+  });
+
+  it("soltar en la misma celda no mueve", async () => {
+    const restaurar = stubGeometria();
+    try {
+      const h = sembrar("u4x2", [100, 200]);
+      const origen = document.querySelectorAll(".cell").item(0);
+      const punto = stubPunto(origen as Element);
+      try {
+        pressCelda(0, 10, 10);
+        moverDoc(170, 50);
+        await esperarRaf(); // moveRaf: el destino propio se anula
+        soltarDoc(170, 50);
+        expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+      } finally {
+        punto();
+      }
+    } finally {
+      restaurar();
+      document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    }
+  });
+
+  it("soltar lejos no mueve (sin celda cercana)", () => {
+    const restaurar = stubGeometria();
+    const punto = stubPunto(null);
+    try {
+      const h = sembrar("u4x2", [100, 200]);
+      pressCelda(0, 10, 10);
+      moverDoc(170, 50);
+      soltarDoc(9999, 9999);
+      expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+    } finally {
+      punto();
+      restaurar();
+      document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    }
+  });
+
+  it("mover con dueño muerto no resucita", () => {
+    const restaurar = stubGeometria();
+    const punto = stubPunto(null);
+    try {
+      const a = sembrar("u1", [100]);
+      const b = sembrar("u1", [200]);
+      pressCelda(0, 10, 10);
+      moverDoc(170, 50);
+      state.hojas = [b];
+      soltarDoc(170, 50);
+      expect(b.slots.map((c) => c?.montoCents)).toEqual([200]);
+      expect(
+        state.hojas.flatMap((h) => h.slots).find((c) => c?.id === a.slots[0]?.id),
+      ).toBeUndefined();
+    } finally {
+      punto();
+      restaurar();
+      document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    }
+  });
+
+  it("salida estructural repinta completo", () => {
+    const restaurar = stubGeometria();
+    const punto = stubPunto(null);
+    try {
+      sembrar("u1", [100]);
+      const b = sembrar("u4x2", [200, null]);
+      pressCelda(0, 10, 10);
+      moverDoc(290, 50);
+      soltarDoc(290, 50);
+      expect(state.hojas).toHaveLength(1);
+      expect(b.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+    } finally {
+      punto();
+      restaurar();
+      document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    }
+  });
+
+  it("flip centrado no anima (soltar en el centro)", () => {
+    // matches:false = sin reduced-motion: pasa el gate y llega al chequeo de distancia.
+    const vuelos: number[] = [];
+    const restaurar = stubGeometria(false, vuelos);
+    const punto = stubPunto(null);
+    try {
+      const h = sembrar("u4x2", [100, 200]);
+      pressCelda(0, 10, 10);
+      moverDoc(170, 50);
+      soltarDoc(170, 50); // centro exacto de la celda destino: dx=dy=0
+      expect(h.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      // imgA salta por hypot<2 y solo imgB vuela: sin el guard serían 2.
+      expect(vuelos).toHaveLength(1);
+    } finally {
+      punto();
+      restaurar();
+      document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    }
   });
 });
