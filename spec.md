@@ -12,7 +12,7 @@ Pegar/subir/arrastrar imágenes y PDFs → normalizar (`imagen.ts`) → recorte 
 
 ```
 facturas/
-├─ index.html            # DOM = contrato (42 ids, getEl falla fuerte si falta)
+├─ index.html            # DOM = contrato (64 ids, getEl falla fuerte si falta)
 ├─ package.json          # scripts vp + deps declaradas (pdfjs-dist ^ flotante, ver §6)
 ├─ pnpm-workspace.yaml   # catalog vite/vite-plus + overrides + allowBuilds (no tocar alias)
 ├─ vite.config.ts        # servir-ort-crudo + COOP/COEP + staged + lint prefer-vite-plus-imports
@@ -33,7 +33,9 @@ facturas/
    │  ├─ sheets.ts       # render carta, drag % + z-order, zoom 0.25–4, lupa, atajos M/Esc/Ctrl
    │  ├─ monto.ts        # Cents enteros, parsearMonto US estricto, formatear en-US
    │  ├─ ocrMode.ts      # toggle chkOcr (no persiste) + renderHojas
-   │  └─ settingsModal.ts# baseUrl/model/apiKey/moneda + restablecerAjustes
+   │  ├─ settingsModal.ts# baseUrl/model/apiKey/moneda + cfgJevKey/razonamiento + probar/borrar + modelos locales
+   │  ├─ github.ts       # initGithub: estrellas en vivo, fallback estático
+   │  └─ recorte.ts      # initRecorte: editor manual modalRecorte
    ├─ pipeline/
    │  ├─ imagen.ts       # passthrough jpg/png/webp + WebP 0.85, LADO_MAX 2000, vacías 99.5%
    │  ├─ docaligner.ts   # 256px/borde100/conf 0.3, EP webgpu→wasm 30s + latch, threads 1
@@ -45,12 +47,14 @@ facturas/
    │  ├─ pdf.ts          # gate ≤5MB ≤10p, MINI 720, vistaSegura, fan-out
    │  ├─ extract.ts      # cascada regex→JEV→LLM: 1800/12000/25/60s, auto al drenar
    │  ├─ jev.ts         # regex MONEY_RE + JEV /api/jev (solo >1 distinto) + fast-path 1 distinto
-   │  └─ queue.ts        # drenado pendiente + precalentar + timings
-   └─ export/
+   │  ├─ queue.ts        # drenado pendiente + precalentar + timings
+   │  └─ modelos.ts      # urlListaModelos/extraerIds + TIMEOUT 15s + ZenGo
+   ├─ export/
       └─ salidas.ts      # docx EMU+SQUARE+header/footer + print zonaPrint
+   └─ styles/            # base/topbar/sidebar/canvas (4 css que carga index.html)
 ```
 
-44 files en `src/` según grafo. `state.hojas/colaEnProceso/modoOcr` no persisten.
+52 ficheros `.ts` en `src/` (56 con estilos). `state.hojas/colaEnProceso/modoOcr` no persisten.
 
 ## 3. Pipeline
 
@@ -71,7 +75,7 @@ facturas/
 - **OCR vista `ocrMode.ts:7`:** `modoOcr` no persiste; toggle muestra texto por celda + lupa (`lupaCanvas`), copiar por comprobante. Texto solo alimenta LLM.
 - **IA `state.ts:23-27`:** default Groq `https://api.groq.com/openai/v1/chat/completions` + `qwen/qwen3.8-27b`, `apiKey` en localStorage, nunca al repo. Sin config → monto manual.
 - **Sheets `sheets.ts:341-342,760,773`:** zoom efímero `0.25–4`, `M`=lupa, `Esc`=soltar, `Ctrl++/−/0`=zoom, `data-accion=girar-izq/der`.
-- **Contrato DOM `utils.ts:4`:** `getEl(id)` hace throw si falta `#id` en `index.html`. Ids: `btnZoomMenos/btnZoom/btnZoomMas/btnLupa/montoTotal/btnAjustes/btnTema/temaIcono/chkCodigo/numCodigo/inputCodigo/chkOcr/ocrEstado/btnIA/btnDescargar2/btnPdf/btnImprimir/btnLimpiar/canvas/metaHojas/aviso/sheets/dropzone/fileInput/zonaPrint/lupa/lupaCanvas/modalAjustes/formAjustes/cfgBaseUrl/cfgModel/cfgApiKey/cfgMoneda/estadoModelos/btnDescargarModelos/btnBorrarModelos/btnResetAjustes/btnGuardarAjustes/modalLimpiar/descLimpiar/tituloCodigo/tituloOcrToggle/tituloExportar/tituloAjustes/tituloLimpiar` (`posCodigo` es `name=` de radios, no id).
+- **Contrato DOM `utils.ts:4`:** `getEl(id)` hace throw si falta `#id` en `index.html`. Ids: `btnZoomMenos/btnZoom/btnZoomMas/btnLupa/montoTotal/btnAjustes/btnTema/temaIcono/chkCodigo/numCodigo/inputCodigo/chkOcr/ocrEstado/btnIA/btnDescargar2/btnPdf/btnImprimir/btnLimpiar/canvas/metaHojas/aviso/sheets/dropzone/fileInput/zonaPrint/lupa/lupaCanvas/modalAjustes/formAjustes/cfgBaseUrl/cfgModel/cfgApiKey/cfgMoneda/estadoModelos/btnDescargarModelos/btnBorrarModelos/btnResetAjustes/btnGuardarAjustes/modalLimpiar/descLimpiar/tituloCodigo/tituloOcrToggle/tituloExportar/tituloAjustes/tituloLimpiar/btnGithub/githubStars/cfgRazonamiento/btnRefrescarModelos/cfgModelManual/estadoModelosIA/btnProbarIA/btnBorrarApiKey/estadoPruebaIA/cfgJevKey/btnConectarJev/btnBorrarJev/estadoJev/modalRecorte/tituloRecorte/recorteBase/recorteGuia/btnRecorteReset/btnRecorteOk` (`posCodigo` es `name=` de radios, no id).
 
 ## 5. Salidas
 

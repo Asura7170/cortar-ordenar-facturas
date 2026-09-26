@@ -7,7 +7,7 @@ Frontend-only, sin backend. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vite
 ```bash
 vp install      # instalar (delega a pnpm 12, fijado en devEngines)
 pnpm dev        # vp dev --open: dev server, abre Chrome solo (server.open)
-pnpm test       # vitest run local (110 tests, ~2s). Ver NOTA abajo: NO usar `vp test`
+pnpm test       # vitest run local (~560 tests, ~20s). Ver NOTA abajo: NO usar `vp test`
 pnpm typecheck  # tsc --noEmit
 vp check        # lint + formato + tipos (válido para loops de validación)
 pnpm build      # vp build: build prod → dist/
@@ -29,11 +29,11 @@ index.html          # DOM estático = contrato (sidebar, modales, #sheets). JS s
 src/main.ts         # bootstrap: cargar() → init* → renders. Entrada única
 src/types.ts        # tipos de dominio (Comprobante, Hoja, EstadoApp). Solo tipos
 src/state.ts        # estado global + localStorage + ops puras (redistribuir, limpiarHojas)
-src/ui/             # layout, sidebar, sheets, monto, ocrMode, settingsModal
-src/pipeline/       # docaligner.ts (DocAligner heatmap/lcnet100 + borde negro 100px + warp canvas, fallback completa; EPs con timeout 30s + latch, nunca cuelga la cola) + queue.ts (recorte real + OCR real, auto IA en lote al drenar) + pdf.ts (gate PDF ≤10p/≤5MB con aviso + fan-out 1 página=1 comprobante, omite blancas) + ocr.ts (det+rec+enderezar reales) + extract.ts (LLM lote único texto→cents, solo null; sin key/monto manual)
-src/export/salidas.ts  # Word real (docx: N-up flotante + footer) + PDF/Imprimir pendientes; gate y nombre comunes
-spec.md             # spec del pipeline objetivo (DocAligner → PaddleOCR → LLM → docx). Fuente de verdad del diseño
-public/models/      # lcnet100_h_e_bifpn_256_fp32.onnx vendoreado (Apache-2.0) + NOTICE.txt. No va por CDN (COEP require-corp)
+src/ui/             # layout, sidebar, sheets, monto, ocrMode, settingsModal, github, recorte
+src/pipeline/       # docaligner.ts (DocAligner heatmap/fastvit_sa24 + borde negro 100px + warp canvas, fallback completa; EPs con timeout 30s + latch, nunca cuelga la cola) + queue.ts (recorte real + OCR real, auto IA en lote al drenar) + pdf.ts (gate PDF ≤10p/≤5MB con aviso + fan-out 1 página=1 comprobante, omite blancas/negras) + ocr.ts (det+rec+enderezar reales) + extract.ts (cascada regex→JEV→LLM texto→cents, keys JEV+LLM; monto manual suma) + imagen.ts + jev.ts + modelos.ts + ocrDb/ocrRec/ocrDict.ts + rotar.ts
+src/export/salidas.ts  # Word real (docx: N-up flotante + footer) + PDF/Imprimir vía zonaPrint (printEnVuelo); gate y nombre comunes
+spec.md             # spec del pipeline objetivo (DocAligner → PP-OCRv6_small ONNX → regex→JEV→LLM → docx). Fuente de verdad del diseño
+public/models/      # fastvit_sa24_h_e_bifpn_256_fp32.onnx + ocr/det.onnx + ocr/rec.onnx vendoreados (Apache-2.0) + NOTICE.txt. No va por CDN (COEP require-corp)
 public/ort/         # par asyncify onnxruntime-web copiado de node_modules (el build webgpu lo exige; los nombres cambian por minor). Excluido de formato (.prettierignore). En dev lo sirve en crudo el middleware servir-ort-crudo (vite prohíbe import() desde /public)
 ```
 
@@ -57,4 +57,3 @@ Solo Chrome/Chromium desktop. Se vale usar lo más moderno disponible en Chrome 
 - `docs/` e `image-test/` están en `.gitignore` (referencia/scratch local): no commitear ni importar desde ahí.
 - API key del LLM vive solo en localStorage (form Ajustes). Nunca al repo.
 - Prohibido `git commit`, `push`, `merge`, crear PRs o reescribir historial (`--force`, `reset --hard`) sin petición explícita del usuario en el prompt. Sin esa orden, los cambios quedan sin commitear.
-- Tras actualizar un PR existente (push nuevo a su rama), como ÚLTIMO paso comentar `@coderabbitai review` en el PR para activar el review de CodeRabbit (obligatorio, sin excepciones). No aplica al crear el PR: CodeRabbit ya revisa la creación automáticamente.
