@@ -1,6 +1,8 @@
 /* Tests P1: cola — drena pendientes aunque se limpie durante el proceso. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture } from "../test/fixture";
+import type { SesionDetectora } from "./docaligner";
+import type { NucleoOcr } from "./ocr";
 
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
@@ -15,20 +17,30 @@ vi.mock("./extract", async (importOriginal) => {
   };
 });
 // OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
-// jsdom); cada test simula giro/texto/girarBlob.
+// jsdom); cada test simula giro/texto/girarBlob. El warmup usa sesiones falsas.
 vi.mock("./ocr", async (importOriginal) => {
   const real = await importOriginal<typeof import("./ocr")>();
+  const nucleoFalso = {} as unknown as NucleoOcr;
   return {
     ...real,
     enderezar: vi.fn(async (blob: Blob) => ({ blob, grados: 0, cajas: [], base: null })),
     extraerTexto: vi.fn(async () => ""),
     girarBlob: vi.fn(async () => null),
+    obtenerNucleo: vi.fn(async () => nucleoFalso),
   };
 });
 // DocAligner real necesita onnx: identidad por defecto (no-op); cada test simula el corte.
+// La sesión es falsa para que el warmup avance sin GPU.
 vi.mock("./docaligner", async (importOriginal) => {
   const real = await importOriginal<typeof import("./docaligner")>();
-  return { ...real, detectarYRecortar: vi.fn(async (b: Blob) => b) };
+  const sesionFalsa: SesionDetectora = {
+    inferir: async () => ({ datos: new Float32Array(0), dims: [] }),
+  };
+  return {
+    ...real,
+    detectarYRecortar: vi.fn(async (b: Blob) => b),
+    obtenerSesion: vi.fn(async () => sesionFalsa),
+  };
 });
 
 montarFixture();
@@ -285,6 +297,93 @@ describe("procesarCola", () => {
     expect(c.file).toBe(intake);
     expect(c.previoDocAligner).toBeUndefined();
   });
+
+  it("fallo del OCR deja texto vacío sin abortar el ítem", async () => {
+    const { extraerTexto } = await import("./ocr");
+    vi.mocked(extraerTexto).mockRejectedValueOnce(new Error("ocr caído"));
+    const h = crearHoja();
+    const c = comprobante({ nombre: "t.png", file: new Blob(["foto"]) });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(c.textoOcr).toBe("");
+    expect(c.estado).toBe("ok");
+  });
+
+  it("PDF sin file recupera el blob por fetch", async () => {
+    const bytes = new Blob(["pdf"]);
+    const red = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue({ blob: async () => bytes } as Response);
+    try {
+      const h = crearHoja();
+      const c = comprobante({ nombre: "d.pdf" });
+      h.slots[0] = c;
+      state.hojas.push(h);
+      const p = procesarCola();
+      await vi.advanceTimersByTimeAsync(2000);
+      await p;
+      expect(red).toHaveBeenCalled();
+      expect(c.estado).toBe("ok");
+    } finally {
+      red.mockRestore();
+    }
+  });
+
+  it("limpieza durante el recorte revoca la URL nueva sin resucitar", async () => {
+    const { detectarYRecortar } = await import("./docaligner");
+    const h = crearHoja();
+    const c = comprobante({ nombre: "t.png", file: new Blob(["foto"]) });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const cortado = new Blob(["doc"]);
+    vi.mocked(detectarYRecortar).mockImplementationOnce(async () => {
+      state.hojas = [];
+      return cortado;
+    });
+    const revocar = vi.spyOn(URL, "revokeObjectURL");
+    try {
+      const p = procesarCola();
+      await vi.advanceTimersByTimeAsync(2000);
+      await p;
+      expect(buscarSlot(c.id)).toBeNull();
+      expect(revocar).toHaveBeenCalled();
+    } finally {
+      revocar.mockRestore();
+    }
+  });
+
+  it("limpieza durante el giro del previo revoca sin mutar", async () => {
+    const { enderezar, girarBlob } = await import("./ocr");
+    const h = crearHoja();
+    const intake = new Blob(["intake"]);
+    const c = comprobante({
+      nombre: "t.png",
+      file: intake,
+      previoDocAligner: new Blob(["previo"]),
+    });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const rotado = new Blob(["rotado"]);
+    vi.mocked(enderezar).mockResolvedValueOnce({ blob: rotado, grados: 90, cajas: [], base: null });
+    vi.mocked(girarBlob).mockImplementationOnce(async () => {
+      state.hojas = [];
+      return new Blob(["previo-rotado"]);
+    });
+    const revocar = vi.spyOn(URL, "revokeObjectURL");
+    try {
+      const p = procesarCola();
+      await vi.advanceTimersByTimeAsync(2000);
+      await p;
+      expect(buscarSlot(c.id)).toBeNull();
+      expect(c.file).toBe(intake);
+      expect(revocar).toHaveBeenCalled();
+    } finally {
+      revocar.mockRestore();
+    }
+  });
 });
 
 describe("precalentarModelos", () => {
@@ -298,6 +397,11 @@ describe("precalentarModelos", () => {
       q.precalentarModelos();
       q.precalentarModelos();
       await vi.advanceTimersByTimeAsync(100);
+      // El warmup avanzó hasta el núcleo (sesiones falsas, sin onnx).
+      const { obtenerSesion } = await import("./docaligner");
+      const { obtenerNucleo } = await import("./ocr");
+      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledTimes(1);
     } finally {
       if (previa !== undefined) w["requestIdleCallback"] = previa;
     }
@@ -315,6 +419,10 @@ describe("precalentarModelos", () => {
       const q = await import("./queue");
       q.precalentarModelos();
       await vi.advanceTimersByTimeAsync(100);
+      const { obtenerSesion } = await import("./docaligner");
+      const { obtenerNucleo } = await import("./ocr");
+      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledTimes(1);
     } finally {
       if (previa === undefined) delete w["requestIdleCallback"];
       else w["requestIdleCallback"] = previa;
