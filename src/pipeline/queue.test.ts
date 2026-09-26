@@ -373,14 +373,18 @@ describe("procesarCola", () => {
       return new Blob(["previo-rotado"]);
     });
     const revocar = vi.spyOn(URL, "revokeObjectURL");
+    const crear = vi.spyOn(URL, "createObjectURL");
     try {
       const p = procesarCola();
       await vi.advanceTimersByTimeAsync(2000);
       await p;
       expect(buscarSlot(c.id)).toBeNull();
       expect(c.file).toBe(intake);
-      expect(revocar).toHaveBeenCalled();
+      // La URL revocada es la rotada (la vieja ya se revocó antes del giro).
+      const imgNueva = crear.mock.results[0]?.value as string;
+      expect(revocar).toHaveBeenCalledWith(imgNueva);
     } finally {
+      crear.mockRestore();
       revocar.mockRestore();
     }
   });
@@ -410,10 +414,11 @@ describe("precalentarModelos", () => {
   it("usa requestIdleCallback cuando existe", async () => {
     const w = window as unknown as Record<string, unknown>;
     const previa = w["requestIdleCallback"];
-    w["requestIdleCallback"] = (cb: () => void): number => {
+    const ocioso = vi.fn((cb: () => void): number => {
       cb();
       return 1;
-    };
+    });
+    w["requestIdleCallback"] = ocioso;
     try {
       vi.resetModules();
       const q = await import("./queue");
@@ -421,6 +426,7 @@ describe("precalentarModelos", () => {
       await vi.advanceTimersByTimeAsync(100);
       const { obtenerSesion } = await import("./docaligner");
       const { obtenerNucleo } = await import("./ocr");
+      expect(ocioso).toHaveBeenCalledTimes(1);
       expect(vi.mocked(obtenerSesion)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledTimes(1);
     } finally {

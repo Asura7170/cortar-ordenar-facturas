@@ -604,10 +604,11 @@ describe("abrirRecorte", () => {
     try {
       const { deps } = depsRecorte();
       const c = sembrar();
+      const antes = c.file;
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(false);
       expect(document.getElementById("aviso")?.textContent).toBe("No se pudo abrir el recorte.");
-      expect(c.file).toBeDefined();
+      expect(c.file).toBe(antes);
     } finally {
       ctx.mockRestore();
     }
