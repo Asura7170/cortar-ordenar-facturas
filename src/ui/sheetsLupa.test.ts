@@ -37,8 +37,13 @@ function moverLupa(x: number, y: number): void {
   );
 }
 
-async function vaciar(): Promise<void> {
-  await new Promise((r) => setTimeout(r, 60));
+/** Polling con timeout (en vez de sleeps fijos: resuelve en cuanto el rAF pinta). */
+async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
+  const t0 = Date.now();
+  while (!cond()) {
+    if (Date.now() - t0 > ms) throw new Error("timeout esperando rAF");
+    await new Promise((r) => setTimeout(r, 10));
+  }
 }
 
 describe("dibujarLupa", () => {
@@ -59,10 +64,10 @@ describe("dibujarLupa", () => {
       renderHojas();
       el<HTMLButtonElement>("btnLupa").click();
       moverLupa(300, 300);
-      await vaciar();
+      await esperar(() => ctx.fillRect.mock.calls.length > 0);
       panel.style.backgroundColor = "rgb(255, 0, 0)";
       moverLupa(310, 310);
-      await vaciar();
+      await esperar(() => ctx.fillRect.mock.calls.length > 1);
       expect(ctx.clearRect).toHaveBeenCalled();
       expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 200, 200);
       expect(ctx.drawImage).not.toHaveBeenCalled();
@@ -101,7 +106,7 @@ describe("dibujarLupa", () => {
     try {
       el<HTMLButtonElement>("btnLupa").click();
       moverLupa(50, 50);
-      await vaciar();
+      await esperar(() => ctx.drawImage.mock.calls.length > 0);
       expect(ctx.drawImage).toHaveBeenCalled();
     } finally {
       rect.mockRestore();

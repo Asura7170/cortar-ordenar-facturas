@@ -38,6 +38,15 @@ afterEach(() => {
   vi.mocked(extraerPendientes).mockClear();
 });
 
+/** Polling con timeout (en vez de sleeps fijos: resuelve en cuanto se cumple). */
+async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
+  const t0 = Date.now();
+  while (!cond()) {
+    if (Date.now() - t0 > ms) throw new Error("timeout esperando condición");
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
 /** Siembra una hoja con montos (null = casilla vacía) y la pinta. */
 function sembrar(layout: LayoutId, montos: (number | null)[]): Hoja {
   const h = crearHoja(layout);
@@ -187,7 +196,7 @@ describe("clic delegado", () => {
       .mockRejectedValue(new Error("denegado"));
     const btn = boton("copiar-ocr");
     btn.click();
-    for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0));
+    await esperar(() => btn.title.includes("Copiar falló"));
     expect(write).toHaveBeenCalledWith("HOLA");
     expect(btn.title).toContain("Copiar falló");
   });
@@ -1165,14 +1174,16 @@ describe("drag: render pendiente y cancelaciones", () => {
 
 describe("drag entre celdas (swap)", () => {
   /** Geometría determinista: celdas en fila de 100px + matchMedia para saltar el FLIP. */
-  function stubGeometria(flip = true): () => void {
+  function stubGeometria(flip = true, vuelos?: number[]): () => void {
     const mm = (window as unknown as Record<string, unknown>)["matchMedia"];
     (window as unknown as Record<string, unknown>)["matchMedia"] = vi.fn(() => ({
       matches: flip,
     }));
     // jsdom no trae Element.animate: se define por test (el FLIP la llama si el vuelo supera 2px).
     Object.defineProperty(Element.prototype, "animate", {
-      value: vi.fn(),
+      value: vi.fn(() => {
+        vuelos?.push(1);
+      }),
       configurable: true,
       writable: true,
     });
@@ -1203,9 +1214,13 @@ describe("drag entre celdas (swap)", () => {
     };
   }
 
-  /** Deja correr los rAF (moveRaf: resalta + autoscroll; paso: scroll en vuelo). */
-  async function esperarRaf(): Promise<void> {
-    await new Promise((r) => setTimeout(r, 70));
+  /** Espera N frames reales (los rAF pendientes van primero: moveRaf/paso corren antes de volver). */
+  async function esperarRaf(n = 2): Promise<void> {
+    for (let i = 0; i < n; i++) {
+      await new Promise<void>((r) => {
+        requestAnimationFrame(() => r());
+      });
+    }
   }
 
   function pressCelda(idx: number, x: number, y: number): void {
@@ -1353,14 +1368,18 @@ describe("drag entre celdas (swap)", () => {
   });
 
   it("flip centrado no anima (soltar en el centro)", () => {
-    const restaurar = stubGeometria(false);
+    // matches:false = sin reduced-motion: pasa el gate y llega al chequeo de distancia.
+    const vuelos: number[] = [];
+    const restaurar = stubGeometria(false, vuelos);
     const punto = stubPunto(null);
     try {
       const h = sembrar("u4x2", [100, 200]);
       pressCelda(0, 10, 10);
       moverDoc(170, 50);
-      soltarDoc(170, 50); // centro de la celda destino: dx=dy=0
+      soltarDoc(170, 50); // centro exacto de la celda destino: dx=dy=0
       expect(h.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      // imgA salta por hypot<2 y solo imgB vuela: sin el guard serían 2.
+      expect(vuelos).toHaveLength(1);
     } finally {
       punto();
       restaurar();
