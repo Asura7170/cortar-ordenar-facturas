@@ -9,6 +9,7 @@
     "lint": "vp lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "prepare": "vp config"
   },
@@ -18,11 +19,12 @@
     "pdfjs-dist": "^6.3.289"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "5.0.1",
     "jsdom": "^30.0.1",
     "typescript": "7.0.2",
     "vite": "catalog:",
     "vite-plus": "catalog:",
-    "vitest": "4.1.11"
+    "vitest": "5.0.1"
   },
   "devEngines": {
     "packageManager": {
