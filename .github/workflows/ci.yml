@@ -23,4 +23,5 @@ jobs:
       - run: pnpm exec vp check
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm run test:coverage
       - run: pnpm build

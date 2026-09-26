@@ -9,6 +9,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       exclude: ["public/ort/**", "public/models/**", "**/*.test.ts", "**/test/**", "dist/**"],
+      thresholds: { lines: 85, statements: 80 },
     },
   },
 });
