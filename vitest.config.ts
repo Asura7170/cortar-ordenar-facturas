@@ -14,8 +14,12 @@ export default defineConfig({
         "public/models/**",
         "**/*.test.ts",
         "**/test/**",
+        "**/*.d.ts",
         "dist/**",
+        // Sin runtime que cubrir: main es bootstrap con side-effects al importar
+        // (cubierto indirectamente vía init*), types solo declara tipos.
         "src/main.ts",
+        "src/types.ts",
       ],
       thresholds: { lines: 85, statements: 80 },
     },
