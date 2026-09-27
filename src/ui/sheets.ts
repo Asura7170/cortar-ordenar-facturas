@@ -342,6 +342,10 @@ let descartarBorrador = false;
 // el commit; los ids monótonos hacen inofensivo un flag rancio).
 let editandoMonto: number | null = null;
 
+// ponytail: check temporal del botón copiar-OCR (1200ms, un timer por botón).
+const TIEMPO_COPIADO_MS = 1200;
+const copiadoTimers = new WeakMap<HTMLElement, number>();
+
 interface BorradorMonto {
   readonly id: number;
   readonly valor: string;
@@ -972,15 +976,34 @@ export function initSheets(cb: SheetsCallbacks): void {
         if (!item.textoOcr) return;
         // Sin Promise.try (ausente en Node 22 del CI): writeText ya devuelve promesa.
         // clipboard no existe fuera de contexto seguro (http): TypeError antes de la promesa.
+        // ponytail: en fallo solo el title (el check es solo éxito, sin error visual nuevo).
         const fallo = "Copiar falló (sin permiso del portapapeles)";
         const portapapeles = navigator.clipboard;
         if (typeof portapapeles?.writeText !== "function") {
           btn.title = fallo;
           return;
         }
-        void portapapeles.writeText(item.textoOcr).catch(() => {
-          btn.title = fallo;
-        });
+        void portapapeles
+          .writeText(item.textoOcr)
+          .then(() => {
+            const previo = copiadoTimers.get(btn);
+            if (previo !== undefined) window.clearTimeout(previo);
+            btn.classList.add("copiado");
+            btn.textContent = "✓";
+            btn.setAttribute("aria-label", "¡Copiado!");
+            copiadoTimers.set(
+              btn,
+              window.setTimeout(() => {
+                if (!btn.isConnected) return;
+                btn.classList.remove("copiado");
+                btn.textContent = "⧉";
+                btn.setAttribute("aria-label", "Copiar OCR");
+              }, TIEMPO_COPIADO_MS),
+            );
+          })
+          .catch(() => {
+            btn.title = fallo;
+          });
         return;
       }
       case "quitar":

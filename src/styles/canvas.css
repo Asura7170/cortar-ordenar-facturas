@@ -429,7 +429,7 @@ body.is-dragging .cell:not(.empty) {
   bottom: 6px;
   right: 6px;
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 14px;
   background: var(--papel-brillo);
   color: var(--verde-tinta);
   border: 1px solid var(--renglon-fuerte);
@@ -707,6 +707,16 @@ body.is-dragging .cell:not(.empty) {
   font-family: var(--mono);
   line-height: 1.2;
   z-index: 2;
+  transition:
+    background-color 0.25s,
+    color 0.25s,
+    transform 0.25s;
+}
+.cell.cell-ocr .cell-remove.copiado {
+  background: var(--verde-tinta);
+  color: var(--verde-claro);
+  border-color: var(--verde-tinta);
+  transform: scale(1.12);
 }
 .cell.cell-ocr .cell-remove:hover {
   background: var(--verde-tinta);

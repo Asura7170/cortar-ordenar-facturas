@@ -201,6 +201,24 @@ describe("clic delegado", () => {
     expect(btn.title).toContain("Copiar falló");
   });
 
+  it("⧉ copiado muestra ✓ 1200ms y revierte (reclic rearma)", async () => {
+    state.modoOcr = true;
+    const h = crearHoja();
+    h.slots[0] = comprobante({ textoOcr: "HOLA" });
+    state.hojas.push(h);
+    renderHojas();
+    vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    const btn = boton("copiar-ocr");
+    btn.click();
+    await esperar(() => btn.textContent === "✓");
+    expect(btn.classList.contains("copiado")).toBe(true);
+    btn.click();
+    await esperar(() => btn.textContent === "✓");
+    await esperar(() => btn.textContent === "⧉", 3000);
+    expect(btn.classList.contains("copiado")).toBe(false);
+    expect(btn.getAttribute("aria-label")).toBe("Copiar OCR");
+  });
+
   it("sin modo OCR no hay botón ⧉", () => {
     sembrar("u4x2", [100]);
     expect(document.querySelector('[data-accion="copiar-ocr"]')).toBeNull();
