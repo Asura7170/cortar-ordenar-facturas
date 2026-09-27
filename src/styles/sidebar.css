@@ -262,6 +262,23 @@
 .btn-ia:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
+/* Extraer montos como barra determinada: relleno por --progreso (0→1) que
+   pinta extract.ts; sin la variable colapsa y el botón queda como siempre. */
+#btnIA {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+#btnIA::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, currentColor 25%, transparent);
+  transform: scaleX(var(--progreso, 0));
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
 
 /* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son
    fantasma con color de marca solo en texto y borde (fondo transparente
