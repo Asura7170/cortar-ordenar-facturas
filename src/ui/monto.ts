@@ -48,6 +48,39 @@ export function totalItems(): number {
   return aplanar().length;
 }
 
+// ponytail: el total se anima por dígito (sube = cae de arriba, baja = cae de
+// abajo); sin cambio no hay animación y el texto queda plano.
+let previoTotal: Cents | null = null;
+
 export function renderMonto(): void {
-  montoEl.textContent = formatearMoneda(sumaTotal());
+  const total = sumaTotal();
+  const texto = formatearMoneda(total);
+  // ponytail: la llamada duplicada (tick + renderHojas final) no toca el DOM:
+  // así no mata la animación en vuelo antes del primer paint.
+  if (montoEl.textContent === texto) {
+    previoTotal = total;
+    return;
+  }
+  if (previoTotal === null || total === previoTotal) {
+    previoTotal = total;
+    montoEl.classList.remove("is-animando");
+    delete montoEl.dataset["dir"];
+    montoEl.textContent = texto;
+    return;
+  }
+  const dir = total > previoTotal ? "-1" : "1";
+  previoTotal = total;
+  montoEl.dataset["dir"] = dir;
+  montoEl.replaceChildren(
+    ...texto.split("").map((ch, i) => {
+      const s = document.createElement("span");
+      s.className = "monto-digito";
+      s.style.setProperty("--i", String(Math.min(i, 6)));
+      s.textContent = ch;
+      return s;
+    }),
+  );
+  montoEl.classList.remove("is-animando");
+  void montoEl.offsetWidth;
+  montoEl.classList.add("is-animando");
 }

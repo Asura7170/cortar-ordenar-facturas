@@ -73,6 +73,48 @@ describe("renderMonto", () => {
     renderMonto();
     expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 1,234.56");
   });
+
+  it("anima por dígito: sube cae de arriba, baja cae de abajo, igual no anima", () => {
+    state.moneda = "USD";
+    const montoEl = document.getElementById("montoTotal");
+    if (!montoEl) throw new Error("sin #montoTotal");
+    hojaCon([10000]);
+    renderMonto(); // sincroniza el previo
+    hojaCon([10000]); // +100.00 → sube
+    renderMonto();
+    expect(montoEl.textContent).toBe("US$ 200.00");
+    expect(montoEl.dataset["dir"]).toBe("-1");
+    expect(montoEl.classList.contains("is-animando")).toBe(true);
+    const digitos = montoEl.querySelectorAll<HTMLSpanElement>(".monto-digito");
+    expect(digitos).toHaveLength("US$ 200.00".length);
+    expect(digitos[9]?.style.getPropertyValue("--i")).toBe("6");
+    state.hojas.pop(); // -100.00 → baja
+    renderMonto();
+    expect(montoEl.textContent).toBe("US$ 100.00");
+    expect(montoEl.dataset["dir"]).toBe("1");
+    renderMonto(); // mismo texto → no-op, preserva la animación en vuelo
+    expect(montoEl.classList.contains("is-animando")).toBe(true);
+    state.moneda = "ARS"; // mismo total, otro texto → plano sin animación
+    renderMonto();
+    expect(montoEl.textContent).toBe("AR$ 100.00");
+    expect(montoEl.classList.contains("is-animando")).toBe(false);
+    expect(montoEl.dataset["dir"]).toBeUndefined();
+  });
+
+  it("duplicada con igual total no mata la animación en vuelo", () => {
+    state.moneda = "USD";
+    const montoEl = document.getElementById("montoTotal");
+    if (!montoEl) throw new Error("sin #montoTotal");
+    hojaCon([10000]);
+    renderMonto(); // sincroniza el previo
+    hojaCon([10000]); // +100.00 → sube y anima
+    renderMonto();
+    expect(montoEl.classList.contains("is-animando")).toBe(true);
+    renderMonto(); // tick + renderHojas final con el mismo total
+    expect(montoEl.textContent).toBe("US$ 200.00");
+    expect(montoEl.classList.contains("is-animando")).toBe(true);
+    expect(montoEl.querySelectorAll(".monto-digito")).toHaveLength("US$ 200.00".length);
+  });
 });
 
 describe("parsearMonto", () => {

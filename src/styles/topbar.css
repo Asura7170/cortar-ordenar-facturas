@@ -68,6 +68,34 @@
   color: var(--monto-valor);
   font-variant-numeric: tabular-nums;
 }
+/* Total animado por dígito: sube = cae de arriba, baja = cae de abajo.
+   ponytail: rebote + stagger 40ms capado a 6 (vía --i); reducido lo anula el global. */
+.monto-digito {
+  display: inline-block;
+  will-change: transform, opacity, filter;
+}
+.monto-valor.is-animando .monto-digito {
+  animation: monto-cae 350ms cubic-bezier(0.34, 1.45, 0.64, 1) both;
+  animation-delay: calc(40ms * var(--i, 0));
+}
+.monto-valor[data-dir="-1"] .monto-digito {
+  --monto-desde: -8px;
+}
+.monto-valor[data-dir="1"] .monto-digito {
+  --monto-desde: 8px;
+}
+@keyframes monto-cae {
+  0% {
+    transform: translateY(var(--monto-desde, -8px));
+    opacity: 0;
+    filter: blur(2px);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
 .topbar-actions {
   display: flex;
   gap: 10px;
