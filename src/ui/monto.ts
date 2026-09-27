@@ -48,8 +48,8 @@ export function totalItems(): number {
   return aplanar().length;
 }
 
-// ponytail: el total se anima por dígito (sube = cae de arriba, baja = cae de
-// abajo); sin cambio no hay animación y el texto queda plano.
+// ponytail: el total es un odómetro (rueda cada posición que cambia, rápido
+// a la derecha y lento a la izquierda); sin cambio no hay animación.
 let previoTotal: Cents | null = null;
 
 export function renderMonto(): void {
@@ -63,24 +63,52 @@ export function renderMonto(): void {
   }
   if (previoTotal === null || total === previoTotal) {
     previoTotal = total;
-    montoEl.classList.remove("is-animando");
     delete montoEl.dataset["dir"];
     montoEl.textContent = texto;
     return;
   }
   const dir = total > previoTotal ? "-1" : "1";
   previoTotal = total;
+  // Prefijo común quieto; el resto se alinea a la derecha por valor posicional.
+  const viejo = montoEl.textContent ?? "";
+  let k = 0;
+  while (k < viejo.length && k < texto.length && viejo[k] === texto[k]) k++;
+  const sufV = viejo.slice(k);
+  const sufN = texto.slice(k);
+  const acolchado = sufV.padStart(sufN.length);
+  const fijos: HTMLElement[] = [];
+  for (let i = 0; i < k; i++) {
+    const s = document.createElement("span");
+    s.textContent = texto[i] ?? "";
+    fijos.push(s);
+  }
   montoEl.dataset["dir"] = dir;
   montoEl.replaceChildren(
-    ...texto.split("").map((ch, i) => {
-      const s = document.createElement("span");
-      s.className = "monto-digito";
-      s.style.setProperty("--i", String(Math.min(i, 6)));
-      s.textContent = ch;
-      return s;
+    ...fijos,
+    ...sufN.split("").map((ch, j) => {
+      const v = acolchado[j] ?? " ";
+      if (v === ch) {
+        const s = document.createElement("span");
+        s.textContent = ch;
+        return s;
+      }
+      if (v === " ") {
+        const s = document.createElement("span");
+        s.className = "monto-nuevo";
+        s.textContent = ch;
+        return s;
+      }
+      const r = document.createElement("span");
+      r.className = "monto-rodillo";
+      const tira = document.createElement("span");
+      tira.className = "monto-desplaza";
+      tira.dataset["viejo"] = v;
+      tira.style.setProperty("--p", String(Math.min(sufN.length - 1 - j, 6)));
+      const nuevo = document.createElement("span");
+      nuevo.textContent = ch;
+      tira.append(nuevo);
+      r.append(tira);
+      return r;
     }),
   );
-  montoEl.classList.remove("is-animando");
-  void montoEl.offsetWidth;
-  montoEl.classList.add("is-animando");
 }

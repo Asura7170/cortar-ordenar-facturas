@@ -74,46 +74,54 @@ describe("renderMonto", () => {
     expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 1,234.56");
   });
 
-  it("anima por dígito: sube cae de arriba, baja cae de abajo, igual no anima", () => {
+  it("odómetro: solo rueda lo que cambia, rápido a la derecha", () => {
     state.moneda = "USD";
     const montoEl = document.getElementById("montoTotal");
     if (!montoEl) throw new Error("sin #montoTotal");
     hojaCon([10000]);
     renderMonto(); // sincroniza el previo
-    hojaCon([10000]); // +100.00 → sube
+    hojaCon([25000]); // +250.00 → sube
     renderMonto();
-    expect(montoEl.textContent).toBe("US$ 200.00");
+    expect(montoEl.textContent).toBe("US$ 350.00");
     expect(montoEl.dataset["dir"]).toBe("-1");
-    expect(montoEl.classList.contains("is-animando")).toBe(true);
-    const digitos = montoEl.querySelectorAll<HTMLSpanElement>(".monto-digito");
-    expect(digitos).toHaveLength("US$ 200.00".length);
-    expect(digitos[9]?.style.getPropertyValue("--i")).toBe("6");
-    state.hojas.pop(); // -100.00 → baja
+    const rodillos = montoEl.querySelectorAll(".monto-rodillo");
+    expect(rodillos).toHaveLength(2);
+    const tiraAlta = rodillos[0]?.querySelector<HTMLSpanElement>(".monto-desplaza");
+    const tiraBaja = rodillos[1]?.querySelector<HTMLSpanElement>(".monto-desplaza");
+    expect(tiraAlta?.style.getPropertyValue("--p")).toBe("5");
+    expect(tiraBaja?.style.getPropertyValue("--p")).toBe("4");
+    expect(tiraAlta?.dataset["viejo"]).toBe("1");
+    expect([...(tiraAlta?.children ?? [])].map((c) => c.textContent)).toEqual(["3"]);
+    expect(montoEl.querySelector(".monto-nuevo")).toBeNull();
+    state.hojas.pop(); // -250.00 → baja con tira invertida
     renderMonto();
     expect(montoEl.textContent).toBe("US$ 100.00");
     expect(montoEl.dataset["dir"]).toBe("1");
-    renderMonto(); // mismo texto → no-op, preserva la animación en vuelo
-    expect(montoEl.classList.contains("is-animando")).toBe(true);
-    state.moneda = "ARS"; // mismo total, otro texto → plano sin animación
+    const tiraBajada = montoEl
+      .querySelector(".monto-rodillo")
+      ?.querySelector<HTMLSpanElement>(".monto-desplaza");
+    expect(tiraBajada?.dataset["viejo"]).toBe("3");
+    expect([...(tiraBajada?.children ?? [])].map((c) => c.textContent)).toEqual(["1"]);
+    renderMonto(); // duplicada → no-op, preserva los rodillos
+    expect(montoEl.querySelectorAll(".monto-rodillo")).toHaveLength(2);
+    state.moneda = "ARS"; // mismo total, otro texto → plano sin rodillos
     renderMonto();
     expect(montoEl.textContent).toBe("AR$ 100.00");
-    expect(montoEl.classList.contains("is-animando")).toBe(false);
+    expect(montoEl.querySelector(".monto-rodillo")).toBeNull();
     expect(montoEl.dataset["dir"]).toBeUndefined();
   });
 
-  it("duplicada con igual total no mata la animación en vuelo", () => {
+  it("al crecer la cifra lo nuevo entra con pop y lo común rueda", () => {
     state.moneda = "USD";
     const montoEl = document.getElementById("montoTotal");
     if (!montoEl) throw new Error("sin #montoTotal");
-    hojaCon([10000]);
-    renderMonto(); // sincroniza el previo
-    hojaCon([10000]); // +100.00 → sube y anima
+    hojaCon([99999]);
+    renderMonto(); // sincroniza el previo (US$ 999.99)
+    hojaCon([100]); // +1.00 → US$ 1,000.99
     renderMonto();
-    expect(montoEl.classList.contains("is-animando")).toBe(true);
-    renderMonto(); // tick + renderHojas final con el mismo total
-    expect(montoEl.textContent).toBe("US$ 200.00");
-    expect(montoEl.classList.contains("is-animando")).toBe(true);
-    expect(montoEl.querySelectorAll(".monto-digito")).toHaveLength("US$ 200.00".length);
+    expect(montoEl.textContent).toBe("US$ 1,000.99");
+    expect(montoEl.querySelectorAll(".monto-nuevo")).toHaveLength(2);
+    expect(montoEl.querySelectorAll(".monto-rodillo")).toHaveLength(3);
   });
 });
 
