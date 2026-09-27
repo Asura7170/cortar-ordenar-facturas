@@ -260,24 +260,35 @@
   border: 1px solid currentColor;
 }
 .btn-ia:hover {
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
-/* Extraer montos como barra determinada: relleno por --progreso (0→1) que
-   pinta extract.ts; sin la variable colapsa y el botón queda como siempre. */
+/* Extraer montos como barra determinada con colores invertidos: el relleno
+   avanza con --progreso (0→1, la pinta extract.ts) y el texto, transparente,
+   se recorta al gradiente de corte duro (sobre el lleno en contraste, fuera
+   en tinta). Sin la variable todo queda en tinta, como siempre. */
+@property --progreso {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
 #btnIA {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-}
-#btnIA::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: color-mix(in srgb, currentColor 25%, transparent);
-  transform: scaleX(var(--progreso, 0));
-  transform-origin: left;
-  transition: transform 0.3s ease;
+  --tia-tinta: light-dark(#7a5c2e, tan);
+  --tia-lleno: light-dark(var(--papel-brillo), var(--panel));
+  color: transparent;
+  border: 1px solid var(--tia-tinta);
+  background-image:
+    linear-gradient(90deg, var(--tia-lleno) 0 calc(var(--progreso, 0) * 100%), var(--tia-tinta) 0),
+    linear-gradient(var(--tia-tinta), var(--tia-tinta));
+  background-clip: text, padding-box;
+  background-size:
+    auto,
+    calc(var(--progreso, 0) * 100%) 100%;
+  background-repeat: no-repeat;
+  transition:
+    --progreso 0.3s ease,
+    transform 0.12s,
+    box-shadow 0.12s,
+    background-color 0.12s;
 }
 
 /* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son

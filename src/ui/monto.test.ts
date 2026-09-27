@@ -1,7 +1,7 @@
 /* Tests P0: montos en cents y colecciones (monto.ts necesita #montoTotal al importar). */
 import { describe, expect, it } from "vite-plus/test";
 
-document.body.innerHTML = '<div id="montoTotal"></div>';
+document.body.innerHTML = '<div id="montoTotal"></div><button id="btnIA" type="button"></button>';
 const { state, crearHoja } = await import("../state");
 const {
   aplanar,
@@ -122,6 +122,44 @@ describe("renderMonto", () => {
     expect(montoEl.textContent).toBe("US$ 1,000.99");
     expect(montoEl.querySelectorAll(".monto-nuevo")).toHaveLength(2);
     expect(montoEl.querySelectorAll(".monto-rodillo")).toHaveLength(3);
+  });
+});
+
+describe("barraBoton", () => {
+  function botonIA(): HTMLButtonElement {
+    const b = document.getElementById("btnIA");
+    if (!(b instanceof HTMLButtonElement)) throw new Error("sin #btnIA");
+    return b;
+  }
+
+  it("siempre visible: 0/0, mitad y lleno", () => {
+    state.moneda = "USD";
+    const btn = botonIA();
+    renderMonto(); // sin hojas
+    expect(btn.textContent).toBe("$ Extraer montos $ · 0/0");
+    expect(btn.style.getPropertyValue("--progreso")).toBe("0");
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
+    h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
+    state.hojas.push(h);
+    renderMonto();
+    expect(btn.textContent).toBe("$ Extraer montos $ · 1/2");
+    expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
+  });
+
+  it("añadir sin monto encoge la barra sin tocar el total", () => {
+    state.moneda = "USD";
+    const btn = botonIA();
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
+    state.hojas.push(h);
+    renderMonto();
+    expect(btn.textContent).toBe("$ Extraer montos $ · 1/1");
+    h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
+    renderMonto(); // mismo total: el odómetro no se toca…
+    expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 5.00");
+    expect(btn.textContent).toBe("$ Extraer montos $ · 1/2"); // …pero la barra sí se mueve
+    expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
   });
 });
 

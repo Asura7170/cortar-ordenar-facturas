@@ -412,30 +412,24 @@ describe("extraerPendientes", () => {
     expect(aviso.textContent).toBe("IA: 2/2 totales.");
   });
 
-  it("el botón es barra: conteo i/n en vuelo y restaura al terminar", async () => {
+  it("el lote mueve la barra global con-monto/total", async () => {
+    const { renderMonto } = await import("../ui/monto");
     lote2();
     const btn = el<HTMLButtonElement>("btnIA");
-    const resolvers: Array<(r: Response) => void> = [];
+    renderMonto();
+    expect(btn.textContent).toBe("$ Extraer montos $ · 0/2");
+    expect(btn.style.getPropertyValue("--progreso")).toBe("0");
     const real = globalThis.fetch;
     globalThis.fetch = (async (): Promise<Response> =>
-      new Promise<Response>((res) => {
-        resolvers.push(res);
-      })) as typeof fetch;
+      respuesta('{"1":"12.50","2":"7.00"}')) as typeof fetch;
     try {
-      const enVuelo = extraerPendientes();
-      expect(btn.textContent).toBe("Extrayendo 0/2…");
-      expect(btn.style.getPropertyValue("--progreso")).toBe("0");
-      expect(btn.disabled).toBe(true);
-      const resolver = resolvers[0];
-      if (!resolver) throw new Error("el lote no disparó el fetch");
-      resolver(respuesta('{"1":"12.50","2":"7.00"}'));
-      await enVuelo;
+      await extraerPendientes();
     } finally {
       globalThis.fetch = real;
     }
-    expect(btn.textContent).toBe("$ Extraer montos $");
-    expect(btn.style.getPropertyValue("--progreso")).toBe("");
-    expect(btn.disabled).toBe(false);
+    renderMonto(); // la app lo hace vía renderHojas (mockeado aquí)
+    expect(btn.textContent).toBe("$ Extraer montos $ · 2/2");
+    expect(btn.style.getPropertyValue("--progreso")).toBe("1");
   });
 
   it("sin apiKey sale en silencio (auto) y avisa si es forzado", async () => {

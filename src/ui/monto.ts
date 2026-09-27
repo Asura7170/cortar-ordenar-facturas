@@ -48,11 +48,25 @@ export function totalItems(): number {
   return aplanar().length;
 }
 
+const TEXTO_BOTON_IA = "$ Extraer montos $";
+
+// ponytail: el botón es el estado (con-monto/total, siempre visible): cada
+// renderMonto lo sincroniza, sin importar qué camino mutó las hojas.
+function pintarBarraBoton(): void {
+  const btn = document.getElementById("btnIA");
+  if (!(btn instanceof HTMLButtonElement)) return;
+  const total = totalItems();
+  const hechos = aplanar().filter((c) => c.montoCents !== null).length;
+  btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
+  btn.textContent = `${TEXTO_BOTON_IA} · ${hechos}/${total}`;
+}
+
 // ponytail: el total es un odómetro (rueda cada posición que cambia, rápido
 // a la derecha y lento a la izquierda); sin cambio no hay animación.
 let previoTotal: Cents | null = null;
 
 export function renderMonto(): void {
+  pintarBarraBoton();
   const total = sumaTotal();
   const texto = formatearMoneda(total);
   // ponytail: la llamada duplicada (tick + renderHojas final) no toca el DOM:

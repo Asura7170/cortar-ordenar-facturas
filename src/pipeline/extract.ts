@@ -270,21 +270,6 @@ function refrescarBoton(): void {
   if (btn instanceof HTMLButtonElement) btn.disabled = extrayendo;
 }
 
-// ponytail: el botón es la barra (relleno por --progreso + conteo en el label).
-function pintarBoton(hechos: number, total: number): void {
-  const btn = document.getElementById("btnIA");
-  if (!(btn instanceof HTMLButtonElement)) return;
-  btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
-  btn.textContent = `Extrayendo ${hechos}/${total}…`;
-}
-
-function restaurarBoton(): void {
-  const btn = document.getElementById("btnIA");
-  if (!(btn instanceof HTMLButtonElement)) return;
-  btn.style.removeProperty("--progreso");
-  btn.textContent = "$ Extraer montos $";
-}
-
 /** Ids con JEV en vuelo: evita doble fetch (1×1 desacoplado + red del drenado). */
 const enVuelo = new Set<number>();
 
@@ -446,7 +431,6 @@ export async function extraerPendientes(opciones?: {
   const previoLote = state.loteEnCurso; // el lote no pisa un intake en curso
   state.loteEnCurso = true; // sin VT ni rebuilds por tick (ver sheets.renderHojas)
   refrescarBoton();
-  pintarBoton(okRapido, items.length);
   avisar(`${prefijo} extrayendo totales…`);
   try {
     let okJev = 0;
@@ -484,7 +468,6 @@ export async function extraerPendientes(opciones?: {
           }
         }
         avisar(`${prefijo} ${okRapido + okJev}/${items.length} totales…`);
-        pintarBoton(okRapido + okJev, items.length);
       };
       const programaTick = (): void => {
         if (programado) return;
@@ -565,7 +548,6 @@ export async function extraerPendientes(opciones?: {
       for (const chunk of partirLote(pendientes)) {
         try {
           okIA += aplicarTotales(chunk, await extraerTotalesLote(chunk, state.configIA));
-          pintarBoton(okRapido + okJev + okIA, items.length);
         } catch (e: unknown) {
           console.warn(`IA: lote omitido (${e instanceof Error ? e.message : String(e)})`);
           continue; // el chunk queda manual; el conteo final lo refleja
@@ -588,6 +570,5 @@ export async function extraerPendientes(opciones?: {
     state.loteEnCurso = previoLote; // restaura: no suelta un intake solapado
     extrayendo = false;
     refrescarBoton();
-    restaurarBoton();
   }
 }
