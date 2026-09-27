@@ -58,7 +58,7 @@ function pintarBarraBoton(): void {
   const total = totalItems();
   const hechos = aplanar().filter((c) => c.montoCents !== null).length;
   btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
-  btn.textContent = `${TEXTO_BOTON_IA} · ${hechos}/${total}`;
+  btn.textContent = hechos > 0 ? `Montos extraídos… ${hechos}/${total}` : TEXTO_BOTON_IA;
 }
 
 // ponytail: el total es un odómetro (rueda cada posición que cambia, rápido

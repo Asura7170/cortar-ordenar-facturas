@@ -17,19 +17,17 @@ function cambiar(checked: boolean): void {
 }
 
 describe("initOcrMode", () => {
-  it("enciende: estado, etiqueta ON y clase", () => {
+  it("enciende: estado y ojo abierto", () => {
     cambiar(true);
     expect(state.modoOcr).toBe(true);
-    expect(ocrEstado.textContent).toBe("ON");
     expect(ocrEstado.classList.contains("on")).toBe(true);
   });
 
-  it("apaga: etiqueta OFF sin clase", () => {
+  it("apaga: ojo cerrado sin clase", () => {
     state.modoOcr = true;
     renderOcrToggle();
     cambiar(false);
     expect(state.modoOcr).toBe(false);
-    expect(ocrEstado.textContent).toBe("OFF");
     expect(ocrEstado.classList.contains("on")).toBe(false);
   });
 
@@ -38,7 +36,6 @@ describe("initOcrMode", () => {
     renderOcrToggle();
     cambiar(false);
     expect(state.modoOcr).toBe(false);
-    expect(ocrEstado.textContent).toBe("OFF");
   });
 });
 
@@ -47,10 +44,10 @@ describe("renderOcrToggle", () => {
     state.modoOcr = true;
     renderOcrToggle();
     expect(chkOcr.checked).toBe(true);
-    expect(ocrEstado.textContent).toBe("ON");
+    expect(ocrEstado.classList.contains("on")).toBe(true);
     state.modoOcr = false;
     renderOcrToggle();
     expect(chkOcr.checked).toBe(false);
-    expect(ocrEstado.textContent).toBe("OFF");
+    expect(ocrEstado.classList.contains("on")).toBe(false);
   });
 });

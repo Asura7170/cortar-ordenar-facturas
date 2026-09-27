@@ -136,14 +136,14 @@ describe("barraBoton", () => {
     state.moneda = "USD";
     const btn = botonIA();
     renderMonto(); // sin hojas
-    expect(btn.textContent).toBe("$ Extraer montos $ · 0/0");
+    expect(btn.textContent).toBe("$ Extraer montos $");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     state.hojas.push(h);
     renderMonto();
-    expect(btn.textContent).toBe("$ Extraer montos $ · 1/2");
+    expect(btn.textContent).toBe("Montos extraídos… 1/2");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
   });
 
@@ -154,11 +154,11 @@ describe("barraBoton", () => {
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
     state.hojas.push(h);
     renderMonto();
-    expect(btn.textContent).toBe("$ Extraer montos $ · 1/1");
+    expect(btn.textContent).toBe("Montos extraídos… 1/1");
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     renderMonto(); // mismo total: el odómetro no se toca…
     expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 5.00");
-    expect(btn.textContent).toBe("$ Extraer montos $ · 1/2"); // …pero la barra sí se mueve
+    expect(btn.textContent).toBe("Montos extraídos… 1/2"); // …pero la barra sí se mueve
     expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
   });
 });
