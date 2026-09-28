@@ -991,6 +991,8 @@ export function initSheets(cb: SheetsCallbacks): void {
             btn.classList.add("copiado");
             btn.textContent = "✓";
             btn.setAttribute("aria-label", "¡Copiado!");
+            const anuncio = document.getElementById("estadoCopiado");
+            if (anuncio) anuncio.textContent = "¡Copiado!";
             copiadoTimers.set(
               btn,
               window.setTimeout(() => {
@@ -998,6 +1000,8 @@ export function initSheets(cb: SheetsCallbacks): void {
                 btn.classList.remove("copiado");
                 btn.textContent = "⧉";
                 btn.setAttribute("aria-label", "Copiar OCR");
+                const aviso = document.getElementById("estadoCopiado");
+                if (aviso) aviso.textContent = "";
               }, TIEMPO_COPIADO_MS),
             );
           })
