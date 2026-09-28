@@ -1,0 +1,94 @@
+name: ort-bump
+# Bump automático de onnxruntime-web con cooling 24h: pin + public/ort
+# vendoreado + menciones en docs + gates del CI, todo en un PR con auto-merge.
+# Si upstream renombra los ficheros asyncify, falla a propósito (exige humano).
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Resolver versión candidata
+        id: version
+        run: |
+          set -euo pipefail
+          actual=$(node -p "require('./package.json').dependencies['onnxruntime-web']")
+          ultima=$(npm view onnxruntime-web version)
+          fecha=$(npm view onnxruntime-web time --json | jq -r --arg v "$ultima" '.[$v] // empty')
+          echo "actual=$actual ultima=$ultima fecha=$fecha"
+          if [ "$actual" = "$ultima" ]; then
+            echo "nueva=false" >> "$GITHUB_OUTPUT"
+            echo "Al día ($actual)."
+            exit 0
+          fi
+          if [ -z "$fecha" ] || [ $(( ($(date +%s) - $(date -d "$fecha" +%s)) / 3600 )) -lt 24 ]; then
+            echo "nueva=false" >> "$GITHUB_OUTPUT"
+            echo "En cooling (<24h): $ultima."
+            exit 0
+          fi
+          echo "nueva=true" >> "$GITHUB_OUTPUT"
+          echo "version=$ultima" >> "$GITHUB_OUTPUT"
+          echo "vieja=$actual" >> "$GITHUB_OUTPUT"
+      - name: Bump + vendorear ort
+        if: steps.version.outputs.nueva == 'true'
+        run: |
+          set -euo pipefail
+          ver="${{ steps.version.outputs.version }}"
+          vieja="${{ steps.version.outputs.vieja }}"
+          pnpm add -E "onnxruntime-web@$ver"
+          for f in ort-wasm-simd-threaded.asyncify.mjs ort-wasm-simd-threaded.asyncify.wasm; do
+            test -f "node_modules/onnxruntime-web/dist/$f" || {
+              echo "::error::Falta $f en onnxruntime-web@$ver: cambio upstream, revisar a mano."
+              exit 1
+            }
+          done
+          cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs \
+            node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm public/ort/
+          sed -i "s/onnxruntime-web\` $vieja/onnxruntime-web\` $ver/; s/onnxruntime-web $vieja/onnxruntime-web $ver/" AGENTS.md spec.md
+          if grep -rn "onnxruntime-web[\` ]$vieja" AGENTS.md spec.md package.json; then
+            echo "::error::Quedan menciones a la versión vieja."
+            exit 1
+          fi
+          git status --porcelain public/ort/
+      - name: Validar (gates del CI)
+        if: steps.version.outputs.nueva == 'true'
+        run: |
+          pnpm exec vp check
+          pnpm typecheck
+          pnpm run test:coverage
+          pnpm build
+      - name: Abrir PR con auto-merge
+        if: steps.version.outputs.nueva == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ver="${{ steps.version.outputs.version }}"
+          rama="chore/ort-$ver"
+          if git ls-remote --heads origin "$rama" | grep -q .; then
+            echo "Ya hay rama $rama pendiente → no duplicar."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$rama"
+          git add package.json pnpm-lock.yaml public/ort/ AGENTS.md spec.md
+          git commit -m "Sube onnxruntime-web a $ver (pipeline ort-bump: vendoreado + validado)"
+          git push -u origin "$rama"
+          gh pr create --title "chore(ort): onnxruntime-web $ver (auto, validado)" \
+            --body "Pipeline ort-bump: pin + public/ort vendoreado + docs + gates en verde. Auto-merge activado." \
+            --base main --head "$rama"
+          gh pr merge --auto --merge "$rama"

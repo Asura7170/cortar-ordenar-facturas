@@ -1,0 +1,70 @@
+name: automerge-dependabot
+# Auto-merge de bumps maduros: minor/patch con >24h desde su publicación y CI
+# verde. Majors y títulos no parseables quedan manuales. Requiere auto-merge
+# activado en el repo (el precheck falla avisando si falta).
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Auto-merge minor/patch maduros
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "$(gh api "repos/${{ github.repository }}" --jq .allow_auto_merge)" != "true" ]; then
+            echo "::error::Activa auto-merge en el repo (Settings > General > Allow auto-merge)."
+            exit 1
+          fi
+          edad_horas() {
+            echo $(( ($(date +%s) - $(date -d "$1" +%s)) / 3600 ))
+          }
+          es_mayor() {
+            local old="${1#v}" new="${2#v}"
+            [[ "$old" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] || return 0
+            [[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] || return 0
+            [ "${old%%.*}" != "${new%%.*}" ]
+          }
+          gh pr list --author "app/dependabot" --state open \
+            --json number,title,headRefName --jq -r '.[] | "\(.number)\t\(.headRefName)\t\(.title)"' |
+            while IFS=$'\t' read -r n rama titulo; do
+              if [[ "$titulo" =~ bump\ ([^[:space:]]+)\ from\ ([^[:space:]]+)\ to\ ([^[:space:]]+) ]]; then
+                pkg="${BASH_REMATCH[1]}" old="${BASH_REMATCH[2]}" new="${BASH_REMATCH[3]}"
+              else
+                echo "PR #$n: título no parseable (grupo?) → manual: $titulo"
+                continue
+              fi
+              if es_mayor "$old" "$new"; then
+                echo "PR #$n ($pkg $old→$new): major → manual"
+                continue
+              fi
+              if [[ "$rama" == dependabot/github_actions/* ]]; then
+                echo "PR #$n ($pkg $old→$new): action minor/patch → auto-merge (CI manda)"
+                gh pr merge --auto --merge "$n" || echo "::warning::No se pudo activar auto-merge en #$n"
+                continue
+              fi
+              if [[ "$rama" != dependabot/npm_and_yarn/* ]]; then
+                echo "PR #$n: ecosistema desconocido → manual: $rama"
+                continue
+              fi
+              fecha=$(npm view "$pkg" time --json | jq -r --arg v "$new" '.[$v] // empty')
+              if [ -z "$fecha" ]; then
+                echo "PR #$n ($pkg $old→$new): sin fecha en npm → manual"
+                continue
+              fi
+              if [ "$(edad_horas "$fecha")" -lt 24 ]; then
+                echo "PR #$n ($pkg $old→$new): en cooling (<24h) → esperar"
+                continue
+              fi
+              echo "PR #$n ($pkg $old→$new): maduro → auto-merge"
+              gh pr merge --auto --merge "$n" || echo "::warning::No se pudo activar auto-merge en #$n"
+            done
