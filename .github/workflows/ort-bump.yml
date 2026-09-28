@@ -28,8 +28,8 @@ jobs:
         run: |
           set -euo pipefail
           actual=$(node -p "require('./package.json').dependencies['onnxruntime-web']")
-          ultima=$(npm view onnxruntime-web version)
-          fecha=$(npm view onnxruntime-web time --json | jq -r --arg v "$ultima" '.[$v] // empty')
+          ultima=$(pnpm view onnxruntime-web version)
+          fecha=$(pnpm view onnxruntime-web time --json | jq -r --arg v "$ultima" '.[$v] // empty')
           echo "actual=$actual ultima=$ultima fecha=$fecha"
           if [ "$actual" = "$ultima" ]; then
             echo "nueva=false" >> "$GITHUB_OUTPUT"
