@@ -12,6 +12,7 @@ export const FIXTURE_HTML = `
 <main class="canvas" id="canvas">
   <div class="canvas-head"><span id="metaHojas"></span></div>
   <p id="aviso" role="status"></p>
+  <span id="estadoCopiado" class="sr-only" role="status" aria-live="polite"></span>
   <div id="sheets"></div>
   <label id="dropzone" for="fileInput" tabindex="0"></label>
   <input id="fileInput" type="file" multiple>

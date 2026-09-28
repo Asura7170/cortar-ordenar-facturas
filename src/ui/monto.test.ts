@@ -1,7 +1,7 @@
 /* Tests P0: montos en cents y colecciones (monto.ts necesita #montoTotal al importar). */
 import { describe, expect, it } from "vite-plus/test";
 
-document.body.innerHTML = '<div id="montoTotal"></div>';
+document.body.innerHTML = '<div id="montoTotal"></div><button id="btnIA" type="button"></button>';
 const { state, crearHoja } = await import("../state");
 const {
   aplanar,
@@ -72,6 +72,111 @@ describe("renderMonto", () => {
     hojaCon([123456]);
     renderMonto();
     expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 1,234.56");
+  });
+
+  it("odómetro: solo rueda lo que cambia, rápido a la derecha", () => {
+    state.moneda = "USD";
+    const montoEl = document.getElementById("montoTotal");
+    if (!montoEl) throw new Error("sin #montoTotal");
+    hojaCon([10000]);
+    renderMonto(); // sincroniza el previo
+    hojaCon([25000]); // +250.00 → sube
+    renderMonto();
+    expect(montoEl.textContent).toBe("US$ 350.00");
+    expect(montoEl.dataset["dir"]).toBe("-1");
+    const rodillos = montoEl.querySelectorAll(".monto-rodillo");
+    expect(rodillos).toHaveLength(2);
+    const tiraAlta = rodillos[0]?.querySelector<HTMLSpanElement>(".monto-desplaza");
+    const tiraBaja = rodillos[1]?.querySelector<HTMLSpanElement>(".monto-desplaza");
+    expect(tiraAlta?.style.getPropertyValue("--p")).toBe("5");
+    expect(tiraBaja?.style.getPropertyValue("--p")).toBe("4");
+    expect(tiraAlta?.dataset["viejo"]).toBe("1");
+    expect([...(tiraAlta?.children ?? [])].map((c) => c.textContent)).toEqual(["3"]);
+    expect(montoEl.querySelector(".monto-nuevo")).toBeNull();
+    state.hojas.pop(); // -250.00 → baja con tira invertida
+    renderMonto();
+    expect(montoEl.textContent).toBe("US$ 100.00");
+    expect(montoEl.dataset["dir"]).toBe("1");
+    const tiraBajada = montoEl
+      .querySelector(".monto-rodillo")
+      ?.querySelector<HTMLSpanElement>(".monto-desplaza");
+    expect(tiraBajada?.dataset["viejo"]).toBe("3");
+    expect([...(tiraBajada?.children ?? [])].map((c) => c.textContent)).toEqual(["1"]);
+    renderMonto(); // duplicada → no-op, preserva los rodillos
+    expect(montoEl.querySelectorAll(".monto-rodillo")).toHaveLength(2);
+    state.moneda = "ARS"; // mismo total, otro texto → plano sin rodillos
+    renderMonto();
+    expect(montoEl.textContent).toBe("AR$ 100.00");
+    expect(montoEl.querySelector(".monto-rodillo")).toBeNull();
+    expect(montoEl.dataset["dir"]).toBeUndefined();
+  });
+
+  it("al crecer la cifra lo nuevo entra con pop y lo común rueda", () => {
+    state.moneda = "USD";
+    const montoEl = document.getElementById("montoTotal");
+    if (!montoEl) throw new Error("sin #montoTotal");
+    hojaCon([99999]);
+    renderMonto(); // sincroniza el previo (US$ 999.99)
+    hojaCon([100]); // +1.00 → US$ 1,000.99
+    renderMonto();
+    expect(montoEl.textContent).toBe("US$ 1,000.99");
+    expect(montoEl.querySelectorAll(".monto-nuevo")).toHaveLength(2);
+    expect(montoEl.querySelectorAll(".monto-rodillo")).toHaveLength(3);
+  });
+
+  it("al encoger la cifra el punto decimal no rueda", () => {
+    state.moneda = "USD";
+    const montoEl = document.getElementById("montoTotal");
+    if (!montoEl) throw new Error("sin #montoTotal");
+    hojaCon([100099]);
+    renderMonto(); // US$ 1,000.99
+    state.hojas = [];
+    hojaCon([99999]);
+    renderMonto(); // US$ 999.99
+    expect(montoEl.textContent).toBe("US$ 999.99");
+    expect(montoEl.querySelectorAll(".monto-rodillo").length).toBeGreaterThan(0);
+    const viejos = [...montoEl.querySelectorAll<HTMLSpanElement>(".monto-desplaza")].map(
+      (t) => t.dataset["viejo"],
+    );
+    expect(viejos).not.toContain(".");
+  });
+});
+
+describe("barraBoton", () => {
+  function botonIA(): HTMLButtonElement {
+    const b = document.getElementById("btnIA");
+    if (!(b instanceof HTMLButtonElement)) throw new Error("sin #btnIA");
+    return b;
+  }
+
+  it("siempre visible: 0/0, mitad y lleno", () => {
+    state.moneda = "USD";
+    const btn = botonIA();
+    renderMonto(); // sin hojas
+    expect(btn.textContent).toBe("$ Extraer montos $");
+    expect(btn.style.getPropertyValue("--progreso")).toBe("0");
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
+    h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
+    state.hojas.push(h);
+    renderMonto();
+    expect(btn.textContent).toBe("Montos extraídos… 1/2");
+    expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
+  });
+
+  it("añadir sin monto encoge la barra sin tocar el total", () => {
+    state.moneda = "USD";
+    const btn = botonIA();
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
+    state.hojas.push(h);
+    renderMonto();
+    expect(btn.textContent).toBe("Montos extraídos… 1/1");
+    h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
+    renderMonto(); // mismo total: el odómetro no se toca…
+    expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 5.00");
+    expect(btn.textContent).toBe("Montos extraídos… 1/2"); // …pero la barra sí se mueve
+    expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
   });
 });
 

@@ -233,18 +233,41 @@
   margin-bottom: 0;
 }
 .panel-ocr .panel-title .ocr-estado {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  display: inline-flex;
+  position: relative;
+  width: 22px;
+  height: 22px;
   margin-left: 6px;
+  vertical-align: -4px;
+}
+/* Contraste AA: tan sobre panel oscuro ≈ 5.3:1 (chocolate daba 2.85). */
+.ocr-estado {
+  color: light-dark(var(--sello), tan);
 }
 .ocr-estado.on {
   color: light-dark(var(--verde-tinta), limegreen);
 }
-/* Contraste AA: tan sobre panel oscuro ≈ 5.3:1 (chocolate daba 2.85). */
-.ocr-estado:not(.on) {
-  color: light-dark(var(--sello), tan);
+/* Parpadeo al conmutar: el que sale se aplasta y funde, el que entra igual. */
+.ocr-estado .ojo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+.ocr-estado .ojo-abierto {
+  opacity: 0;
+  transform: scaleY(0.3);
+}
+.ocr-estado.on .ojo-abierto {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.ocr-estado.on .ojo-cerrado {
+  opacity: 0;
+  transform: scaleY(0.3);
 }
 
 /* El head del panel OCR no deja margen: lo aporta el botón de abajo. */
@@ -260,7 +283,35 @@
   border: 1px solid currentColor;
 }
 .btn-ia:hover {
-  background: color-mix(in srgb, currentColor 12%, transparent);
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
+}
+/* Extraer montos como barra determinada con colores invertidos: el relleno
+   avanza con --progreso (0→1, la pinta extract.ts) y el texto, transparente,
+   se recorta al gradiente de corte duro (sobre el lleno en contraste, fuera
+   en tinta). Sin la variable todo queda en tinta, como siempre. */
+@property --progreso {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+#btnIA {
+  --tia-tinta: light-dark(#7a5c2e, tan);
+  --tia-lleno: light-dark(var(--papel-brillo), var(--panel));
+  color: transparent;
+  border: 1px solid var(--tia-tinta);
+  background-image:
+    linear-gradient(90deg, var(--tia-lleno) 0 calc(var(--progreso, 0) * 100%), var(--tia-tinta) 0),
+    linear-gradient(var(--tia-tinta), var(--tia-tinta));
+  background-clip: text, padding-box;
+  background-size:
+    auto,
+    calc(var(--progreso, 0) * 100%) 100%;
+  background-repeat: no-repeat;
+  transition:
+    --progreso 0.3s ease,
+    transform 0.12s,
+    box-shadow 0.12s,
+    background-color 0.12s;
 }
 
 /* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son

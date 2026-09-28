@@ -412,6 +412,26 @@ describe("extraerPendientes", () => {
     expect(aviso.textContent).toBe("IA: 2/2 totales.");
   });
 
+  it("el lote mueve la barra global con-monto/total", async () => {
+    const { renderMonto } = await import("../ui/monto");
+    lote2();
+    const btn = el<HTMLButtonElement>("btnIA");
+    renderMonto();
+    expect(btn.textContent).toBe("$ Extraer montos $");
+    expect(btn.style.getPropertyValue("--progreso")).toBe("0");
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (): Promise<Response> =>
+      respuesta('{"1":"12.50","2":"7.00"}')) as typeof fetch;
+    try {
+      await extraerPendientes();
+    } finally {
+      globalThis.fetch = real;
+    }
+    renderMonto(); // la app lo hace vía renderHojas (mockeado aquí)
+    expect(btn.textContent).toBe("Montos extraídos… 2/2");
+    expect(btn.style.getPropertyValue("--progreso")).toBe("1");
+  });
+
   it("sin apiKey sale en silencio (auto) y avisa si es forzado", async () => {
     const { c1 } = lote2();
     state.configIA.apiKey = "  ";

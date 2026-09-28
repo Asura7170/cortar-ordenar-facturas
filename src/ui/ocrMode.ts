@@ -8,7 +8,6 @@ const ocrEstado: HTMLElement = getEl("ocrEstado");
 
 export function renderOcrToggle(): void {
   chkOcr.checked = state.modoOcr;
-  ocrEstado.textContent = state.modoOcr ? "ON" : "OFF";
   ocrEstado.classList.toggle("on", state.modoOcr);
 }
 

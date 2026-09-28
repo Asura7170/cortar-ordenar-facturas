@@ -201,6 +201,49 @@ describe("clic delegado", () => {
     expect(btn.title).toContain("Copiar falló");
   });
 
+  it("⧉ copiado muestra ✓ 1200ms y revierte (reclic rearma)", async () => {
+    state.modoOcr = true;
+    const h = crearHoja();
+    h.slots[0] = comprobante({ textoOcr: "HOLA" });
+    state.hojas.push(h);
+    renderHojas();
+    vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    const btn = boton("copiar-ocr");
+    vi.useFakeTimers();
+    try {
+      btn.click();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(btn.textContent).toBe("✓");
+      await vi.advanceTimersByTimeAsync(600);
+      btn.click();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(btn.textContent).toBe("✓");
+      await vi.advanceTimersByTimeAsync(600); // cruza el deadline del 1.º → sigue ✓ si rearma
+      expect(btn.textContent).toBe("✓");
+      expect(btn.classList.contains("copiado")).toBe(true);
+      await vi.advanceTimersByTimeAsync(600); // deadline del 2.º → revierte
+      expect(btn.textContent).toBe("⧉");
+      expect(btn.classList.contains("copiado")).toBe(false);
+      expect(btn.getAttribute("aria-label")).toBe("Copiar OCR");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("⧉ copiado anuncia en live region y la limpia al revertir", async () => {
+    state.modoOcr = true;
+    const h = crearHoja();
+    h.slots[0] = comprobante({ textoOcr: "HOLA" });
+    state.hojas.push(h);
+    renderHojas();
+    vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    const btn = boton("copiar-ocr");
+    btn.click();
+    await esperar(() => el("estadoCopiado").textContent === "¡Copiado!");
+    await esperar(() => el("estadoCopiado").textContent === "", 3000);
+    expect(btn.textContent).toBe("⧉");
+  });
+
   it("sin modo OCR no hay botón ⧉", () => {
     sembrar("u4x2", [100]);
     expect(document.querySelector('[data-accion="copiar-ocr"]')).toBeNull();
