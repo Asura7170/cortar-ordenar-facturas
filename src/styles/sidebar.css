@@ -260,10 +260,19 @@
 .ocr-estado .ojo-abierto {
   opacity: 0;
   transform: scaleY(0.3);
+  /* ponytail: `scale` suelto, no `transform` — compone con el scaleY del
+     parpadeo y equipara el tamaño visual con el cerrado (más ancho). */
+  scale: 1.12;
 }
 .ocr-estado.on .ojo-abierto {
   opacity: 1;
   transform: scaleY(1);
+}
+/* Cerrado más bajo que el abierto: achata párpado para una transición
+   más orgánica (constante, fuera de la transición del parpadeo). */
+.ocr-estado .ojo-cerrado {
+  scale: 1 0.85;
+  translate: 0 3px;
 }
 .ocr-estado.on .ojo-cerrado {
   opacity: 0;
