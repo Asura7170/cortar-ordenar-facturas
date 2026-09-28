@@ -12,11 +12,9 @@ import { getEl } from "./utils";
 
 const TEMA_KEY = "libro-mayor-tema";
 const btnTema: HTMLButtonElement = getEl<HTMLButtonElement>("btnTema");
-const temaIcono: HTMLElement = getEl("temaIcono");
 
 function aplicarTema(tema: string): void {
   document.documentElement.dataset["tema"] = tema;
-  temaIcono.textContent = tema === "claro" ? "☀" : "☾";
   btnTema.title = tema === "claro" ? "Cambiar a oscuro" : "Cambiar a claro";
 }
 

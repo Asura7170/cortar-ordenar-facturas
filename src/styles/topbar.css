@@ -152,6 +152,134 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Lupa: texto + icono a la derecha; morph continuo vía CSS `d: path()`. */
+#btnLupa {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lupa-ico {
+  display: inline-flex;
+  transition:
+    transform 0.2s,
+    color 0.2s,
+    filter 0.2s;
+}
+.lupa-morph {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+/* ponytail: un solo SVG + `d` interpolable (misma secuencia de comandos),
+   sin SMIL — el loop lo maneja CSS y movimiento-reducido lo congela solo. */
+.lm-lente {
+  animation: lm-lente 4s ease-in-out infinite;
+}
+.lm-h {
+  animation: lm-h 4s ease-in-out infinite;
+}
+.lm-v {
+  animation: lm-v 4s ease-in-out infinite;
+}
+.lm-mango {
+  animation: lm-mango 4s ease-in-out infinite;
+}
+@keyframes lm-lente {
+  0%,
+  20% {
+    d: path("M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0");
+  }
+  50%,
+  70% {
+    d: path("M10 15a5 5 0 1 0 10 0a5 5 0 1 0 -10 0");
+  }
+  100% {
+    d: path("M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0");
+  }
+}
+@keyframes lm-h {
+  0%,
+  20% {
+    d: path("M7 10l6 0");
+  }
+  50%,
+  70% {
+    d: path("M13 15l4 0");
+  }
+  100% {
+    d: path("M7 10l6 0");
+  }
+}
+@keyframes lm-v {
+  0%,
+  20% {
+    d: path("M10 7l0 6");
+  }
+  50%,
+  70% {
+    d: path("M15 13l0 4");
+  }
+  100% {
+    d: path("M10 7l0 6");
+  }
+}
+@keyframes lm-mango {
+  0%,
+  20% {
+    d: path("M21 21l-6 -6");
+  }
+  50%,
+  70% {
+    d: path("M22 22l-3 -3");
+  }
+  100% {
+    d: path("M21 21l-6 -6");
+  }
+}
+/* Marco de foco: aparece y se dibuja con el mismo loop (pathLength=1
+   normaliza el largo de cada esquina). */
+.lm-marco {
+  opacity: 0;
+  animation: lm-marco-op 4s ease-in-out infinite;
+}
+.lm-marco path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: lm-dibuja 4s ease-in-out infinite;
+}
+@keyframes lm-marco-op {
+  0%,
+  20% {
+    opacity: 0;
+  }
+  50%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes lm-dibuja {
+  0%,
+  20% {
+    stroke-dashoffset: 1;
+  }
+  50%,
+  70% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 1;
+  }
+}
+#btnLupa:hover .lupa-ico,
+#btnLupa:focus-visible .lupa-ico {
+  transform: scale(1.2);
+  color: var(--monto-valor);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--renglon-fuerte) 80%, transparent));
+}
+
 /* Lupa: cuadrado fijo con zoom alrededor del puntero (el JS lo mueve con
    transform y lo muestra con opacity: solo compositor). */
 #lupa {
@@ -193,7 +321,57 @@
   font-size: 16px;
 }
 .tema-ico {
+  display: inline-flex;
   line-height: 1;
+}
+.tema-ico svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  transition:
+    transform 0.15s,
+    filter 0.15s,
+    color 0.15s;
+}
+/* Sol en oscuro, luna en claro (el botón muestra a dónde NO estás).
+   ponytail: con .tema-ico delante — `.ico-luna` solo pierde contra
+   `.tema-ico svg` (0,1,0 vs 0,1,1) y la luna se colaba en oscuro. */
+.tema-ico .ico-luna {
+  display: none;
+}
+[data-tema="claro"] .tema-ico .ico-sol {
+  display: none;
+}
+[data-tema="claro"] .tema-ico .ico-luna {
+  display: block;
+}
+/* Rellenos fijos: núcleo sol amarillo, cuerpo luna azul. */
+.sol-nucleo {
+  fill: #fbbf24;
+}
+.luna-cuerpo {
+  fill: #8ab6ff;
+  fill-opacity: 0.85;
+}
+/* Hover/teclado: agranda; sol con bloom amarillo, luna con niebla oscura
+   (la luna vive en fondo papel claro: el brillo claro no se nota). */
+#btnTema:hover .tema-ico svg,
+#btnTema:focus-visible .tema-ico svg {
+  transform: scale(1.15);
+}
+#btnTema:hover .ico-sol,
+#btnTema:focus-visible .ico-sol {
+  color: #fbbf24;
+  filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.9)) drop-shadow(0 0 10px rgba(251, 191, 36, 0.5));
+}
+#btnTema:hover .ico-luna,
+#btnTema:focus-visible .ico-luna {
+  color: #33507e;
+  filter: drop-shadow(0 0 3px rgba(35, 50, 75, 0.65)) drop-shadow(0 0 9px rgba(35, 50, 75, 0.4));
+}
+#btnTema:hover .luna-cuerpo,
+#btnTema:focus-visible .luna-cuerpo {
+  fill: #5b8dd9;
 }
 
 /* GitHub: <a> con piel .btn — sin subrayado, icono alineado, 44px táctil. */
@@ -207,6 +385,11 @@
 .github-ico {
   line-height: 1;
   flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.btn-github:hover .github-ico,
+.btn-github:focus-visible .github-ico {
+  transform: scale(1.15);
 }
 /* Sin conteo (inicio/offline): el span vacío no deja aire por el gap. */
 .github-stars:empty {

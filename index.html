@@ -71,6 +71,29 @@
             aria-pressed="false"
           >
             Lupa
+            <span class="lupa-ico" aria-hidden="true">
+              <svg
+                class="lupa-morph"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <g class="lm-marco">
+                  <path pathLength="1" d="M3 6v-1a2 2 0 0 1 2 -2h1" />
+                  <path pathLength="1" d="M10 3h1" />
+                  <path pathLength="1" d="M15 3h1a2 2 0 0 1 2 2v1" />
+                  <path pathLength="1" d="M3 11v-1" />
+                  <path pathLength="1" d="M6 18h-1a2 2 0 0 1 -2 -2v-1" />
+                </g>
+                <path class="lm-lente" d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+                <path class="lm-h" d="M7 10l6 0" />
+                <path class="lm-v" d="M10 7l0 6" />
+                <path class="lm-mango" d="M21 21l-6 -6" />
+              </svg>
+            </span>
           </button>
         </div>
         <div class="monto-box">
@@ -108,7 +131,36 @@
             title="Cambiar tema claro/oscuro"
             aria-label="Cambiar tema"
           >
-            <span class="tema-ico" id="temaIcono">☾</span>
+            <span class="tema-ico" id="temaIcono" aria-hidden="true">
+              <svg
+                class="ico-sol"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle class="sol-nucleo" cx="12" cy="12" r="4" />
+                <path
+                  d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"
+                />
+              </svg>
+              <svg
+                class="ico-luna"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  class="luna-cuerpo"
+                  d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008"
+                />
+              </svg>
+            </span>
           </button>
         </div>
       </header>
