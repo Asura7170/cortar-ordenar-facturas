@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.ORT_BUMP_TOKEN }}
       - uses: pnpm/action-setup@v6
         with:
           version: 12
@@ -73,7 +75,8 @@ jobs:
       - name: Abrir PR con auto-merge
         if: steps.version.outputs.nueva == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.ORT_BUMP_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           ver="${{ steps.version.outputs.version }}"
