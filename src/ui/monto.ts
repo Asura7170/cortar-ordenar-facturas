@@ -89,7 +89,8 @@ export function renderMonto(): void {
   while (k < viejo.length && k < texto.length && viejo[k] === texto[k]) k++;
   const sufV = viejo.slice(k);
   const sufN = texto.slice(k);
-  const acolchado = sufV.padStart(sufN.length);
+  const acolchado =
+    sufV.length > sufN.length ? sufV.slice(sufV.length - sufN.length) : sufV.padStart(sufN.length);
   const fijos: HTMLElement[] = [];
   for (let i = 0; i < k; i++) {
     const s = document.createElement("span");

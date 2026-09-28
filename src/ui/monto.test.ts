@@ -123,6 +123,23 @@ describe("renderMonto", () => {
     expect(montoEl.querySelectorAll(".monto-nuevo")).toHaveLength(2);
     expect(montoEl.querySelectorAll(".monto-rodillo")).toHaveLength(3);
   });
+
+  it("al encoger la cifra el punto decimal no rueda", () => {
+    state.moneda = "USD";
+    const montoEl = document.getElementById("montoTotal");
+    if (!montoEl) throw new Error("sin #montoTotal");
+    hojaCon([100099]);
+    renderMonto(); // US$ 1,000.99
+    state.hojas = [];
+    hojaCon([99999]);
+    renderMonto(); // US$ 999.99
+    expect(montoEl.textContent).toBe("US$ 999.99");
+    expect(montoEl.querySelectorAll(".monto-rodillo").length).toBeGreaterThan(0);
+    const viejos = [...montoEl.querySelectorAll<HTMLSpanElement>(".monto-desplaza")].map(
+      (t) => t.dataset["viejo"],
+    );
+    expect(viejos).not.toContain(".");
+  });
 });
 
 describe("barraBoton", () => {
