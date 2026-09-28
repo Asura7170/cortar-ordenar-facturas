@@ -360,6 +360,26 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+/* Exportar con iconos: logo a la izquierda, descarga a la derecha. */
+#btnDescargar2,
+#btnPdf,
+#btnImprimir {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.export-ico {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+/* Impresora con viewBox 512: icono mayor y trazo grueso para igualar el peso
+   visual de los iconos de 24 (≈1.7px a 20px). */
+#btnImprimir .export-ico {
+  width: 28px;
+  height: 28px;
+}
 .btn-word {
   background: transparent;
   /* Azul Word en claro; aclarado en oscuro (el puro sobre panel oscuro ≈ 2:1). */
