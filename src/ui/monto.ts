@@ -48,7 +48,7 @@ export function totalItems(): number {
   return aplanar().length;
 }
 
-const TEXTO_BOTON_IA = "$ Extraer montos $";
+const TEXTO_BOTON_IA = "Calcular totales";
 
 // ponytail: el botón es el estado (con-monto/total, siempre visible): cada
 // renderMonto lo sincroniza, sin importar qué camino mutó las hojas.
@@ -58,7 +58,14 @@ function pintarBarraBoton(): void {
   const total = totalItems();
   const hechos = aplanar().filter((c) => c.montoCents !== null).length;
   btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
-  btn.textContent = hechos > 0 ? `Montos extraídos… ${hechos}/${total}` : TEXTO_BOTON_IA;
+  // ponytail: solo spans de texto — textContent borraría el icono.
+  const texto = hechos > 0 ? `Montos extraídos… ${hechos}/${total}` : TEXTO_BOTON_IA;
+  // ponytail: base + fantasma de la capa clara (la centra igual, ver CSS).
+  const textos = btn.querySelectorAll(".ia-txt");
+  if (textos.length === 0) btn.textContent = texto;
+  textos.forEach((txt) => {
+    txt.textContent = texto;
+  });
 }
 
 // ponytail: el total es un odómetro (rueda cada posición que cambia, rápido

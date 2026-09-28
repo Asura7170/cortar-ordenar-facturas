@@ -306,6 +306,11 @@
 #btnIA {
   --tia-tinta: light-dark(#7a5c2e, tan);
   --tia-lleno: light-dark(var(--papel-brillo), var(--panel));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
   color: transparent;
   border: 1px solid var(--tia-tinta);
   background-image:
@@ -321,6 +326,30 @@
     transform 0.12s,
     box-shadow 0.12s,
     background-color 0.12s;
+}
+/* Icono sólido: el botón lleva color transparente (recorte de texto) y sin
+   esto la calculadora heredaría invisible. */
+.btn-ia .ia-ico {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--tia-tinta);
+}
+/* Capa clara: duplica la fila y se revela de izquierda a derecha con el
+   mismo avance de la barra — espeja la inversión del texto sin constantes
+   de geometría (la fila duplicada se centra sola). */
+.btn-ia .ia-capa {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  clip-path: inset(0 calc((1 - var(--progreso, 0)) * 100%) 0 0);
+  pointer-events: none;
+}
+.btn-ia .ia-capa .ia-ico {
+  color: var(--tia-lleno);
 }
 
 /* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son

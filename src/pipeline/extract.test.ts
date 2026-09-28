@@ -417,7 +417,7 @@ describe("extraerPendientes", () => {
     lote2();
     const btn = el<HTMLButtonElement>("btnIA");
     renderMonto();
-    expect(btn.textContent).toBe("$ Extraer montos $");
+    expect(btn.textContent).toBe("Calcular totales");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");
     const real = globalThis.fetch;
     globalThis.fetch = (async (): Promise<Response> =>

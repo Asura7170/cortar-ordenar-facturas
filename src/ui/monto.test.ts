@@ -153,7 +153,7 @@ describe("barraBoton", () => {
     state.moneda = "USD";
     const btn = botonIA();
     renderMonto(); // sin hojas
-    expect(btn.textContent).toBe("$ Extraer montos $");
+    expect(btn.textContent).toBe("Calcular totales");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
