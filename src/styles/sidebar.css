@@ -379,6 +379,9 @@
 #btnImprimir .export-ico {
   width: 28px;
   height: 28px;
+  /* Verde sólido del modo claro en ambos temas (el currentColor del botón
+     se vuelve pálido en oscuro y lava el icono). */
+  color: var(--verde-tinta);
 }
 .btn-word {
   background: transparent;
@@ -409,9 +412,17 @@
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
-/* Ajustes al fondo del sidebar (flex columna: auto empuja abajo). */
-.panel-ajustes {
+/* Limpiar + Ajustes al fondo (el auto va en limpiar: si ambos lo llevan, el
+   espacio libre se reparte; gap 12 + margen 4 = 16px entre ellos). */
+.panel-limpiar {
   margin-top: auto;
+  margin-bottom: 4px;
+}
+#btnLimpiar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .panel-ajustes .btn {
   min-height: 44px;
