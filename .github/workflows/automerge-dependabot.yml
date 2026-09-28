@@ -22,10 +22,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          if [ "$(gh api "repos/${{ github.repository }}" --jq .allow_auto_merge)" != "true" ]; then
-            echo "::error::Activa auto-merge en el repo (Settings > General > Allow auto-merge)."
-            exit 1
-          fi
+          # ponytail: sin precheck de allow_auto_merge — ese campo no es legible
+          # con GITHUB_TOKEN (falso negativo); si auto-merge está desactivado,
+          # cada `gh pr merge --auto` ya avisa con ::warning sin abortar el loop.
           edad_horas() {
             echo $(( ($(date +%s) - $(date -d "$1" +%s)) / 3600 ))
           }
