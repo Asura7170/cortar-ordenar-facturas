@@ -7,13 +7,12 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch:
 permissions:
-  contents: write
   pull-requests: write
 jobs:
   automerge:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Auto-merge minor/patch maduros
@@ -43,6 +42,12 @@ jobs:
                 echo "PR #$n: título no parseable (grupo?) → manual: $titulo"
                 continue
               fi
+              case "$pkg" in
+                onnxruntime-web | */onnxruntime-web)
+                  echo "PR #$n: onnxruntime-web lo gestiona ort-bump → manual"
+                  continue
+                  ;;
+              esac
               if es_mayor "$old" "$new"; then
                 echo "PR #$n ($pkg $old→$new): major → manual"
                 continue
