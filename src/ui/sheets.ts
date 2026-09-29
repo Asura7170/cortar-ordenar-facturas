@@ -33,6 +33,10 @@ const canvasEl: HTMLElement | null = document.querySelector(".canvas");
 const X_SVG: string =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
+/* Rotor de giro (marcado estático confiable: sin datos de usuario). */
+const GIRAR_SVG: string =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="girar-nucleo"><path d="M15 4.55a8 8 0 0 0 -6 14.9"/><polyline class="girar-aleta" points="9 15 9 20 4 20"/><circle class="punto punto-1" cx="18.37" cy="7.16" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-2" cx="19.94" cy="11" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-3" cx="19.37" cy="15.1" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-4" cx="16.84" cy="18.37" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-5" cx="13" cy="19.94" r="1" fill="currentColor" stroke="none"/></g></svg>';
+
 function celda(
   item: Comprobante | null,
   pos: Plantilla["pos"][number] | undefined,
@@ -104,9 +108,9 @@ function pintarCelda(
   btn.innerHTML = X_SVG;
   if (item.estado === "ok") {
     // Giro manual (fallback del auto-enderezado): arriba-izquierda, espejo del ×.
-    for (const [accion, glifo, lado] of [
-      ["girar-izq", "⟲", "izquierda"],
-      ["girar-der", "⟳", "derecha"],
+    for (const [accion, lado] of [
+      ["girar-izq", "izquierda"],
+      ["girar-der", "derecha"],
     ] as const) {
       const g = document.createElement("button");
       g.type = "button";
@@ -114,7 +118,7 @@ function pintarCelda(
       g.dataset["accion"] = accion;
       g.title = `Girar a la ${lado}`;
       g.setAttribute("aria-label", `Girar a la ${lado}`);
-      g.textContent = glifo;
+      g.innerHTML = GIRAR_SVG;
       div.append(g);
     }
     // Recorte manual: abajo-izquierda (el badge/monto vive abajo-derecha).

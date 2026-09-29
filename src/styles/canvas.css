@@ -536,10 +536,14 @@ body.is-dragging .cell:not(.empty) {
   border-radius: 50%;
   background: rgba(20, 25, 20, 0.72);
   color: #fff;
-  font-size: 16px;
-  line-height: 1;
   display: none;
+  align-items: center;
+  justify-content: center;
   z-index: 3;
+}
+.cell-girar svg {
+  width: 16px;
+  height: 16px;
 }
 .cell-girar-izq {
   left: 6px;
@@ -555,12 +559,12 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell:hover .cell-girar,
 .cell:focus-within .cell-girar {
-  display: block;
+  display: flex;
 }
 /* Sin hover (táctil) no hay revelado: siempre visible. Es capacidad, no breakpoint. */
 @media (hover: none) {
   .cell .cell-girar {
-    display: block;
+    display: flex;
   }
 }
 .cell-girar:focus-visible {
@@ -569,6 +573,135 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell-girar:hover {
   background: var(--verde-tinta);
+}
+/* Rotor: mismo icono en ambos lados, la derecha espeja (el giro se invierte
+   solo). ponytail: pivote del núcleo en coords del viewBox (12,12) — su bbox
+   es asimétrico y fill-box orbitaría; sin transforms SVG anidados es estable. */
+.cell-girar-der svg {
+  transform: scaleX(-1);
+}
+.girar-nucleo {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+}
+.girar-aleta {
+  transform-box: fill-box;
+  transform-origin: 100% 100%;
+}
+.punto {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.punto-5 {
+  --base-op: 0.85;
+}
+.punto-4 {
+  --base-op: 0.7;
+  animation-delay: 0.06s;
+}
+.punto-3 {
+  --base-op: 0.55;
+  animation-delay: 0.12s;
+}
+.punto-2 {
+  --base-op: 0.4;
+  animation-delay: 0.18s;
+}
+.punto-1 {
+  --base-op: 0.25;
+  animation-delay: 0.24s;
+}
+.cell-girar:hover .girar-nucleo,
+.cell-girar:focus-visible .girar-nucleo {
+  animation: giro-organico 3.2s linear infinite;
+}
+.cell-girar:hover .girar-aleta,
+.cell-girar:focus-visible .girar-aleta {
+  animation: latigazo-aleta 3.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.cell-girar:hover .punto,
+.cell-girar:focus-visible .punto {
+  animation: estela-puntos 3.2s ease-out infinite;
+}
+@keyframes giro-organico {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  14% {
+    transform: rotate(18deg) scale(0.95);
+  }
+  28% {
+    transform: rotate(-120deg) scale(1.03);
+  }
+  42% {
+    transform: rotate(-320deg) scale(1.05);
+  }
+  54% {
+    transform: rotate(-380deg) scale(1.02);
+  }
+  64% {
+    transform: rotate(-354deg) scale(0.99);
+  }
+  74% {
+    transform: rotate(-361deg) scale(1.005);
+  }
+  82% {
+    transform: rotate(-360deg) scale(1);
+  }
+  91% {
+    transform: rotate(-360deg) scale(1.03);
+  }
+  100% {
+    transform: rotate(-360deg) scale(1);
+  }
+}
+@keyframes latigazo-aleta {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  14% {
+    transform: rotate(-10deg);
+  }
+  30%,
+  46% {
+    transform: rotate(14deg);
+  }
+  54% {
+    transform: rotate(-16deg);
+  }
+  64% {
+    transform: rotate(6deg);
+  }
+  74% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes estela-puntos {
+  0%,
+  14% {
+    opacity: var(--base-op);
+    transform: scale(1);
+  }
+  32%,
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
+  62%,
+  82% {
+    opacity: var(--base-op);
+    transform: scale(1);
+  }
+  88% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  96%,
+  100% {
+    opacity: var(--base-op);
+    transform: scale(1);
+  }
 }
 
 /* Recorte manual: abajo-izquierda (el badge/monto vive abajo-derecha).
