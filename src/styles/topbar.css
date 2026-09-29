@@ -324,6 +324,10 @@
   display: inline-flex;
   line-height: 1;
 }
+.tema-ico .ico-sol {
+  width: 24px;
+  height: 24px;
+}
 .tema-ico svg {
   display: block;
   width: 20px;
@@ -346,8 +350,15 @@
   display: block;
 }
 /* Rellenos fijos: núcleo sol amarillo, cuerpo luna azul. */
-.sol-nucleo {
-  fill: #fbbf24;
+.sol-halo {
+  opacity: 0.18;
+}
+.sol-corona,
+.sol-rayos,
+.sol-nucleo,
+.sol-halo {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
 }
 .luna-cuerpo {
   fill: #8ab6ff;
@@ -363,6 +374,61 @@
 #btnTema:focus-visible .ico-sol {
   color: #fbbf24;
   filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.9)) drop-shadow(0 0 10px rgba(251, 191, 36, 0.5));
+}
+#btnTema:hover .sol-corona,
+#btnTema:focus-visible .sol-corona {
+  animation: giro-sol 6s linear infinite;
+}
+#btnTema:hover .sol-rayos polygon,
+#btnTema:focus-visible .sol-rayos polygon {
+  fill: #fbbf24;
+}
+#btnTema:hover .sol-rayos,
+#btnTema:focus-visible .sol-rayos {
+  animation: respiro-rayos 1.6s ease-in-out infinite alternate;
+  animation-delay: -0.4s;
+}
+#btnTema:hover .sol-nucleo,
+#btnTema:focus-visible .sol-nucleo {
+  animation: latido-sol 1.6s ease-in-out infinite alternate;
+}
+#btnTema:hover .sol-halo,
+#btnTema:focus-visible .sol-halo {
+  animation: halo-sol 1.6s ease-in-out infinite alternate;
+}
+@keyframes giro-sol {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes respiro-rayos {
+  from {
+    transform: scale(0.98);
+  }
+  to {
+    transform: scale(1.02);
+  }
+}
+@keyframes latido-sol {
+  from {
+    transform: scale(0.97);
+  }
+  to {
+    transform: scale(1.03);
+  }
+}
+@keyframes halo-sol {
+  from {
+    transform: scale(0.96);
+    opacity: 0.12;
+  }
+  to {
+    transform: scale(1.14);
+    opacity: 0.35;
+  }
 }
 #btnTema:hover .ico-luna,
 #btnTema:focus-visible .ico-luna {
