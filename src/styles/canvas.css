@@ -716,10 +716,14 @@ body.is-dragging .cell:not(.empty) {
   border-radius: 50%;
   background: rgba(20, 25, 20, 0.72);
   color: #fff;
-  font-size: 15px;
-  line-height: 1;
   display: none;
+  align-items: center;
+  justify-content: center;
   z-index: 3;
+}
+.cell-recortar svg {
+  width: 16px;
+  height: 16px;
 }
 /* Hit-area 44px: el visual queda en 28px, el ::after recibe el tap. */
 .cell-recortar::after {
@@ -729,12 +733,12 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell:hover .cell-recortar,
 .cell:focus-within .cell-recortar {
-  display: block;
+  display: flex;
 }
 /* Sin hover (táctil) no hay revelado: siempre visible. Es capacidad, no breakpoint. */
 @media (hover: none) {
   .cell .cell-recortar {
-    display: block;
+    display: flex;
   }
 }
 .cell-recortar:focus-visible {
@@ -743,6 +747,117 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell-recortar:hover {
   background: var(--verde-tinta);
+}
+/* Encuadre: las escuadras abren/cierran solo en hover/foco; la retícula de
+   tercios emerge durante el encuadre. Pivotes por geometría (vértices). */
+.encuadre,
+.tercios {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+.escuadra-inf {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+}
+.escuadra-sup {
+  transform-box: fill-box;
+  transform-origin: 100% 0%;
+}
+.cell-recortar:hover .encuadre,
+.cell-recortar:focus-visible .encuadre {
+  animation: respiro-encuadre 3.2s ease-in-out infinite;
+}
+.cell-recortar:hover .escuadra-inf,
+.cell-recortar:focus-visible .escuadra-inf {
+  animation: escuadra-inf 3.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.cell-recortar:hover .escuadra-sup,
+.cell-recortar:focus-visible .escuadra-sup {
+  animation: escuadra-sup 3.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.cell-recortar:hover .tercios,
+.cell-recortar:focus-visible .tercios {
+  animation: rejilla-tercios 3.2s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+@keyframes escuadra-inf {
+  0%,
+  10% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  26% {
+    transform: translate(-2.4px, 2.4px) rotate(-1.5deg);
+  }
+  46% {
+    transform: translate(1.8px, -1.8px) rotate(1deg);
+  }
+  56% {
+    transform: translate(-0.6px, 0.6px) rotate(-0.5deg);
+  }
+  66% {
+    transform: translate(0.2px, -0.2px) rotate(0deg);
+  }
+  74%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+@keyframes escuadra-sup {
+  0%,
+  12% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  28% {
+    transform: translate(2.4px, -2.4px) rotate(-1.5deg);
+  }
+  48% {
+    transform: translate(-1.8px, 1.8px) rotate(1deg);
+  }
+  58% {
+    transform: translate(0.6px, -0.6px) rotate(-0.5deg);
+  }
+  68% {
+    transform: translate(-0.2px, 0.2px) rotate(0deg);
+  }
+  76%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+@keyframes rejilla-tercios {
+  0%,
+  12% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  26% {
+    transform: scale(1.25);
+    opacity: 0.35;
+  }
+  47% {
+    transform: scale(0.82);
+    opacity: 0.55;
+  }
+  58% {
+    transform: scale(1.04);
+    opacity: 0.2;
+  }
+  68%,
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@keyframes respiro-encuadre {
+  0%,
+  74% {
+    transform: scale(1);
+  }
+  86% {
+    transform: scale(1.025);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* Modal Recorte flotante: la foto sola sobre el velo, barra de acciones

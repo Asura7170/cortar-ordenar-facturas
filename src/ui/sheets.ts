@@ -37,6 +37,10 @@ const X_SVG: string =
 const GIRAR_SVG: string =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="girar-nucleo"><path d="M15 4.55a8 8 0 0 0 -6 14.9"/><polyline class="girar-aleta" points="9 15 9 20 4 20"/><circle class="punto punto-1" cx="18.37" cy="7.16" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-2" cx="19.94" cy="11" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-3" cx="19.37" cy="15.1" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-4" cx="16.84" cy="18.37" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-5" cx="13" cy="19.94" r="1" fill="currentColor" stroke="none"/></g></svg>';
 
+/* Encuadre de recorte (marcado estático confiable: sin datos de usuario). */
+const CROP_SVG: string =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="encuadre"><g class="tercios" stroke-width="0.9" opacity="0"><line x1="10" y1="6" x2="10" y2="18" stroke-dasharray="1.2 1.2"/><line x1="14" y1="6" x2="14" y2="18" stroke-dasharray="1.2 1.2"/><line x1="6" y1="10" x2="18" y2="10" stroke-dasharray="1.2 1.2"/><line x1="6" y1="14" x2="18" y2="14" stroke-dasharray="1.2 1.2"/></g><path class="escuadra-inf" d="M6 2v14a2 2 0 0 0 2 2h14"/><path class="escuadra-sup" d="M18 22V8a2 2 0 0 0-2-2H2"/></g></svg>';
+
 function celda(
   item: Comprobante | null,
   pos: Plantilla["pos"][number] | undefined,
@@ -128,7 +132,7 @@ function pintarCelda(
     r.dataset["accion"] = "recortar";
     r.title = "Recortar";
     r.setAttribute("aria-label", "Recortar comprobante");
-    r.textContent = "✂";
+    r.innerHTML = CROP_SVG;
     div.append(r);
   }
   const img = document.createElement("img");
