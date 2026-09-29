@@ -422,7 +422,46 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 40px;
+}
+/* Escobas: barren solo en hover/foco (en reposo quietas); la derecha espeja.
+   ponytail: pivotes por geometría (fill-box), no por coords del viewBox —
+   el marco anidado + espejo invalida cualquier punto hardcodeado. */
+#btnLimpiar .export-ico {
+  width: 28px;
+  height: 28px;
+}
+#btnLimpiar .escoba-der {
+  transform: scaleX(-1);
+}
+#btnLimpiar:hover .barrido-pivote,
+#btnLimpiar:focus-visible .barrido-pivote {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: barrido 0.9s ease-in-out infinite alternate;
+}
+#btnLimpiar:hover .barrido-cerdas,
+#btnLimpiar:focus-visible .barrido-cerdas {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: cerdas-flex 0.9s ease-in-out infinite alternate;
+  animation-delay: -0.23s;
+}
+@keyframes barrido {
+  from {
+    transform: rotate(12deg);
+  }
+  to {
+    transform: rotate(-12deg);
+  }
+}
+@keyframes cerdas-flex {
+  from {
+    transform: rotate(-4deg) skewX(-3deg);
+  }
+  to {
+    transform: rotate(4deg) skewX(3deg);
+  }
 }
 .panel-ajustes .btn {
   min-height: 44px;
