@@ -466,3 +466,30 @@
 .panel-ajustes .btn {
   min-height: 44px;
 }
+#btnAjustes {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.ajustes-ico {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+/* Engranaje: gira continuo solo en hover/foco (corona simétrica cada 60°:
+   el reseteo al salir es invisible, sin tics). */
+#btnAjustes:hover .engranaje-giro,
+#btnAjustes:focus-visible .engranaje-giro {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: giro-engranaje 2.4s linear infinite;
+}
+@keyframes giro-engranaje {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
