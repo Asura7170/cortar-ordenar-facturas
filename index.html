@@ -443,59 +443,164 @@
                 viewBox="0 0 512 512"
                 fill="none"
                 stroke="currentColor"
-                stroke-width="32"
                 aria-hidden="true"
               >
-                <rect
-                  x="128"
-                  y="56"
-                  width="256"
-                  height="120"
-                  rx="16"
-                  fill="var(--paper-color, #ffffff)"
-                />
-                <rect
-                  x="48"
-                  y="152"
-                  width="416"
-                  height="208"
-                  rx="28"
-                  fill="currentColor"
-                  stroke="none"
-                />
-                <circle cx="412" cy="196" r="10" fill="var(--paper-color, #ffffff)" stroke="none" />
-                <rect
-                  x="112"
-                  y="252"
-                  width="288"
-                  height="24"
-                  rx="12"
-                  fill="#000000"
-                  opacity="0.2"
-                  stroke="none"
-                />
-                <path
-                  d="M128 264H384V440A16 16 0 0 1 368 456H144A16 16 0 0 1 128 440Z"
-                  fill="var(--paper-color, #ffffff)"
-                />
-                <rect
-                  x="168"
-                  y="336"
-                  width="176"
-                  height="14"
-                  rx="7"
-                  fill="currentColor"
-                  stroke="none"
-                />
-                <rect
-                  x="168"
-                  y="372"
-                  width="112"
-                  height="14"
-                  rx="7"
-                  fill="currentColor"
-                  stroke="none"
-                />
+                <defs>
+                  <mask id="prn-chassis-mask">
+                    <rect width="512" height="512" fill="#fff" />
+                    <circle cx="412" cy="196" r="10" fill="#000" />
+                    <rect x="112" y="252" width="288" height="24" rx="12" fill="#000" />
+                    <rect x="120" y="260" width="272" height="108" rx="8" fill="#000" />
+                  </mask>
+                  <clipPath id="prn-feed-clip">
+                    <rect x="100" y="0" width="312" height="252" />
+                  </clipPath>
+                  <clipPath id="prn-slot-clip">
+                    <rect x="100" y="252" width="312" height="250" />
+                  </clipPath>
+                </defs>
+                <g class="prn-ambient-rig">
+                  <circle
+                    class="prn-particle"
+                    cx="170"
+                    cy="152"
+                    r="3"
+                    fill="currentColor"
+                    stroke="none"
+                    style="--p-dx: -16px; --p-dy: -18px"
+                  />
+                  <circle
+                    class="prn-particle"
+                    cx="342"
+                    cy="152"
+                    r="3"
+                    fill="currentColor"
+                    stroke="none"
+                    style="--p-dx: 18px; --p-dy: -16px"
+                  />
+                  <g clip-path="url(#prn-feed-clip)">
+                    <g class="prn-top-sheet">
+                      <rect
+                        x="128"
+                        y="56"
+                        width="256"
+                        height="120"
+                        rx="16"
+                        stroke-width="16"
+                        stroke-linejoin="round"
+                      />
+                    </g>
+                  </g>
+                  <g class="prn-tick-l">
+                    <line
+                      x1="22"
+                      y1="210"
+                      x2="38"
+                      y2="210"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                    />
+                    <line
+                      x1="16"
+                      y1="236"
+                      x2="34"
+                      y2="236"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                    />
+                  </g>
+                  <g class="prn-tick-r">
+                    <line
+                      x1="474"
+                      y1="210"
+                      x2="490"
+                      y2="210"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                    />
+                    <line
+                      x1="478"
+                      y1="236"
+                      x2="496"
+                      y2="236"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                    />
+                  </g>
+                  <g class="prn-chassis-squash">
+                    <g class="prn-chassis-rumble">
+                      <rect
+                        x="48"
+                        y="152"
+                        width="416"
+                        height="208"
+                        rx="28"
+                        fill="currentColor"
+                        mask="url(#prn-chassis-mask)"
+                      />
+                      <circle class="prn-led-ring" cx="412" cy="196" r="10" stroke-width="3" />
+                      <rect
+                        x="112"
+                        y="252"
+                        width="288"
+                        height="24"
+                        rx="12"
+                        fill="currentColor"
+                        opacity="0.25"
+                        stroke="none"
+                      />
+                    </g>
+                  </g>
+                  <g class="prn-stream">
+                    <line
+                      x1="116"
+                      y1="360"
+                      x2="116"
+                      y2="396"
+                      stroke-width="4"
+                      stroke-linecap="round"
+                    />
+                    <line
+                      x1="396"
+                      y1="360"
+                      x2="396"
+                      y2="396"
+                      stroke-width="4"
+                      stroke-linecap="round"
+                    />
+                  </g>
+                  <g clip-path="url(#prn-slot-clip)">
+                    <g class="prn-bottom-assembly">
+                      <path
+                        d="M128 264H384V440A16 16 0 0 1 368 456H144A16 16 0 0 1 128 440Z"
+                        stroke-width="16"
+                        stroke-linejoin="round"
+                      />
+                      <g class="prn-text-1">
+                        <rect
+                          x="168"
+                          y="336"
+                          width="176"
+                          height="14"
+                          rx="7"
+                          fill="currentColor"
+                          stroke="none"
+                        />
+                      </g>
+                      <g class="prn-text-2">
+                        <rect
+                          x="168"
+                          y="372"
+                          width="112"
+                          height="14"
+                          rx="7"
+                          fill="currentColor"
+                          stroke="none"
+                        />
+                      </g>
+                    </g>
+                  </g>
+                </g>
               </svg>
               <span>Imprimir</span>
             </button>
