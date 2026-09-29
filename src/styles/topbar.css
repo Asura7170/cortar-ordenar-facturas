@@ -360,27 +360,64 @@
   transform-box: fill-box;
   transform-origin: 50% 50%;
 }
-/* Luna nueva (28px: la escena trae detalles finos): escena nocturna con
-   luna rellena #8ab6ff y nube gris-blanca; pivotes por geometría. */
+/* Luna (24px, igual que el sol): escena nocturna con
+   luna rellena #8ab6ff y nube gris-blanca. */
 .tema-ico .ico-luna {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
-/* Hover/teclado del botón: fondo noche solo en claro (la luna vive ahí). */
+/* Hover/teclado del botón: fondo noche solo en claro (la luna vive ahí;
+   el icono en sí no trae fondo: es transparente). */
 [data-tema="claro"] #btnTema:hover,
 [data-tema="claro"] #btnTema:focus-visible {
   background: #0b1526;
   border-color: #0b1526;
 }
-.nube-flota,
-.luna-deriva,
+/* Luna: brillo/bloom fijo en hover, sin animación. */
+#btnTema:hover .luna-deriva,
+#btnTema:focus-visible .luna-deriva {
+  filter: drop-shadow(0 0 7px rgba(138, 182, 255, 1)) drop-shadow(0 0 16px rgba(138, 182, 255, 0.7));
+}
+/* Estrellas titilantes solo en hover/foco (aparecen y desaparecen en
+   cascada: retardos negativos para que todas vivan desde el inicio). */
 .estrella-1,
-.estrella-2 {
+.estrella-2,
+.estrella-3,
+.estrella-4 {
   transform-box: fill-box;
   transform-origin: 50% 50%;
 }
-/* Hover/teclado: agranda; sol con bloom amarillo, luna con fondo negro y
-   bloom azul (los trazos aclaran de noche). */
+#btnTema:hover .estrella-1,
+#btnTema:focus-visible .estrella-1 {
+  animation: titilar-estrella 2s ease-in-out infinite alternate;
+}
+#btnTema:hover .estrella-2,
+#btnTema:focus-visible .estrella-2 {
+  animation: titilar-estrella 2s ease-in-out infinite alternate;
+  animation-delay: -0.5s;
+}
+#btnTema:hover .estrella-3,
+#btnTema:focus-visible .estrella-3 {
+  animation: titilar-estrella 2s ease-in-out infinite alternate;
+  animation-delay: -1s;
+}
+#btnTema:hover .estrella-4,
+#btnTema:focus-visible .estrella-4 {
+  animation: titilar-estrella 2s ease-in-out infinite alternate;
+  animation-delay: -1.5s;
+}
+@keyframes titilar-estrella {
+  from {
+    transform: scale(0.35);
+    opacity: 0.15;
+  }
+  to {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+/* Hover/teclado: agranda; sol con bloom amarillo, luna con fondo noche y
+   bloom azul. */
 #btnTema:hover .tema-ico svg,
 #btnTema:focus-visible .tema-ico svg {
   transform: scale(1.15);
@@ -445,8 +482,9 @@
     opacity: 0.35;
   }
 }
-/* Trazos y estrellas aclaran de noche (>-selector: la copia de la nube
-   dentro de la máscara conserva su negro para seguir recortando). */
+/* Trazos que se vuelven transparentes y estrellas que aclaran en hover
+   (>-selector: la copia de la nube dentro de la máscara conserva su
+   negro para seguir recortando). */
 #btnTema:hover .ico-luna > .nube-flota path,
 #btnTema:focus-visible .ico-luna > .nube-flota path {
   stroke: transparent;
@@ -454,10 +492,6 @@
 #btnTema:hover .luna-deriva path,
 #btnTema:focus-visible .luna-deriva path {
   stroke: transparent;
-}
-#btnTema:hover .luna-brisa,
-#btnTema:focus-visible .luna-brisa {
-  stroke: #9fc0ee;
 }
 #btnTema:hover .luna-estrellas,
 #btnTema:focus-visible .luna-estrellas {
@@ -468,79 +502,6 @@
   filter: drop-shadow(0 0 5px rgba(233, 237, 244, 0.9))
     drop-shadow(0 0 13px rgba(233, 237, 244, 0.6));
 }
-#btnTema:hover .nube-flota,
-#btnTema:focus-visible .nube-flota {
-  animation: flotar-nube 5s ease-in-out infinite alternate;
-}
-#btnTema:hover .luna-deriva,
-#btnTema:focus-visible .luna-deriva {
-  animation: balanceo-luna 5s ease-in-out infinite alternate;
-}
-#btnTema:hover .brisa-1,
-#btnTema:focus-visible .brisa-1 {
-  animation: flujo-brisa 3.8s linear infinite;
-}
-#btnTema:hover .brisa-2,
-#btnTema:focus-visible .brisa-2 {
-  animation: flujo-brisa 3.8s linear infinite;
-  animation-delay: -1.9s;
-}
-#btnTema:hover .estrella-1,
-#btnTema:focus-visible .estrella-1 {
-  animation: titilar-estrella 3.4s ease-in-out infinite alternate;
-}
-#btnTema:hover .estrella-2,
-#btnTema:focus-visible .estrella-2 {
-  animation: titilar-estrella 3.4s ease-in-out infinite alternate;
-  animation-delay: -1.7s;
-}
-@keyframes flotar-nube {
-  from {
-    transform: translate(0, 0) rotate(0deg) scale(1, 1);
-  }
-  to {
-    transform: translate(5px, -4px) rotate(1.5deg) scale(1.02, 0.98);
-  }
-}
-@keyframes balanceo-luna {
-  from {
-    transform: translate(0, 0) rotate(0deg);
-    filter: drop-shadow(0 0 4px rgba(138, 182, 255, 0.85))
-      drop-shadow(0 0 11px rgba(138, 182, 255, 0.55));
-  }
-  to {
-    transform: translate(-1.5px, 2px) rotate(-1.2deg);
-    filter: drop-shadow(0 0 7px rgba(138, 182, 255, 1))
-      drop-shadow(0 0 16px rgba(138, 182, 255, 0.7));
-  }
-}
-@keyframes flujo-brisa {
-  from {
-    opacity: 0;
-    stroke-dashoffset: 36;
-  }
-  30% {
-    opacity: 0.55;
-  }
-  70% {
-    opacity: 0.3;
-  }
-  to {
-    opacity: 0;
-    stroke-dashoffset: -36;
-  }
-}
-@keyframes titilar-estrella {
-  from {
-    transform: scale(0.3);
-    opacity: 0.1;
-  }
-  to {
-    transform: scale(1.1);
-    opacity: 0.85;
-  }
-}
-
 /* GitHub: <a> con piel .btn — sin subrayado, icono alineado, 44px táctil. */
 .btn-github {
   display: inline-flex;

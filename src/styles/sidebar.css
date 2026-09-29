@@ -482,8 +482,8 @@
 /* Impresora con viewBox 512: icono mayor y trazo grueso para igualar el peso
    visual de los iconos de 24 (≈1.7px a 20px). */
 #btnImprimir .export-ico {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   /* Verde sólido del modo claro en ambos temas (el currentColor del botón
      se vuelve pálido en oscuro y lava el icono). */
   color: var(--verde-tinta);
