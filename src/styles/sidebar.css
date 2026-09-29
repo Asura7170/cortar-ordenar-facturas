@@ -586,7 +586,9 @@
   .btn-imprimir:hover,
   .btn-imprimir:focus-visible,
   #btnIA:hover,
-  #btnIA:focus-visible {
+  #btnIA:focus-visible,
+  #btnLimpiar:hover,
+  #btnLimpiar:focus-visible {
     transform: none;
   }
 }
@@ -602,6 +604,35 @@
   align-items: center;
   justify-content: center;
   gap: 40px;
+  position: relative;
+  /* Borde reservado transparente: el rojo de hover no recoloca nada. */
+  border: 1px solid transparent;
+}
+/* Inversión fantasma + realce en hover/foco (las escobas heredan el rojo
+   por currentColor; el ::before funde el halo direccional por opacidad). */
+#btnLimpiar:hover,
+#btnLimpiar:focus-visible {
+  background-color: color-mix(in srgb, var(--sello) 12%, transparent);
+  color: #f04438;
+  border-color: var(--sello);
+  transform: translateY(-2px);
+}
+#btnLimpiar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 8px color-mix(in srgb, #f04438 30%, transparent),
+    0 14px 22px -6px color-mix(in srgb, #f04438 38%, transparent);
+  opacity: 0;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+#btnLimpiar:hover::before,
+#btnLimpiar:focus-visible::before {
+  opacity: 1;
 }
 /* Escobas: barren solo en hover/foco (en reposo quietas); la derecha espeja.
    ponytail: pivotes por geometría (fill-box), no por coords del viewBox —
