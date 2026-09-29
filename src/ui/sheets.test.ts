@@ -213,16 +213,16 @@ describe("clic delegado", () => {
     try {
       btn.click();
       await vi.advanceTimersByTimeAsync(0);
-      expect(btn.textContent).toBe("✓");
+      expect(btn.getAttribute("aria-label")).toBe("¡Copiado!");
       await vi.advanceTimersByTimeAsync(600);
       btn.click();
       await vi.advanceTimersByTimeAsync(0);
-      expect(btn.textContent).toBe("✓");
+      expect(btn.getAttribute("aria-label")).toBe("¡Copiado!");
       await vi.advanceTimersByTimeAsync(600); // cruza el deadline del 1.º → sigue ✓ si rearma
-      expect(btn.textContent).toBe("✓");
+      expect(btn.getAttribute("aria-label")).toBe("¡Copiado!");
       expect(btn.classList.contains("copiado")).toBe(true);
       await vi.advanceTimersByTimeAsync(600); // deadline del 2.º → revierte
-      expect(btn.textContent).toBe("⧉");
+      expect(btn.querySelector("svg")).not.toBeNull();
       expect(btn.classList.contains("copiado")).toBe(false);
       expect(btn.getAttribute("aria-label")).toBe("Copiar OCR");
     } finally {
@@ -241,7 +241,7 @@ describe("clic delegado", () => {
     btn.click();
     await esperar(() => el("estadoCopiado").textContent === "¡Copiado!");
     await esperar(() => el("estadoCopiado").textContent === "", 3000);
-    expect(btn.textContent).toBe("⧉");
+    expect(btn.querySelector("svg")).not.toBeNull();
   });
 
   it("sin modo OCR no hay botón ⧉", () => {

@@ -41,6 +41,10 @@ const GIRAR_SVG: string =
 const CROP_SVG: string =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="encuadre"><g class="tercios" stroke-width="0.9" opacity="0"><line x1="10" y1="6" x2="10" y2="18" stroke-dasharray="1.2 1.2"/><line x1="14" y1="6" x2="14" y2="18" stroke-dasharray="1.2 1.2"/><line x1="6" y1="10" x2="18" y2="10" stroke-dasharray="1.2 1.2"/><line x1="6" y1="14" x2="18" y2="14" stroke-dasharray="1.2 1.2"/></g><path class="escuadra-inf" d="M6 2v14a2 2 0 0 0 2 2h14"/><path class="escuadra-sup" d="M18 22V8a2 2 0 0 0-2-2H2"/></g></svg>';
 
+/* Copiar OCR (marcado estático confiable: sin datos de usuario). */
+const COPY_SVG: string =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="hoja-atras" d="M4 7v13a1 1 0 0 0 1 1h10"/><g class="hoja-frente"><rect x="8" y="3" width="11" height="14" rx="1"/><g class="lineas-doc" stroke-width="1.5"><line x1="11" y1="7" x2="16" y2="7"/><line x1="11" y1="10" x2="16" y2="10"/><line x1="11" y1="13" x2="14" y2="13"/></g><line class="rayo-scan" x1="9.5" y1="4.5" x2="17.5" y2="4.5" stroke-width="1.5"/><polyline class="check-ok" points="10.5 10.5 12.5 12.5 16 8.5"/></g></svg>';
+
 function celda(
   item: Comprobante | null,
   pos: Plantilla["pos"][number] | undefined,
@@ -98,7 +102,7 @@ function pintarCelda(
     btn.dataset["accion"] = "copiar-ocr";
     btn.title = "Copiar OCR";
     btn.setAttribute("aria-label", "Copiar OCR");
-    btn.textContent = "⧉";
+    btn.innerHTML = COPY_SVG;
     div.append(pre, btn);
     return;
   }
@@ -1001,7 +1005,6 @@ export function initSheets(cb: SheetsCallbacks): void {
             const previo = copiadoTimers.get(btn);
             if (previo !== undefined) window.clearTimeout(previo);
             btn.classList.add("copiado");
-            btn.textContent = "✓";
             btn.setAttribute("aria-label", "¡Copiado!");
             const anuncio = document.getElementById("estadoCopiado");
             if (anuncio) anuncio.textContent = "¡Copiado!";
@@ -1010,7 +1013,6 @@ export function initSheets(cb: SheetsCallbacks): void {
               window.setTimeout(() => {
                 if (!btn.isConnected) return;
                 btn.classList.remove("copiado");
-                btn.textContent = "⧉";
                 btn.setAttribute("aria-label", "Copiar OCR");
                 const aviso = document.getElementById("estadoCopiado");
                 if (aviso) aviso.textContent = "";
