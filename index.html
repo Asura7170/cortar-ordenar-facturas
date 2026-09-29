@@ -859,7 +859,40 @@
       <form method="dialog" class="recorte-barra">
         <button class="btn btn-ghost" type="button" id="btnRecorteReset">Restablecer</button>
         <button class="btn btn-ghost" type="submit" value="cancel" autofocus>Cancelar</button>
-        <button class="btn btn-primary" type="button" id="btnRecorteOk">Recortar</button>
+        <button class="btn btn-primary" type="button" id="btnRecorteOk">
+          <span>Recortar</span>
+          <svg
+            class="tijera-ico"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <defs>
+              <mask id="tijera-eje">
+                <rect width="24" height="24" fill="#fff" stroke="none" />
+                <circle cx="12" cy="12" r="0.75" fill="#000" stroke="none" />
+              </mask>
+            </defs>
+            <g class="tijera-chasis">
+              <g mask="url(#tijera-eje)">
+                <g class="mitad-a">
+                  <circle cx="6" cy="7" r="3" />
+                  <line x1="8.56" y1="8.56" x2="19" y2="19" />
+                </g>
+                <g class="mitad-b">
+                  <circle cx="6" cy="17" r="3" />
+                  <line x1="8.56" y1="15.44" x2="19" y2="5" />
+                </g>
+              </g>
+              <circle class="chispa chispa-arriba" cx="18.5" cy="11.5" r="0.75" />
+              <circle class="chispa chispa-abajo" cx="18.5" cy="12.5" r="0.75" />
+            </g>
+          </svg>
+        </button>
       </form>
     </dialog>
 
