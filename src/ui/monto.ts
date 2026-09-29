@@ -58,9 +58,10 @@ function pintarBarraBoton(): void {
   const total = totalItems();
   const hechos = aplanar().filter((c) => c.montoCents !== null).length;
   btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
-  // ponytail: solo spans de texto — textContent borraría el icono.
-  const texto = hechos > 0 ? `Montos extraídos… ${hechos}/${total}` : TEXTO_BOTON_IA;
-  // ponytail: base + fantasma de la capa clara (la centra igual, ver CSS).
+  // ponytail: solo el span de texto — textContent borraría el icono.
+  // El fantasma solo duplica el icono (el texto lo invierte el degradado).
+  const texto = hechos > 0 ? `Montos extraídos: ${hechos}/${total}` : TEXTO_BOTON_IA;
+  // ponytail: texto único en el DOM (el fantasma solo lleva el icono).
   const textos = btn.querySelectorAll(".ia-txt");
   if (textos.length === 0) btn.textContent = texto;
   textos.forEach((txt) => {

@@ -428,7 +428,7 @@ describe("extraerPendientes", () => {
       globalThis.fetch = real;
     }
     renderMonto(); // la app lo hace vía renderHojas (mockeado aquí)
-    expect(btn.textContent).toBe("Montos extraídos… 2/2");
+    expect(btn.textContent).toBe("Montos extraídos: 2/2");
     expect(btn.style.getPropertyValue("--progreso")).toBe("1");
   });
 

@@ -375,6 +375,11 @@
 .btn-ia .ia-capa .ia-ico {
   color: var(--tia-lleno);
 }
+/* Texto fantasma invisible: solo reserva el ancho para que el icono
+   fantasma calce sobre el base (visible duplicaría el texto). */
+.btn-ia .ia-capa .ia-txt {
+  visibility: hidden;
+}
 
 /* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son
    fantasma con color de marca solo en texto y borde (fondo transparente
