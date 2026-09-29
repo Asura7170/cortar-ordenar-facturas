@@ -342,7 +342,15 @@ export function initSettings(): void {
     pintarJev();
   });
   btnRefrescarModelos.addEventListener("click", () => {
+    // ponytail: re-disparo del giro — quitar + reflow + poner (el doble clic
+    // reanima aunque animationend aún no haya limpiado la clase).
+    btnRefrescarModelos.classList.remove("girando");
+    void btnRefrescarModelos.offsetWidth;
+    btnRefrescarModelos.classList.add("girando");
     void cargarModelos(true);
+  });
+  btnRefrescarModelos.addEventListener("animationend", (e: AnimationEvent) => {
+    if (e.animationName === "recarga-giro") btnRefrescarModelos.classList.remove("girando");
   });
   btnResetAjustes.addEventListener("click", () => {
     ++pruebaJevGen; // idem: el probe en vuelo no revive tras Predeterminado
