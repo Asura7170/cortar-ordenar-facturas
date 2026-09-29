@@ -294,6 +294,29 @@
 .btn-ia:hover {
   background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
+/* Realce del botón IA: el halo vive en ::before estático y solo se funde
+   su opacidad (animar box-shadow repinta por cuadro y arrastra); usa
+   --tia-tinta porque el color propio es transparente por el recorte. */
+#btnIA::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--tia-tinta) 35%, transparent),
+    0 8px 20px color-mix(in srgb, var(--tia-tinta) 30%, transparent);
+  opacity: 0;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+#btnIA:hover,
+#btnIA:focus-visible {
+  transform: translateY(-2px);
+}
+#btnIA:hover::before,
+#btnIA:focus-visible::before {
+  opacity: 1;
+}
 /* Extraer montos como barra determinada con colores invertidos: el relleno
    avanza con --progreso (0→1, la pinta extract.ts) y el texto, transparente,
    se recorta al gradiente de corte duro (sobre el lleno en contraste, fuera
@@ -515,6 +538,55 @@
 }
 .btn-imprimir:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
+}
+/* Realce orgánico de exportar: elevación en el botón y halo/sombra en
+   ::before estático fundido por opacidad (currentColor = marca). */
+.btn-word,
+.btn-pdf,
+.btn-imprimir {
+  position: relative;
+}
+.btn-word::before,
+.btn-pdf::before,
+.btn-imprimir::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 10px color-mix(in srgb, currentColor 35%, transparent),
+    0 8px 20px color-mix(in srgb, currentColor 30%, transparent);
+  opacity: 0;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+.btn-word:hover,
+.btn-word:focus-visible,
+.btn-pdf:hover,
+.btn-pdf:focus-visible,
+.btn-imprimir:hover,
+.btn-imprimir:focus-visible {
+  transform: translateY(-2px);
+}
+.btn-word:hover::before,
+.btn-word:focus-visible::before,
+.btn-pdf:hover::before,
+.btn-pdf:focus-visible::before,
+.btn-imprimir:hover::before,
+.btn-imprimir:focus-visible::before {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-word:hover,
+  .btn-word:focus-visible,
+  .btn-pdf:hover,
+  .btn-pdf:focus-visible,
+  .btn-imprimir:hover,
+  .btn-imprimir:focus-visible,
+  #btnIA:hover,
+  #btnIA:focus-visible {
+    transform: none;
+  }
 }
 
 /* Limpiar + Ajustes al fondo (el auto va en limpiar: si ambos lo llevan, el
