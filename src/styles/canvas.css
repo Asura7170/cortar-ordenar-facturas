@@ -469,10 +469,16 @@ body.is-dragging .cell:not(.empty) {
   border-radius: 50%;
   background: var(--celda-remove);
   color: #fff;
-  font-size: 17px;
-  line-height: 1;
   display: none;
+  align-items: center;
+  justify-content: center;
   z-index: 3;
+}
+.cell-remove svg {
+  width: 16px;
+  height: 16px;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
 }
 /* Hit-area 44px: el visual queda en 28px, el ::after recibe el tap. */
 .cell-remove::after {
@@ -482,12 +488,12 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell:hover .cell-remove,
 .cell:focus-within .cell-remove {
-  display: block;
+  display: flex;
 }
 /* Sin hover (táctil) no hay revelado: siempre visible. Es capacidad, no breakpoint. */
 @media (hover: none) {
   .cell .cell-remove {
-    display: block;
+    display: flex;
   }
 }
 .cell-remove:focus-visible {
@@ -496,6 +502,28 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell-remove:hover {
   background: var(--sello);
+}
+/* Giro orgánico en una pasada (la X es simétrica cada 90°: el 180° final se
+   ve idéntico al reposo y la salida del hover no salta). */
+.cell-remove:hover svg,
+.cell-remove:focus-visible svg {
+  animation: giro-x 0.45s ease-out;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9))
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
+}
+@keyframes giro-x {
+  0% {
+    transform: rotate(0deg);
+  }
+  55% {
+    transform: rotate(192deg);
+  }
+  75% {
+    transform: rotate(174deg);
+  }
+  100% {
+    transform: rotate(180deg);
+  }
 }
 
 /* Giro manual: espejo del × pero arriba-izquierda y en verde (no es destructivo). */

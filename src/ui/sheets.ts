@@ -29,6 +29,10 @@ const canvasEl: HTMLElement | null = document.querySelector(".canvas");
 
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
 
+/* X de quitar (Lucide, marcado estático confiable: sin datos de usuario). */
+const X_SVG: string =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+
 function celda(
   item: Comprobante | null,
   pos: Plantilla["pos"][number] | undefined,
@@ -97,7 +101,7 @@ function pintarCelda(
   btn.dataset["accion"] = "quitar";
   btn.title = "Quitar";
   btn.setAttribute("aria-label", "Quitar comprobante");
-  btn.textContent = "×";
+  btn.innerHTML = X_SVG;
   if (item.estado === "ok") {
     // Giro manual (fallback del auto-enderezado): arriba-izquierda, espejo del ×.
     for (const [accion, glifo, lado] of [
