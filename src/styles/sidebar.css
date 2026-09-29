@@ -374,6 +374,111 @@
   height: 20px;
   flex-shrink: 0;
 }
+/* Descarga (Word + PDF): la flecha cae a la bandeja solo en hover/foco;
+   ponytail: pivotes por geometría (fill-box) — punta de flecha y base. */
+.flecha-caida,
+.bandeja,
+.destello-base {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.destello-base {
+  opacity: 0;
+  transform-origin: 50% 50%;
+}
+#btnDescargar2:hover .flecha-caida,
+#btnDescargar2:focus-visible .flecha-caida,
+#btnPdf:hover .flecha-caida,
+#btnPdf:focus-visible .flecha-caida {
+  animation: caida-flecha 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+#btnDescargar2:hover .bandeja,
+#btnDescargar2:focus-visible .bandeja,
+#btnPdf:hover .bandeja,
+#btnPdf:focus-visible .bandeja {
+  animation: bandeja-elastica 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+#btnDescargar2:hover .destello-base,
+#btnDescargar2:focus-visible .destello-base,
+#btnPdf:hover .destello-base,
+#btnPdf:focus-visible .destello-base {
+  animation: destello-base 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes caida-flecha {
+  0% {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+  16% {
+    transform: translateY(-2px) scaleY(0.96);
+    opacity: 1;
+  }
+  42% {
+    transform: translateY(3.5px) scaleY(1.15);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(5px) scaleY(0.85);
+    opacity: 0.9;
+  }
+  58% {
+    transform: translateY(7px) scaleY(0.7);
+    opacity: 0;
+  }
+  59% {
+    transform: translateY(-8px) scaleY(1);
+    opacity: 0;
+  }
+  76% {
+    transform: translateY(0.5px) scaleY(0.98);
+    opacity: 1;
+  }
+  88% {
+    transform: translateY(-0.2px) scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+}
+@keyframes bandeja-elastica {
+  0%,
+  42% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(1.6px) scale(1.05, 0.88);
+  }
+  62% {
+    transform: translateY(-0.8px) scale(0.98, 1.04);
+  }
+  74% {
+    transform: translateY(0.3px) scale(1.01, 0.99);
+  }
+  84%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+@keyframes destello-base {
+  0%,
+  44% {
+    opacity: 0;
+    transform: scaleX(0.7);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scaleX(1);
+  }
+  65% {
+    opacity: 0;
+    transform: scaleX(1.1);
+  }
+  100% {
+    opacity: 0;
+  }
+}
 /* Impresora con viewBox 512: icono mayor y trazo grueso para igualar el peso
    visual de los iconos de 24 (≈1.7px a 20px). */
 #btnImprimir .export-ico {
