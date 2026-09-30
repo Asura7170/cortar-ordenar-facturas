@@ -549,6 +549,12 @@
      se vuelve pálido en oscuro y lava el icono). */
   color: var(--verde-tinta);
 }
+/* Hoja de papel: transparente en claro, marfil en oscuro (sin relleno el
+   icono se vacía sobre el fondo oscuro). */
+#btnImprimir .prn-hoja {
+  fill: light-dark(transparent, #fdfaf0);
+  stroke-width: 24px;
+}
 /* Impresora imprimiendo: quieta en pose héroe; ciclo de 4.4s en hover/foco.
    ponytail: pivotes view-box en px verbatim (excepción rotor) — 12 puntos de
    diseño co-autorados con sus keyframes, fill-box derivaría el movimiento. */

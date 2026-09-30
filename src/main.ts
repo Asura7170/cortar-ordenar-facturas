@@ -18,17 +18,24 @@ function aplicarTema(tema: string): void {
   btnTema.title = tema === "claro" ? "Cambiar a oscuro" : "Cambiar a claro";
 }
 
-function initTema(): void {
+function resolverTema(): "claro" | "oscuro" {
   const guardado = localStorage.getItem(TEMA_KEY);
-  if (guardado) {
-    aplicarTema(guardado);
-    return;
+  if (guardado === "claro" || guardado === "oscuro") return guardado;
+  // ponytail: doble query explícita — sin matchMedia o sin coincidencia
+  // (modo desconocido) el default es claro, no oscuro.
+  if (typeof window.matchMedia === "function") {
+    if (window.matchMedia("(prefers-color-scheme: light)").matches) return "claro";
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "oscuro";
   }
-  const prefiereClaro = window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false;
-  aplicarTema(prefiereClaro ? "claro" : "oscuro");
+  return "claro";
+}
+
+function initTema(): void {
+  aplicarTema(resolverTema());
 }
 
 cargar();
+initTema();
 if (state.hojas.length === 0) state.hojas.push(crearHoja());
 initSheets({ agregarArchivos, pedirArchivos: elegirArchivos });
 initSidebar();
@@ -45,4 +52,3 @@ btnTema.addEventListener("click", () => {
 renderCodigo();
 renderHojas();
 renderOcrToggle();
-initTema();
