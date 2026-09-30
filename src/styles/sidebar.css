@@ -312,7 +312,9 @@
 }
 #btnIA:hover,
 #btnIA:focus-visible {
-  transform: translateY(-2px);
+  /* ponytail: scale en vez de translateY — trasladar la caja bajo un cursor
+     quieto en el borde oscila el hover (tembleque flecha/puntero). */
+  transform: scale(1.03);
 }
 #btnIA:hover::before,
 #btnIA:focus-visible::before {
@@ -1000,7 +1002,8 @@
 .btn-pdf:focus-visible,
 .btn-imprimir:hover,
 .btn-imprimir:focus-visible {
-  transform: translateY(-2px);
+  /* ponytail: scale en vez de translateY — ver #btnIA (tembleque de hover). */
+  transform: scale(1.03);
 }
 .btn-word:hover::before,
 .btn-word:focus-visible::before,
@@ -1047,7 +1050,8 @@
   background-color: color-mix(in srgb, var(--sello) 12%, transparent);
   color: #f04438;
   border-color: var(--sello);
-  transform: translateY(-2px);
+  /* ponytail: scale en vez de translateY — ver #btnIA (tembleque de hover). */
+  transform: scale(1.03);
 }
 #btnLimpiar::before {
   content: "";
