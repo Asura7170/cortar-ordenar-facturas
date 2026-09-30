@@ -1054,7 +1054,7 @@
 }
 .esc-anim-body {
   transform-box: fill-box;
-  transform-origin: 50% 85%;
+  transform-origin: 50% 0%;
 }
 .esc-anim-spin {
   transform-box: fill-box;
@@ -1169,16 +1169,16 @@
     transform: translate(0, 0) rotate(0deg);
   }
   10% {
-    transform: translate(-22px, 5px) rotate(-13deg);
+    transform: translate(-8px, 5px) rotate(-4deg);
   }
   18% {
-    transform: translate(25px, -3px) rotate(15deg);
+    transform: translate(9px, -3px) rotate(5deg);
   }
   23% {
-    transform: translate(29px, -4px) rotate(17deg);
+    transform: translate(10px, -4px) rotate(6deg);
   }
   31% {
-    transform: translate(-15px, 2px) rotate(-10deg);
+    transform: translate(-5px, 2px) rotate(-3deg);
   }
   38% {
     transform: translate(0, 0) rotate(0deg);
@@ -1285,16 +1285,16 @@
     transform: rotate(0deg);
   }
   10% {
-    transform: rotate(-7deg);
+    transform: rotate(-2deg);
   }
   18% {
-    transform: rotate(11deg);
+    transform: rotate(3deg);
   }
   23% {
-    transform: rotate(-3deg);
+    transform: rotate(-1deg);
   }
   31% {
-    transform: rotate(6deg);
+    transform: rotate(2deg);
   }
   38% {
     transform: rotate(0deg);
