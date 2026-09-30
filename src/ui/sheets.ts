@@ -1005,6 +1005,7 @@ export function initSheets(cb: SheetsCallbacks): void {
             const previo = copiadoTimers.get(btn);
             if (previo !== undefined) window.clearTimeout(previo);
             btn.classList.add("copiado");
+            btn.title = "Copiar OCR";
             btn.setAttribute("aria-label", "¡Copiado!");
             const anuncio = document.getElementById("estadoCopiado");
             if (anuncio) anuncio.textContent = "¡Copiado!";
@@ -1020,6 +1021,13 @@ export function initSheets(cb: SheetsCallbacks): void {
             );
           })
           .catch(() => {
+            const previo = copiadoTimers.get(btn);
+            if (previo !== undefined) {
+              window.clearTimeout(previo);
+              copiadoTimers.delete(btn);
+            }
+            btn.classList.remove("copiado");
+            btn.setAttribute("aria-label", "Copiar OCR");
             btn.title = fallo;
           });
         return;
