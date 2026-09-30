@@ -294,9 +294,25 @@
 .btn-ia:hover {
   background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
-/* Realce del botón IA: el halo vive en ::before estático y solo se funde
-   su opacidad (animar box-shadow repinta por cuadro y arrastra); usa
-   --tia-tinta porque el color propio es transparente por el recorte. */
+/* Realce botones: halo en ::before estático fundido por opacidad (animar
+   box-shadow repinta por cuadro); #btnIA usa --tia-tinta porque su color
+   es transparente por el recorte, el resto usa currentColor (= tinta hover). */
+.btn-word::before,
+.btn-pdf::before,
+.btn-imprimir::before,
+#btnLimpiar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 8px color-mix(in oklch, currentColor 30%, transparent),
+    0 14px 22px -6px color-mix(in oklch, currentColor 38%, transparent);
+  opacity: 0;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
 #btnIA::before {
   content: "";
   position: absolute;
@@ -304,20 +320,34 @@
   border-radius: inherit;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 2px 8px color-mix(in srgb, var(--tia-tinta) 30%, transparent),
-    0 14px 22px -6px color-mix(in srgb, var(--tia-tinta) 38%, transparent);
+    0 2px 8px color-mix(in oklch, var(--tia-tinta) 30%, transparent),
+    0 14px 22px -6px color-mix(in oklch, var(--tia-tinta) 38%, transparent);
   opacity: 0;
   transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
 }
 #btnIA:hover,
-#btnIA:focus-visible {
+#btnIA:focus-visible,
+.btn-word:hover,
+.btn-word:focus-visible,
+.btn-pdf:hover,
+.btn-pdf:focus-visible,
+.btn-imprimir:hover,
+.btn-imprimir:focus-visible {
   /* ponytail: scale en vez de translateY — trasladar la caja bajo un cursor
      quieto en el borde oscila el hover (tembleque flecha/puntero). */
   transform: scale(1.03);
 }
 #btnIA:hover::before,
-#btnIA:focus-visible::before {
+#btnIA:focus-visible::before,
+.btn-word:hover::before,
+.btn-word:focus-visible::before,
+.btn-pdf:hover::before,
+.btn-pdf:focus-visible::before,
+.btn-imprimir:hover::before,
+.btn-imprimir:focus-visible::before,
+#btnLimpiar:hover::before,
+#btnLimpiar:focus-visible::before {
   opacity: 1;
 }
 /* Extraer montos como barra determinada con colores invertidos: el relleno
@@ -543,53 +573,44 @@
 #btnImprimir .prn-stream {
   opacity: 0;
 }
-#btnImprimir:hover .prn-ambient-rig,
-#btnImprimir:focus-visible .prn-ambient-rig {
-  animation: prn-amb-float 6.8s ease-in-out infinite;
-}
-#btnImprimir:hover .prn-chassis-squash,
-#btnImprimir:focus-visible .prn-chassis-squash {
-  animation: prn-chassis-squash-k 4.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
-}
-#btnImprimir:hover .prn-chassis-rumble,
-#btnImprimir:focus-visible .prn-chassis-rumble {
-  animation: prn-chassis-rumble-k 4.4s linear infinite;
-}
-#btnImprimir:hover .prn-top-sheet,
-#btnImprimir:focus-visible .prn-top-sheet {
-  animation: prn-top-sheet-k 4.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-#btnImprimir:hover .prn-bottom-assembly,
-#btnImprimir:focus-visible .prn-bottom-assembly {
-  animation: prn-bottom-assembly-k 4.4s cubic-bezier(0.2, 0.8, 0.3, 1) infinite;
-}
-#btnImprimir:hover .prn-text-1,
-#btnImprimir:focus-visible .prn-text-1 {
-  animation: prn-text-1-k 4.4s cubic-bezier(0.1, 0.9, 0.2, 1) infinite;
-}
-#btnImprimir:hover .prn-text-2,
-#btnImprimir:focus-visible .prn-text-2 {
-  animation: prn-text-2-k 4.4s cubic-bezier(0.1, 0.9, 0.2, 1) infinite;
-}
-#btnImprimir:hover .prn-led-ring,
-#btnImprimir:focus-visible .prn-led-ring {
-  animation: prn-led-ring-k 4.4s ease-out infinite;
-}
-#btnImprimir:hover .prn-tick-l,
-#btnImprimir:focus-visible .prn-tick-l {
-  animation: prn-tick-l-k 4.4s steps(1) infinite;
-}
-#btnImprimir:hover .prn-tick-r,
-#btnImprimir:focus-visible .prn-tick-r {
-  animation: prn-tick-r-k 4.4s steps(1) infinite;
-}
-#btnImprimir:hover .prn-particle,
-#btnImprimir:focus-visible .prn-particle {
-  animation: prn-particle-k 4.4s cubic-bezier(0, 0.8, 0.4, 1) infinite;
-}
-#btnImprimir:hover .prn-stream,
-#btnImprimir:focus-visible .prn-stream {
-  animation: prn-stream-k 4.4s cubic-bezier(0.2, 0.9, 0.4, 1) infinite;
+#btnImprimir:hover,
+#btnImprimir:focus-visible {
+  .prn-ambient-rig {
+    animation: prn-amb-float 6.8s ease-in-out infinite;
+  }
+  .prn-chassis-squash {
+    animation: prn-chassis-squash-k 4.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  }
+  .prn-chassis-rumble {
+    animation: prn-chassis-rumble-k 4.4s linear infinite;
+  }
+  .prn-top-sheet {
+    animation: prn-top-sheet-k 4.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  .prn-bottom-assembly {
+    animation: prn-bottom-assembly-k 4.4s cubic-bezier(0.2, 0.8, 0.3, 1) infinite;
+  }
+  .prn-text-1 {
+    animation: prn-text-1-k 4.4s cubic-bezier(0.1, 0.9, 0.2, 1) infinite;
+  }
+  .prn-text-2 {
+    animation: prn-text-2-k 4.4s cubic-bezier(0.1, 0.9, 0.2, 1) infinite;
+  }
+  .prn-led-ring {
+    animation: prn-led-ring-k 4.4s ease-out infinite;
+  }
+  .prn-tick-l {
+    animation: prn-tick-l-k 4.4s steps(1) infinite;
+  }
+  .prn-tick-r {
+    animation: prn-tick-r-k 4.4s steps(1) infinite;
+  }
+  .prn-particle {
+    animation: prn-particle-k 4.4s cubic-bezier(0, 0.8, 0.4, 1) infinite;
+  }
+  .prn-stream {
+    animation: prn-stream-k 4.4s cubic-bezier(0.2, 0.9, 0.4, 1) infinite;
+  }
 }
 @keyframes prn-amb-float {
   0%,
@@ -981,38 +1002,6 @@
 .btn-imprimir {
   position: relative;
 }
-.btn-word::before,
-.btn-pdf::before,
-.btn-imprimir::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 2px 8px color-mix(in srgb, currentColor 30%, transparent),
-    0 14px 22px -6px color-mix(in srgb, currentColor 38%, transparent);
-  opacity: 0;
-  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-  pointer-events: none;
-}
-.btn-word:hover,
-.btn-word:focus-visible,
-.btn-pdf:hover,
-.btn-pdf:focus-visible,
-.btn-imprimir:hover,
-.btn-imprimir:focus-visible {
-  /* ponytail: scale en vez de translateY — ver #btnIA (tembleque de hover). */
-  transform: scale(1.03);
-}
-.btn-word:hover::before,
-.btn-word:focus-visible::before,
-.btn-pdf:hover::before,
-.btn-pdf:focus-visible::before,
-.btn-imprimir:hover::before,
-.btn-imprimir:focus-visible::before {
-  opacity: 1;
-}
 @media (prefers-reduced-motion: reduce) {
   .btn-word:hover,
   .btn-word:focus-visible,
@@ -1044,7 +1033,7 @@
   border: 1px solid transparent;
 }
 /* Inversión fantasma + realce en hover/foco (las escobas heredan el rojo
-   por currentColor; el ::before funde el halo direccional por opacidad). */
+   por currentColor; el halo común vive arriba y usa currentColor). */
 #btnLimpiar:hover,
 #btnLimpiar:focus-visible {
   background-color: color-mix(in srgb, var(--sello) 12%, transparent);
@@ -1052,23 +1041,6 @@
   border-color: var(--sello);
   /* ponytail: scale en vez de translateY — ver #btnIA (tembleque de hover). */
   transform: scale(1.03);
-}
-#btnLimpiar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 2px 8px color-mix(in srgb, #f04438 30%, transparent),
-    0 14px 22px -6px color-mix(in srgb, #f04438 38%, transparent);
-  opacity: 0;
-  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-  pointer-events: none;
-}
-#btnLimpiar:hover::before,
-#btnLimpiar:focus-visible::before {
-  opacity: 1;
 }
 /* Escoba acrobática: quieta en reposo; ciclo de 6.4s solo en hover/foco.
    Los fx (estelas, ondas, polvo, destellos) nacen en opacity 0: en estático
@@ -1124,77 +1096,62 @@
   transform-origin: 50% 50%;
   opacity: 0;
 }
-#btnLimpiar:hover .esc-ambient,
-#btnLimpiar:focus-visible .esc-ambient {
-  animation: esc-kf-ambient 7.3s ease-in-out infinite alternate;
-}
-#btnLimpiar:hover .esc-anim-body,
-#btnLimpiar:focus-visible .esc-anim-body {
-  animation: esc-kf-body 6.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
-}
-#btnLimpiar:hover .esc-anim-spin,
-#btnLimpiar:focus-visible .esc-anim-spin {
-  animation: esc-kf-spin 6.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-#btnLimpiar:hover .esc-anim-squash,
-#btnLimpiar:focus-visible .esc-anim-squash {
-  animation: esc-kf-squash 6.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
-}
-#btnLimpiar:hover .esc-anim-mango,
-#btnLimpiar:focus-visible .esc-anim-mango {
-  animation: esc-kf-mango 6.4s cubic-bezier(0.33, 1, 0.68, 1) infinite;
-}
-#btnLimpiar:hover .esc-anim-cerdas,
-#btnLimpiar:focus-visible .esc-anim-cerdas {
-  animation: esc-kf-cerdas 6.4s cubic-bezier(0.33, 1, 0.68, 1) infinite;
-}
-#btnLimpiar:hover .esc-trail-1,
-#btnLimpiar:focus-visible .esc-trail-1 {
-  animation: esc-kf-trail-1 6.4s ease-out infinite;
-}
-#btnLimpiar:hover .esc-trail-2,
-#btnLimpiar:focus-visible .esc-trail-2 {
-  animation: esc-kf-trail-2 6.4s ease-out infinite;
-}
-#btnLimpiar:hover .esc-shock-1,
-#btnLimpiar:focus-visible .esc-shock-1 {
-  animation: esc-kf-shock-1 6.4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
-}
-#btnLimpiar:hover .esc-shock-2,
-#btnLimpiar:focus-visible .esc-shock-2 {
-  animation: esc-kf-shock-2 6.4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
-}
-#btnLimpiar:hover .esc-dust-1,
-#btnLimpiar:focus-visible .esc-dust-1 {
-  animation: esc-kf-dust-1 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
-}
-#btnLimpiar:hover .esc-dust-2,
-#btnLimpiar:focus-visible .esc-dust-2 {
-  animation: esc-kf-dust-2 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
-}
-#btnLimpiar:hover .esc-dust-3,
-#btnLimpiar:focus-visible .esc-dust-3 {
-  animation: esc-kf-dust-3 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
-}
-#btnLimpiar:hover .esc-dust-4,
-#btnLimpiar:focus-visible .esc-dust-4 {
-  animation: esc-kf-dust-4 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
-}
-#btnLimpiar:hover .esc-dust-5,
-#btnLimpiar:focus-visible .esc-dust-5 {
-  animation: esc-kf-dust-5 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
-}
-#btnLimpiar:hover .esc-star-1,
-#btnLimpiar:focus-visible .esc-star-1 {
-  animation: esc-kf-star-1 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-}
-#btnLimpiar:hover .esc-star-2,
-#btnLimpiar:focus-visible .esc-star-2 {
-  animation: esc-kf-star-2 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-}
-#btnLimpiar:hover .esc-star-3,
-#btnLimpiar:focus-visible .esc-star-3 {
-  animation: esc-kf-star-3 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+#btnLimpiar:hover,
+#btnLimpiar:focus-visible {
+  .esc-ambient {
+    animation: esc-kf-ambient 7.3s ease-in-out infinite alternate;
+  }
+  .esc-anim-body {
+    animation: esc-kf-body 6.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  }
+  .esc-anim-spin {
+    animation: esc-kf-spin 6.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  .esc-anim-squash {
+    animation: esc-kf-squash 6.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  }
+  .esc-anim-mango {
+    animation: esc-kf-mango 6.4s cubic-bezier(0.33, 1, 0.68, 1) infinite;
+  }
+  .esc-anim-cerdas {
+    animation: esc-kf-cerdas 6.4s cubic-bezier(0.33, 1, 0.68, 1) infinite;
+  }
+  .esc-trail-1 {
+    animation: esc-kf-trail-1 6.4s ease-out infinite;
+  }
+  .esc-trail-2 {
+    animation: esc-kf-trail-2 6.4s ease-out infinite;
+  }
+  .esc-shock-1 {
+    animation: esc-kf-shock-1 6.4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  }
+  .esc-shock-2 {
+    animation: esc-kf-shock-2 6.4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  }
+  .esc-dust-1 {
+    animation: esc-kf-dust-1 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-dust-2 {
+    animation: esc-kf-dust-2 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-dust-3 {
+    animation: esc-kf-dust-3 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-dust-4 {
+    animation: esc-kf-dust-4 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-dust-5 {
+    animation: esc-kf-dust-5 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-star-1 {
+    animation: esc-kf-star-1 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  }
+  .esc-star-2 {
+    animation: esc-kf-star-2 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  }
+  .esc-star-3 {
+    animation: esc-kf-star-3 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  }
 }
 @keyframes esc-kf-ambient {
   0% {

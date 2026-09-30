@@ -119,14 +119,12 @@
 }
 @keyframes monto-cae {
   0% {
-    transform: translateY(var(--monto-desde, -8px));
+    transform: translateY(-8px);
     opacity: 0;
-    filter: blur(2px);
   }
   100% {
     transform: translateY(0);
     opacity: 1;
-    filter: blur(0);
   }
 }
 .topbar-actions {
