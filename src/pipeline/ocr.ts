@@ -99,7 +99,10 @@ export function envolver(
 async function nucleoReal(): Promise<NucleoOcr> {
   // ponytail: mismos valores que docaligner (single-thread: COEP bloquea pthreads).
   const ort: OrtModulo = await import("onnxruntime-web/webgpu");
-  ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`;
+  // ponytail: mismo CDN pineado que docaligner (el .wasm supera el límite de Pages).
+  ort.env.wasm.wasmPaths = import.meta.env.PROD
+    ? "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/"
+    : `${import.meta.env.BASE_URL}ort/`;
   ort.env.wasm.numThreads = 1;
   const crearSesion =
     (pesos: ArrayBuffer) =>
