@@ -59,7 +59,7 @@ Nombre: `{codigo}-comprobante.{docx|pdf}` (`sincodigo-` sin código).
 ## Troubleshooting
 
 - `SharedArrayBuffer` / pantalla negra: revisa COOP/COEP (solo `pnpm dev`/`preview`, no otro server).
-- `ORT sin proveedor`: primer EP con timeout 30s + latch, reintenta con wasm; revisa `public/ort/` servido.
+- `ORT sin proveedor`: primer EP con timeout 30s + latch, reintenta con wasm; revisa `public/ort/` servido en dev (en prod el wasm sale del CDN).
 - `LLM CORS/key`: revisa `baseURL`, key en Ajustes, y consola (timeout 60s).
 - `vp test` falla con `jsdom`: usa `pnpm test` (binario local).
 - `dist` >1MB: build es solo-webgpu a propósito.

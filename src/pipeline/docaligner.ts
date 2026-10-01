@@ -4,6 +4,7 @@
    Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + recorte + vacías). Fallo → blob original. */
 import { CALIDAD_WEBP, cargarReal, crearReal, recortarMargenesBlancos } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
+import { rutaWasmOrt } from "./ortWasm";
 
 /** Punto en píxeles de la imagen original. */
 export interface Punto {
@@ -603,12 +604,8 @@ export async function olvidarSesionFallida(): Promise<void> {
 async function crearSesion(): Promise<SesionDetectora> {
   // ponytail: build solo-webgpu (sin jsep deprecado ni webgl): el dist pasa de ~30MB a <1MB.
   const ort = await import("onnxruntime-web/webgpu");
-  // ponytail: wasmPaths copiado de node_modules (los nombres cambian por minor, no van por CDN).
-  // En PROD el .wasm (25.5MB > límite 25MB de Pages) se sirve de jsdelivr pineado (CORS+WASM ok);
-  // en dev/preview sigue local. Versión a la par de package.json (ort-bump la mueve junta).
-  ort.env.wasm.wasmPaths = import.meta.env.PROD
-    ? "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/"
-    : `${import.meta.env.BASE_URL}ort/`;
+  // ponytail: nombres cambian por minor (ort-bump mueve VERSION_ORT junta).
+  ort.env.wasm.wasmPaths = rutaWasmOrt(import.meta.env.PROD, import.meta.env.BASE_URL);
   // ponytail: single-thread a propósito — los workers pthread del build threaded los bloquea
   // Chrome bajo COEP require-corp (y en headless cuelgan sin rechazar); ~250ms/foto bastan.
   ort.env.wasm.numThreads = 1;

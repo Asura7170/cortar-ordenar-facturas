@@ -27,11 +27,10 @@ jobs:
       # Pages rechaza archivos >25MB: el fastvit (79MB) se sirve de HuggingFace en prod.
       - run: mv public/models/fastvit_sa24_h_e_bifpn_256_fp32.onnx "$RUNNER_TEMP/"
       - run: pnpm build
-      # El .wasm de ort en PROD sale del CDN (wasmPaths), no de dist/: la copia
-      # hasheada de assets/ nunca se pide y la verbatim de ort/ supera el límite.
-      - run: rm -f dist/assets/ort-*.wasm dist/ort/ort-*.wasm
+      # El .wasm de ort en PROD sale del CDN (wasmPaths), no de dist/: nada de dist/ort/ se pide.
+      - run: rm -rf dist/ort dist/assets/ort-*.wasm
       # Gate 25MB de Pages sobre todo dist/ (antes solo .onnx: el .wasm coló el fallo).
-      - run: test -z "$(find dist -type f -size +25M)"
+      - run: find dist -type f -size +25M -print | grep . && exit 1 || exit 0
       - run: pnpm dlx --allow-build=esbuild --allow-build=workerd wrangler@4 pages deploy dist --project-name cortar-ordenar-facturas --branch main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
