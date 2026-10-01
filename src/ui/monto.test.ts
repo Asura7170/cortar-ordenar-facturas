@@ -153,15 +153,32 @@ describe("barraBoton", () => {
     state.moneda = "USD";
     const btn = botonIA();
     renderMonto(); // sin hojas
-    expect(btn.textContent).toBe("$ Extraer montos $");
+    expect(btn.textContent).toBe("Calcular totales");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     state.hojas.push(h);
     renderMonto();
-    expect(btn.textContent).toBe("Montos extraídos… 1/2");
+    expect(btn.textContent).toBe("Montos extraídos: 1/2");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
+  });
+
+  it("fantasma: actualiza los dos .ia-txt de prod", () => {
+    state.moneda = "USD";
+    const btn = botonIA();
+    btn.innerHTML =
+      '<span class="ia-txt"></span><span class="ia-capa" aria-hidden="true"><span class="ia-txt" aria-hidden="true"></span></span>';
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
+    h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
+    state.hojas.push(h);
+    renderMonto();
+    expect([...btn.querySelectorAll(".ia-txt")].map((s) => s.textContent)).toEqual([
+      "Montos extraídos: 1/2",
+      "Montos extraídos: 1/2",
+    ]);
+    btn.innerHTML = "";
   });
 
   it("añadir sin monto encoge la barra sin tocar el total", () => {
@@ -171,11 +188,11 @@ describe("barraBoton", () => {
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
     state.hojas.push(h);
     renderMonto();
-    expect(btn.textContent).toBe("Montos extraídos… 1/1");
+    expect(btn.textContent).toBe("Montos extraídos: 1/1");
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     renderMonto(); // mismo total: el odómetro no se toca…
     expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 5.00");
-    expect(btn.textContent).toBe("Montos extraídos… 1/2"); // …pero la barra sí se mueve
+    expect(btn.textContent).toBe("Montos extraídos: 1/2"); // …pero la barra sí se mueve
     expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
   });
 });

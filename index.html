@@ -71,6 +71,29 @@
             aria-pressed="false"
           >
             Lupa
+            <span class="lupa-ico" aria-hidden="true">
+              <svg
+                class="lupa-morph"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <g class="lm-marco">
+                  <path pathLength="1" d="M3 6v-1a2 2 0 0 1 2 -2h1" />
+                  <path pathLength="1" d="M10 3h1" />
+                  <path pathLength="1" d="M15 3h1a2 2 0 0 1 2 2v1" />
+                  <path pathLength="1" d="M3 11v-1" />
+                  <path pathLength="1" d="M6 18h-1a2 2 0 0 1 -2 -2v-1" />
+                </g>
+                <path class="lm-lente" d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+                <path class="lm-h" d="M7 10l6 0" />
+                <path class="lm-v" d="M10 7l0 6" />
+                <path class="lm-mango" d="M21 21l-6 -6" />
+              </svg>
+            </span>
           </button>
         </div>
         <div class="monto-box">
@@ -108,7 +131,81 @@
             title="Cambiar tema claro/oscuro"
             aria-label="Cambiar tema"
           >
-            <span class="tema-ico" id="temaIcono">☾</span>
+            <span class="tema-ico" aria-hidden="true">
+              <svg class="ico-sol" viewBox="0 0 180 180">
+                <g transform="translate(90, 90)">
+                  <circle class="sol-halo" r="42" fill="currentColor" />
+                  <g class="sol-corona">
+                    <g class="sol-rayos">
+                      <polygon
+                        points="0.00,-80.00 23.73,-57.28 56.57,-56.57 57.28,-23.73 80.00,0.00 57.28,23.73 56.57,56.57 23.73,57.28 0.00,80.00 -23.73,57.28 -56.57,56.57 -57.28,23.73 -80.00,0.00 -57.28,-23.73 -56.57,-56.57 -23.73,-57.28"
+                        fill="none"
+                        stroke="#fbbf24"
+                        stroke-width="6"
+                        stroke-linejoin="round"
+                      />
+                    </g>
+                  </g>
+                  <g class="sol-nucleo">
+                    <circle r="40" fill="#fbbf24" />
+                  </g>
+                </g>
+              </svg>
+              <svg class="ico-luna" viewBox="0 0 186 169">
+                <defs>
+                  <mask id="corte-nube">
+                    <rect width="186" height="169" fill="#ffffff" />
+                    <g class="nube-flota">
+                      <path
+                        d="M 26 152 A 20 20 0 0 1 30 112.4 A 24 24 0 0 1 78 112.4 A 20 20 0 0 1 82 152 Z"
+                        fill="#000000"
+                        stroke="#000000"
+                        stroke-width="6"
+                        stroke-linejoin="round"
+                      />
+                    </g>
+                  </mask>
+                </defs>
+                <g class="luna-estrellas" fill="#3d629e">
+                  <path
+                    class="estrella-1"
+                    d="M 36 31 Q 36 42 47 42 Q 36 42 36 53 Q 36 42 25 42 Q 36 42 36 31 Z"
+                  />
+                  <path
+                    class="estrella-2"
+                    d="M 165 65 Q 165 76 176 76 Q 165 76 165 87 Q 165 76 154 76 Q 165 76 165 65 Z"
+                  />
+                  <path
+                    class="estrella-3"
+                    d="M 95 14 Q 95 22 103 22 Q 95 22 95 30 Q 95 22 87 22 Q 95 22 95 14 Z"
+                  />
+                  <path
+                    class="estrella-4"
+                    d="M 140 144 Q 140 152 148 152 Q 140 152 140 160 Q 140 152 132 152 Q 140 152 140 144 Z"
+                  />
+                </g>
+                <g class="luna-deriva">
+                  <path
+                    d="M 146 15 A 76 76 0 1 0 178 136 A 64 64 0 0 1 146 15 Z"
+                    mask="url(#corte-nube)"
+                    fill="#8ab6ff"
+                    stroke="#203251"
+                    stroke-width="6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </g>
+                <g class="nube-flota">
+                  <path
+                    d="M 26 152 A 20 20 0 0 1 30 112.4 A 24 24 0 0 1 78 112.4 A 20 20 0 0 1 82 152 Z"
+                    fill="#e9edf4"
+                    stroke="#203251"
+                    stroke-width="6"
+                    stroke-linejoin="round"
+                  />
+                </g>
+              </svg>
+            </span>
           </button>
         </div>
       </header>
@@ -180,10 +277,10 @@
                     stroke-linecap="round"
                     stroke-linejoin="round"
                   >
+                    <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
                     <path
-                      d="M2 12c3-5.5 7-8.5 10-8.5S19 6.5 22 12c-3 5.5-7 8.5-10 8.5S5 17.5 2 12Z"
-                    />
-                    <circle cx="12" cy="12" r="3" /></svg
+                      d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"
+                    /></svg
                   ><svg
                     class="ojo ojo-cerrado"
                     viewBox="0 0 24 24"
@@ -193,7 +290,11 @@
                     stroke-linecap="round"
                     stroke-linejoin="round"
                   >
-                    <path d="M3 10c3 5 6.5 7 9 7s6-2 9-7" />
+                    <path d="m15 18-.722-3.25" />
+                    <path d="M2 8a10.645 10.645 0 0 0 20 0" />
+                    <path d="m20 15-1.726-2.05" />
+                    <path d="m4 15 1.726-2.05" />
+                    <path d="m9 18 .722-3.25" />
                   </svg>
                 </span>
               </h2>
@@ -206,9 +307,42 @@
               class="btn btn-ia btn-block"
               id="btnIA"
               type="button"
-              title="La IA lee el total de los comprobantes sin monto"
+              title="Lee el total de cada comprobante y lo suma"
             >
-              $ Extraer montos $
+              <svg
+                class="ia-ico"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect width="16" height="20" x="4" y="2" rx="2" />
+                <line x1="8" x2="16" y1="6" y2="6" />
+                <line x1="16" x2="16" y1="14" y2="18" />
+                <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01" />
+              </svg>
+              <span class="ia-txt">Calcular totales</span>
+              <span class="ia-capa" aria-hidden="true">
+                <svg
+                  class="ia-ico"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect width="16" height="20" x="4" y="2" rx="2" />
+                  <line x1="8" x2="16" y1="6" y2="6" />
+                  <line x1="16" x2="16" y1="14" y2="18" />
+                  <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01" />
+                </svg>
+                <span class="ia-txt" aria-hidden="true">Calcular totales</span>
+              </span>
             </button>
           </section>
 
@@ -218,10 +352,84 @@
             </header>
             <div class="export-doble">
               <button class="btn btn-word btn-block" id="btnDescargar2" title="Descargar Word">
-                ⤓ Word
+                <svg class="export-ico" viewBox="0 0 165.73 156.45" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="a" x1="0" x2="1" y1="0" y2="0">
+                      <stop offset="0" stop-color="#2c5a9e" />
+                      <stop offset="1" stop-color="#285294" />
+                    </linearGradient>
+                  </defs>
+                  <rect
+                    width="108.9"
+                    height="125.86"
+                    x="56.83"
+                    y="15.29"
+                    fill="#2a5699"
+                    rx="6.69"
+                  />
+                  <path fill="#fff" d="M62.18 20.81h98.14v114.74H62.18z" />
+                  <path
+                    fill="#2a5699"
+                    d="M80.11 32.61h68.76v7.13H80.11zm0 16.82h68.76v7.13H80.11zm0 16.82h68.76v7.13H80.11zm0 16.82h68.76v7.13H80.11zm0 17.32h68.76v7.13H80.11zm0 16.82h68.76v7.13H80.11z"
+                  />
+                  <path fill="url(#a)" d="M94.28 156.45V0L0 15.64V140.8z" />
+                  <path
+                    fill="#fff"
+                    d="m16.31 54.76 9.17 46.66c3.28.3 6.57.5 9.86.58l6.72-30.68c.28-.97.4-2.04.52-4.08.13 2.06.21 2.8.5 4.08l6.65 31.54 10.74.64 11.92-52.08-10.52.63-6.05 34.56c-.3 1.4-.51 2.82-.51 4.07.1-1.03-.07-2.42-.51-4.07l-6.72-33.74-9.49.56-7.24 33.17c-.19.65-.38 1.83-.51 3.06-.05-1.06-.21-2.46-.51-4.08l-4.89-31.37z"
+                  />
+                </svg>
+                <span>Word</span>
+                <svg
+                  class="export-ico"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <g class="flecha-caida">
+                    <line x1="12" y1="4" x2="12" y2="16" />
+                    <polyline points="7 11 12 16 17 11" />
+                  </g>
+                  <line class="destello-base" x1="7" y1="21" x2="17" y2="21" stroke-width="3" />
+                  <path class="bandeja" d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                </svg>
               </button>
               <button class="btn btn-pdf btn-block" id="btnPdf" type="button" title="Descargar PDF">
-                ⤓ PDF
+                <svg class="export-ico" viewBox="0 0 512 512" aria-hidden="true">
+                  <path
+                    fill="#e5252a"
+                    d="M128 0h176l144 144v304a64 64 0 0 1-64 64H128a64 64 0 0 1-64-64V64a64 64 0 0 1 64-64"
+                  />
+                  <path fill="#ed686b" d="M304 0v144h144Z" />
+                  <g fill="#fff">
+                    <path
+                      fill-rule="evenodd"
+                      d="M134 288h42a30 30 0 0 1 0 60h-18v36h-24Zm24 20h18a10 10 0 0 1 0 20h-18Zm60-20h34a48 48 0 0 1 0 96h-34Zm24 20h10a28 28 0 0 1 0 56h-10Z"
+                    />
+                    <path d="M312 288h66v20h-42v20h34v20h-34v36h-24Z" />
+                  </g>
+                </svg>
+                <span>PDF</span>
+                <svg
+                  class="export-ico"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <g class="flecha-caida">
+                    <line x1="12" y1="4" x2="12" y2="16" />
+                    <polyline points="7 11 12 16 17 11" />
+                  </g>
+                  <line class="destello-base" x1="7" y1="21" x2="17" y2="21" stroke-width="3" />
+                  <path class="bandeja" d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                </svg>
               </button>
             </div>
             <button
@@ -230,7 +438,173 @@
               type="button"
               title="Imprimir"
             >
-              Imprimir
+              <svg
+                class="export-ico"
+                viewBox="0 0 512 512"
+                fill="none"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <defs>
+                  <mask id="prn-chassis-mask">
+                    <rect width="512" height="512" fill="#fff" />
+                    <circle cx="412" cy="196" r="10" fill="#000" />
+                    <rect x="112" y="252" width="288" height="24" rx="12" fill="#000" />
+                    <rect x="120" y="260" width="272" height="108" rx="8" fill="#000" />
+                  </mask>
+                  <clipPath id="prn-feed-clip">
+                    <rect x="100" y="0" width="312" height="252" />
+                  </clipPath>
+                  <clipPath id="prn-slot-clip">
+                    <rect x="100" y="252" width="312" height="250" />
+                  </clipPath>
+                </defs>
+                <g class="prn-ambient-rig">
+                  <circle
+                    class="prn-particle"
+                    cx="170"
+                    cy="152"
+                    r="3"
+                    fill="currentColor"
+                    stroke="none"
+                    style="--p-dx: -16px; --p-dy: -18px"
+                  />
+                  <circle
+                    class="prn-particle"
+                    cx="342"
+                    cy="152"
+                    r="3"
+                    fill="currentColor"
+                    stroke="none"
+                    style="--p-dx: 18px; --p-dy: -16px"
+                  />
+                  <g clip-path="url(#prn-feed-clip)">
+                    <g class="prn-top-sheet">
+                      <rect
+                        class="prn-hoja"
+                        x="128"
+                        y="56"
+                        width="256"
+                        height="120"
+                        rx="16"
+                        stroke-width="16"
+                        stroke-linejoin="round"
+                      />
+                    </g>
+                  </g>
+                  <g class="prn-tick-l">
+                    <line
+                      x1="22"
+                      y1="210"
+                      x2="38"
+                      y2="210"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                    />
+                    <line
+                      x1="16"
+                      y1="236"
+                      x2="34"
+                      y2="236"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                    />
+                  </g>
+                  <g class="prn-tick-r">
+                    <line
+                      x1="474"
+                      y1="210"
+                      x2="490"
+                      y2="210"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                    />
+                    <line
+                      x1="478"
+                      y1="236"
+                      x2="496"
+                      y2="236"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                    />
+                  </g>
+                  <g class="prn-chassis-squash">
+                    <g class="prn-chassis-rumble">
+                      <rect
+                        x="48"
+                        y="152"
+                        width="416"
+                        height="208"
+                        rx="28"
+                        fill="currentColor"
+                        mask="url(#prn-chassis-mask)"
+                      />
+                      <circle class="prn-led-ring" cx="412" cy="196" r="10" stroke-width="3" />
+                      <rect
+                        x="112"
+                        y="252"
+                        width="288"
+                        height="24"
+                        rx="12"
+                        fill="currentColor"
+                        opacity="0.25"
+                        stroke="none"
+                      />
+                    </g>
+                  </g>
+                  <g class="prn-stream">
+                    <line
+                      x1="116"
+                      y1="360"
+                      x2="116"
+                      y2="396"
+                      stroke-width="4"
+                      stroke-linecap="round"
+                    />
+                    <line
+                      x1="396"
+                      y1="360"
+                      x2="396"
+                      y2="396"
+                      stroke-width="4"
+                      stroke-linecap="round"
+                    />
+                  </g>
+                  <g clip-path="url(#prn-slot-clip)">
+                    <g class="prn-bottom-assembly">
+                      <path
+                        class="prn-hoja"
+                        d="M128 264H384V440A16 16 0 0 1 368 456H144A16 16 0 0 1 128 440Z"
+                        stroke-width="16"
+                        stroke-linejoin="round"
+                      />
+                      <g class="prn-text-1">
+                        <rect
+                          x="168"
+                          y="336"
+                          width="176"
+                          height="14"
+                          rx="7"
+                          fill="currentColor"
+                          stroke="none"
+                        />
+                      </g>
+                      <g class="prn-text-2">
+                        <rect
+                          x="168"
+                          y="372"
+                          width="112"
+                          height="14"
+                          rx="7"
+                          fill="currentColor"
+                          stroke="none"
+                        />
+                      </g>
+                    </g>
+                  </g>
+                </g>
+              </svg>
+              <span>Imprimir</span>
             </button>
           </section>
 
@@ -241,7 +615,112 @@
               command="show-modal"
               commandfor="modalLimpiar"
             >
-              Limpiar
+              <svg
+                class="export-ico escoba-der"
+                viewBox="0 0 192 192"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <g class="esc-ambient">
+                  <g transform="translate(97.77, 94.23) rotate(45)">
+                    <g class="esc-fx-under">
+                      <path class="esc-trail esc-trail-1" d="M-44 72C-15 88 25 88 56 68" />
+                      <path class="esc-trail esc-trail-2" d="M48 68C20 84-20 84-46 70" />
+                      <ellipse class="esc-shock esc-shock-1" cx="0" cy="76" rx="28" ry="6" />
+                      <ellipse class="esc-shock esc-shock-2" cx="-8" cy="76" rx="16" ry="4" />
+                      <circle class="esc-dust esc-dust-1" cx="16" cy="72" r="2.2" />
+                      <circle class="esc-dust esc-dust-2" cx="26" cy="69" r="1.8" />
+                      <circle class="esc-dust esc-dust-3" cx="36" cy="64" r="1.5" />
+                      <circle class="esc-dust esc-dust-4" cx="-18" cy="73" r="2.1" />
+                      <circle class="esc-dust esc-dust-5" cx="-32" cy="67" r="1.7" />
+                    </g>
+                    <g class="esc-anim-body">
+                      <g class="esc-anim-spin">
+                        <g class="esc-anim-squash">
+                          <g class="esc-anim-mango">
+                            <path
+                              d="M0 -125A11 11 0 0 1 11 -114V-29A23 23 0 0 1 34 -6H-34A23 23 0 0 1 -11 -29V-114A11 11 0 0 1 0 -125Z"
+                            />
+                          </g>
+                          <g class="esc-anim-cerdas">
+                            <path
+                              d="M-37 6H37L54 66A8 8 0 0 1 46 76H0L-9.5 59.3A3.5 3.5 0 0 0 -14.5 59.3L-24 76H-46A8 8 0 0 1 -54 66L-37 6Z"
+                            />
+                          </g>
+                        </g>
+                      </g>
+                    </g>
+                    <g class="esc-fx-over">
+                      <g class="esc-star-wrap esc-star-1" transform="translate(24, -14)">
+                        <path
+                          d="M0 -7C0 -1.5 1.5 0 7 0C1.5 0 0 1.5 0 7C0 1.5-1.5 0-7 0C-1.5 0 0-1.5 0-7Z"
+                        />
+                      </g>
+                      <g class="esc-star-wrap esc-star-2" transform="translate(-36, 62)">
+                        <path
+                          d="M0 -7.5C0 -1.7 1.7 0 7.5 0C1.7 0 0 1.7 0 7.5C0 1.7-1.7 0-7.5 0C-1.7 0 0-1.7 0-7.5Z"
+                        />
+                      </g>
+                      <g class="esc-star-wrap esc-star-3" transform="translate(0, -126)">
+                        <path
+                          d="M0 -6.5C0 -1.4 1.4 0 6.5 0C1.4 0 0 1.4 0 6.5C0 1.4-1.4 0-6.5 0C-1.4 0 0-1.4 0-6.5Z"
+                        />
+                      </g>
+                    </g>
+                  </g>
+                </g>
+              </svg>
+              <span>Limpiar</span>
+              <svg class="export-ico" viewBox="0 0 192 192" fill="currentColor" aria-hidden="true">
+                <g class="esc-ambient">
+                  <g transform="translate(97.77, 94.23) rotate(45)">
+                    <g class="esc-fx-under">
+                      <path class="esc-trail esc-trail-1" d="M-44 72C-15 88 25 88 56 68" />
+                      <path class="esc-trail esc-trail-2" d="M48 68C20 84-20 84-46 70" />
+                      <ellipse class="esc-shock esc-shock-1" cx="0" cy="76" rx="28" ry="6" />
+                      <ellipse class="esc-shock esc-shock-2" cx="-8" cy="76" rx="16" ry="4" />
+                      <circle class="esc-dust esc-dust-1" cx="16" cy="72" r="2.2" />
+                      <circle class="esc-dust esc-dust-2" cx="26" cy="69" r="1.8" />
+                      <circle class="esc-dust esc-dust-3" cx="36" cy="64" r="1.5" />
+                      <circle class="esc-dust esc-dust-4" cx="-18" cy="73" r="2.1" />
+                      <circle class="esc-dust esc-dust-5" cx="-32" cy="67" r="1.7" />
+                    </g>
+                    <g class="esc-anim-body">
+                      <g class="esc-anim-spin">
+                        <g class="esc-anim-squash">
+                          <g class="esc-anim-mango">
+                            <path
+                              d="M0 -125A11 11 0 0 1 11 -114V-29A23 23 0 0 1 34 -6H-34A23 23 0 0 1 -11 -29V-114A11 11 0 0 1 0 -125Z"
+                            />
+                          </g>
+                          <g class="esc-anim-cerdas">
+                            <path
+                              d="M-37 6H37L54 66A8 8 0 0 1 46 76H0L-9.5 59.3A3.5 3.5 0 0 0 -14.5 59.3L-24 76H-46A8 8 0 0 1 -54 66L-37 6Z"
+                            />
+                          </g>
+                        </g>
+                      </g>
+                    </g>
+                    <g class="esc-fx-over">
+                      <g class="esc-star-wrap esc-star-1" transform="translate(24, -14)">
+                        <path
+                          d="M0 -7C0 -1.5 1.5 0 7 0C1.5 0 0 1.5 0 7C0 1.5-1.5 0-7 0C-1.5 0 0-1.5 0-7Z"
+                        />
+                      </g>
+                      <g class="esc-star-wrap esc-star-2" transform="translate(-36, 62)">
+                        <path
+                          d="M0 -7.5C0 -1.7 1.7 0 7.5 0C1.7 0 0 1.7 0 7.5C0 1.7-1.7 0-7.5 0C-1.7 0 0-1.7 0-7.5Z"
+                        />
+                      </g>
+                      <g class="esc-star-wrap esc-star-3" transform="translate(0, -126)">
+                        <path
+                          d="M0 -6.5C0 -1.4 1.4 0 6.5 0C1.4 0 0 1.4 0 6.5C0 1.4-1.4 0-6.5 0C-1.4 0 0-1.4 0-6.5Z"
+                        />
+                      </g>
+                    </g>
+                  </g>
+                </g>
+              </svg>
             </button>
           </section>
 
@@ -252,7 +731,23 @@
               type="button"
               title="Ajustes de IA y moneda"
             >
-              <span class="tema-ico" aria-hidden="true">⚙</span>
+              <svg
+                class="ajustes-ico"
+                viewBox="0 0 180 180"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="15"
+                stroke-linejoin="round"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <g class="engranaje-giro">
+                  <circle cx="90" cy="90" r="22.5" />
+                  <polygon
+                    points="76.54,13.68 103.46,13.68 109.67,35.97 126.96,45.95 149.37,40.18 162.83,63.49 146.63,80.02 146.63,99.98 162.83,116.51 149.37,139.82 126.96,134.05 109.67,144.03 103.46,166.32 76.54,166.32 70.33,144.03 53.04,134.05 30.63,139.82 17.17,116.51 33.37,99.98 33.37,80.02 17.17,63.49 30.63,40.18 53.04,45.95 70.33,35.97"
+                  />
+                </g>
+              </svg>
               Ajustes
             </button>
           </section>
@@ -332,7 +827,22 @@
                   title="Recargar lista de modelos"
                   aria-label="Recargar lista de modelos"
                 >
-                  ↻
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <g class="recarga-grupo">
+                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                      <path d="M21 3v5h-5" />
+                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                      <path d="M8 16H3v5" />
+                    </g>
+                  </svg>
                 </button>
               </div>
               <input
@@ -375,19 +885,33 @@
                   aria-label="Borrar API key"
                 >
                   <svg
+                    class="basura-ico"
                     aria-hidden="true"
                     viewBox="0 0 24 24"
-                    width="16"
-                    height="16"
                     fill="none"
                     stroke="currentColor"
-                    stroke-width="1.8"
+                    stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
                   >
-                    <path
-                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                    />
+                    <g class="desecho">
+                      <path
+                        d="M-1.8 -1.2l1.2 -1l2 0.6l0.6 1.8l-1.2 1.4l-2 0.2l-0.8 -1.2z"
+                        stroke-width="1.8"
+                      />
+                      <path d="M-0.3 -0.8l0.4 1.2l1.1 0.4" stroke-width="1.6" />
+                    </g>
+                    <g class="tapa-basura">
+                      <path d="M4 7l16 0" />
+                      <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+                    </g>
+                    <g class="cuerpo-basura">
+                      <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                      <g class="lineas-basura">
+                        <path d="M10 11l0 6" />
+                        <path d="M14 11l0 6" />
+                      </g>
+                    </g>
                   </svg>
                 </button>
               </div>
@@ -420,19 +944,33 @@
                   aria-label="Borrar key JEV"
                 >
                   <svg
+                    class="basura-ico"
                     aria-hidden="true"
                     viewBox="0 0 24 24"
-                    width="16"
-                    height="16"
                     fill="none"
                     stroke="currentColor"
-                    stroke-width="1.8"
+                    stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
                   >
-                    <path
-                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                    />
+                    <g class="desecho">
+                      <path
+                        d="M-1.8 -1.2l1.2 -1l2 0.6l0.6 1.8l-1.2 1.4l-2 0.2l-0.8 -1.2z"
+                        stroke-width="1.8"
+                      />
+                      <path d="M-0.3 -0.8l0.4 1.2l1.1 0.4" stroke-width="1.6" />
+                    </g>
+                    <g class="tapa-basura">
+                      <path d="M4 7l16 0" />
+                      <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+                    </g>
+                    <g class="cuerpo-basura">
+                      <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                      <g class="lineas-basura">
+                        <path d="M10 11l0 6" />
+                        <path d="M14 11l0 6" />
+                      </g>
+                    </g>
                   </svg>
                 </button>
               </div>
@@ -518,7 +1056,18 @@
           commandfor="modalRecorte"
           aria-label="Cerrar"
         >
-          ×
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
         </button>
         <div class="recorte-escena">
           <canvas id="recorteBase"></canvas>
@@ -532,7 +1081,40 @@
       <form method="dialog" class="recorte-barra">
         <button class="btn btn-ghost" type="button" id="btnRecorteReset">Restablecer</button>
         <button class="btn btn-ghost" type="submit" value="cancel" autofocus>Cancelar</button>
-        <button class="btn btn-primary" type="button" id="btnRecorteOk">Recortar</button>
+        <button class="btn btn-primary" type="button" id="btnRecorteOk">
+          <span>Recortar</span>
+          <svg
+            class="tijera-ico"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <defs>
+              <mask id="tijera-eje">
+                <rect width="24" height="24" fill="#fff" stroke="none" />
+                <circle cx="12" cy="12" r="0.75" fill="#000" stroke="none" />
+              </mask>
+            </defs>
+            <g class="tijera-chasis">
+              <g mask="url(#tijera-eje)">
+                <g class="mitad-a">
+                  <circle cx="6" cy="7" r="3" />
+                  <line x1="8.56" y1="8.56" x2="19" y2="19" />
+                </g>
+                <g class="mitad-b">
+                  <circle cx="6" cy="17" r="3" />
+                  <line x1="8.56" y1="15.44" x2="19" y2="5" />
+                </g>
+              </g>
+              <circle class="chispa chispa-arriba" cx="18.5" cy="11.5" r="0.75" />
+              <circle class="chispa chispa-abajo" cx="18.5" cy="12.5" r="0.75" />
+            </g>
+          </svg>
+        </button>
       </form>
     </dialog>
 

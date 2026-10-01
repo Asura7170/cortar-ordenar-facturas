@@ -299,6 +299,7 @@ input::placeholder {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.01em;
+  text-transform: uppercase;
   transition:
     transform 0.12s,
     box-shadow 0.12s,
@@ -527,6 +528,222 @@ input::placeholder {
 /* Botón solo-icono: sin hueco de línea base bajo el SVG. */
 .fila-modelos .btn svg {
   display: block;
+  width: 16px;
+  height: 16px;
+}
+/* Papelera orgánica: estática en reposo, ciclo de 3s solo en hover/foco.
+   El desecho y la tapa salen del viewBox → overflow visible funcional.
+   ponytail: la bisagra de la tapa usa la excepción rotor (view-box 19px 7px,
+   no expresable por geometría); cuerpo y líneas van por geometría. */
+.btn .basura-ico {
+  overflow: visible;
+}
+/* Desecho oculto en reposo: solo existe durante la animación (sus keyframes
+   controlan la opacidad mientras corre). */
+.desecho {
+  opacity: 0;
+}
+.tapa-basura {
+  transform-box: view-box;
+  transform-origin: 19px 7px;
+}
+.cuerpo-basura {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.lineas-basura {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.btn:hover .tapa-basura,
+.btn:focus-visible .tapa-basura {
+  animation: ciclo-tapa 3s infinite;
+}
+.btn:hover .cuerpo-basura,
+.btn:focus-visible .cuerpo-basura {
+  animation: reaccion-cuerpo 3s infinite;
+}
+.btn:hover .lineas-basura,
+.btn:focus-visible .lineas-basura {
+  animation: rebote-lineas 3s infinite;
+}
+.btn:hover .desecho,
+.btn:focus-visible .desecho {
+  animation: caida-desecho 3s infinite;
+}
+@keyframes ciclo-tapa {
+  0%,
+  10% {
+    transform: rotate(0deg);
+    animation-timing-function: ease-in-out;
+  }
+  13% {
+    transform: rotate(-2.5deg);
+    animation-timing-function: cubic-bezier(0.2, 1.25, 0.4, 1);
+  }
+  30% {
+    transform: rotate(44deg);
+    animation-timing-function: ease-in-out;
+  }
+  50% {
+    transform: rotate(45deg);
+    animation-timing-function: cubic-bezier(0.55, 0.05, 0.8, 0.3);
+  }
+  62% {
+    transform: rotate(0deg);
+    animation-timing-function: ease-out;
+  }
+  68% {
+    transform: rotate(10deg);
+    animation-timing-function: ease-in;
+  }
+  74% {
+    transform: rotate(0deg);
+    animation-timing-function: ease-out;
+  }
+  78% {
+    transform: rotate(2.5deg);
+    animation-timing-function: ease-in;
+  }
+  82%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes caida-desecho {
+  0%,
+  28% {
+    opacity: 0;
+    transform: translate(8.5px, -3px) rotate(0deg) scale(0.6);
+  }
+  31% {
+    opacity: 1;
+    transform: translate(9px, -1px) rotate(20deg) scale(0.9);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.5);
+  }
+  41% {
+    opacity: 1;
+    transform: translate(11.2px, 7px) rotate(140deg) scale(1);
+  }
+  48% {
+    opacity: 0;
+    transform: translate(12px, 14px) rotate(220deg) scale(0.45);
+  }
+  52%,
+  100% {
+    opacity: 0;
+    transform: translate(8.5px, -3px) scale(0.6);
+  }
+}
+@keyframes rebote-lineas {
+  0%,
+  40% {
+    transform: translateY(0);
+  }
+  44% {
+    transform: translateY(1.4px);
+  }
+  49% {
+    transform: translateY(-0.6px);
+  }
+  54% {
+    transform: translateY(0);
+  }
+  62% {
+    transform: scaleY(0.92);
+  }
+  68% {
+    transform: scaleY(1.03);
+  }
+  74%,
+  100% {
+    transform: scaleY(1);
+  }
+}
+@keyframes reaccion-cuerpo {
+  0% {
+    transform: scale(1, 1);
+  }
+  13% {
+    transform: scale(1.015, 0.985);
+  }
+  20%,
+  54% {
+    transform: scale(1, 1);
+  }
+  62% {
+    transform: scale(1.06, 0.92);
+  }
+  68% {
+    transform: scale(0.98, 1.025);
+  }
+  74% {
+    transform: scale(1.015, 0.99);
+  }
+  80% {
+    transform: scale(1, 1);
+  }
+  92% {
+    transform: scale(1.012, 1.012);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+/* Recarga de modelos: el grupo es simétrico centrado en (12, 12) → pivote
+   exacto del viewBox (excepción rotor). La transición suaviza la salida del
+   hover a media tensión (con animación en curso no interfiere). */
+.recarga-grupo {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  transition: transform 0.18s ease-out;
+}
+/* Hover: tensión 1-3 (agranda → achica → arma) y queda armada en -24°/0.88. */
+#btnRefrescarModelos:hover .recarga-grupo,
+#btnRefrescarModelos:focus-visible .recarga-grupo {
+  animation: recarga-tension 0.45s ease-out forwards;
+}
+/* Clic: giro 4-5 desde el estado armado (empalme exacto con la tensión) hasta
+   el reposo. Va después del hover (igual especificidad → gana por orden). */
+#btnRefrescarModelos.girando .recarga-grupo {
+  animation: recarga-giro 1.15s cubic-bezier(0.25, 1, 0.5, 1) 1;
+}
+@keyframes recarga-tension {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  30% {
+    transform: rotate(-8deg) scale(1.08);
+  }
+  60% {
+    transform: rotate(-16deg) scale(0.94);
+  }
+  100% {
+    transform: rotate(-24deg) scale(0.88);
+  }
+}
+@keyframes recarga-giro {
+  0% {
+    transform: rotate(-24deg) scale(0.88);
+  }
+  30% {
+    transform: rotate(260deg) scale(1.07);
+  }
+  45% {
+    transform: rotate(382deg) scale(1.04);
+  }
+  60% {
+    transform: rotate(354deg) scale(0.98);
+  }
+  72% {
+    transform: rotate(362.5deg) scale(1.01);
+  }
+  82% {
+    transform: rotate(359.3deg) scale(0.998);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
 }
 #cfgApiKey[aria-invalid="true"],
 #cfgJevKey[aria-invalid="true"] {
@@ -586,6 +803,7 @@ input::placeholder {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 

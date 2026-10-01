@@ -417,7 +417,7 @@ describe("extraerPendientes", () => {
     lote2();
     const btn = el<HTMLButtonElement>("btnIA");
     renderMonto();
-    expect(btn.textContent).toBe("$ Extraer montos $");
+    expect(btn.textContent).toBe("Calcular totales");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");
     const real = globalThis.fetch;
     globalThis.fetch = (async (): Promise<Response> =>
@@ -428,7 +428,7 @@ describe("extraerPendientes", () => {
       globalThis.fetch = real;
     }
     renderMonto(); // la app lo hace vía renderHojas (mockeado aquí)
-    expect(btn.textContent).toBe("Montos extraídos… 2/2");
+    expect(btn.textContent).toBe("Montos extraídos: 2/2");
     expect(btn.style.getPropertyValue("--progreso")).toBe("1");
   });
 

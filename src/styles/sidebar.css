@@ -260,10 +260,19 @@
 .ocr-estado .ojo-abierto {
   opacity: 0;
   transform: scaleY(0.3);
+  /* ponytail: `scale` suelto, no `transform` — compone con el scaleY del
+     parpadeo y equipara el tamaño visual con el cerrado (más ancho). */
+  scale: 1.12;
 }
 .ocr-estado.on .ojo-abierto {
   opacity: 1;
   transform: scaleY(1);
+}
+/* Cerrado más bajo que el abierto: achata párpado para una transición
+   más orgánica (constante, fuera de la transición del parpadeo). */
+.ocr-estado .ojo-cerrado {
+  scale: 1 0.85;
+  translate: 0 3px;
 }
 .ocr-estado.on .ojo-cerrado {
   opacity: 0;
@@ -285,6 +294,62 @@
 .btn-ia:hover {
   background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
+/* Realce botones: halo en ::before estático fundido por opacidad (animar
+   box-shadow repinta por cuadro); #btnIA usa --tia-tinta porque su color
+   es transparente por el recorte, el resto usa currentColor (= tinta hover). */
+.btn-word::before,
+.btn-pdf::before,
+.btn-imprimir::before,
+#btnLimpiar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 8px color-mix(in oklch, currentColor 30%, transparent),
+    0 14px 22px -6px color-mix(in oklch, currentColor 38%, transparent);
+  opacity: 0;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+#btnIA::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 2px 8px color-mix(in oklch, var(--tia-tinta) 30%, transparent),
+    0 14px 22px -6px color-mix(in oklch, var(--tia-tinta) 38%, transparent);
+  opacity: 0;
+  transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+}
+#btnIA:hover,
+#btnIA:focus-visible,
+.btn-word:hover,
+.btn-word:focus-visible,
+.btn-pdf:hover,
+.btn-pdf:focus-visible,
+.btn-imprimir:hover,
+.btn-imprimir:focus-visible {
+  /* ponytail: scale en vez de translateY — trasladar la caja bajo un cursor
+     quieto en el borde oscila el hover (tembleque flecha/puntero). */
+  transform: scale(1.03);
+}
+#btnIA:hover::before,
+#btnIA:focus-visible::before,
+.btn-word:hover::before,
+.btn-word:focus-visible::before,
+.btn-pdf:hover::before,
+.btn-pdf:focus-visible::before,
+.btn-imprimir:hover::before,
+.btn-imprimir:focus-visible::before,
+#btnLimpiar:hover::before,
+#btnLimpiar:focus-visible::before {
+  opacity: 1;
+}
 /* Extraer montos como barra determinada con colores invertidos: el relleno
    avanza con --progreso (0→1, la pinta extract.ts) y el texto, transparente,
    se recorta al gradiente de corte duro (sobre el lleno en contraste, fuera
@@ -297,6 +362,11 @@
 #btnIA {
   --tia-tinta: light-dark(#7a5c2e, tan);
   --tia-lleno: light-dark(var(--papel-brillo), var(--panel));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
   color: transparent;
   border: 1px solid var(--tia-tinta);
   background-image:
@@ -313,6 +383,35 @@
     box-shadow 0.12s,
     background-color 0.12s;
 }
+/* Icono sólido: el botón lleva color transparente (recorte de texto) y sin
+   esto la calculadora heredaría invisible. */
+.btn-ia .ia-ico {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--tia-tinta);
+}
+/* Capa clara: duplica la fila y se revela de izquierda a derecha con el
+   mismo avance de la barra — espeja la inversión del texto sin constantes
+   de geometría (la fila duplicada se centra sola). */
+.btn-ia .ia-capa {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  clip-path: inset(0 calc((1 - var(--progreso, 0)) * 100%) 0 0);
+  pointer-events: none;
+}
+.btn-ia .ia-capa .ia-ico {
+  color: var(--tia-lleno);
+}
+/* Texto fantasma invisible: solo reserva el ancho para que el icono
+   fantasma calce sobre el base (visible duplicaría el texto). */
+.btn-ia .ia-capa .ia-txt {
+  visibility: hidden;
+}
 
 /* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son
    fantasma con color de marca solo en texto y borde (fondo transparente
@@ -321,6 +420,559 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+/* Exportar con iconos: logo a la izquierda, descarga a la derecha. */
+#btnDescargar2,
+#btnPdf,
+#btnImprimir {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.export-ico {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+/* Descarga (Word + PDF): la flecha cae a la bandeja solo en hover/foco;
+   ponytail: pivotes por geometría (fill-box) — punta de flecha y base. */
+.flecha-caida,
+.bandeja,
+.destello-base {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.destello-base {
+  opacity: 0;
+  transform-origin: 50% 50%;
+}
+#btnDescargar2:hover .flecha-caida,
+#btnDescargar2:focus-visible .flecha-caida,
+#btnPdf:hover .flecha-caida,
+#btnPdf:focus-visible .flecha-caida {
+  animation: caida-flecha 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+#btnDescargar2:hover .bandeja,
+#btnDescargar2:focus-visible .bandeja,
+#btnPdf:hover .bandeja,
+#btnPdf:focus-visible .bandeja {
+  animation: bandeja-elastica 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+#btnDescargar2:hover .destello-base,
+#btnDescargar2:focus-visible .destello-base,
+#btnPdf:hover .destello-base,
+#btnPdf:focus-visible .destello-base {
+  animation: destello-base 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes caida-flecha {
+  0% {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+  16% {
+    transform: translateY(-2px) scaleY(0.96);
+    opacity: 1;
+  }
+  42% {
+    transform: translateY(3.5px) scaleY(1.15);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(5px) scaleY(0.85);
+    opacity: 0.9;
+  }
+  58% {
+    transform: translateY(7px) scaleY(0.7);
+    opacity: 0;
+  }
+  59% {
+    transform: translateY(-8px) scaleY(1);
+    opacity: 0;
+  }
+  76% {
+    transform: translateY(0.5px) scaleY(0.98);
+    opacity: 1;
+  }
+  88% {
+    transform: translateY(-0.2px) scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+}
+@keyframes bandeja-elastica {
+  0%,
+  42% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(1.6px) scale(1.05, 0.88);
+  }
+  62% {
+    transform: translateY(-0.8px) scale(0.98, 1.04);
+  }
+  74% {
+    transform: translateY(0.3px) scale(1.01, 0.99);
+  }
+  84%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+}
+@keyframes destello-base {
+  0%,
+  44% {
+    opacity: 0;
+    transform: scaleX(0.7);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scaleX(1);
+  }
+  65% {
+    opacity: 0;
+    transform: scaleX(1.1);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* Impresora con viewBox 512: icono mayor y trazo grueso para igualar el peso
+   visual de los iconos de 24 (≈1.7px a 20px). */
+#btnImprimir .export-ico {
+  width: 32px;
+  height: 32px;
+  /* Verde sólido del modo claro en ambos temas (el currentColor del botón
+     se vuelve pálido en oscuro y lava el icono). */
+  color: var(--verde-tinta);
+}
+/* Hoja de papel: transparente en claro, marfil en oscuro (sin relleno el
+   icono se vacía sobre el fondo oscuro). */
+#btnImprimir .prn-hoja {
+  fill: light-dark(transparent, #fdfaf0);
+  /* Trazo 24px deliberado: iguala el peso visual de los iconos de 24. */
+  stroke-width: 24px;
+}
+/* Impresora imprimiendo: quieta en pose héroe; ciclo de 4.4s en hover/foco.
+   ponytail: pivotes view-box en px verbatim (excepción rotor) — 12 puntos de
+   diseño co-autorados con sus keyframes, fill-box derivaría el movimiento. */
+#btnImprimir .prn-ambient-rig,
+#btnImprimir .prn-chassis-squash,
+#btnImprimir .prn-chassis-rumble,
+#btnImprimir .prn-top-sheet,
+#btnImprimir .prn-bottom-assembly,
+#btnImprimir .prn-text-1,
+#btnImprimir .prn-text-2,
+#btnImprimir .prn-led-ring,
+#btnImprimir .prn-tick-l,
+#btnImprimir .prn-tick-r,
+#btnImprimir .prn-particle,
+#btnImprimir .prn-stream {
+  transform-box: view-box;
+}
+#btnImprimir .prn-led-ring,
+#btnImprimir .prn-tick-l,
+#btnImprimir .prn-tick-r,
+#btnImprimir .prn-particle,
+#btnImprimir .prn-stream {
+  opacity: 0;
+}
+#btnImprimir:hover,
+#btnImprimir:focus-visible {
+  .prn-ambient-rig {
+    animation: prn-amb-float 6.8s ease-in-out infinite;
+  }
+  .prn-chassis-squash {
+    animation: prn-chassis-squash-k 4.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  }
+  .prn-chassis-rumble {
+    animation: prn-chassis-rumble-k 4.4s linear infinite;
+  }
+  .prn-top-sheet {
+    animation: prn-top-sheet-k 4.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  .prn-bottom-assembly {
+    animation: prn-bottom-assembly-k 4.4s cubic-bezier(0.2, 0.8, 0.3, 1) infinite;
+  }
+  .prn-text-1 {
+    animation: prn-text-1-k 4.4s cubic-bezier(0.1, 0.9, 0.2, 1) infinite;
+  }
+  .prn-text-2 {
+    animation: prn-text-2-k 4.4s cubic-bezier(0.1, 0.9, 0.2, 1) infinite;
+  }
+  .prn-led-ring {
+    animation: prn-led-ring-k 4.4s ease-out infinite;
+  }
+  .prn-tick-l {
+    animation: prn-tick-l-k 4.4s steps(1) infinite;
+  }
+  .prn-tick-r {
+    animation: prn-tick-r-k 4.4s steps(1) infinite;
+  }
+  .prn-particle {
+    animation: prn-particle-k 4.4s cubic-bezier(0, 0.8, 0.4, 1) infinite;
+  }
+  .prn-stream {
+    animation: prn-stream-k 4.4s cubic-bezier(0.2, 0.9, 0.4, 1) infinite;
+  }
+}
+@keyframes prn-amb-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.003, 0.997);
+  }
+}
+@keyframes prn-chassis-squash-k {
+  0%,
+  12% {
+    transform: scale(1, 1);
+  }
+  15% {
+    transform: scale(1.025, 0.96) translateY(4px);
+  }
+  18% {
+    transform: scale(0.99, 1.018) translateY(-2px);
+  }
+  21%,
+  34% {
+    transform: scale(1, 1);
+  }
+  36% {
+    transform: scale(1.01, 0.985) translateY(1.5px);
+  }
+  40% {
+    transform: scale(1, 1);
+  }
+  47% {
+    transform: scale(1.015, 0.98) translateY(2px);
+  }
+  51% {
+    transform: scale(0.995, 1.008) translateY(-1px);
+  }
+  56%,
+  100% {
+    transform: scale(1, 1);
+  }
+}
+@keyframes prn-chassis-rumble-k {
+  0%,
+  21% {
+    transform: translate(0, 0);
+  }
+  22% {
+    transform: translate(-3px, 0.5px);
+  }
+  24% {
+    transform: translate(3px, -0.5px);
+  }
+  26% {
+    transform: translate(-3.5px, 0.5px);
+  }
+  28% {
+    transform: translate(3.5px, -0.5px);
+  }
+  30% {
+    transform: translate(-2.5px, 0.5px);
+  }
+  32% {
+    transform: translate(2px, -0.5px);
+  }
+  34%,
+  100% {
+    transform: translate(0, 0);
+  }
+}
+@keyframes prn-top-sheet-k {
+  /* ponytail: tiempos del autor v2 (ciclo 4.4s) — ingesta desde el 12%. */
+  0%,
+  10% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  12% {
+    transform: translateY(-10px) scale(0.98, 1.04);
+  }
+  14% {
+    transform: translateY(-6px);
+  }
+  18% {
+    transform: translateY(115px) scale(0.96, 1.06);
+    opacity: 1;
+  }
+  20%,
+  63% {
+    transform: translateY(120px);
+    opacity: 0;
+  }
+  64% {
+    transform: translateY(-95px) rotate(1.4deg);
+    opacity: 0;
+  }
+  66% {
+    opacity: 1;
+  }
+  73% {
+    transform: translateY(6px) rotate(-0.6deg);
+  }
+  77% {
+    transform: translateY(-3px) rotate(0.3deg);
+  }
+  81% {
+    transform: translateY(1px);
+  }
+  85%,
+  100% {
+    transform: translateY(0) rotate(0);
+    opacity: 1;
+  }
+}
+@keyframes prn-bottom-assembly-k {
+  0%,
+  3% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  5% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+  9% {
+    transform: translateY(180px);
+    opacity: 0;
+  }
+  10%,
+  32% {
+    transform: translateY(-190px);
+    opacity: 0;
+  }
+  33% {
+    transform: translateY(-185px);
+    opacity: 1;
+  }
+  40% {
+    transform: translateY(-90px);
+  }
+  43% {
+    transform: translateY(-86px);
+  }
+  51% {
+    transform: translateY(14px) scale(1, 1.02);
+  }
+  55% {
+    transform: translateY(-6px) scale(1, 0.99);
+  }
+  59% {
+    transform: translateY(2px);
+  }
+  63%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+    opacity: 1;
+  }
+}
+@keyframes prn-text-1-k {
+  0%,
+  3% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  4%,
+  34% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  40%,
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+@keyframes prn-text-2-k {
+  0%,
+  3% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  4%,
+  44% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  45% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+@keyframes prn-led-ring-k {
+  0%,
+  10% {
+    transform: scale(1);
+    opacity: 0.25;
+  }
+  12% {
+    transform: scale(1.6);
+    opacity: 0.8;
+  }
+  16% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  22% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  25% {
+    transform: scale(1.8);
+    opacity: 0.2;
+  }
+  28% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  31% {
+    transform: scale(1.9);
+    opacity: 0.15;
+  }
+  34% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  65%,
+  100% {
+    transform: scale(1);
+    opacity: 0.25;
+  }
+}
+@keyframes prn-tick-l-k {
+  0%,
+  21% {
+    opacity: 0;
+    transform: scaleX(0.4);
+  }
+  23% {
+    opacity: 0.9;
+    transform: scaleX(1) translateX(-3px);
+  }
+  25% {
+    opacity: 0.2;
+    transform: scaleX(0.6);
+  }
+  28% {
+    opacity: 1;
+    transform: scaleX(1.1) translateX(-5px);
+  }
+  31% {
+    opacity: 0.3;
+    transform: scaleX(0.5);
+  }
+  33% {
+    opacity: 0.85;
+    transform: scaleX(1) translateX(-3px);
+  }
+  34%,
+  100% {
+    opacity: 0;
+    transform: scaleX(0.4);
+  }
+}
+@keyframes prn-tick-r-k {
+  0%,
+  22% {
+    opacity: 0;
+    transform: scaleX(0.4);
+  }
+  24% {
+    opacity: 0.95;
+    transform: scaleX(1) translateX(3px);
+  }
+  26% {
+    opacity: 0.2;
+    transform: scaleX(0.6);
+  }
+  29% {
+    opacity: 1;
+    transform: scaleX(1.15) translateX(5px);
+  }
+  32% {
+    opacity: 0.25;
+    transform: scaleX(0.5);
+  }
+  34%,
+  100% {
+    opacity: 0;
+    transform: scaleX(0.4);
+  }
+}
+@keyframes prn-particle-k {
+  0%,
+  13% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+  15% {
+    opacity: 0.9;
+    transform: translate(var(--p-dx), var(--p-dy)) scale(1.2);
+  }
+  18% {
+    opacity: 0;
+    transform: translate(calc(var(--p-dx) * 1.5), calc(var(--p-dy) * 1.5)) scale(0);
+  }
+  19%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes prn-stream-k {
+  0%,
+  46% {
+    opacity: 0;
+    transform: scaleY(0.2) translateY(-20px);
+  }
+  49% {
+    opacity: 0.75;
+    transform: scaleY(1.1) translateY(0);
+  }
+  52% {
+    opacity: 0.4;
+    transform: scaleY(1.3) translateY(25px);
+  }
+  55% {
+    opacity: 0;
+    transform: scaleY(0.3) translateY(45px);
+  }
+  56%,
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #btnImprimir .prn-ambient-rig,
+  #btnImprimir .prn-chassis-squash,
+  #btnImprimir .prn-chassis-rumble,
+  #btnImprimir .prn-top-sheet,
+  #btnImprimir .prn-bottom-assembly,
+  #btnImprimir .prn-text-1,
+  #btnImprimir .prn-text-2,
+  #btnImprimir .prn-led-ring,
+  #btnImprimir .prn-tick-l,
+  #btnImprimir .prn-tick-r,
+  #btnImprimir .prn-particle,
+  #btnImprimir .prn-stream {
+    animation: none !important;
+  }
 }
 .btn-word {
   background: transparent;
@@ -350,11 +1002,683 @@
 .btn-imprimir:hover {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
+/* Realce orgánico de exportar: elevación en el botón y halo/sombra en
+   ::before estático fundido por opacidad (currentColor = marca). */
+.btn-word,
+.btn-pdf,
+.btn-imprimir {
+  position: relative;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-word:hover,
+  .btn-word:focus-visible,
+  .btn-pdf:hover,
+  .btn-pdf:focus-visible,
+  .btn-imprimir:hover,
+  .btn-imprimir:focus-visible,
+  #btnIA:hover,
+  #btnIA:focus-visible,
+  #btnLimpiar:hover,
+  #btnLimpiar:focus-visible {
+    transform: none;
+  }
+}
 
-/* Ajustes al fondo del sidebar (flex columna: auto empuja abajo). */
-.panel-ajustes {
+/* Limpiar + Ajustes al fondo (el auto va en limpiar: si ambos lo llevan, el
+   espacio libre se reparte; gap 12 + margen 4 = 16px entre ellos). */
+.panel-limpiar {
   margin-top: auto;
+  margin-bottom: 4px;
+}
+#btnLimpiar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  position: relative;
+  /* Borde reservado transparente: el rojo de hover no recoloca nada. */
+  border: 1px solid transparent;
+}
+/* Inversión fantasma + realce en hover/foco (las escobas heredan el rojo
+   por currentColor; el halo común vive arriba y usa currentColor). */
+#btnLimpiar:hover,
+#btnLimpiar:focus-visible {
+  background-color: color-mix(in srgb, var(--sello) 12%, transparent);
+  color: #f04438;
+  border-color: var(--sello);
+  /* ponytail: scale en vez de translateY — ver #btnIA (tembleque de hover). */
+  transform: scale(1.03);
+}
+/* Escoba acrobática: quieta en reposo; ciclo de 6.4s solo en hover/foco.
+   Los fx (estelas, ondas, polvo, destellos) nacen en opacity 0: en estático
+   solo se ve la escoba limpia. Pivotes por geometría (fill-box). */
+#btnLimpiar .export-ico {
+  width: 28px;
+  height: 28px;
+}
+#btnLimpiar .escoba-der {
+  transform: scaleX(-1);
+}
+.esc-anim-body {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+}
+.esc-anim-spin {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+.esc-anim-squash {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.esc-anim-mango {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.esc-anim-cerdas {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+}
+.esc-trail {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  opacity: 0;
+}
+.esc-shock {
+  fill: none;
+  stroke: currentColor;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  opacity: 0;
+}
+.esc-dust {
+  fill: currentColor;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+.esc-star-wrap {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  opacity: 0;
+}
+#btnLimpiar:hover,
+#btnLimpiar:focus-visible {
+  .esc-ambient {
+    animation: esc-kf-ambient 7.3s ease-in-out infinite alternate;
+  }
+  .esc-anim-body {
+    animation: esc-kf-body 6.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  }
+  .esc-anim-spin {
+    animation: esc-kf-spin 6.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+  .esc-anim-squash {
+    animation: esc-kf-squash 6.4s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  }
+  .esc-anim-mango {
+    animation: esc-kf-mango 6.4s cubic-bezier(0.33, 1, 0.68, 1) infinite;
+  }
+  .esc-anim-cerdas {
+    animation: esc-kf-cerdas 6.4s cubic-bezier(0.33, 1, 0.68, 1) infinite;
+  }
+  .esc-trail-1 {
+    animation: esc-kf-trail-1 6.4s ease-out infinite;
+  }
+  .esc-trail-2 {
+    animation: esc-kf-trail-2 6.4s ease-out infinite;
+  }
+  .esc-shock-1 {
+    animation: esc-kf-shock-1 6.4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  }
+  .esc-shock-2 {
+    animation: esc-kf-shock-2 6.4s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+  }
+  .esc-dust-1 {
+    animation: esc-kf-dust-1 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-dust-2 {
+    animation: esc-kf-dust-2 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-dust-3 {
+    animation: esc-kf-dust-3 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-dust-4 {
+    animation: esc-kf-dust-4 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-dust-5 {
+    animation: esc-kf-dust-5 6.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  }
+  .esc-star-1 {
+    animation: esc-kf-star-1 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  }
+  .esc-star-2 {
+    animation: esc-kf-star-2 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  }
+  .esc-star-3 {
+    animation: esc-kf-star-3 6.4s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  }
+}
+@keyframes esc-kf-ambient {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  100% {
+    transform: translate(1.5px, -1.2px) rotate(1deg);
+  }
+}
+@keyframes esc-kf-body {
+  /* ponytail: ventana útil vieja [14→91] remapeada a [0→100] — sin los
+     holds de entrada/salida la animación arranca al instante y el loop no
+     espera. La coreografía interna no cambia (mapeo lineal). */
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  10% {
+    transform: translate(-8px, 5px) rotate(-4deg);
+  }
+  18% {
+    transform: translate(9px, -3px) rotate(5deg);
+  }
+  23% {
+    transform: translate(10px, -4px) rotate(6deg);
+  }
+  31% {
+    transform: translate(-5px, 2px) rotate(-3deg);
+  }
+  38% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  42% {
+    transform: translate(0, 6px) rotate(0deg);
+  }
+  47% {
+    transform: translate(0, -22px) rotate(0deg);
+  }
+  53% {
+    transform: translate(0, -32px) rotate(0deg);
+  }
+  60% {
+    transform: translate(0, -18px) rotate(0deg);
+  }
+  64% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  68% {
+    transform: translate(0, -6px) rotate(0deg);
+  }
+  71% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  75% {
+    transform: translate(-3px, 0) rotate(4deg);
+  }
+  78% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  81% {
+    transform: translate(3px, 0) rotate(-3.5deg);
+  }
+  83%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+@keyframes esc-kf-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  43% {
+    transform: rotate(0deg);
+  }
+  61% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+@keyframes esc-kf-squash {
+  0% {
+    transform: scale(1, 1);
+  }
+  10% {
+    transform: scale(0.96, 1.05);
+  }
+  18% {
+    transform: scale(1.04, 0.96);
+  }
+  23% {
+    transform: scale(1, 1);
+  }
+  39% {
+    transform: scale(1, 1);
+  }
+  42% {
+    transform: scale(1.25, 0.75);
+  }
+  45% {
+    transform: scale(0.85, 1.2);
+  }
+  53% {
+    transform: scale(0.95, 1.05);
+  }
+  61% {
+    transform: scale(0.88, 1.15);
+  }
+  64% {
+    transform: scale(1.36, 0.66);
+  }
+  68% {
+    transform: scale(0.94, 1.08);
+  }
+  71% {
+    transform: scale(1.04, 0.97);
+  }
+  75% {
+    transform: scale(1.02, 0.98);
+  }
+  81% {
+    transform: scale(1.02, 0.98);
+  }
+  84%,
+  100% {
+    transform: scale(1, 1);
+  }
+}
+@keyframes esc-kf-mango {
+  0% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(-2deg);
+  }
+  18% {
+    transform: rotate(3deg);
+  }
+  23% {
+    transform: rotate(-1deg);
+  }
+  31% {
+    transform: rotate(2deg);
+  }
+  38% {
+    transform: rotate(0deg);
+  }
+  42% {
+    transform: rotate(-2deg);
+  }
+  47% {
+    transform: rotate(4deg);
+  }
+  53% {
+    transform: rotate(-2deg);
+  }
+  64% {
+    transform: rotate(6deg);
+  }
+  68% {
+    transform: rotate(-3deg);
+  }
+  71%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+@keyframes esc-kf-cerdas {
+  0% {
+    transform: skewX(0deg) scaleY(1);
+  }
+  10% {
+    transform: skewX(17deg) scaleY(0.93);
+  }
+  14% {
+    transform: skewX(-27deg) scaleY(1.07);
+  }
+  19% {
+    transform: skewX(18deg) scaleY(0.96);
+  }
+  25% {
+    transform: skewX(-4deg) scaleY(1);
+  }
+  31% {
+    transform: skewX(21deg) scaleY(0.95);
+  }
+  35% {
+    transform: skewX(-10deg) scaleY(1.02);
+  }
+  39%,
+  43% {
+    transform: skewX(0deg) scaleY(1);
+  }
+  47% {
+    transform: skewX(-7deg) scaleY(1.04);
+  }
+  53% {
+    transform: skewX(5deg) scaleY(1);
+  }
+  60% {
+    transform: skewX(-4deg) scaleY(1);
+  }
+  64% {
+    transform: skewX(0deg) scaleY(0.85);
+  }
+  68% {
+    transform: skewX(0deg) scaleY(1.05);
+  }
+  75% {
+    transform: skewX(-5deg) scaleY(1);
+  }
+  81% {
+    transform: skewX(4deg) scaleY(1);
+  }
+  84%,
+  100% {
+    transform: skewX(0deg) scaleY(1);
+  }
+}
+@keyframes esc-kf-trail-1 {
+  0%,
+  14% {
+    opacity: 0;
+    stroke-dasharray: 10 120;
+    stroke-dashoffset: 40;
+  }
+  17% {
+    opacity: 0.9;
+    stroke-dasharray: 45 120;
+    stroke-dashoffset: 10;
+  }
+  22% {
+    opacity: 0.6;
+    stroke-dasharray: 30 120;
+    stroke-dashoffset: -30;
+  }
+  25%,
+  100% {
+    opacity: 0;
+    stroke-dasharray: 10 120;
+    stroke-dashoffset: -60;
+  }
+}
+@keyframes esc-kf-trail-2 {
+  0%,
+  27% {
+    opacity: 0;
+    stroke-dasharray: 10 120;
+    stroke-dashoffset: 30;
+  }
+  30% {
+    opacity: 0.8;
+    stroke-dasharray: 40 120;
+    stroke-dashoffset: 5;
+  }
+  34% {
+    opacity: 0.5;
+    stroke-dasharray: 25 120;
+    stroke-dashoffset: -25;
+  }
+  36%,
+  100% {
+    opacity: 0;
+    stroke-dasharray: 5 120;
+    stroke-dashoffset: -50;
+  }
+}
+@keyframes esc-kf-shock-1 {
+  0%,
+  63% {
+    opacity: 0;
+    transform: scale(0.2);
+    stroke-width: 2.4;
+  }
+  64% {
+    opacity: 0.95;
+    transform: scale(0.4);
+    stroke-width: 2;
+  }
+  70% {
+    opacity: 0.4;
+    transform: scale(1.4);
+    stroke-width: 1.2;
+  }
+  74%,
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+    stroke-width: 0.4;
+  }
+}
+@keyframes esc-kf-shock-2 {
+  0%,
+  75% {
+    opacity: 0;
+    transform: scale(0.3);
+    stroke-width: 1.8;
+  }
+  77% {
+    opacity: 0.85;
+    transform: scale(0.6);
+    stroke-width: 1.5;
+  }
+  81%,
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+    stroke-width: 0.4;
+  }
+}
+@keyframes esc-kf-dust-1 {
+  0%,
+  14% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0);
+  }
+  17% {
+    opacity: 0.9;
+    transform: translate(0, 0) scale(1);
+  }
+  23% {
+    opacity: 0.7;
+    transform: translate(22px, -10px) scale(1.1);
+  }
+  27%,
+  100% {
+    opacity: 0;
+    transform: translate(36px, 8px) scale(0.2);
+  }
+}
+@keyframes esc-kf-dust-2 {
+  0%,
+  16% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0);
+  }
+  18% {
+    opacity: 0.85;
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    opacity: 0.6;
+    transform: translate(28px, -18px) scale(0.9);
+  }
+  29%,
+  100% {
+    opacity: 0;
+    transform: translate(44px, -2px) scale(0.1);
+  }
+}
+@keyframes esc-kf-dust-3 {
+  0%,
+  17% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0);
+  }
+  19% {
+    opacity: 0.8;
+    transform: translate(0, 0) scale(1);
+  }
+  26% {
+    opacity: 0.5;
+    transform: translate(32px, -26px) scale(0.8);
+  }
+  30%,
+  100% {
+    opacity: 0;
+    transform: translate(50px, -10px) scale(0.2);
+  }
+}
+@keyframes esc-kf-dust-4 {
+  0%,
+  27% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0);
+  }
+  30% {
+    opacity: 0.85;
+    transform: translate(0, 0) scale(1);
+  }
+  35% {
+    opacity: 0.6;
+    transform: translate(-22px, -12px) scale(0.9);
+  }
+  39%,
+  100% {
+    opacity: 0;
+    transform: translate(-38px, 6px) scale(0.2);
+  }
+}
+@keyframes esc-kf-dust-5 {
+  0%,
+  29% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0);
+  }
+  31% {
+    opacity: 0.8;
+    transform: translate(0, 0) scale(1);
+  }
+  36% {
+    opacity: 0.5;
+    transform: translate(-28px, -18px) scale(0.8);
+  }
+  40%,
+  100% {
+    opacity: 0;
+    transform: translate(-45px, -2px) scale(0.1);
+  }
+}
+@keyframes esc-kf-star-1 {
+  0%,
+  83% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  88% {
+    opacity: 1;
+    transform: scale(1.3) rotate(45deg);
+  }
+  92% {
+    opacity: 0;
+    transform: scale(0) rotate(90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0) rotate(90deg);
+  }
+}
+@keyframes esc-kf-star-2 {
+  0%,
+  87% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  92% {
+    opacity: 1;
+    transform: scale(1.4) rotate(-45deg);
+  }
+  96% {
+    opacity: 0;
+    transform: scale(0) rotate(-90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0) rotate(-90deg);
+  }
+}
+@keyframes esc-kf-star-3 {
+  0%,
+  91% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  96% {
+    opacity: 1;
+    transform: scale(1.35) rotate(60deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0) rotate(120deg);
+  }
+}
+/* Movimiento reducido: la global solo acorta la duración y con 10 capas de
+   opacidad eso sería estrobo en hover — aquí quietud total garantizada. */
+@media (prefers-reduced-motion: reduce) {
+  #btnLimpiar .esc-ambient,
+  #btnLimpiar .esc-anim-body,
+  #btnLimpiar .esc-anim-spin,
+  #btnLimpiar .esc-anim-squash,
+  #btnLimpiar .esc-anim-mango,
+  #btnLimpiar .esc-anim-cerdas,
+  #btnLimpiar .esc-trail-1,
+  #btnLimpiar .esc-trail-2,
+  #btnLimpiar .esc-shock-1,
+  #btnLimpiar .esc-shock-2,
+  #btnLimpiar .esc-dust-1,
+  #btnLimpiar .esc-dust-2,
+  #btnLimpiar .esc-dust-3,
+  #btnLimpiar .esc-dust-4,
+  #btnLimpiar .esc-dust-5,
+  #btnLimpiar .esc-star-1,
+  #btnLimpiar .esc-star-2,
+  #btnLimpiar .esc-star-3 {
+    animation: none !important;
+  }
+  #btnLimpiar .esc-trail,
+  #btnLimpiar .esc-shock,
+  #btnLimpiar .esc-dust,
+  #btnLimpiar .esc-star-wrap {
+    opacity: 0 !important;
+  }
 }
 .panel-ajustes .btn {
   min-height: 44px;
+}
+#btnAjustes {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.ajustes-ico {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+/* Engranaje: gira continuo solo en hover/foco (corona simétrica cada 60°:
+   el reseteo al salir es invisible, sin tics). */
+#btnAjustes:hover .engranaje-giro,
+#btnAjustes:focus-visible .engranaje-giro {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: giro-engranaje 2.4s linear infinite;
+}
+@keyframes giro-engranaje {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

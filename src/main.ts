@@ -12,25 +12,49 @@ import { getEl } from "./utils";
 
 const TEMA_KEY = "libro-mayor-tema";
 const btnTema: HTMLButtonElement = getEl<HTMLButtonElement>("btnTema");
-const temaIcono: HTMLElement = getEl("temaIcono");
 
 function aplicarTema(tema: string): void {
   document.documentElement.dataset["tema"] = tema;
-  temaIcono.textContent = tema === "claro" ? "☀" : "☾";
   btnTema.title = tema === "claro" ? "Cambiar a oscuro" : "Cambiar a claro";
 }
 
-function initTema(): void {
-  const guardado = localStorage.getItem(TEMA_KEY);
-  if (guardado) {
-    aplicarTema(guardado);
-    return;
+// ponytail: pura e inyectada para testear sin arrancar el bootstrap.
+export function resolverTema(
+  guardado: string | null,
+  luz: boolean,
+  oscuridad: boolean,
+): "claro" | "oscuro" {
+  if (guardado === "claro" || guardado === "oscuro") return guardado;
+  if (luz) return "claro";
+  if (oscuridad) return "oscuro";
+  // Sin matchMedia o sin coincidencia (modo desconocido) el default es claro.
+  return "claro";
+}
+
+function leerTemaGuardado(): string | null {
+  try {
+    return localStorage.getItem(TEMA_KEY);
+  } catch {
+    return null; // almacenamiento bloqueado: cae al SO/default, nunca aborta el boot
   }
-  const prefiereClaro = window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false;
-  aplicarTema(prefiereClaro ? "claro" : "oscuro");
+}
+
+function initTema(): void {
+  const mm =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia.bind(window)
+      : null;
+  aplicarTema(
+    resolverTema(
+      leerTemaGuardado(),
+      mm?.("(prefers-color-scheme: light)").matches ?? false,
+      mm?.("(prefers-color-scheme: dark)").matches ?? false,
+    ),
+  );
 }
 
 cargar();
+initTema();
 if (state.hojas.length === 0) state.hojas.push(crearHoja());
 initSheets({ agregarArchivos, pedirArchivos: elegirArchivos });
 initSidebar();
@@ -41,10 +65,13 @@ initExport();
 void initGithub();
 btnTema.addEventListener("click", () => {
   const nuevo = document.documentElement.dataset["tema"] === "claro" ? "oscuro" : "claro";
-  localStorage.setItem(TEMA_KEY, nuevo);
+  try {
+    localStorage.setItem(TEMA_KEY, nuevo);
+  } catch {
+    // almacenamiento bloqueado: el tema aplica igual, solo no persiste
+  }
   aplicarTema(nuevo);
 });
 renderCodigo();
 renderHojas();
 renderOcrToggle();
-initTema();
