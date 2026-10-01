@@ -65,7 +65,11 @@ initExport();
 void initGithub();
 btnTema.addEventListener("click", () => {
   const nuevo = document.documentElement.dataset["tema"] === "claro" ? "oscuro" : "claro";
-  localStorage.setItem(TEMA_KEY, nuevo);
+  try {
+    localStorage.setItem(TEMA_KEY, nuevo);
+  } catch {
+    // almacenamiento bloqueado: el tema aplica igual, solo no persiste
+  }
   aplicarTema(nuevo);
 });
 renderCodigo();

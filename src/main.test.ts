@@ -19,7 +19,14 @@ vi.mock("./ui/github", () => ({ initGithub: vi.fn() }));
 vi.mock("./ui/recorte", () => ({ initRecorte: vi.fn() }));
 vi.mock("./export/salidas", () => ({ initExport: vi.fn() }));
 vi.mock("./utils", () => ({
-  getEl: vi.fn(() => ({ title: "", addEventListener: () => {} })),
+  getEl: vi.fn(() => ({
+    title: "",
+    addEventListener: (_ev: string, fn: () => void) => {
+      const g = globalThis as unknown as { __temaClicks?: Array<() => void> };
+      g.__temaClicks ??= [];
+      g.__temaClicks.push(fn);
+    },
+  })),
 }));
 
 const { resolverTema } = await import("./main");
@@ -40,5 +47,30 @@ describe("resolverTema", () => {
     expect(resolverTema(null, true, false)).toBe("claro");
     expect(resolverTema(null, false, true)).toBe("oscuro");
     expect(resolverTema(null, false, false)).toBe("claro");
+  });
+});
+
+describe("toggle con storage bloqueado", () => {
+  it("aplica el tema aunque el guardado falle", () => {
+    const g = globalThis as unknown as { __temaClicks?: Array<() => void> };
+    const handler = g.__temaClicks?.[0];
+    if (!handler) throw new Error("sin handler de tema");
+    const original = localStorage.setItem.bind(localStorage);
+    Object.defineProperty(localStorage, "setItem", {
+      value: () => {
+        throw new Error("bloqueado");
+      },
+      configurable: true,
+    });
+    try {
+      document.documentElement.dataset["tema"] = "claro";
+      expect(() => handler()).not.toThrow();
+      expect(document.documentElement.dataset["tema"]).toBe("oscuro");
+    } finally {
+      Object.defineProperty(localStorage, "setItem", {
+        value: original,
+        configurable: true,
+      });
+    }
   });
 });
