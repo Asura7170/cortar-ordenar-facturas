@@ -553,6 +553,7 @@
    icono se vacía sobre el fondo oscuro). */
 #btnImprimir .prn-hoja {
   fill: light-dark(transparent, #fdfaf0);
+  /* Trazo 24px deliberado: iguala el peso visual de los iconos de 24. */
   stroke-width: 24px;
 }
 /* Impresora imprimiendo: quieta en pose héroe; ciclo de 4.4s en hover/foco.

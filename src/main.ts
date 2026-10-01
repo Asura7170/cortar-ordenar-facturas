@@ -18,20 +18,39 @@ function aplicarTema(tema: string): void {
   btnTema.title = tema === "claro" ? "Cambiar a oscuro" : "Cambiar a claro";
 }
 
-function resolverTema(): "claro" | "oscuro" {
-  const guardado = localStorage.getItem(TEMA_KEY);
+// ponytail: pura e inyectada para testear sin arrancar el bootstrap.
+export function resolverTema(
+  guardado: string | null,
+  luz: boolean,
+  oscuridad: boolean,
+): "claro" | "oscuro" {
   if (guardado === "claro" || guardado === "oscuro") return guardado;
-  // ponytail: doble query explícita — sin matchMedia o sin coincidencia
-  // (modo desconocido) el default es claro, no oscuro.
-  if (typeof window.matchMedia === "function") {
-    if (window.matchMedia("(prefers-color-scheme: light)").matches) return "claro";
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "oscuro";
-  }
+  if (luz) return "claro";
+  if (oscuridad) return "oscuro";
+  // Sin matchMedia o sin coincidencia (modo desconocido) el default es claro.
   return "claro";
 }
 
+function leerTemaGuardado(): string | null {
+  try {
+    return localStorage.getItem(TEMA_KEY);
+  } catch {
+    return null; // almacenamiento bloqueado: cae al SO/default, nunca aborta el boot
+  }
+}
+
 function initTema(): void {
-  aplicarTema(resolverTema());
+  const mm =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia.bind(window)
+      : null;
+  aplicarTema(
+    resolverTema(
+      leerTemaGuardado(),
+      mm?.("(prefers-color-scheme: light)").matches ?? false,
+      mm?.("(prefers-color-scheme: dark)").matches ?? false,
+    ),
+  );
 }
 
 cargar();
