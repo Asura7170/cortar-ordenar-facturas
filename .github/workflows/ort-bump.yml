@@ -60,8 +60,13 @@ jobs:
           cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.mjs \
             node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.asyncify.wasm public/ort/
           sed -i "s/onnxruntime-web\` $vieja/onnxruntime-web\` $ver/; s/onnxruntime-web $vieja/onnxruntime-web $ver/" AGENTS.md spec.md
+          sed -i "s/VERSION_ORT = \"$vieja\"/VERSION_ORT = \"$ver\"/" src/pipeline/ortWasm.ts
           if grep -rn "onnxruntime-web[\` ]$vieja" AGENTS.md spec.md package.json; then
             echo "::error::Quedan menciones a la versión vieja."
+            exit 1
+          fi
+          if grep -rn "VERSION_ORT = \"$vieja\"" src/pipeline/ortWasm.ts; then
+            echo "::error::VERSION_ORT sin actualizar."
             exit 1
           fi
           git status --porcelain public/ort/
@@ -88,7 +93,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$rama"
-          git add package.json pnpm-lock.yaml public/ort/ AGENTS.md spec.md
+          git add package.json pnpm-lock.yaml public/ort/ AGENTS.md spec.md src/pipeline/ortWasm.ts
           git commit -m "Sube onnxruntime-web a $ver (pipeline ort-bump: vendoreado + validado)"
           git push -u origin "$rama"
           gh pr create --title "chore(ort): onnxruntime-web $ver (auto, validado)" \

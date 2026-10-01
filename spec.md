@@ -20,7 +20,7 @@ facturas/
 ├─ spec.md               # este archivo (fuente técnica)
 ├─ public/
 │  ├─ models/fastvit_sa24_h_e_bifpn_256_fp32.onnx + ocr/det.onnx + ocr/rec.onnx + NOTICE.txt
-│  ├─ ort/ort-wasm-simd-threaded.asyncify.{mjs,wasm}  # wasmPaths = BASE_URL ort/
+│  ├─ ort/ort-wasm-simd-threaded.asyncify.{mjs,wasm}  # local en dev; en PROD wasmPaths va al CDN (límite Pages)
 │  └─ fonts/*.woff2 + llms.txt + robots.txt
 └─ src/
    ├─ main.ts            # bootstrap: cargar() → init* → renders
@@ -59,7 +59,7 @@ facturas/
 ## 3. Pipeline
 
 - **imagen `imagen.ts`:** `LADO_MAX_IMAGEN=2000`, `CALIDAD_WEBP=0.85`, `BLANCO_UMBRAL=245/MUESTRA=4/RATIO=0.995` (+ `esPaginaNegra` mismo ratio). `normalizarImagen` → passthrough jpg/png/webp intacto si nada que corregir, si no WebP; `recortarMargenesBlancos` (bbox por lado uniforme del color que sea: refs por mediana de borde, `TOL_LADO=15`, esquinas por franja perpendicular; guarda 15% si ralo `AREA_MINIMA=0.15`); error tipado `blanca|ilegible` (negra reuse `blanca`).
-- **docaligner `docaligner.ts:25,34,38,461,514`:** `LADO_MODELO=256`, `PAD_BORDE=100` (extrapola esquinas cortadas), `UMBRAL_HEATMAP=0.3`, `RUTA_MODELO=local en dev, HuggingFace /resolve/ en prod (Pages rechaza >25MB)`, `TIMEOUT_MODELO_MS=300s` + `descargarConCache` en caché `modelos` (una descarga por navegador y clave, dedup en vuelo, mínimo 50MB anti-corruptos, `put` con warn), `tamanoModelos/borrarModelos/olvidarSesionFallida` en Ajustes, `TIMEOUT_EP_MS=30s` + `conTimeout` + latch `epCaidos` + `reintentarEps`, singleton `obtenerSesion/crearSesion`, `wasmPaths=BASE_URL ort/`, `numThreads=1`, EPs `["webgpu","wasm"]`. Sin quad plausible → imagen completa, la cola sigue. `rectificar` pasa el warp por `recortarMargenesBlancos` (2º pase: quita cuñas blancas del quad salido).
+- **docaligner `docaligner.ts:25,34,38,461,514`:** `LADO_MODELO=256`, `PAD_BORDE=100` (extrapola esquinas cortadas), `UMBRAL_HEATMAP=0.3`, `RUTA_MODELO=local en dev, HuggingFace /resolve/ en prod (Pages rechaza >25MB)`, `TIMEOUT_MODELO_MS=300s` + `descargarConCache` en caché `modelos` (una descarga por navegador y clave, dedup en vuelo, mínimo 50MB anti-corruptos, `put` con warn), `tamanoModelos/borrarModelos/olvidarSesionFallida` en Ajustes, `TIMEOUT_EP_MS=30s` + `conTimeout` + latch `epCaidos` + `reintentarEps`, singleton `obtenerSesion/crearSesion`, `wasmPaths=local ort/ en dev, CDN pineado en prod`, `numThreads=1`, EPs `["webgpu","wasm"]`. Sin quad plausible → imagen completa, la cola sigue. `rectificar` pasa el warp por `recortarMargenesBlancos` (2º pase: quita cuñas blancas del quad salido).
 - **ocr `ocr.ts:21-22,65,205`:** `RUTA_DET/REC=BASE_URL models/ocr/*.onnx`, `TIMEOUT_OCR_MS=120s`, `LADO_DET_MAX=960`, `DET_MEDIA/STD` ImageNet, `MULTIPLO=32`, `UMBRAL_MAPA_VACIO=0.0005`, `UMBRAL_REC_OK=0.9`, `TOP_CAJAS_GIRO=2`, `GIROS=[0,270,90,180]`, `CHUNK_REC=16`. `enderezar()` prueba giros y queda con mejor confianza; det solo recorta líneas. `det/rec` también en caché `modelos` (`descargarPesosOcr` precarga sin sesiones).
 - **queue `queue.ts`:** `precalentarModelos()` al agregar, fases `detectarYRecortar→enderezar→extraerTexto→ok` (la celda pinta el full-res con lazy, sin miniaturas), guards `buscarSlot` no-resucita, `console.info` timings, auto `extraerPendientes({desdeCola:true})` al drenar.
 - **rotar `rotar.ts:16,29`:** `QUIETUD_GIRO_MS=1500`, `girarYReleer(id,90|270)` con debounce; relee OCR y reabre si era manual.

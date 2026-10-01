@@ -3,6 +3,7 @@
    ocrDb.ts/ocrRec.ts. Entrada: blob ya recortado por DocAligner; salida:
    texto plano por líneas ("" si no hay texto o algo falla: la cola sigue). */
 import { descargarConCache, iniciarSesion } from "./docaligner";
+import { rutaWasmOrt } from "./ortWasm";
 import { DICT_OCR } from "./ocrDict";
 import { cajasDesdeMapa } from "./ocrDb";
 import type { CajaDb } from "./ocrDb";
@@ -99,7 +100,8 @@ export function envolver(
 async function nucleoReal(): Promise<NucleoOcr> {
   // ponytail: mismos valores que docaligner (single-thread: COEP bloquea pthreads).
   const ort: OrtModulo = await import("onnxruntime-web/webgpu");
-  ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`;
+  // ponytail: misma fuente que docaligner (single-thread: COEP bloquea pthreads).
+  ort.env.wasm.wasmPaths = rutaWasmOrt(import.meta.env.PROD, import.meta.env.BASE_URL);
   ort.env.wasm.numThreads = 1;
   const crearSesion =
     (pesos: ArrayBuffer) =>
