@@ -631,6 +631,9 @@ describe("pegarEnCelda (clic en vacía)", () => {
     await pegarEnCelda(h.id, 1);
     expect(items().filter(Boolean)).toHaveLength(0);
     expect(aviso.textContent).toContain("no hay imagen");
+    // El Ctrl+C al archivo en el Explorador no trae bytes: se guía a Ctrl+V.
+    expect(aviso.textContent).toContain("Explorador");
+    expect(aviso.textContent).toContain("Ctrl+V");
   });
 
   it("permiso denegado avisa sin colocar", async () => {

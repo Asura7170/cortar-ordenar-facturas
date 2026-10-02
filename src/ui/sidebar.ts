@@ -233,6 +233,12 @@ interface ItemConImagen {
   getType(tipo: string): Promise<Blob>;
 }
 
+// Sin bytes de imagen el clic no puede pegar: el Ctrl+C al ARCHIVO en el
+// Explorador deja una referencia (no bytes) y el navegador no la entrega vía
+// read() — ese caso solo entra por Ctrl+V o la tarjeta. El mensaje cubre ambos.
+const MOTIVO_SIN_IMAGEN: string =
+  "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pega con Ctrl+V";
+
 // Clic en celda vacía: lee la imagen del portapapeles del SO (copiada en
 // WhatsApp con clic derecho > Copiar imagen) y la coloca en ese slot exacto.
 // El read() corre sin await previo: el gesto del clic lo autoriza en Chrome.
@@ -257,13 +263,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
   try {
     items = await lector.read();
   } catch {
-    avisar([
-      {
-        archivo: "Portapapeles",
-        motivo:
-          "no hay imagen para pegar: cópiala primero en WhatsApp (clic derecho > Copiar imagen)",
-      },
-    ]);
+    avisar([{ archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN }]);
     return;
   }
   const archivos: File[] = [];
@@ -279,13 +279,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     }
   }
   if (archivos.length === 0) {
-    avisar([
-      {
-        archivo: "Portapapeles",
-        motivo:
-          "no hay imagen para pegar: cópiala primero en WhatsApp (clic derecho > Copiar imagen)",
-      },
-    ]);
+    avisar([{ archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN }]);
     return;
   }
   intakesActivos++;
