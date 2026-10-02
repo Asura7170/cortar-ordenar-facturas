@@ -9,6 +9,7 @@ import {
   eventoPaste,
 } from "../test/fixture";
 import type { PaginaPdf } from "../pipeline/pdf";
+import type { Comprobante } from "../types";
 
 // El conteo real abre el PDF con pdf.js: stub fijo (cada test lo ajusta).
 let paginasSimuladas = 5;
@@ -19,6 +20,8 @@ function paginaSimulada(indice: number, total: number): PaginaPdf {
 let expansionSimulada: PaginaPdf[] = [paginaSimulada(1, 1)];
 // La normalización real necesita Chrome: stub (cada test lo ajusta).
 const fallosImagen = new Map<string, string>();
+// Compuerta para simular carreras (barrer hojas mientras la normalización pende).
+let esperaNormalizar: Promise<unknown> | null = null;
 vi.mock("../pipeline/imagen", async (importOriginal) => {
   const real = await importOriginal<typeof import("../pipeline/imagen")>();
   return {
@@ -26,6 +29,7 @@ vi.mock("../pipeline/imagen", async (importOriginal) => {
     normalizarImagen: async (f: File): Promise<Blob> => {
       const motivo = fallosImagen.get(f.name);
       if (motivo) throw new Error(motivo);
+      if (esperaNormalizar) await esperaNormalizar;
       return new Blob(["x"], { type: "image/jpeg" });
     },
   };
@@ -41,8 +45,16 @@ vi.mock("../pipeline/pdf", async (importOriginal) => {
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
-const { agregarArchivos, elegirArchivos, initSidebar, renderCodigo } = await import("./sidebar");
+const {
+  agregarArchivos,
+  elegirArchivos,
+  initSidebar,
+  pegarDelPortapapeles,
+  pegarEnCelda,
+  renderCodigo,
+} = await import("./sidebar");
 const { archivo, comprobante } = await import("../test/factoria");
+const { HOJA_FANTASMA } = await import("./sheets");
 
 const canvas = el("canvas");
 const aviso = el("aviso");
@@ -54,11 +66,30 @@ const modalLimpiar = el<HTMLDialogElement>("modalLimpiar");
 
 initSidebar();
 
+/** Portapapeles simulado (los dos describes de pegado lo comparten). */
+const realClipboard = navigator.clipboard;
+
+function mockRead(read: () => Promise<unknown>): void {
+  Object.defineProperty(navigator, "clipboard", { value: { read }, configurable: true });
+}
+
+function itemPng(): { types: string[]; getType: () => Promise<Blob> } {
+  return {
+    types: ["image/png"],
+    getType: async () => new Blob(["x"], { type: "image/png" }),
+  };
+}
+
+function restaurarPortapapeles(): void {
+  Object.defineProperty(navigator, "clipboard", { value: realClipboard, configurable: true });
+}
+
 beforeEach(() => {
   // La cola MOCK usa sleep(900ms): timers falsos para que nunca avance en tests.
   vi.useFakeTimers();
   paginasSimuladas = 5;
   fallosImagen.clear();
+  esperaNormalizar = null;
   expansionSimulada = [paginaSimulada(1, 1)];
 });
 
@@ -563,5 +594,254 @@ describe("modalLimpiar", () => {
     expect(state.hojas[0]).toBe(h);
     expect(state.codigoValor).toBe("123456");
     expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toEqual(blob);
+  });
+});
+
+describe("pegarEnCelda (clic en vacía)", () => {
+  function items(): (Comprobante | null)[] {
+    return state.hojas.flatMap((h) => h.slots);
+  }
+
+  afterEach(() => {
+    restaurarPortapapeles();
+  });
+
+  it("coloca exacto en el slot clicado", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u4x2");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 2);
+    expect(h.slots[2]?.nombre).toBe("pegado.png");
+    expect(h.slots[1]).toBeNull();
+    expect(aviso.textContent).toBe("");
+  });
+
+  it("slot ocupado → primer hueco de la misma hoja", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u4x2");
+    h.slots[0] = comprobante();
+    h.slots[2] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 2);
+    expect(h.slots[1]?.nombre).toBe("pegado.png");
+    expect(items().filter(Boolean)).toHaveLength(3);
+  });
+
+  it("hoja llena → nueva hoja heredando layout", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u1");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 0);
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[1]?.layout).toBe("u1");
+    expect(state.hojas[1]?.slots[0]?.nombre).toBe("pegado.png");
+  });
+
+  it("portapapeles sin imagen avisa sin colocar", async () => {
+    aviso.textContent = "";
+    mockRead(async () => [{ types: ["text/plain"], getType: async () => new Blob(["x"]) }]);
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("no hay imagen");
+    // El Ctrl+C al archivo en el Explorador no trae bytes: se guía a Ctrl+V.
+    expect(aviso.textContent).toContain("Explorador");
+    expect(aviso.textContent).toContain("Ctrl+V");
+  });
+
+  it("permiso denegado avisa sin colocar", async () => {
+    aviso.textContent = "";
+    mockRead(async () => {
+      throw new Error("denegado");
+    });
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("no hay imagen");
+  });
+
+  it("sin API read avisa Ctrl+V", async () => {
+    aviso.textContent = "";
+    Object.defineProperty(navigator, "clipboard", { value: {}, configurable: true });
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("Ctrl+V");
+  });
+
+  it("normalizar que rechaza avisa sin colocar", async () => {
+    aviso.textContent = "";
+    fallosImagen.set("pegado.png", "ilegible");
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("no se pudo leer");
+  });
+
+  it("resto multi-imagen llena la misma hoja clicada", async () => {
+    mockRead(async () => [itemPng(), itemPng()]);
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(state.hojas).toHaveLength(1);
+    expect(h.slots.filter(Boolean)).toHaveLength(2);
+    expect(h.slots[1]?.nombre).toBe("pegado.png");
+  });
+
+  it("formato fuera del allowlist avisa igual que Ctrl+V", async () => {
+    aviso.textContent = "";
+    mockRead(async () => [{ types: ["image/avif"], getType: async () => new Blob(["x"]) }]);
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("formato no soportado");
+  });
+
+  it("hoja inexistente no hace nada", async () => {
+    aviso.textContent = "";
+    mockRead(async () => [itemPng()]);
+    await pegarEnCelda(999999, 0);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toBe("");
+  });
+
+  it("clic fantasma materializa hoja con layout heredado en el slot", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u2h");
+    h.slots[0] = comprobante();
+    h.slots[1] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 1);
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[1]?.layout).toBe("u2h");
+    expect(state.hojas[1]?.slots[1]?.nombre).toBe("pegado.png");
+    expect(state.hojas[1]?.slots[0]).toBeNull();
+  });
+
+  it("doble clic fantasma cae al hueco de la misma hoja", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u2h");
+    h.slots[0] = comprobante();
+    h.slots[1] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[1]?.slots.filter(Boolean)).toHaveLength(2);
+  });
+
+  it("fantasma rancio reutiliza huecos de la última sin fragmentar", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u4x2");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 2);
+    expect(state.hojas).toHaveLength(1);
+    expect(h.slots[2]?.nombre).toBe("pegado.png");
+  });
+
+  it("fantasma + portapapeles vacío no crea hoja", async () => {
+    aviso.textContent = "";
+    mockRead(async () => [{ types: ["text/plain"], getType: async () => new Blob(["x"]) }]);
+    const h = crearHoja("u1");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]).toBe(h);
+    expect(aviso.textContent).toContain("no hay imagen");
+  });
+
+  it("hoja barrida durante la normalización cae al flujo normal", async () => {
+    let abrir!: () => void;
+    esperaNormalizar = new Promise<void>((res) => {
+      abrir = res;
+    });
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u1");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    const pendiente = pegarEnCelda(HOJA_FANTASMA, 0);
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    expect(state.hojas).toHaveLength(1); // aún no materializada: normalizando
+    state.hojas = [crearHoja("u4x2")]; // barrido en el ínterin
+    abrir();
+    await pendiente;
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
+    expect(h.slots.filter(Boolean)).toHaveLength(1); // la desvinculada intacta
+  });
+
+  it("fantasma + normalización que rechaza no deja hoja vacía", async () => {
+    aviso.textContent = "";
+    fallosImagen.set("pegado.png", "ilegible");
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u1");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]).toBe(h);
+    expect(aviso.textContent).toContain("no se pudo leer");
+  });
+
+  it("en modo OCR no pega ni lee", async () => {
+    const leer = vi.fn(async () => [itemPng()]);
+    mockRead(leer);
+    state.modoOcr = true;
+    try {
+      const h = crearHoja("u4x2");
+      state.hojas.push(h);
+      await pegarEnCelda(h.id, 0);
+      expect(leer).not.toHaveBeenCalled();
+      expect(items().filter(Boolean)).toHaveLength(0);
+    } finally {
+      state.modoOcr = false;
+    }
+  });
+});
+
+describe("pegarDelPortapapeles (lote vacío)", () => {
+  afterEach(() => {
+    restaurarPortapapeles();
+  });
+
+  it("pega sin destino: crea la hoja desde el vacío", async () => {
+    mockRead(async () => [itemPng()]);
+    await pegarDelPortapapeles();
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
+    expect(aviso.textContent).toBe("");
+  });
+
+  it("sin imagen avisa sin crear hojas", async () => {
+    aviso.textContent = "";
+    mockRead(async () => []);
+    await pegarDelPortapapeles();
+    expect(state.hojas).toHaveLength(0);
+    expect(aviso.textContent).toContain("no hay imagen");
+  });
+
+  it("el botón cablea el pegado y el doble-clic no duplica", async () => {
+    const btn = el<HTMLButtonElement>("btnPegar");
+    let soltar: () => void = () => {};
+    const lectura = new Promise<unknown>((r) => {
+      soltar = () => r([itemPng()]);
+    });
+    mockRead(() => lectura);
+    btn.click();
+    btn.click();
+    soltar();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
+    expect(btn.dataset["pegando"]).toBeUndefined();
   });
 });

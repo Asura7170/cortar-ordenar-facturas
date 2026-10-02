@@ -6,11 +6,21 @@ vi.mock("./state", () => ({
   crearHoja: vi.fn(() => ({})),
   state: { hojas: [] as unknown[] },
 }));
-vi.mock("./ui/sheets", () => ({ initSheets: vi.fn(), renderHojas: vi.fn() }));
+vi.mock("./ui/sheets", () => {
+  const registro = globalThis as unknown as { __initSheetsArgs?: unknown[][] };
+  registro.__initSheetsArgs ??= [];
+  return {
+    initSheets: vi.fn((...args: unknown[]) => {
+      registro.__initSheetsArgs?.push(args);
+    }),
+    renderHojas: vi.fn(),
+  };
+});
 vi.mock("./ui/sidebar", () => ({
   agregarArchivos: vi.fn(),
   elegirArchivos: vi.fn(),
   initSidebar: vi.fn(),
+  pegarEnCelda: vi.fn(),
   renderCodigo: vi.fn(),
 }));
 vi.mock("./ui/ocrMode", () => ({ initOcrMode: vi.fn(), renderOcrToggle: vi.fn() }));
@@ -30,6 +40,10 @@ vi.mock("./utils", () => ({
 }));
 
 const { resolverTema } = await import("./main");
+
+function argsInitSheets(): unknown[][] {
+  return (globalThis as unknown as { __initSheetsArgs?: unknown[][] }).__initSheetsArgs ?? [];
+}
 
 describe("resolverTema", () => {
   it("guardado válido manda sobre el SO", () => {
@@ -72,5 +86,13 @@ describe("toggle con storage bloqueado", () => {
         configurable: true,
       });
     }
+  });
+});
+
+describe("cableado de hojas", () => {
+  it("initSheets recibe pegarEnCelda (sin esta red el clic muere en silencio)", () => {
+    const llamadas = argsInitSheets()[0] as unknown[];
+    expect(argsInitSheets()).toHaveLength(1);
+    expect(llamadas[0]).toEqual(expect.objectContaining({ pegarEnCelda: expect.any(Function) }));
   });
 });

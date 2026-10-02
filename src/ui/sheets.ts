@@ -25,6 +25,11 @@ const lupaCanvas: HTMLCanvasElement = getEl<HTMLCanvasElement>("lupaCanvas");
 const lupaCtx: CanvasRenderingContext2D | null = lupaCanvas.getContext("2d");
 // Tarjeta de subida: visible solo con cero comprobantes.
 const tarjetaVacia: HTMLElement = getEl("dropzone");
+// Botón de pegado del lote vacío: junto a la tarjeta (lookup perezoso con
+// guarda: importar sidebar sería ciclo, y el nodo puede remontarse).
+function btnPegarVacio(): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>("#btnPegar");
+}
 const canvasEl: HTMLElement | null = document.querySelector(".canvas");
 
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
@@ -79,7 +84,28 @@ function pintarCelda(
 
   if (!item) {
     div.classList.add("empty");
-    div.textContent = "Vacío";
+    // En modo OCR el pegado por clic está bloqueado: queda el texto inerte.
+    if (state.modoOcr) {
+      div.textContent = "Vacío";
+      return;
+    }
+    const pegar = document.createElement("button");
+    pegar.type = "button";
+    pegar.className = "cell-pegar";
+    pegar.dataset["accion"] = "pegar";
+    pegar.dataset["hoja"] = String(hojaId);
+    pegar.dataset["slot"] = String(slotIdx);
+    pegar.title = "Pegar la imagen copiada";
+    pegar.setAttribute("aria-label", "Pegar la imagen copiada aquí");
+    const mas = document.createElement("span");
+    mas.className = "cell-pegar-mas";
+    mas.setAttribute("aria-hidden", "true");
+    mas.textContent = "＋";
+    const txt = document.createElement("span");
+    txt.className = "cell-pegar-txt";
+    txt.textContent = "Clic para pegar";
+    pegar.append(mas, txt);
+    div.append(pegar);
     return;
   }
 
@@ -201,6 +227,13 @@ function panelHoja(hoja: Hoja, idx: number): string {
     </aside>`;
 }
 
+/** Todas las hojas al tope (el fantasma solo aparece en ese caso). */
+function todasLlenas(): boolean {
+  return (
+    state.hojas.length > 0 && state.hojas.every((h) => cuentaHoja(h) >= layoutDe(h.layout).total)
+  );
+}
+
 /** Cuerpo del render (siempre bajo `mutandoHojas`: el swap destruye el foco). */
 function renderCuerpo(borrador: BorradorMonto | null): void {
   rectsCache = null;
@@ -210,6 +243,8 @@ function renderCuerpo(borrador: BorradorMonto | null): void {
 
   if (n === 0) {
     tarjetaVacia.hidden = false;
+    const pegar = btnPegarVacio();
+    if (pegar) pegar.hidden = false;
     renderMonto();
     return;
   }
@@ -254,7 +289,36 @@ function renderCuerpo(borrador: BorradorMonto | null): void {
     row.append(lado);
     sheetsEl.append(row);
   });
+  // Hoja fantasma: solo visual (nunca entra a state.hojas, así no se
+  // exporta ni se cuenta). Hereda el layout de la última; al pegar en
+  // ella se materializa como hoja real. Va en .sheet-row con la columna
+  // vacía para alinear el borde izquierdo con las hojas reales.
+  if (!state.modoOcr && todasLlenas()) {
+    const ultima = state.hojas[state.hojas.length - 1];
+    const l = layoutDe(ultima?.layout ?? "u4x2");
+    const fila = document.createElement("div");
+    fila.className = "sheet-row";
+    fila.dataset["hoja"] = String(HOJA_FANTASMA);
+    const fantasma = document.createElement("article");
+    fantasma.className = "sheet sheet-fantasma";
+    fantasma.dataset["hoja"] = String(HOJA_FANTASMA);
+    const grid = document.createElement("div");
+    grid.className = "sheet-grid";
+    grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
+    l.pos.forEach((p, i) => grid.append(celda(null, p, i, HOJA_FANTASMA)));
+    const tag = document.createElement("span");
+    tag.className = "sheet-tag";
+    tag.textContent = `HOJA ${state.hojas.length + 1} · nueva`;
+    fantasma.append(tag, grid);
+    const lado = document.createElement("div");
+    lado.className = "sheet-side";
+    lado.setAttribute("aria-hidden", "true");
+    fila.append(fantasma, lado);
+    sheetsEl.append(fila);
+  }
   tarjetaVacia.hidden = true;
+  const pegar = btnPegarVacio();
+  if (pegar) pegar.hidden = true;
   renderMonto();
   if (borrador) restaurarBorrador(borrador);
 }
@@ -690,10 +754,14 @@ function celdaRect(c: Element): DOMRect {
 function celdaBajoPunto(x: number, y: number, excluir: Element | null): HTMLElement | null {
   const el = document.elementFromPoint(x, y);
   const directa = el?.closest?.(".cell");
-  if (directa instanceof HTMLElement) return directa;
+  if (directa instanceof HTMLElement && !directa.closest(".sheet-fantasma")) return directa;
   const hoja = el?.closest?.(".sheet");
   const scope: ParentNode = hoja ?? sheetsEl;
-  const celulas = [...scope.querySelectorAll(".cell")].filter((c) => c !== excluir);
+  // El fantasma no es destino de drag (clic-sí / drag-no): se excluye del
+  // barrido para no prometer un drop que sería no-op.
+  const celulas = [...scope.querySelectorAll(".cell")].filter(
+    (c) => c !== excluir && !c.closest(".sheet-fantasma"),
+  );
   let mejor: HTMLElement | null = null,
     mejorD = Infinity;
   for (const c of celulas) {
@@ -844,7 +912,17 @@ function finalizarDrag(x: number, y: number): void {
 export interface SheetsCallbacks {
   agregarArchivos: (files: FileList | File[] | null | undefined, hojaId?: number | null) => void;
   pedirArchivos: (hojaId: number) => void;
+  /** Clic en celda vacía: pega el portapapeles en ese slot exacto. */
+  pegarEnCelda?: (hojaId: number, slotIdx: number) => Promise<void> | void;
 }
+
+/** Id de la hoja fantasma (solo visual, nunca en state.hojas): los ids reales son ≥1.
+    Clic-sí / drag-no (el drag la ignora); el drop la normaliza a null en el borde. */
+export const HOJA_FANTASMA: number = -1;
+
+// ponytail: callbacks vigentes (initSheets los refresca aunque los listeners ya
+// existan: HMR/tests re-cablean sin duplicar).
+let callbacks: SheetsCallbacks | null = null;
 
 // ponytail: swap destructivo en curso (un change que llegue ahora es eco de
 // remoción, no edición del usuario: se ignora en el handler change).
@@ -866,6 +944,7 @@ export function esEcoDeRemocion(target: HTMLInputElement): boolean {
 }
 
 export function initSheets(cb: SheetsCallbacks): void {
+  callbacks = cb;
   // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
   if (sheetsEl.dataset["init"] === "1") return;
   sheetsEl.dataset["init"] = "1";
@@ -1066,8 +1145,28 @@ export function initSheets(cb: SheetsCallbacks): void {
         aplicarATodas(btn.dataset["hoja"] ?? "");
         return;
       case "agregar": {
+        // El fantasma no tiene botón ＋ (su columna va vacía): -1 nunca llega acá.
         const destino = Number(btn.dataset["hoja"]);
-        if (Number.isInteger(destino)) cb.pedirArchivos(destino);
+        if (Number.isInteger(destino)) callbacks?.pedirArchivos(destino);
+        return;
+      }
+      case "pegar": {
+        // En modo OCR el pegado por clic está bloqueado (como el reordenamiento).
+        if (state.modoOcr) return;
+        if (!(btn instanceof HTMLButtonElement)) return;
+        // ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces).
+        if (btn.dataset["pegando"] === "1") return;
+        const celda = cell instanceof HTMLElement ? cell.dataset : null;
+        const hoja = Number(btn.dataset["hoja"] ?? celda?.["hoja"] ?? NaN);
+        const slot = Number(btn.dataset["slot"] ?? celda?.["slot"] ?? NaN);
+        if (!Number.isInteger(hoja) || !Number.isInteger(slot)) return;
+        const listo = callbacks?.pegarEnCelda?.(hoja, slot);
+        if (listo instanceof Promise) {
+          btn.dataset["pegando"] = "1";
+          void listo.finally(() => {
+            delete btn.dataset["pegando"];
+          });
+        }
         return;
       }
     }
@@ -1133,7 +1232,8 @@ export function initSheets(cb: SheetsCallbacks): void {
     sheetsEl.querySelectorAll(".sheet.file-drop").forEach((s) => {
       if (s !== sheet) s.classList.remove("file-drop");
     });
-    if (sheet instanceof HTMLElement) sheet.classList.add("file-drop");
+    if (sheet instanceof HTMLElement && sheet.dataset["hoja"] !== String(HOJA_FANTASMA))
+      sheet.classList.add("file-drop");
   });
 
   sheetsEl.addEventListener("dragleave", (e) => {
@@ -1153,8 +1253,11 @@ export function initSheets(cb: SheetsCallbacks): void {
     const target = e.target as HTMLElement | null;
     const sheet = target?.closest?.(".sheet");
     cancelarDragVisual();
-    if (sheet instanceof HTMLElement)
-      cb.agregarArchivos(e.dataTransfer?.files, Number(sheet.dataset["hoja"]));
+    if (sheet instanceof HTMLElement) {
+      // El centinela nunca cruza el borde: el fantasma va por el flujo normal.
+      const crudo = Number(sheet.dataset["hoja"]);
+      callbacks?.agregarArchivos(e.dataTransfer?.files, crudo === HOJA_FANTASMA ? null : crudo);
+    }
   });
 
   canvasEl?.addEventListener(

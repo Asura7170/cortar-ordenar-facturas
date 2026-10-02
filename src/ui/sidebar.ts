@@ -12,7 +12,7 @@ import {
 import type { Comprobante } from "../types";
 import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
-import { esDragDeArchivos, renderHojas } from "./sheets";
+import { HOJA_FANTASMA, esDragDeArchivos, renderHojas } from "./sheets";
 import { precalentarModelos, procesarCola } from "../pipeline/queue";
 import { extraerPendientes } from "../pipeline/extract";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
@@ -33,6 +33,7 @@ function radiosPosicion(): NodeListOf<HTMLInputElement> {
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
 const aviso: HTMLElement = getEl("aviso");
 const btnIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnIA");
+const btnPegar: HTMLButtonElement = getEl<HTMLButtonElement>("btnPegar");
 
 /** Rechazo de entrada: nombre en tono tenue + motivo en rojo sello. */
 interface AvisoRechazo {
@@ -73,6 +74,28 @@ function textoMotivo(m: MotivoRechazo): string {
 // ponytail: contador, no booleano — dos intakes solapados (paste durante un
 // PDF largo) no sueltan loteEnCurso a mitad del otro.
 let intakesActivos = 0;
+
+// Formatos de imagen del intake (clic / Ctrl+V / drop): un solo allowlist.
+const MIME_IMAGEN: RegExp = /^image\/(jpeg|png|webp|bmp|gif)$/i;
+
+/** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
+let hojaPedida: number | null = null;
+
+/** Comprobante pendiente desde un blob normalizado (vías clic e intake). */
+function comprobanteDesdeBlob(blob: Blob, nombre: string): Comprobante {
+  return {
+    id: nextComprobanteId(),
+    nombre: sanear(nombre),
+    file: blob,
+    imgUrl: URL.createObjectURL(blob),
+    textoOcr: "",
+    montoCents: null,
+    montoManual: false,
+    moneda: "USD",
+    estado: "pendiente",
+    posicion: 0,
+  };
+}
 export async function agregarArchivos(
   files: FileList | readonly File[] | null | undefined,
   hojaId: number | null = null,
@@ -82,7 +105,7 @@ export async function agregarArchivos(
   const destino = hojaId ?? hojaPedida;
   hojaPedida = null;
   const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
-  const esImagen = (f: File): boolean => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type);
+  const esImagen = (f: File): boolean => MIME_IMAGEN.test(f.type);
   const avisos: AvisoRechazo[] = lista
     .filter((f) => !esImagen(f) && !esPdf(f))
     .map((f) => ({ archivo: sanear(f.name), motivo: "formato no soportado" }));
@@ -151,20 +174,7 @@ export async function agregarArchivos(
           const tN = performance.now();
           const blob = await normalizarImagen(f);
           if (import.meta.env.DEV) msNorm.push(performance.now() - tN);
-          colocar([
-            {
-              id: nextComprobanteId(),
-              nombre: sanear(f.name),
-              file: blob,
-              imgUrl: URL.createObjectURL(blob),
-              textoOcr: "",
-              montoCents: null,
-              montoManual: false,
-              moneda: "USD",
-              estado: "pendiente",
-              posicion: 0,
-            },
-          ]);
+          colocar([comprobanteDesdeBlob(blob, f.name)]);
         } catch {
           avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
         }
@@ -227,6 +237,161 @@ export async function agregarArchivos(
   void procesarCola();
 }
 
+/** Item del portapapeles con al menos una imagen (shape mínimo de ClipboardItem). */
+interface ItemConImagen {
+  readonly types: readonly string[];
+  getType(tipo: string): Promise<Blob>;
+}
+
+// Sin bytes de imagen el clic no puede pegar: el Ctrl+C al ARCHIVO en el
+// Explorador deja una referencia (no bytes) y el navegador no la entrega vía
+// read() — ese caso solo entra por Ctrl+V o la tarjeta. El mensaje cubre ambos.
+const MOTIVO_SIN_IMAGEN: string =
+  "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pega con Ctrl+V";
+
+// Lee los bytes de imagen del portapapeles del SO. Null = ya se avisó.
+// El read() corre sin await previo: el gesto del clic lo autoriza en Chrome.
+async function leerImagenesPortapapeles(): Promise<File[] | null> {
+  const lector = (
+    globalThis as unknown as {
+      navigator?: { clipboard?: { read?: () => Promise<ItemConImagen[]> } };
+    }
+  ).navigator?.clipboard;
+  if (typeof lector?.read !== "function") {
+    avisar([
+      {
+        archivo: "Portapapeles",
+        motivo: "este navegador no permite pegar con clic: usa Ctrl+V",
+      },
+    ]);
+    return null;
+  }
+  let items: readonly ItemConImagen[];
+  try {
+    items = await lector.read();
+  } catch {
+    avisar([{ archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN }]);
+    return null;
+  }
+  const archivos: File[] = [];
+  let formatoNoSoportado = false;
+  for (const item of items) {
+    const tipo = (item.types ?? []).find((t) => t.startsWith("image/"));
+    if (!tipo) continue;
+    const cruda = (tipo.split("/")[1] ?? "").split(";")[0]?.toLowerCase() ?? "";
+    if (!MIME_IMAGEN.test(`image/${cruda}`)) {
+      formatoNoSoportado = true; // mismo mensaje que Ctrl+V para esos bytes
+      continue;
+    }
+    try {
+      const blob = await item.getType(tipo);
+      archivos.push(new File([blob], `pegado.${cruda}`, { type: `image/${cruda}` }));
+    } catch {
+      // item ilegible: se ignora; el aviso final cubre el vacío total
+    }
+  }
+  if (archivos.length === 0) {
+    avisar([
+      {
+        archivo: "Portapapeles",
+        motivo: formatoNoSoportado ? "formato no soportado" : MOTIVO_SIN_IMAGEN,
+      },
+    ]);
+    return null;
+  }
+  return archivos;
+}
+
+// Clic en celda vacía: lee la imagen del portapapeles del SO (copiada en
+// WhatsApp con clic derecho > Copiar imagen) y la coloca en ese slot exacto.
+export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
+  if (state.modoOcr) return;
+  // Lee antes de mutar: si no hay imagen no se toca el estado (el fantasma
+  // no se materializa ni se consume la hoja pedida). Sin await previo: el
+  // gesto del clic autoriza el read() en Chrome.
+  const archivos = await leerImagenesPortapapeles();
+  if (!archivos) return;
+  const primero = archivos[0];
+  if (!primero) return;
+  let destino = hojaId === HOJA_FANTASMA ? undefined : hojaPorId(hojaId);
+  if (!destino && hojaId === HOJA_FANTASMA) {
+    // Clic en la hoja fantasma (solo visual): hoja pendiente con el layout de
+    // la última, que se materializa recién con la normalización buena (abajo).
+    // Si la última ya tiene huecos (carrera con otro intake), se reutiliza.
+    const ultima = state.hojas[state.hojas.length - 1];
+    destino = ultima && ultima.slots.includes(null) ? ultima : crearHoja(ultima?.layout ?? "u4x2");
+  }
+  if (!destino) return;
+  // Elección explícita de destino: consume la pendiente del picker (si no, el
+  // próximo intake caería en una hoja abandonada).
+  hojaPedida = null;
+  const layoutRespaldo = destino.layout;
+  intakesActivos++;
+  state.loteEnCurso = true;
+  try {
+    let comp: Comprobante;
+    try {
+      comp = comprobanteDesdeBlob(await normalizarImagen(primero), primero.name);
+    } catch {
+      avisar([{ archivo: sanear(primero.name), motivo: "no se pudo leer" }]);
+      return;
+    }
+    // Materializa recién con la normalización buena (si falla, no queda hoja
+    // vacía) y solo si sigue haciendo falta: misma política compacta del
+    // fallback de abajo — si otro intake abrió un hueco, manda ese.
+    if (
+      hojaId === HOJA_FANTASMA &&
+      !state.hojas.includes(destino) &&
+      !state.hojas.some((x) => x.slots.includes(null))
+    ) {
+      state.hojas.push(destino);
+    }
+    // Re-resuelve tras el await: la hoja pudo barrerse (limpiar/cambio de
+    // layout) mientras la normalización pendía; nunca se escribe en un
+    // objeto desvinculado.
+    const vigente = hojaPorId(destino.id);
+    const h = vigente && state.hojas.includes(vigente) ? vigente : null;
+    let afinidad: number | null = h?.id ?? null;
+    if (h && slotIdx >= 0 && slotIdx < h.slots.length && h.slots[slotIdx] == null) {
+      h.slots[slotIdx] = comp;
+    } else if (h && h.slots.includes(null)) {
+      const libre = h.slots.indexOf(null);
+      if (libre >= 0) h.slots[libre] = comp;
+    } else {
+      // Hoja llena o barrida en el ínterin: flujo normal (última con hueco o
+      // nueva heredando layout).
+      const actual =
+        state.hojas.find((x) => x.slots.includes(null)) ??
+        (() => {
+          const nueva = crearHoja(h?.layout ?? layoutRespaldo);
+          state.hojas.push(nueva);
+          return nueva;
+        })();
+      const libre = actual.slots.indexOf(null);
+      if (libre >= 0) actual.slots[libre] = comp;
+      afinidad = actual.id;
+    }
+    renderHojas();
+    // Resto (raro desde WhatsApp): sigue a la hoja donde cayó `primero`.
+    const resto = archivos.slice(1);
+    if (resto.length > 0) await agregarArchivos(resto, afinidad);
+    else avisar([]); // éxito: limpia un rechazo viejo de otro intento
+    precalentarModelos();
+    void procesarCola();
+  } finally {
+    intakesActivos--;
+    state.loteEnCurso = intakesActivos > 0;
+  }
+}
+
+// Lote vacío (botón bajo la tarjeta): pega lo copiado sin destino,
+// por el flujo normal de entrada (crea la hoja sola).
+export async function pegarDelPortapapeles(): Promise<void> {
+  const archivos = await leerImagenesPortapapeles();
+  if (!archivos) return;
+  await agregarArchivos(archivos);
+}
+
 export function renderCodigo(): void {
   chkCodigo.checked = state.codigoActivo;
   numCodigo.value = String(state.codigoLongitud);
@@ -244,9 +409,6 @@ export function renderCodigo(): void {
     r.disabled = !state.codigoActivo;
   });
 }
-
-/** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
-let hojaPedida: number | null = null;
 
 /** Abre el diálogo para subir directo a una hoja (la consume cualquier intake). */
 export function elegirArchivos(hojaId: number): void {
@@ -322,6 +484,15 @@ export function initSidebar(): void {
       .map((it) => it.getAsFile())
       .filter((f): f is File => f !== null);
     if (files.length) void agregarArchivos(files);
+  });
+  // Lote vacío: el botón pega lo copiado sin abrir el buscador.
+  // ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces).
+  btnPegar.addEventListener("click", () => {
+    if (btnPegar.dataset["pegando"] === "1") return;
+    btnPegar.dataset["pegando"] = "1";
+    void pegarDelPortapapeles().finally(() => {
+      delete btnPegar.dataset["pegando"];
+    });
   });
 
   // Reintento manual del lote IA (el auto corre al drenar la cola).

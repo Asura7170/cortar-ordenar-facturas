@@ -162,6 +162,16 @@
   z-index: 2;
 }
 
+/* Hoja fantasma: solo visual (no existe en el estado ni se exporta). */
+.sheet-fantasma {
+  border: 2px dashed var(--renglon-fuerte);
+  box-shadow: none;
+  opacity: 0.85;
+}
+.sheet-fantasma .sheet-tag {
+  border-style: dashed;
+}
+
 /* Fila hoja + panel de distribución (siempre visible, a la derecha) */
 .sheet-row {
   display: flex;
@@ -183,13 +193,18 @@
   scrollbar-width: thin;
   scrollbar-color: var(--texto-panel-suave) transparent;
 }
-/* Columna derecha de la hoja: panel arriba, botón de agregar debajo. */
+/* Columna derecha de la hoja: panel arriba, botón de agregar debajo.
+   Sticky en el rango de su fila (el scroll container es .canvas, sin
+   overflows intermedios que lo recorten). */
 .sheet-side {
   width: 224px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: sticky;
+  top: 12px;
+  align-self: flex-start;
 }
 /* Botón ＋ por hoja: sólido en reposo; en hover se vuelve fantasma
    discontinuo (mismo lenguaje que el overlay de arrastre del canvas). */
@@ -351,6 +366,64 @@
   border-radius: 4px;
   color: var(--tinta-fina);
   font-size: 12px;
+}
+/* Botón de pegado en la celda vacía (llena la casilla: un clic grande para mayores). */
+.cell-pegar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 8px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.cell-pegar:hover,
+.cell-pegar:focus-visible {
+  background: var(--verde-claro);
+  box-shadow: inset 0 0 0 2px var(--verde-tinta);
+  outline: 2px solid var(--verde-tinta);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  .cell-pegar:hover,
+  .cell-pegar:focus-visible {
+    box-shadow: none;
+    outline: 2px solid CanvasText;
+  }
+}
+.cell-pegar-mas {
+  font-size: 28px;
+  line-height: 1;
+}
+.cell-pegar-txt {
+  font-size: 12px;
+}
+.cell-pegar[data-pegando="1"],
+.btn-pegar[data-pegando="1"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Pegado del lote vacío: secundario bajo la tarjeta, mismo icono que copiar-OCR. */
+.btn-pegar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 560px;
+  margin: 12px auto 0;
+}
+.pegar-ico {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 .cell img {
   width: 100%;

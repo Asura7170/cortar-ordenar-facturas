@@ -1,7 +1,13 @@
 /* Bootstrap: carga estado, cablea módulos y pinta el primer frame. */
 import { cargar, crearHoja, state } from "./state";
 import { initSheets } from "./ui/sheets";
-import { agregarArchivos, elegirArchivos, initSidebar, renderCodigo } from "./ui/sidebar";
+import {
+  agregarArchivos,
+  elegirArchivos,
+  initSidebar,
+  pegarEnCelda,
+  renderCodigo,
+} from "./ui/sidebar";
 import { initOcrMode, renderOcrToggle } from "./ui/ocrMode";
 import { initSettings } from "./ui/settingsModal";
 import { initGithub } from "./ui/github";
@@ -56,7 +62,7 @@ function initTema(): void {
 cargar();
 initTema();
 if (state.hojas.length === 0) state.hojas.push(crearHoja());
-initSheets({ agregarArchivos, pedirArchivos: elegirArchivos });
+initSheets({ agregarArchivos, pedirArchivos: elegirArchivos, pegarEnCelda });
 initSidebar();
 initOcrMode();
 initSettings();

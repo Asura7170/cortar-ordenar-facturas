@@ -17,6 +17,7 @@ const {
   cambiarLayoutHoja,
   esDragDeArchivos,
   esEcoDeRemocion,
+  HOJA_FANTASMA,
   initSheets,
   quitarComprobante,
   renderHojas,
@@ -29,7 +30,8 @@ import type { Comprobante, Hoja, LayoutId } from "../types";
 
 const agregarArchivos = vi.fn();
 const pedirArchivos = vi.fn();
-initSheets({ agregarArchivos, pedirArchivos });
+const pegarEnCelda = vi.fn();
+initSheets({ agregarArchivos, pedirArchivos, pegarEnCelda });
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -306,8 +308,8 @@ describe("celdas", () => {
     h.slots[0] = c;
     state.hojas.push(h);
     renderHojas();
-    // La celda propia es la última (el rebuild pinta en orden de hojas).
-    const celdas = document.querySelectorAll(".cell");
+    // La celda propia es la última real (el fantasma va en .sheet-fantasma).
+    const celdas = document.querySelectorAll(".sheet:not(.sheet-fantasma) .cell");
     const cell = celdas.item(celdas.length - 1);
     if (!(cell instanceof HTMLElement)) throw new Error("sin celda propia");
     const input = cell.querySelector("input.cell-monto");
@@ -678,6 +680,22 @@ describe("drop de archivos sobre hojas", () => {
     const files = [new File(["x"], "d.png", { type: "image/png" })];
     document.querySelector(".sheet")?.dispatchEvent(eventoDrop(files));
     expect(agregarArchivos).toHaveBeenCalledWith(files, h.id);
+  });
+
+  it("drop sobre el fantasma va por el flujo normal (null)", () => {
+    sembrar("u1", [100]); // llena → fantasma
+    const files = [new File(["x"], "d.png", { type: "image/png" })];
+    agregarArchivos.mockClear();
+    document.querySelector(".sheet-fantasma")?.dispatchEvent(eventoDrop(files));
+    expect(agregarArchivos).toHaveBeenCalledWith(files, null);
+  });
+
+  it("dragover sobre el fantasma no resalta", () => {
+    sembrar("u1", [100]); // llena → fantasma
+    const fantasma = document.querySelector(".sheet-fantasma");
+    if (!fantasma) throw new Error("sin fantasma");
+    fantasma.dispatchEvent(eventoDragover());
+    expect(fantasma.classList.contains("file-drop")).toBe(false);
   });
 
   it("en modo OCR el drop sigue activo (la entrada nunca se bloquea)", () => {
@@ -1428,5 +1446,145 @@ describe("drag entre celdas (swap)", () => {
       restaurar();
       document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
     }
+  });
+});
+
+describe("pegar con clic en vacía", () => {
+  function botonPegar(): HTMLButtonElement {
+    const b = document.querySelector<HTMLButtonElement>('[data-accion="pegar"]');
+    if (!b) throw new Error("sin botón pegar");
+    return b;
+  }
+
+  function pressVacia(): Event {
+    return Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+  }
+
+  it("vacía pinta botón con destino hoja/slot", () => {
+    const h = sembrar("u4x2", [100, null]);
+    const botones = [...document.querySelectorAll<HTMLButtonElement>('[data-accion="pegar"]')];
+    expect(botones).toHaveLength(3);
+    expect(botones[0]?.dataset["hoja"]).toBe(String(h.id));
+    expect(botones[0]?.dataset["slot"]).toBe("1");
+    expect(botones[0]?.getAttribute("aria-label")).toContain("Pegar");
+  });
+
+  it("clic delega hoja y slot al callback", () => {
+    const h = sembrar("u4x2", [100, null]);
+    pegarEnCelda.mockClear();
+    document.querySelectorAll<HTMLButtonElement>('[data-accion="pegar"]')[0]?.click();
+    expect(pegarEnCelda).toHaveBeenCalledWith(h.id, 1);
+  });
+
+  it("doble clic no duplica (lock hasta resolver)", async () => {
+    sembrar("u4x2", [100, null]);
+    pegarEnCelda.mockClear();
+    let soltar: () => void = () => {};
+    pegarEnCelda.mockImplementationOnce(
+      () =>
+        new Promise<void>((r) => {
+          soltar = r;
+        }),
+    );
+    const btn = botonPegar();
+    btn.click();
+    btn.click();
+    expect(pegarEnCelda).toHaveBeenCalledTimes(1);
+    soltar();
+    await Promise.resolve();
+    btn.click();
+    expect(pegarEnCelda).toHaveBeenCalledTimes(2);
+  });
+
+  it("en modo OCR la vacía queda inerte (sin botón)", () => {
+    state.modoOcr = true;
+    try {
+      sembrar("u4x2", [100, null]);
+      expect(document.querySelector('[data-accion="pegar"]')).toBeNull();
+      expect(document.querySelector(".cell.empty")?.textContent).toBe("Vacío");
+    } finally {
+      state.modoOcr = false;
+    }
+  });
+
+  it("pointerdown en vacía no inicia drag", () => {
+    sembrar("u4x2", [100, null]);
+    const ev = pressVacia();
+    botonPegar().dispatchEvent(ev);
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  it("lote vacío muestra tarjeta y pegado; con items los oculta", () => {
+    renderHojas();
+    expect(el("dropzone").hidden).toBe(false);
+    expect(el("btnPegar").hidden).toBe(false);
+    sembrar("u4x2", [100]);
+    expect(el("dropzone").hidden).toBe(true);
+    expect(el("btnPegar").hidden).toBe(true);
+  });
+
+  it("destino corrupto no llama al callback", () => {
+    sembrar("u4x2", [100, null]);
+    pegarEnCelda.mockClear();
+    const btn = botonPegar();
+    btn.dataset["hoja"] = "x";
+    btn.click();
+    expect(pegarEnCelda).not.toHaveBeenCalled();
+  });
+});
+
+describe("hoja fantasma", () => {
+  it("aparece solo si todas llenas, sin mutar el estado", () => {
+    sembrar("u1", [100]);
+    const fantasma = document.querySelector(".sheet-fantasma");
+    expect(fantasma?.getAttribute("data-hoja")).toBe(String(HOJA_FANTASMA));
+    expect(fantasma?.querySelector(".sheet-tag")?.textContent).toBe("HOJA 2 · nueva");
+    expect(state.hojas).toHaveLength(1);
+    // Misma fila que las reales, con la columna vacía (alinea el borde izquierdo).
+    const fila = fantasma?.closest(".sheet-row");
+    expect(fila?.getAttribute("data-hoja")).toBe(String(HOJA_FANTASMA));
+    const lado = fila?.querySelector(".sheet-side");
+    expect(lado?.getAttribute("aria-hidden")).toBe("true");
+    expect(lado?.childElementCount).toBe(0);
+    const botones = [
+      ...(fantasma?.querySelectorAll<HTMLButtonElement>('[data-accion="pegar"]') ?? []),
+    ];
+    expect(botones).toHaveLength(1);
+    expect(botones[0]?.dataset["slot"]).toBe("0");
+  });
+
+  it("con huecos no hay fantasma", () => {
+    sembrar("u4x2", [100]);
+    expect(document.querySelector(".sheet-fantasma")).toBeNull();
+  });
+
+  it("lote vacío no hay fantasma (está la tarjeta)", () => {
+    renderHojas();
+    expect(document.querySelector(".sheet-fantasma")).toBeNull();
+    expect(el("dropzone").hidden).toBe(false);
+  });
+
+  it("en modo OCR no hay fantasma", () => {
+    state.modoOcr = true;
+    try {
+      sembrar("u1", [100]);
+      expect(document.querySelector(".sheet-fantasma")).toBeNull();
+    } finally {
+      state.modoOcr = false;
+    }
+  });
+
+  it("clic fantasma delega el centinela y el slot", () => {
+    sembrar("u1", [100]);
+    pegarEnCelda.mockClear();
+    document.querySelector<HTMLButtonElement>('.sheet-fantasma [data-accion="pegar"]')?.click();
+    expect(pegarEnCelda).toHaveBeenCalledWith(HOJA_FANTASMA, 0);
   });
 });
