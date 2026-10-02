@@ -770,14 +770,27 @@ describe("pegarEnCelda (clic en vacía)", () => {
     h.slots[0] = comprobante();
     state.hojas.push(h);
     const pendiente = pegarEnCelda(HOJA_FANTASMA, 0);
-    for (let i = 0; i < 50 && state.hojas.length < 2; i++) await Promise.resolve();
-    expect(state.hojas).toHaveLength(2); // materializada, normalizando
+    for (let i = 0; i < 50; i++) await Promise.resolve();
+    expect(state.hojas).toHaveLength(1); // aún no materializada: normalizando
     state.hojas = [crearHoja("u4x2")]; // barrido en el ínterin
     abrir();
     await pendiente;
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
     expect(h.slots.filter(Boolean)).toHaveLength(1); // la desvinculada intacta
+  });
+
+  it("fantasma + normalización que rechaza no deja hoja vacía", async () => {
+    aviso.textContent = "";
+    fallosImagen.set("pegado.png", "ilegible");
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u1");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]).toBe(h);
+    expect(aviso.textContent).toContain("no se pudo leer");
   });
 
   it("en modo OCR no pega ni lee", async () => {

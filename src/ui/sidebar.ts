@@ -315,17 +315,13 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
   if (!primero) return;
   let destino = hojaId === HOJA_FANTASMA ? undefined : hojaPorId(hojaId);
   if (!destino && hojaId === HOJA_FANTASMA) {
-    // Clic en la hoja fantasma (solo visual): se materializa con el layout
-    // de la última hoja y el flujo sigue al slot exacto. Si la última ya
-    // tiene huecos (carrera con otro intake), se reutiliza sin fragmentar.
+    // Clic en la hoja fantasma (solo visual): hoja pendiente con el layout de
+    // la última, que se materializa recién con la normalización buena (abajo).
+    // Si la última ya tiene huecos (carrera con otro intake), se reutiliza.
     const ultima = state.hojas[state.hojas.length - 1];
-    if (ultima && ultima.slots.includes(null)) destino = ultima;
-    else {
-      destino = crearHoja(ultima?.layout ?? "u4x2");
-      state.hojas.push(destino);
-    }
+    destino = ultima && ultima.slots.includes(null) ? ultima : crearHoja(ultima?.layout ?? "u4x2");
   }
-  if (!destino || !state.hojas.includes(destino)) return;
+  if (!destino) return;
   // Elección explícita de destino: consume la pendiente del picker (si no, el
   // próximo intake caería en una hoja abandonada).
   hojaPedida = null;
@@ -339,6 +335,16 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     } catch {
       avisar([{ archivo: sanear(primero.name), motivo: "no se pudo leer" }]);
       return;
+    }
+    // Materializa recién con la normalización buena (si falla, no queda hoja
+    // vacía) y solo si sigue haciendo falta: misma política compacta del
+    // fallback de abajo — si otro intake abrió un hueco, manda ese.
+    if (
+      hojaId === HOJA_FANTASMA &&
+      !state.hojas.includes(destino) &&
+      !state.hojas.some((x) => x.slots.includes(null))
+    ) {
+      state.hojas.push(destino);
     }
     // Re-resuelve tras el await: la hoja pudo barrerse (limpiar/cambio de
     // layout) mientras la normalización pendía; nunca se escribe en un
