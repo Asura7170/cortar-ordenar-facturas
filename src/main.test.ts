@@ -11,6 +11,7 @@ vi.mock("./ui/sidebar", () => ({
   agregarArchivos: vi.fn(),
   elegirArchivos: vi.fn(),
   initSidebar: vi.fn(),
+  pegarEnCelda: vi.fn(),
   renderCodigo: vi.fn(),
 }));
 vi.mock("./ui/ocrMode", () => ({ initOcrMode: vi.fn(), renderOcrToggle: vi.fn() }));

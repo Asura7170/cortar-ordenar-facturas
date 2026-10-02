@@ -352,6 +352,40 @@
   color: var(--tinta-fina);
   font-size: 12px;
 }
+/* Botón de pegado en la celda vacía (llena la casilla: un clic grande para mayores). */
+.cell-pegar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 8px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.cell-pegar:hover,
+.cell-pegar:focus-visible {
+  background: var(--verde-claro);
+  box-shadow: inset 0 0 0 2px var(--verde-tinta);
+  outline: none;
+}
+.cell-pegar-mas {
+  font-size: 28px;
+  line-height: 1;
+}
+.cell-pegar-txt {
+  font-size: 12px;
+}
+.cell-pegar[data-pegando="1"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
 .cell img {
   width: 100%;
   height: 100%;

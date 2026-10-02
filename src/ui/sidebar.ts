@@ -227,6 +227,122 @@ export async function agregarArchivos(
   void procesarCola();
 }
 
+/** Item del portapapeles con al menos una imagen (shape mínimo de ClipboardItem). */
+interface ItemConImagen {
+  readonly types: readonly string[];
+  getType(tipo: string): Promise<Blob>;
+}
+
+// Clic en celda vacía: lee la imagen del portapapeles del SO (copiada en
+// WhatsApp con clic derecho > Copiar imagen) y la coloca en ese slot exacto.
+// El read() corre sin await previo: el gesto del clic lo autoriza en Chrome.
+export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
+  const destino = hojaPorId(hojaId);
+  if (!destino) return;
+  const lector = (
+    globalThis as unknown as {
+      navigator?: { clipboard?: { read?: () => Promise<ItemConImagen[]> } };
+    }
+  ).navigator?.clipboard;
+  if (typeof lector?.read !== "function") {
+    avisar([
+      {
+        archivo: "Portapapeles",
+        motivo: "este navegador no permite pegar con clic: usa Ctrl+V",
+      },
+    ]);
+    return;
+  }
+  let items: readonly ItemConImagen[];
+  try {
+    items = await lector.read();
+  } catch {
+    avisar([
+      {
+        archivo: "Portapapeles",
+        motivo:
+          "no hay imagen para pegar: cópiala primero en WhatsApp (clic derecho > Copiar imagen)",
+      },
+    ]);
+    return;
+  }
+  const archivos: File[] = [];
+  for (const item of items) {
+    const tipo = item.types.find((t) => t.startsWith("image/"));
+    if (!tipo) continue;
+    try {
+      const blob = await item.getType(tipo);
+      const ext = tipo.split("/")[1] ?? "png";
+      archivos.push(new File([blob], `pegado.${ext}`, { type: tipo }));
+    } catch {
+      // item ilegible: se ignora; el aviso final cubre el vacío total
+    }
+  }
+  if (archivos.length === 0) {
+    avisar([
+      {
+        archivo: "Portapapeles",
+        motivo:
+          "no hay imagen para pegar: cópiala primero en WhatsApp (clic derecho > Copiar imagen)",
+      },
+    ]);
+    return;
+  }
+  intakesActivos++;
+  state.loteEnCurso = true;
+  try {
+    const primero = archivos[0];
+    if (!primero) return;
+    try {
+      const blob = await normalizarImagen(primero);
+      const comp: Comprobante = {
+        id: nextComprobanteId(),
+        nombre: sanear(primero.name),
+        file: blob,
+        imgUrl: URL.createObjectURL(blob),
+        textoOcr: "",
+        montoCents: null,
+        montoManual: false,
+        moneda: "USD",
+        estado: "pendiente",
+        posicion: 0,
+      };
+      const h = hojaPorId(hojaId);
+      const libreExacto = h && slotIdx >= 0 && slotIdx < h.slots.length && h.slots[slotIdx] == null;
+      if (libreExacto && h) {
+        h.slots[slotIdx] = comp;
+      } else if (h && h.slots.includes(null)) {
+        const libre = h.slots.indexOf(null);
+        if (libre >= 0) h.slots[libre] = comp;
+      } else {
+        // Hoja llena: flujo normal (última con hueco o nueva heredando layout).
+        const actual =
+          state.hojas.find((x) => x.slots.includes(null)) ??
+          (() => {
+            const nueva = crearHoja(h?.layout ?? "u4x2");
+            state.hojas.push(nueva);
+            return nueva;
+          })();
+        const libre = actual.slots.indexOf(null);
+        if (libre >= 0) actual.slots[libre] = comp;
+      }
+      renderHojas();
+    } catch {
+      avisar([{ archivo: sanear(primero.name), motivo: "no se pudo leer" }]);
+      return;
+    }
+    // Resto (raro desde WhatsApp): flujo normal sin destino.
+    const resto = archivos.slice(1);
+    if (resto.length > 0) await agregarArchivos(resto);
+    else avisar([]); // éxito: limpia un rechazo viejo de otro intento
+    precalentarModelos();
+    void procesarCola();
+  } finally {
+    intakesActivos--;
+    state.loteEnCurso = intakesActivos > 0;
+  }
+}
+
 export function renderCodigo(): void {
   chkCodigo.checked = state.codigoActivo;
   numCodigo.value = String(state.codigoLongitud);

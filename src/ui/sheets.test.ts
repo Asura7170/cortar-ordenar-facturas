@@ -1430,3 +1430,80 @@ describe("drag entre celdas (swap)", () => {
     }
   });
 });
+
+describe("pegar con clic en vacía", () => {
+  const pegarEnCelda = vi.fn();
+  // Re-cablea con el nuevo callback (initSheets refresca sin duplicar listeners).
+  initSheets({ agregarArchivos, pedirArchivos, pegarEnCelda });
+
+  function botonPegar(): HTMLButtonElement {
+    const b = document.querySelector<HTMLButtonElement>('[data-accion="pegar"]');
+    if (!b) throw new Error("sin botón pegar");
+    return b;
+  }
+
+  function pressVacia(): Event {
+    return Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
+      button: 0,
+      isPrimary: true,
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+    });
+  }
+
+  it("vacía pinta botón con destino hoja/slot", () => {
+    const h = sembrar("u4x2", [100, null]);
+    const botones = [...document.querySelectorAll<HTMLButtonElement>('[data-accion="pegar"]')];
+    expect(botones).toHaveLength(3);
+    expect(botones[0]?.dataset["hoja"]).toBe(String(h.id));
+    expect(botones[0]?.dataset["slot"]).toBe("1");
+    expect(botones[0]?.getAttribute("aria-label")).toContain("Pegar");
+  });
+
+  it("clic delega hoja y slot al callback", () => {
+    const h = sembrar("u4x2", [100, null]);
+    pegarEnCelda.mockClear();
+    document.querySelectorAll<HTMLButtonElement>('[data-accion="pegar"]')[0]?.click();
+    expect(pegarEnCelda).toHaveBeenCalledWith(h.id, 1);
+  });
+
+  it("doble clic no duplica (lock hasta resolver)", async () => {
+    sembrar("u4x2", [100, null]);
+    pegarEnCelda.mockClear();
+    let soltar: () => void = () => {};
+    pegarEnCelda.mockImplementationOnce(
+      () =>
+        new Promise<void>((r) => {
+          soltar = r;
+        }),
+    );
+    const btn = botonPegar();
+    btn.click();
+    btn.click();
+    expect(pegarEnCelda).toHaveBeenCalledTimes(1);
+    soltar();
+    await Promise.resolve();
+    btn.click();
+    expect(pegarEnCelda).toHaveBeenCalledTimes(2);
+  });
+
+  it("en modo OCR la vacía queda inerte (sin botón)", () => {
+    state.modoOcr = true;
+    try {
+      sembrar("u4x2", [100, null]);
+      expect(document.querySelector('[data-accion="pegar"]')).toBeNull();
+      expect(document.querySelector(".cell.empty")?.textContent).toBe("Vacío");
+    } finally {
+      state.modoOcr = false;
+    }
+  });
+
+  it("pointerdown en vacía no inicia drag", () => {
+    sembrar("u4x2", [100, null]);
+    const ev = pressVacia();
+    botonPegar().dispatchEvent(ev);
+    expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
+    expect(ev.defaultPrevented).toBe(false);
+  });
+});

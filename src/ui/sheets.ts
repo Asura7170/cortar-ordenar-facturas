@@ -79,7 +79,28 @@ function pintarCelda(
 
   if (!item) {
     div.classList.add("empty");
-    div.textContent = "Vacío";
+    // En modo OCR el pegado por clic está bloqueado: queda el texto inerte.
+    if (state.modoOcr) {
+      div.textContent = "Vacío";
+      return;
+    }
+    const pegar = document.createElement("button");
+    pegar.type = "button";
+    pegar.className = "cell-pegar";
+    pegar.dataset["accion"] = "pegar";
+    pegar.dataset["hoja"] = String(hojaId);
+    pegar.dataset["slot"] = String(slotIdx);
+    pegar.title = "Pegar la imagen copiada";
+    pegar.setAttribute("aria-label", "Pegar la imagen copiada aquí");
+    const mas = document.createElement("span");
+    mas.className = "cell-pegar-mas";
+    mas.setAttribute("aria-hidden", "true");
+    mas.textContent = "＋";
+    const txt = document.createElement("span");
+    txt.className = "cell-pegar-txt";
+    txt.textContent = "Clic para pegar";
+    pegar.append(mas, txt);
+    div.append(pegar);
     return;
   }
 
@@ -844,7 +865,13 @@ function finalizarDrag(x: number, y: number): void {
 export interface SheetsCallbacks {
   agregarArchivos: (files: FileList | File[] | null | undefined, hojaId?: number | null) => void;
   pedirArchivos: (hojaId: number) => void;
+  /** Clic en celda vacía: pega el portapapeles en ese slot exacto. */
+  pegarEnCelda?: (hojaId: number, slotIdx: number) => Promise<void> | void;
 }
+
+// ponytail: callbacks vigentes (initSheets los refresca aunque los listeners ya
+// existan: HMR/tests re-cablean sin duplicar).
+let callbacks: SheetsCallbacks | null = null;
 
 // ponytail: swap destructivo en curso (un change que llegue ahora es eco de
 // remoción, no edición del usuario: se ignora en el handler change).
@@ -866,6 +893,7 @@ export function esEcoDeRemocion(target: HTMLInputElement): boolean {
 }
 
 export function initSheets(cb: SheetsCallbacks): void {
+  callbacks = cb;
   // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
   if (sheetsEl.dataset["init"] === "1") return;
   sheetsEl.dataset["init"] = "1";
@@ -1067,7 +1095,26 @@ export function initSheets(cb: SheetsCallbacks): void {
         return;
       case "agregar": {
         const destino = Number(btn.dataset["hoja"]);
-        if (Number.isInteger(destino)) cb.pedirArchivos(destino);
+        if (Number.isInteger(destino)) callbacks?.pedirArchivos(destino);
+        return;
+      }
+      case "pegar": {
+        // En modo OCR el pegado por clic está bloqueado (como el reordenamiento).
+        if (state.modoOcr) return;
+        if (!(btn instanceof HTMLButtonElement)) return;
+        // ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces).
+        if (btn.dataset["pegando"] === "1") return;
+        const celda = cell instanceof HTMLElement ? cell.dataset : null;
+        const hoja = Number(btn.dataset["hoja"] ?? celda?.["hoja"] ?? NaN);
+        const slot = Number(btn.dataset["slot"] ?? celda?.["slot"] ?? NaN);
+        if (!Number.isInteger(hoja) || !Number.isInteger(slot)) return;
+        const listo = callbacks?.pegarEnCelda?.(hoja, slot);
+        if (listo instanceof Promise) {
+          btn.dataset["pegando"] = "1";
+          void listo.finally(() => {
+            delete btn.dataset["pegando"];
+          });
+        }
         return;
       }
     }
@@ -1154,7 +1201,7 @@ export function initSheets(cb: SheetsCallbacks): void {
     const sheet = target?.closest?.(".sheet");
     cancelarDragVisual();
     if (sheet instanceof HTMLElement)
-      cb.agregarArchivos(e.dataTransfer?.files, Number(sheet.dataset["hoja"]));
+      callbacks?.agregarArchivos(e.dataTransfer?.files, Number(sheet.dataset["hoja"]));
   });
 
   canvasEl?.addEventListener(
