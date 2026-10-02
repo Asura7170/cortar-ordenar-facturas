@@ -1515,4 +1515,13 @@ describe("pegar con clic en vacía", () => {
     expect(el("dropzone").hidden).toBe(true);
     expect(el("btnPegar").hidden).toBe(true);
   });
+
+  it("destino corrupto no llama al callback", () => {
+    sembrar("u4x2", [100, null]);
+    pegarEnCelda.mockClear();
+    const btn = botonPegar();
+    btn.dataset["hoja"] = "x";
+    btn.click();
+    expect(pegarEnCelda).not.toHaveBeenCalled();
+  });
 });

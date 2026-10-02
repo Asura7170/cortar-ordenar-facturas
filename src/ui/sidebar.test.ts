@@ -62,6 +62,24 @@ const modalLimpiar = el<HTMLDialogElement>("modalLimpiar");
 
 initSidebar();
 
+/** Portapapeles simulado (los dos describes de pegado lo comparten). */
+const realClipboard = navigator.clipboard;
+
+function mockRead(read: () => Promise<unknown>): void {
+  Object.defineProperty(navigator, "clipboard", { value: { read }, configurable: true });
+}
+
+function itemPng(): { types: string[]; getType: () => Promise<Blob> } {
+  return {
+    types: ["image/png"],
+    getType: async () => new Blob(["x"], { type: "image/png" }),
+  };
+}
+
+function restaurarPortapapeles(): void {
+  Object.defineProperty(navigator, "clipboard", { value: realClipboard, configurable: true });
+}
+
 beforeEach(() => {
   // La cola MOCK usa sleep(900ms): timers falsos para que nunca avance en tests.
   vi.useFakeTimers();
@@ -575,25 +593,12 @@ describe("modalLimpiar", () => {
 });
 
 describe("pegarEnCelda (clic en vacía)", () => {
-  const realClipboard = navigator.clipboard;
-
-  function mockRead(read: () => Promise<unknown>): void {
-    Object.defineProperty(navigator, "clipboard", { value: { read }, configurable: true });
-  }
-
-  function itemPng(): { types: string[]; getType: () => Promise<Blob> } {
-    return {
-      types: ["image/png"],
-      getType: async () => new Blob(["x"], { type: "image/png" }),
-    };
-  }
-
   function items(): (Comprobante | null)[] {
     return state.hojas.flatMap((h) => h.slots);
   }
 
   afterEach(() => {
-    Object.defineProperty(navigator, "clipboard", { value: realClipboard, configurable: true });
+    restaurarPortapapeles();
   });
 
   it("coloca exacto en el slot clicado", async () => {
@@ -663,24 +668,50 @@ describe("pegarEnCelda (clic en vacía)", () => {
     expect(items().filter(Boolean)).toHaveLength(0);
     expect(aviso.textContent).toContain("Ctrl+V");
   });
+
+  it("normalizar que rechaza avisa sin colocar", async () => {
+    aviso.textContent = "";
+    fallosImagen.set("pegado.png", "ilegible");
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("no se pudo leer");
+  });
+
+  it("resto multi-imagen llena la misma hoja clicada", async () => {
+    mockRead(async () => [itemPng(), itemPng()]);
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(state.hojas).toHaveLength(1);
+    expect(h.slots.filter(Boolean)).toHaveLength(2);
+    expect(h.slots[1]?.nombre).toBe("pegado.png");
+  });
+
+  it("formato fuera del allowlist avisa igual que Ctrl+V", async () => {
+    aviso.textContent = "";
+    mockRead(async () => [{ types: ["image/avif"], getType: async () => new Blob(["x"]) }]);
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 1);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("formato no soportado");
+  });
+
+  it("hoja inexistente no hace nada", async () => {
+    aviso.textContent = "";
+    mockRead(async () => [itemPng()]);
+    await pegarEnCelda(999999, 0);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toBe("");
+  });
 });
 
 describe("pegarDelPortapapeles (lote vacío)", () => {
-  const realClipboard = navigator.clipboard;
-
-  function mockRead(read: () => Promise<unknown>): void {
-    Object.defineProperty(navigator, "clipboard", { value: { read }, configurable: true });
-  }
-
-  function itemPng(): { types: string[]; getType: () => Promise<Blob> } {
-    return {
-      types: ["image/png"],
-      getType: async () => new Blob(["x"], { type: "image/png" }),
-    };
-  }
-
   afterEach(() => {
-    Object.defineProperty(navigator, "clipboard", { value: realClipboard, configurable: true });
+    restaurarPortapapeles();
   });
 
   it("pega sin destino: crea la hoja desde el vacío", async () => {

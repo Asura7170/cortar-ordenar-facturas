@@ -74,6 +74,28 @@ function textoMotivo(m: MotivoRechazo): string {
 // ponytail: contador, no booleano — dos intakes solapados (paste durante un
 // PDF largo) no sueltan loteEnCurso a mitad del otro.
 let intakesActivos = 0;
+
+// Formatos de imagen del intake (clic / Ctrl+V / drop): un solo allowlist.
+const MIME_IMAGEN: RegExp = /^image\/(jpeg|png|webp|bmp|gif)$/i;
+
+/** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
+let hojaPedida: number | null = null;
+
+/** Comprobante pendiente desde un blob normalizado (vías clic e intake). */
+function comprobanteDesdeBlob(blob: Blob, nombre: string): Comprobante {
+  return {
+    id: nextComprobanteId(),
+    nombre: sanear(nombre),
+    file: blob,
+    imgUrl: URL.createObjectURL(blob),
+    textoOcr: "",
+    montoCents: null,
+    montoManual: false,
+    moneda: "USD",
+    estado: "pendiente",
+    posicion: 0,
+  };
+}
 export async function agregarArchivos(
   files: FileList | readonly File[] | null | undefined,
   hojaId: number | null = null,
@@ -83,7 +105,7 @@ export async function agregarArchivos(
   const destino = hojaId ?? hojaPedida;
   hojaPedida = null;
   const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
-  const esImagen = (f: File): boolean => /^image\/(jpeg|png|webp|bmp|gif)$/i.test(f.type);
+  const esImagen = (f: File): boolean => MIME_IMAGEN.test(f.type);
   const avisos: AvisoRechazo[] = lista
     .filter((f) => !esImagen(f) && !esPdf(f))
     .map((f) => ({ archivo: sanear(f.name), motivo: "formato no soportado" }));
@@ -152,20 +174,7 @@ export async function agregarArchivos(
           const tN = performance.now();
           const blob = await normalizarImagen(f);
           if (import.meta.env.DEV) msNorm.push(performance.now() - tN);
-          colocar([
-            {
-              id: nextComprobanteId(),
-              nombre: sanear(f.name),
-              file: blob,
-              imgUrl: URL.createObjectURL(blob),
-              textoOcr: "",
-              montoCents: null,
-              montoManual: false,
-              moneda: "USD",
-              estado: "pendiente",
-              posicion: 0,
-            },
-          ]);
+          colocar([comprobanteDesdeBlob(blob, f.name)]);
         } catch {
           avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
         }
@@ -265,19 +274,29 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
     return null;
   }
   const archivos: File[] = [];
+  let formatoNoSoportado = false;
   for (const item of items) {
-    const tipo = item.types.find((t) => t.startsWith("image/"));
+    const tipo = (item.types ?? []).find((t) => t.startsWith("image/"));
     if (!tipo) continue;
+    const cruda = (tipo.split("/")[1] ?? "").split(";")[0]?.toLowerCase() ?? "";
+    if (!MIME_IMAGEN.test(`image/${cruda}`)) {
+      formatoNoSoportado = true; // mismo mensaje que Ctrl+V para esos bytes
+      continue;
+    }
     try {
       const blob = await item.getType(tipo);
-      const ext = tipo.split("/")[1] ?? "png";
-      archivos.push(new File([blob], `pegado.${ext}`, { type: tipo }));
+      archivos.push(new File([blob], `pegado.${cruda}`, { type: `image/${cruda}` }));
     } catch {
       // item ilegible: se ignora; el aviso final cubre el vacío total
     }
   }
   if (archivos.length === 0) {
-    avisar([{ archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN }]);
+    avisar([
+      {
+        archivo: "Portapapeles",
+        motivo: formatoNoSoportado ? "formato no soportado" : MOTIVO_SIN_IMAGEN,
+      },
+    ]);
     return null;
   }
   return archivos;
@@ -288,6 +307,9 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
 export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
   const destino = hojaPorId(hojaId);
   if (!destino) return;
+  // Elección explícita de destino: consume la pendiente del picker (si no, el
+  // próximo intake caería en una hoja abandonada).
+  hojaPedida = null;
   const archivos = await leerImagenesPortapapeles();
   if (!archivos) return;
   intakesActivos++;
@@ -297,18 +319,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     if (!primero) return;
     try {
       const blob = await normalizarImagen(primero);
-      const comp: Comprobante = {
-        id: nextComprobanteId(),
-        nombre: sanear(primero.name),
-        file: blob,
-        imgUrl: URL.createObjectURL(blob),
-        textoOcr: "",
-        montoCents: null,
-        montoManual: false,
-        moneda: "USD",
-        estado: "pendiente",
-        posicion: 0,
-      };
+      const comp: Comprobante = comprobanteDesdeBlob(blob, primero.name);
       const h = hojaPorId(hojaId);
       const libreExacto = h && slotIdx >= 0 && slotIdx < h.slots.length && h.slots[slotIdx] == null;
       if (libreExacto && h) {
@@ -333,9 +344,9 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
       avisar([{ archivo: sanear(primero.name), motivo: "no se pudo leer" }]);
       return;
     }
-    // Resto (raro desde WhatsApp): flujo normal sin destino.
+    // Resto (raro desde WhatsApp): llena la hoja clicada y desborda como el flujo normal.
     const resto = archivos.slice(1);
-    if (resto.length > 0) await agregarArchivos(resto);
+    if (resto.length > 0) await agregarArchivos(resto, hojaId);
     else avisar([]); // éxito: limpia un rechazo viejo de otro intento
     precalentarModelos();
     void procesarCola();
@@ -370,9 +381,6 @@ export function renderCodigo(): void {
     r.disabled = !state.codigoActivo;
   });
 }
-
-/** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
-let hojaPedida: number | null = null;
 
 /** Abre el diálogo para subir directo a una hoja (la consume cualquier intake). */
 export function elegirArchivos(hojaId: number): void {

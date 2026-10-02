@@ -373,7 +373,15 @@
 .cell-pegar:focus-visible {
   background: var(--verde-claro);
   box-shadow: inset 0 0 0 2px var(--verde-tinta);
-  outline: none;
+  outline: 2px solid var(--verde-tinta);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  .cell-pegar:hover,
+  .cell-pegar:focus-visible {
+    box-shadow: none;
+    outline: 2px solid CanvasText;
+  }
 }
 .cell-pegar-mas {
   font-size: 28px;
@@ -382,7 +390,8 @@
 .cell-pegar-txt {
   font-size: 12px;
 }
-.cell-pegar[data-pegando="1"] {
+.cell-pegar[data-pegando="1"],
+.btn-pegar[data-pegando="1"] {
   opacity: 0.5;
   pointer-events: none;
 }
@@ -400,10 +409,6 @@
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-}
-.btn-pegar[data-pegando="1"] {
-  opacity: 0.5;
-  pointer-events: none;
 }
 .cell img {
   width: 100%;

@@ -25,10 +25,11 @@ const lupaCanvas: HTMLCanvasElement = getEl<HTMLCanvasElement>("lupaCanvas");
 const lupaCtx: CanvasRenderingContext2D | null = lupaCanvas.getContext("2d");
 // Tarjeta de subida: visible solo con cero comprobantes.
 const tarjetaVacia: HTMLElement = getEl("dropzone");
-// Botón de pegado del lote vacío: junto a la tarjeta (querySelector con
-// guarda: importar sidebar sería ciclo, y en fixtures viejos puede faltar).
-const btnPegarVacio: HTMLButtonElement | null =
-  document.querySelector<HTMLButtonElement>("#btnPegar");
+// Botón de pegado del lote vacío: junto a la tarjeta (lookup perezoso con
+// guarda: importar sidebar sería ciclo, y el nodo puede remontarse).
+function btnPegarVacio(): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>("#btnPegar");
+}
 const canvasEl: HTMLElement | null = document.querySelector(".canvas");
 
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
@@ -235,7 +236,8 @@ function renderCuerpo(borrador: BorradorMonto | null): void {
 
   if (n === 0) {
     tarjetaVacia.hidden = false;
-    if (btnPegarVacio) btnPegarVacio.hidden = false;
+    const pegar = btnPegarVacio();
+    if (pegar) pegar.hidden = false;
     renderMonto();
     return;
   }
@@ -281,7 +283,8 @@ function renderCuerpo(borrador: BorradorMonto | null): void {
     sheetsEl.append(row);
   });
   tarjetaVacia.hidden = true;
-  if (btnPegarVacio) btnPegarVacio.hidden = true;
+  const pegar = btnPegarVacio();
+  if (pegar) pegar.hidden = true;
   renderMonto();
   if (borrador) restaurarBorrador(borrador);
 }
