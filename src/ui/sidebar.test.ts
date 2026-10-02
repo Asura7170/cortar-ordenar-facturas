@@ -42,8 +42,14 @@ vi.mock("../pipeline/pdf", async (importOriginal) => {
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
-const { agregarArchivos, elegirArchivos, initSidebar, pegarEnCelda, renderCodigo } =
-  await import("./sidebar");
+const {
+  agregarArchivos,
+  elegirArchivos,
+  initSidebar,
+  pegarDelPortapapeles,
+  pegarEnCelda,
+  renderCodigo,
+} = await import("./sidebar");
 const { archivo, comprobante } = await import("../test/factoria");
 
 const canvas = el("canvas");
@@ -656,5 +662,55 @@ describe("pegarEnCelda (clic en vacía)", () => {
     await pegarEnCelda(h.id, 1);
     expect(items().filter(Boolean)).toHaveLength(0);
     expect(aviso.textContent).toContain("Ctrl+V");
+  });
+});
+
+describe("pegarDelPortapapeles (lote vacío)", () => {
+  const realClipboard = navigator.clipboard;
+
+  function mockRead(read: () => Promise<unknown>): void {
+    Object.defineProperty(navigator, "clipboard", { value: { read }, configurable: true });
+  }
+
+  function itemPng(): { types: string[]; getType: () => Promise<Blob> } {
+    return {
+      types: ["image/png"],
+      getType: async () => new Blob(["x"], { type: "image/png" }),
+    };
+  }
+
+  afterEach(() => {
+    Object.defineProperty(navigator, "clipboard", { value: realClipboard, configurable: true });
+  });
+
+  it("pega sin destino: crea la hoja desde el vacío", async () => {
+    mockRead(async () => [itemPng()]);
+    await pegarDelPortapapeles();
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
+    expect(aviso.textContent).toBe("");
+  });
+
+  it("sin imagen avisa sin crear hojas", async () => {
+    aviso.textContent = "";
+    mockRead(async () => []);
+    await pegarDelPortapapeles();
+    expect(state.hojas).toHaveLength(0);
+    expect(aviso.textContent).toContain("no hay imagen");
+  });
+
+  it("el botón cablea el pegado y el doble-clic no duplica", async () => {
+    const btn = el<HTMLButtonElement>("btnPegar");
+    let soltar: () => void = () => {};
+    const lectura = new Promise<unknown>((r) => {
+      soltar = () => r([itemPng()]);
+    });
+    mockRead(() => lectura);
+    btn.click();
+    btn.click();
+    soltar();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
+    expect(btn.dataset["pegando"]).toBeUndefined();
   });
 });

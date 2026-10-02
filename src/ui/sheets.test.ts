@@ -1506,4 +1506,13 @@ describe("pegar con clic en vacía", () => {
     expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
     expect(ev.defaultPrevented).toBe(false);
   });
+
+  it("lote vacío muestra tarjeta y pegado; con items los oculta", () => {
+    renderHojas();
+    expect(el("dropzone").hidden).toBe(false);
+    expect(el("btnPegar").hidden).toBe(false);
+    sembrar("u4x2", [100]);
+    expect(el("dropzone").hidden).toBe(true);
+    expect(el("btnPegar").hidden).toBe(true);
+  });
 });

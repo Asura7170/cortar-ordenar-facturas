@@ -15,6 +15,7 @@ export const FIXTURE_HTML = `
   <span id="estadoCopiado" class="sr-only" role="status" aria-live="polite"></span>
   <div id="sheets"></div>
   <label id="dropzone" for="fileInput" tabindex="0"></label>
+  <button id="btnPegar" type="button"></button>
   <input id="fileInput" type="file" multiple>
 </main>
 <div id="lupa" aria-hidden="true"><canvas id="lupaCanvas"></canvas></div>

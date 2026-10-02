@@ -33,6 +33,7 @@ function radiosPosicion(): NodeListOf<HTMLInputElement> {
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
 const aviso: HTMLElement = getEl("aviso");
 const btnIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnIA");
+const btnPegar: HTMLButtonElement = getEl<HTMLButtonElement>("btnPegar");
 
 /** Rechazo de entrada: nombre en tono tenue + motivo en rojo sello. */
 interface AvisoRechazo {
@@ -239,12 +240,9 @@ interface ItemConImagen {
 const MOTIVO_SIN_IMAGEN: string =
   "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pega con Ctrl+V";
 
-// Clic en celda vacía: lee la imagen del portapapeles del SO (copiada en
-// WhatsApp con clic derecho > Copiar imagen) y la coloca en ese slot exacto.
+// Lee los bytes de imagen del portapapeles del SO. Null = ya se avisó.
 // El read() corre sin await previo: el gesto del clic lo autoriza en Chrome.
-export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
-  const destino = hojaPorId(hojaId);
-  if (!destino) return;
+async function leerImagenesPortapapeles(): Promise<File[] | null> {
   const lector = (
     globalThis as unknown as {
       navigator?: { clipboard?: { read?: () => Promise<ItemConImagen[]> } };
@@ -257,14 +255,14 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
         motivo: "este navegador no permite pegar con clic: usa Ctrl+V",
       },
     ]);
-    return;
+    return null;
   }
   let items: readonly ItemConImagen[];
   try {
     items = await lector.read();
   } catch {
     avisar([{ archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN }]);
-    return;
+    return null;
   }
   const archivos: File[] = [];
   for (const item of items) {
@@ -280,8 +278,18 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
   }
   if (archivos.length === 0) {
     avisar([{ archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN }]);
-    return;
+    return null;
   }
+  return archivos;
+}
+
+// Clic en celda vacía: lee la imagen del portapapeles del SO (copiada en
+// WhatsApp con clic derecho > Copiar imagen) y la coloca en ese slot exacto.
+export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
+  const destino = hojaPorId(hojaId);
+  if (!destino) return;
+  const archivos = await leerImagenesPortapapeles();
+  if (!archivos) return;
   intakesActivos++;
   state.loteEnCurso = true;
   try {
@@ -335,6 +343,14 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     intakesActivos--;
     state.loteEnCurso = intakesActivos > 0;
   }
+}
+
+// Lote vacío (botón bajo la tarjeta): pega lo copiado sin destino,
+// por el flujo normal de entrada (crea la hoja sola).
+export async function pegarDelPortapapeles(): Promise<void> {
+  const archivos = await leerImagenesPortapapeles();
+  if (!archivos) return;
+  await agregarArchivos(archivos);
 }
 
 export function renderCodigo(): void {
@@ -432,6 +448,15 @@ export function initSidebar(): void {
       .map((it) => it.getAsFile())
       .filter((f): f is File => f !== null);
     if (files.length) void agregarArchivos(files);
+  });
+  // Lote vacío: el botón pega lo copiado sin abrir el buscador.
+  // ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces).
+  btnPegar.addEventListener("click", () => {
+    if (btnPegar.dataset["pegando"] === "1") return;
+    btnPegar.dataset["pegando"] = "1";
+    void pegarDelPortapapeles().finally(() => {
+      delete btnPegar.dataset["pegando"];
+    });
   });
 
   // Reintento manual del lote IA (el auto corre al drenar la cola).
