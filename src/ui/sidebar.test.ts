@@ -20,6 +20,8 @@ function paginaSimulada(indice: number, total: number): PaginaPdf {
 let expansionSimulada: PaginaPdf[] = [paginaSimulada(1, 1)];
 // La normalización real necesita Chrome: stub (cada test lo ajusta).
 const fallosImagen = new Map<string, string>();
+// Compuerta para simular carreras (barrer hojas mientras la normalización pende).
+let esperaNormalizar: Promise<unknown> | null = null;
 vi.mock("../pipeline/imagen", async (importOriginal) => {
   const real = await importOriginal<typeof import("../pipeline/imagen")>();
   return {
@@ -27,6 +29,7 @@ vi.mock("../pipeline/imagen", async (importOriginal) => {
     normalizarImagen: async (f: File): Promise<Blob> => {
       const motivo = fallosImagen.get(f.name);
       if (motivo) throw new Error(motivo);
+      if (esperaNormalizar) await esperaNormalizar;
       return new Blob(["x"], { type: "image/jpeg" });
     },
   };
@@ -86,6 +89,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   paginasSimuladas = 5;
   fallosImagen.clear();
+  esperaNormalizar = null;
   expansionSimulada = [paginaSimulada(1, 1)];
 });
 
@@ -742,6 +746,53 @@ describe("pegarEnCelda (clic en vacía)", () => {
     await pegarEnCelda(HOJA_FANTASMA, 2);
     expect(state.hojas).toHaveLength(1);
     expect(h.slots[2]?.nombre).toBe("pegado.png");
+  });
+
+  it("fantasma + portapapeles vacío no crea hoja", async () => {
+    aviso.textContent = "";
+    mockRead(async () => [{ types: ["text/plain"], getType: async () => new Blob(["x"]) }]);
+    const h = crearHoja("u1");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]).toBe(h);
+    expect(aviso.textContent).toContain("no hay imagen");
+  });
+
+  it("hoja barrida durante la normalización cae al flujo normal", async () => {
+    let abrir!: () => void;
+    esperaNormalizar = new Promise<void>((res) => {
+      abrir = res;
+    });
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u1");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    const pendiente = pegarEnCelda(HOJA_FANTASMA, 0);
+    for (let i = 0; i < 50 && state.hojas.length < 2; i++) await Promise.resolve();
+    expect(state.hojas).toHaveLength(2); // materializada, normalizando
+    state.hojas = [crearHoja("u4x2")]; // barrido en el ínterin
+    abrir();
+    await pendiente;
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
+    expect(h.slots.filter(Boolean)).toHaveLength(1); // la desvinculada intacta
+  });
+
+  it("en modo OCR no pega ni lee", async () => {
+    const leer = vi.fn(async () => [itemPng()]);
+    mockRead(leer);
+    state.modoOcr = true;
+    try {
+      const h = crearHoja("u4x2");
+      state.hojas.push(h);
+      await pegarEnCelda(h.id, 0);
+      expect(leer).not.toHaveBeenCalled();
+      expect(items().filter(Boolean)).toHaveLength(0);
+    } finally {
+      state.modoOcr = false;
+    }
   });
 });
 

@@ -682,6 +682,22 @@ describe("drop de archivos sobre hojas", () => {
     expect(agregarArchivos).toHaveBeenCalledWith(files, h.id);
   });
 
+  it("drop sobre el fantasma va por el flujo normal (null)", () => {
+    sembrar("u1", [100]); // llena → fantasma
+    const files = [new File(["x"], "d.png", { type: "image/png" })];
+    agregarArchivos.mockClear();
+    document.querySelector(".sheet-fantasma")?.dispatchEvent(eventoDrop(files));
+    expect(agregarArchivos).toHaveBeenCalledWith(files, null);
+  });
+
+  it("dragover sobre el fantasma no resalta", () => {
+    sembrar("u1", [100]); // llena → fantasma
+    const fantasma = document.querySelector(".sheet-fantasma");
+    if (!fantasma) throw new Error("sin fantasma");
+    fantasma.dispatchEvent(eventoDragover());
+    expect(fantasma.classList.contains("file-drop")).toBe(false);
+  });
+
   it("en modo OCR el drop sigue activo (la entrada nunca se bloquea)", () => {
     state.modoOcr = true;
     try {

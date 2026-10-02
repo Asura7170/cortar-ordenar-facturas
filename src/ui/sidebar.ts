@@ -305,7 +305,15 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
 // Clic en celda vacía: lee la imagen del portapapeles del SO (copiada en
 // WhatsApp con clic derecho > Copiar imagen) y la coloca en ese slot exacto.
 export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
-  let destino = hojaPorId(hojaId);
+  if (state.modoOcr) return;
+  // Lee antes de mutar: si no hay imagen no se toca el estado (el fantasma
+  // no se materializa ni se consume la hoja pedida). Sin await previo: el
+  // gesto del clic autoriza el read() en Chrome.
+  const archivos = await leerImagenesPortapapeles();
+  if (!archivos) return;
+  const primero = archivos[0];
+  if (!primero) return;
+  let destino = hojaId === HOJA_FANTASMA ? undefined : hojaPorId(hojaId);
   if (!destino && hojaId === HOJA_FANTASMA) {
     // Clic en la hoja fantasma (solo visual): se materializa con el layout
     // de la última hoja y el flujo sigue al slot exacto. Si la última ya
@@ -317,47 +325,50 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
       state.hojas.push(destino);
     }
   }
-  if (!destino) return;
+  if (!destino || !state.hojas.includes(destino)) return;
   // Elección explícita de destino: consume la pendiente del picker (si no, el
   // próximo intake caería en una hoja abandonada).
   hojaPedida = null;
-  const archivos = await leerImagenesPortapapeles();
-  if (!archivos) return;
+  const layoutRespaldo = destino.layout;
   intakesActivos++;
   state.loteEnCurso = true;
   try {
-    const primero = archivos[0];
-    if (!primero) return;
+    let comp: Comprobante;
     try {
-      const blob = await normalizarImagen(primero);
-      const comp: Comprobante = comprobanteDesdeBlob(blob, primero.name);
-      const h = destino;
-      const libreExacto = h && slotIdx >= 0 && slotIdx < h.slots.length && h.slots[slotIdx] == null;
-      if (libreExacto && h) {
-        h.slots[slotIdx] = comp;
-      } else if (h && h.slots.includes(null)) {
-        const libre = h.slots.indexOf(null);
-        if (libre >= 0) h.slots[libre] = comp;
-      } else {
-        // Hoja llena: flujo normal (última con hueco o nueva heredando layout).
-        const actual =
-          state.hojas.find((x) => x.slots.includes(null)) ??
-          (() => {
-            const nueva = crearHoja(h?.layout ?? "u4x2");
-            state.hojas.push(nueva);
-            return nueva;
-          })();
-        const libre = actual.slots.indexOf(null);
-        if (libre >= 0) actual.slots[libre] = comp;
-      }
-      renderHojas();
+      comp = comprobanteDesdeBlob(await normalizarImagen(primero), primero.name);
     } catch {
       avisar([{ archivo: sanear(primero.name), motivo: "no se pudo leer" }]);
       return;
     }
-    // Resto (raro desde WhatsApp): llena la hoja clicada y desborda como el flujo normal.
+    // Re-resuelve tras el await: la hoja pudo barrerse (limpiar/cambio de
+    // layout) mientras la normalización pendía; nunca se escribe en un
+    // objeto desvinculado.
+    const vigente = hojaPorId(destino.id);
+    const h = vigente && state.hojas.includes(vigente) ? vigente : null;
+    let afinidad: number | null = h?.id ?? null;
+    if (h && slotIdx >= 0 && slotIdx < h.slots.length && h.slots[slotIdx] == null) {
+      h.slots[slotIdx] = comp;
+    } else if (h && h.slots.includes(null)) {
+      const libre = h.slots.indexOf(null);
+      if (libre >= 0) h.slots[libre] = comp;
+    } else {
+      // Hoja llena o barrida en el ínterin: flujo normal (última con hueco o
+      // nueva heredando layout).
+      const actual =
+        state.hojas.find((x) => x.slots.includes(null)) ??
+        (() => {
+          const nueva = crearHoja(h?.layout ?? layoutRespaldo);
+          state.hojas.push(nueva);
+          return nueva;
+        })();
+      const libre = actual.slots.indexOf(null);
+      if (libre >= 0) actual.slots[libre] = comp;
+      afinidad = actual.id;
+    }
+    renderHojas();
+    // Resto (raro desde WhatsApp): sigue a la hoja donde cayó `primero`.
     const resto = archivos.slice(1);
-    if (resto.length > 0) await agregarArchivos(resto, hojaId);
+    if (resto.length > 0) await agregarArchivos(resto, afinidad);
     else avisar([]); // éxito: limpia un rechazo viejo de otro intento
     precalentarModelos();
     void procesarCola();

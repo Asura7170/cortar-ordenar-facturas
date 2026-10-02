@@ -754,10 +754,14 @@ function celdaRect(c: Element): DOMRect {
 function celdaBajoPunto(x: number, y: number, excluir: Element | null): HTMLElement | null {
   const el = document.elementFromPoint(x, y);
   const directa = el?.closest?.(".cell");
-  if (directa instanceof HTMLElement) return directa;
+  if (directa instanceof HTMLElement && !directa.closest(".sheet-fantasma")) return directa;
   const hoja = el?.closest?.(".sheet");
   const scope: ParentNode = hoja ?? sheetsEl;
-  const celulas = [...scope.querySelectorAll(".cell")].filter((c) => c !== excluir);
+  // El fantasma no es destino de drag (clic-sí / drag-no): se excluye del
+  // barrido para no prometer un drop que sería no-op.
+  const celulas = [...scope.querySelectorAll(".cell")].filter(
+    (c) => c !== excluir && !c.closest(".sheet-fantasma"),
+  );
   let mejor: HTMLElement | null = null,
     mejorD = Infinity;
   for (const c of celulas) {
@@ -912,7 +916,8 @@ export interface SheetsCallbacks {
   pegarEnCelda?: (hojaId: number, slotIdx: number) => Promise<void> | void;
 }
 
-/** Id de la hoja fantasma (solo visual, nunca en state.hojas): los ids reales son ≥1. */
+/** Id de la hoja fantasma (solo visual, nunca en state.hojas): los ids reales son ≥1.
+    Clic-sí / drag-no (el drag la ignora); el drop la normaliza a null en el borde. */
 export const HOJA_FANTASMA: number = -1;
 
 // ponytail: callbacks vigentes (initSheets los refresca aunque los listeners ya
@@ -1140,6 +1145,7 @@ export function initSheets(cb: SheetsCallbacks): void {
         aplicarATodas(btn.dataset["hoja"] ?? "");
         return;
       case "agregar": {
+        // El fantasma no tiene botón ＋ (su columna va vacía): -1 nunca llega acá.
         const destino = Number(btn.dataset["hoja"]);
         if (Number.isInteger(destino)) callbacks?.pedirArchivos(destino);
         return;
@@ -1226,7 +1232,8 @@ export function initSheets(cb: SheetsCallbacks): void {
     sheetsEl.querySelectorAll(".sheet.file-drop").forEach((s) => {
       if (s !== sheet) s.classList.remove("file-drop");
     });
-    if (sheet instanceof HTMLElement) sheet.classList.add("file-drop");
+    if (sheet instanceof HTMLElement && sheet.dataset["hoja"] !== String(HOJA_FANTASMA))
+      sheet.classList.add("file-drop");
   });
 
   sheetsEl.addEventListener("dragleave", (e) => {
@@ -1246,8 +1253,11 @@ export function initSheets(cb: SheetsCallbacks): void {
     const target = e.target as HTMLElement | null;
     const sheet = target?.closest?.(".sheet");
     cancelarDragVisual();
-    if (sheet instanceof HTMLElement)
-      callbacks?.agregarArchivos(e.dataTransfer?.files, Number(sheet.dataset["hoja"]));
+    if (sheet instanceof HTMLElement) {
+      // El centinela nunca cruza el borde: el fantasma va por el flujo normal.
+      const crudo = Number(sheet.dataset["hoja"]);
+      callbacks?.agregarArchivos(e.dataTransfer?.files, crudo === HOJA_FANTASMA ? null : crudo);
+    }
   });
 
   canvasEl?.addEventListener(
