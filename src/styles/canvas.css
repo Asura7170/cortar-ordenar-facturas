@@ -162,6 +162,16 @@
   z-index: 2;
 }
 
+/* Hoja fantasma: solo visual (no existe en el estado ni se exporta). */
+.sheet-fantasma {
+  border: 2px dashed var(--renglon-fuerte);
+  box-shadow: none;
+  opacity: 0.85;
+}
+.sheet-fantasma .sheet-tag {
+  border-style: dashed;
+}
+
 /* Fila hoja + panel de distribución (siempre visible, a la derecha) */
 .sheet-row {
   display: flex;
@@ -183,13 +193,18 @@
   scrollbar-width: thin;
   scrollbar-color: var(--texto-panel-suave) transparent;
 }
-/* Columna derecha de la hoja: panel arriba, botón de agregar debajo. */
+/* Columna derecha de la hoja: panel arriba, botón de agregar debajo.
+   Sticky en el rango de su fila (el scroll container es .canvas, sin
+   overflows intermedios que lo recorten). */
 .sheet-side {
   width: 224px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: sticky;
+  top: 12px;
+  align-self: flex-start;
 }
 /* Botón ＋ por hoja: sólido en reposo; en hover se vuelve fantasma
    discontinuo (mismo lenguaje que el overlay de arrastre del canvas). */

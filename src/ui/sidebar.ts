@@ -12,7 +12,7 @@ import {
 import type { Comprobante } from "../types";
 import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
-import { esDragDeArchivos, renderHojas } from "./sheets";
+import { HOJA_FANTASMA, esDragDeArchivos, renderHojas } from "./sheets";
 import { precalentarModelos, procesarCola } from "../pipeline/queue";
 import { extraerPendientes } from "../pipeline/extract";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
@@ -305,7 +305,18 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
 // Clic en celda vacía: lee la imagen del portapapeles del SO (copiada en
 // WhatsApp con clic derecho > Copiar imagen) y la coloca en ese slot exacto.
 export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
-  const destino = hojaPorId(hojaId);
+  let destino = hojaPorId(hojaId);
+  if (!destino && hojaId === HOJA_FANTASMA) {
+    // Clic en la hoja fantasma (solo visual): se materializa con el layout
+    // de la última hoja y el flujo sigue al slot exacto. Si la última ya
+    // tiene huecos (carrera con otro intake), se reutiliza sin fragmentar.
+    const ultima = state.hojas[state.hojas.length - 1];
+    if (ultima && ultima.slots.includes(null)) destino = ultima;
+    else {
+      destino = crearHoja(ultima?.layout ?? "u4x2");
+      state.hojas.push(destino);
+    }
+  }
   if (!destino) return;
   // Elección explícita de destino: consume la pendiente del picker (si no, el
   // próximo intake caería en una hoja abandonada).
@@ -320,7 +331,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     try {
       const blob = await normalizarImagen(primero);
       const comp: Comprobante = comprobanteDesdeBlob(blob, primero.name);
-      const h = hojaPorId(hojaId);
+      const h = destino;
       const libreExacto = h && slotIdx >= 0 && slotIdx < h.slots.length && h.slots[slotIdx] == null;
       if (libreExacto && h) {
         h.slots[slotIdx] = comp;

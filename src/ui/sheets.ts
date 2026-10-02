@@ -227,6 +227,13 @@ function panelHoja(hoja: Hoja, idx: number): string {
     </aside>`;
 }
 
+/** Todas las hojas al tope (el fantasma solo aparece en ese caso). */
+function todasLlenas(): boolean {
+  return (
+    state.hojas.length > 0 && state.hojas.every((h) => cuentaHoja(h) >= layoutDe(h.layout).total)
+  );
+}
+
 /** Cuerpo del render (siempre bajo `mutandoHojas`: el swap destruye el foco). */
 function renderCuerpo(borrador: BorradorMonto | null): void {
   rectsCache = null;
@@ -282,6 +289,33 @@ function renderCuerpo(borrador: BorradorMonto | null): void {
     row.append(lado);
     sheetsEl.append(row);
   });
+  // Hoja fantasma: solo visual (nunca entra a state.hojas, así no se
+  // exporta ni se cuenta). Hereda el layout de la última; al pegar en
+  // ella se materializa como hoja real. Va en .sheet-row con la columna
+  // vacía para alinear el borde izquierdo con las hojas reales.
+  if (!state.modoOcr && todasLlenas()) {
+    const ultima = state.hojas[state.hojas.length - 1];
+    const l = layoutDe(ultima?.layout ?? "u4x2");
+    const fila = document.createElement("div");
+    fila.className = "sheet-row";
+    fila.dataset["hoja"] = String(HOJA_FANTASMA);
+    const fantasma = document.createElement("article");
+    fantasma.className = "sheet sheet-fantasma";
+    fantasma.dataset["hoja"] = String(HOJA_FANTASMA);
+    const grid = document.createElement("div");
+    grid.className = "sheet-grid";
+    grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
+    l.pos.forEach((p, i) => grid.append(celda(null, p, i, HOJA_FANTASMA)));
+    const tag = document.createElement("span");
+    tag.className = "sheet-tag";
+    tag.textContent = `HOJA ${state.hojas.length + 1} · nueva`;
+    fantasma.append(tag, grid);
+    const lado = document.createElement("div");
+    lado.className = "sheet-side";
+    lado.setAttribute("aria-hidden", "true");
+    fila.append(fantasma, lado);
+    sheetsEl.append(fila);
+  }
   tarjetaVacia.hidden = true;
   const pegar = btnPegarVacio();
   if (pegar) pegar.hidden = true;
@@ -877,6 +911,9 @@ export interface SheetsCallbacks {
   /** Clic en celda vacía: pega el portapapeles en ese slot exacto. */
   pegarEnCelda?: (hojaId: number, slotIdx: number) => Promise<void> | void;
 }
+
+/** Id de la hoja fantasma (solo visual, nunca en state.hojas): los ids reales son ≥1. */
+export const HOJA_FANTASMA: number = -1;
 
 // ponytail: callbacks vigentes (initSheets los refresca aunque los listeners ya
 // existan: HMR/tests re-cablean sin duplicar).

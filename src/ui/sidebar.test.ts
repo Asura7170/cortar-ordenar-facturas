@@ -51,6 +51,7 @@ const {
   renderCodigo,
 } = await import("./sidebar");
 const { archivo, comprobante } = await import("../test/factoria");
+const { HOJA_FANTASMA } = await import("./sheets");
 
 const canvas = el("canvas");
 const aviso = el("aviso");
@@ -706,6 +707,41 @@ describe("pegarEnCelda (clic en vacía)", () => {
     await pegarEnCelda(999999, 0);
     expect(items().filter(Boolean)).toHaveLength(0);
     expect(aviso.textContent).toBe("");
+  });
+
+  it("clic fantasma materializa hoja con layout heredado en el slot", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u2h");
+    h.slots[0] = comprobante();
+    h.slots[1] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 1);
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[1]?.layout).toBe("u2h");
+    expect(state.hojas[1]?.slots[1]?.nombre).toBe("pegado.png");
+    expect(state.hojas[1]?.slots[0]).toBeNull();
+  });
+
+  it("doble clic fantasma cae al hueco de la misma hoja", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u2h");
+    h.slots[0] = comprobante();
+    h.slots[1] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[1]?.slots.filter(Boolean)).toHaveLength(2);
+  });
+
+  it("fantasma rancio reutiliza huecos de la última sin fragmentar", async () => {
+    mockRead(async () => [itemPng()]);
+    const h = crearHoja("u4x2");
+    h.slots[0] = comprobante();
+    state.hojas.push(h);
+    await pegarEnCelda(HOJA_FANTASMA, 2);
+    expect(state.hojas).toHaveLength(1);
+    expect(h.slots[2]?.nombre).toBe("pegado.png");
   });
 });
 
