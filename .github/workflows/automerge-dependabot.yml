@@ -7,8 +7,15 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch:
 permissions:
-  contents: read
+  # ponytail: contents: write (no read) es lo que habilita `gh pr merge --auto`
+  # en los dos caminos: mergePullRequest y enablePullRequestAutoMerge. Con
+  # contents: read ambos fallan con "Resource not accessible by integration" y
+  # el run reporta success igual, porque el || solo emitía ::warning::.
+  # actions: write lo necesitan los PR de dependabot/github_actions/*, que
+  # tocan .github/workflows/*.yml: sin ese permiso GitHub rechaza el merge.
+  contents: write
   pull-requests: write
+  actions: write
 jobs:
   automerge:
     runs-on: ubuntu-latest
@@ -23,8 +30,15 @@ jobs:
         run: |
           set -euo pipefail
           # ponytail: sin precheck de allow_auto_merge — ese campo no es legible
-          # con GITHUB_TOKEN (falso negativo); si auto-merge está desactivado,
-          # cada `gh pr merge --auto` ya avisa con ::warning sin abortar el loop.
+          # con GITHUB_TOKEN (falso negativo). Si auto-merge está desactivado en
+          # el repo, el merge falla y el contador de abajo lo vuelve visible.
+          fallos=0
+          intentar() {
+            if ! gh pr merge --auto --merge "$1"; then
+              echo "::error::No se pudo activar auto-merge/merge en PR #$1"
+              fallos=$((fallos + 1))
+            fi
+          }
           edad_horas() {
             echo $(( ($(date +%s) - $(date -d "$1" +%s)) / 3600 ))
           }
@@ -34,9 +48,10 @@ jobs:
             [[ "$new" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] || return 0
             [ "${old%%.*}" != "${new%%.*}" ]
           }
-          gh pr list --author "app/dependabot" --state open --limit 100 \
-            --json number,title,headRefName --jq '.[] | "\(.number)\t\(.headRefName)\t\(.title)"' |
-            while IFS=$'\t' read -r n rama titulo; do
+          # ponytail: process substitution, no pipe. Con `gh pr list | while`,
+          # el loop corre en un subshell y `fallos` se pierde al salir (por eso
+          # antes un fallo total de permisos reportaba conclusion: success).
+          while IFS=$'\t' read -r n rama titulo; do
               if [[ "$titulo" =~ bump\ ([^[:space:]]+)\ from\ ([^[:space:]]+)\ to\ ([^[:space:]]+) ]]; then
                 pkg="${BASH_REMATCH[1]}" old="${BASH_REMATCH[2]}" new="${BASH_REMATCH[3]}"
               else
@@ -55,7 +70,7 @@ jobs:
               fi
               if [[ "$rama" == dependabot/github_actions/* ]]; then
                 echo "PR #$n ($pkg $old→$new): action minor/patch → auto-merge (CI manda)"
-                gh pr merge --auto --merge "$n" || echo "::warning::No se pudo activar auto-merge en #$n"
+                intentar "$n"
                 continue
               fi
               if [[ "$rama" != dependabot/npm_and_yarn/* ]]; then
@@ -72,5 +87,13 @@ jobs:
                 continue
               fi
               echo "PR #$n ($pkg $old→$new): maduro → auto-merge"
-              gh pr merge --auto --merge "$n" || echo "::warning::No se pudo activar auto-merge en #$n"
-            done
+              intentar "$n"
+            done < <(gh pr list --author "app/dependabot" --state open --limit 100 \
+              --json number,title,headRefName --jq '.[] | "\(.number)\t\(.headRefName)\t\(.title)"')
+          # ponytail: el run debe fallar si algún merge falló. Con conclusion:
+          # success el aviso se perdía y nadie notaba que el token no servía.
+          if [ "$fallos" -gt 0 ]; then
+            echo "::error::$fallos merge(s)/auto-merge(s) fallaron (permisos o repo sin allow_auto_merge)"
+            exit 1
+          fi
+          echo "Sin fallos."
