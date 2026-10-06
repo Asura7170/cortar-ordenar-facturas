@@ -5,6 +5,11 @@ on:
     branches: [main]
 permissions:
   contents: read
+# ponytail: ver ci.yml. Sin concurrency, audit y secrets se apilan y acaban
+# cancelados por falta de runner (steps=0, runner='') en vez de correr.
+concurrency:
+  group: quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   audit:
     runs-on: ubuntu-latest
