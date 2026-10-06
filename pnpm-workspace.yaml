@@ -16,6 +16,11 @@ overrides:
   # installed"), así que subir esto sin subir vite-plus rompe `test:coverage`.
   # Subir los dos juntos, nunca este override en solitario.
   vitest: "5.0.1"
+  # ponytail: parche de CVE (GHSA-68fv-2mgg-jv7q, event-loop DoS). Llega
+  # transitivo por postcss<-vite-plus-core y jsdom<-vitest; ninguna de las dos
+  # lo sube sola porque fijan ^1.2.1. 1.2.2 cabe en ese rango, asi que es un
+  # override real y no un force. Quitarlo cuando postcss/jsdom suban el minimo.
+  source-map-js: "1.2.2"
 peerDependencyRules:
   allowAny:
     - vite

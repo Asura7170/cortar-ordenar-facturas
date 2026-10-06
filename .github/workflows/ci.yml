@@ -5,6 +5,14 @@ on:
     branches: [main]
 permissions:
   contents: read
+# ponytail: sin esto, cada push nuevo encola un run entero sin cancelar el
+# anterior y acaban compitiendo por los runners. Con la cola llena, GitHub
+# CANCELA el job a los 15min sin asignarle runner (steps=0, runner='') y el PR
+# queda rojo con "Some checks haven't completed yet" sin que haya un fallo real.
+# grupo por workflow+ref: ci y quality no se cancelan entre si.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
     runs-on: ubuntu-latest
