@@ -5,7 +5,7 @@ Frontend-only, Chrome desktop-only. Fotos/PDFs → recorte DocAligner + OCR PP-O
 ## Requisitos
 
 - Chrome latest en desktop (usa WASM, SharedArrayBuffer, `<dialog closedby>`, etc.)
-- `node ^20.19.0 || ^22.18.0 || >=24.11.0` + `pnpm 12` (ver `devEngines`)
+- `node ^22.18.0 || ^24.11.0 || >=26.0.0` + `pnpm 12` (ver `devEngines`)
 - Servir con COOP/COEP (lo pone `vite.config.ts`). No usar `file://` ni `python -m http.server`.
 
 ## Instalación
@@ -66,7 +66,7 @@ Nombre: `{codigo}-comprobante.{docx|pdf}` (`sincodigo-` sin código).
 ## Licencias
 
 - Modelos vendoreados: ver `public/models/NOTICE.txt` (DocAligner Apache-2.0, PaddleOCR PP-OCRv6 Apache-2.0, geometría MIT).
-- Deps runtime: `onnxruntime-web` MIT, `pdfjs-dist` Apache-2.0 (`^6.3.289` flotante deliberado), `docx` MIT, `vite-plus` MIT.
+- Deps runtime: `onnxruntime-web` MIT, `pdfjs-dist` Apache-2.0 (`^6.4.299` flotante deliberado), `docx` MIT, `vite-plus` MIT.
 
 ## Spec
 
