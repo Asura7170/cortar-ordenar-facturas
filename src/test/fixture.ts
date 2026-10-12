@@ -53,10 +53,10 @@ export const FIXTURE_HTML = `
   <button id="btnBorrarModelos" type="button"></button>
   </fieldset>
 </form>
-<button id="btnDescargar2"></button>
+<button id="btnWord"></button>
 <button id="btnPdf" type="button"></button>
 <button id="btnImprimir" type="button"></button>
-<button id="btnIA" type="button"></button>
+<button id="btnCalcular" type="button"></button>
 <div id="zonaPrint" hidden></div>
 `;
 

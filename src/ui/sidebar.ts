@@ -32,7 +32,7 @@ function radiosPosicion(): NodeListOf<HTMLInputElement> {
 }
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
 const aviso: HTMLElement = getEl("aviso");
-const btnIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnIA");
+const btnCalcular: HTMLButtonElement = getEl<HTMLButtonElement>("btnCalcular");
 const btnPegar: HTMLButtonElement = getEl<HTMLButtonElement>("btnPegar");
 
 /** Rechazo de entrada: nombre en tono tenue + motivo en rojo sello. */
@@ -496,7 +496,7 @@ export function initSidebar(): void {
   });
 
   // Reintento manual del cálculo de totales (el auto corre al drenar la cola).
-  btnIA.addEventListener("click", () => {
+  btnCalcular.addEventListener("click", () => {
     extraerPendientes({ forzado: true });
   });
 

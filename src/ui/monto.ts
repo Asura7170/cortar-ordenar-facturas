@@ -48,21 +48,21 @@ export function totalItems(): number {
   return aplanar().length;
 }
 
-const TEXTO_BOTON_IA = "Calcular totales";
+const TEXTO_INICIAL = "Calcular totales";
 
 // ponytail: el botón es el estado (con-monto/total, siempre visible): cada
 // renderMonto lo sincroniza, sin importar qué camino mutó las hojas.
 function pintarBarraBoton(): void {
-  const btn = document.getElementById("btnIA");
+  const btn = document.getElementById("btnCalcular");
   if (!(btn instanceof HTMLButtonElement)) return;
   const total = totalItems();
   const hechos = aplanar().filter((c) => c.montoCents !== null).length;
   btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
   // ponytail: solo el span de texto — textContent borraría el icono.
   // El fantasma solo duplica el icono (el texto lo invierte el degradado).
-  const texto = hechos > 0 ? `Montos extraídos: ${hechos}/${total}` : TEXTO_BOTON_IA;
+  const texto = hechos > 0 ? `Montos extraídos: ${hechos}/${total}` : TEXTO_INICIAL;
   // ponytail: texto único en el DOM (el fantasma solo lleva el icono).
-  const textos = btn.querySelectorAll(".ia-txt");
+  const textos = btn.querySelectorAll(".calculo-txt");
   if (textos.length === 0) btn.textContent = texto;
   textos.forEach((txt) => {
     txt.textContent = texto;

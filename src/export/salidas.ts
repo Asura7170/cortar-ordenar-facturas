@@ -24,7 +24,7 @@ import { layoutDe } from "../ui/layout";
 import { totalItems } from "../ui/monto";
 import { getEl } from "../utils";
 
-const btnDescargar: HTMLButtonElement = getEl<HTMLButtonElement>("btnDescargar2");
+const btnDescargar: HTMLButtonElement = getEl<HTMLButtonElement>("btnWord");
 const btnPdf: HTMLButtonElement = getEl<HTMLButtonElement>("btnPdf");
 const btnImprimir: HTMLButtonElement = getEl<HTMLButtonElement>("btnImprimir");
 const zonaPrint: HTMLElement = getEl<HTMLElement>("zonaPrint");

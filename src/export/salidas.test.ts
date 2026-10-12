@@ -1,4 +1,4 @@
-/* Tests salida Word (salidas.ts necesita #montoTotal, #btnDescargar2, #btnPdf y
+/* Tests salida Word (salidas.ts necesita #montoTotal, #btnWord, #btnPdf y
    #btnImprimir al importar; docx va mockeado: se aserta la estructura armada). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { ORDEN_PLANTILLAS } from "../ui/layout";
@@ -77,7 +77,7 @@ HTMLCanvasElement.prototype.toBlob = ((cb: BlobCallback): void => {
 }) as unknown as typeof HTMLCanvasElement.prototype.toBlob;
 
 document.body.innerHTML =
-  '<div id="montoTotal"></div><p id="aviso"></p><button id="btnDescargar2"></button><button id="btnPdf"></button><button id="btnImprimir"></button><div id="zonaPrint" hidden></div>';
+  '<div id="montoTotal"></div><p id="aviso"></p><button id="btnWord"></button><button id="btnPdf"></button><button id="btnImprimir"></button><div id="zonaPrint" hidden></div>';
 const { state, crearHoja } = await import("../state");
 const {
   GUTTER,
@@ -432,7 +432,7 @@ describe("initExport", () => {
     sembrar();
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     initExport();
-    document.getElementById("btnDescargar2")?.click();
+    document.getElementById("btnWord")?.click();
     // descargarWord es async (mide + empaca): el clic del anchor llega después.
     await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
   });

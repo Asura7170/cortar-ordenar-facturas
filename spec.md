@@ -29,7 +29,7 @@ facturas/
    ├─ utils.ts           # getEl (throw si falta #id), sanear toWellFormed, sleep AbortSignal
    ├─ ui/
    │  ├─ layout.ts       # 10 plantillas + layoutDe (fallback u4x2)
-   │  ├─ sidebar.ts      # dropzone/pegar/clic, gate PDF, avisos, btnIA, limpiar
+   │  ├─ sidebar.ts      # dropzone/pegar/clic, gate PDF, avisos, btnCalcular, limpiar
    │  ├─ sheets.ts       # render carta, drag % + z-order, zoom 0.25–4, lupa, atajos M/Esc/Ctrl
    │  ├─ monto.ts        # Cents enteros, parsearMonto US estricto, formatear en-US
    │  ├─ ocrMode.ts      # toggle chkOcr (no persiste) + renderHojas
@@ -62,7 +62,7 @@ facturas/
 - **queue `queue.ts`:** `precalentarModelos()` al agregar, fases `detectarYRecortar→enderezar→extraerTexto→ok` (la celda pinta el full-res con lazy, sin miniaturas), guards `buscarSlot` no-resucita, `console.info` timings, auto `extraerPendientes({desdeCola:true})` al drenar.
 - **rotar `rotar.ts:16,29`:** `QUIETUD_GIRO_MS=1500`, `girarYReleer(id,90|270)` con debounce; relee OCR y reabre si era manual.
 - **pdf `pdf.ts:10,13,73,91`:** `PDF_MAX_BYTES=5MiB`, `PDF_MAX_PAGINAS=10` (por archivo), `ANCHO_MINI_PDF=720`, `vistaSegura=alto≤4000 && area≤8M`. `esPdf` por MIME+ext, `admitirPdf` con avisos sin `innerHTML`. Cada página no-blanca/no-negra = comprobante; blancas y negras se omiten.
-- **extract `extract.ts`:** regex offline, sin red. `MONEY_RE` (precios `X,XXX.XX`/`X.XX`, filtra cuentas sin decimal y precios ×4 decimales), `extractCandidates` devuelve `{valor, previo}`; `extraerRapidoCents` (1 distinto = total sin red, repetido N veces vale; ≥2 distintos, con `-`/`(` previo o sin montos = manual; clasifica sobre texto completo sin tope). `extraerPendientes({forzado?,desdeCola?})` re-chequea los null no-manuales (drenado de `queue` con `desdeCola`, botón `btnIA` con `forzado`, giro tras releer OCR) y pinta progresivo vía `aplicarTotales` (borrador en curso, manual y texto rancio ganan). `parsearMonto` US estricto rechaza `1,234` sin decimal. Monto manual en tarjeta siempre gana y sí suma.
+- **extract `extract.ts`:** regex offline, sin red. `MONEY_RE` (precios `X,XXX.XX`/`X.XX`, filtra cuentas sin decimal y precios ×4 decimales), `extractCandidates` devuelve `{valor, previo}`; `extraerRapidoCents` (1 distinto = total sin red, repetido N veces vale; ≥2 distintos, con `-`/`(` previo o sin montos = manual; clasifica sobre texto completo sin tope). `extraerPendientes({forzado?,desdeCola?})` re-chequea los null no-manuales (drenado de `queue` con `desdeCola`, botón `btnCalcular` con `forzado`, giro tras releer OCR) y pinta progresivo vía `aplicarTotales` (borrador en curso, manual y texto rancio ganan). `parsearMonto` US estricto rechaza `1,234` sin decimal. Monto manual en tarjeta siempre gana y sí suma.
 - **Entrada `sidebar.ts:83,87`:** regex `image/(jpeg|png|webp|bmp|gif)`, resto (incl. HEIC) → `formato no soportado`, no rompe cola. PDF con `>5MB/>10p/protegido/ilegible` → aviso en entrada sin entrar a cola.
 
 ## 4. UI / Estado
@@ -73,7 +73,7 @@ facturas/
 - **OCR vista `ocrMode.ts:7`:** `modoOcr` no persiste; toggle muestra texto por celda + lupa (`lupaCanvas`), copiar por comprobante. Texto solo alimenta el regex del TOTAL.
 - **Ajustes `state.ts`:** persisten código (por ventana) y moneda en `localStorage`; la gestión de modelos locales vive en el caché del navegador (`docaligner`).
 - **Sheets `sheets.ts:341-342,760,773`:** zoom efímero `0.25–4`, `M`=lupa, `Esc`=soltar, `Ctrl++/−/0`=zoom, `data-accion=girar-izq/der`.
-- **Contrato DOM `utils.ts:4`:** `getEl(id)` hace throw si falta `#id` en `index.html`. Ids: `btnZoomMenos/btnZoom/btnZoomMas/btnLupa/montoTotal/btnAjustes/btnTema/temaIcono/chkCodigo/numCodigo/inputCodigo/chkOcr/ocrEstado/btnIA/btnDescargar2/btnPdf/btnImprimir/btnLimpiar/canvas/metaHojas/aviso/sheets/dropzone/fileInput/zonaPrint/lupa/lupaCanvas/modalAjustes/formAjustes/cfgMoneda/estadoModelos/btnDescargarModelos/btnBorrarModelos/btnResetAjustes/btnGuardarAjustes/modalLimpiar/descLimpiar/tituloCodigo/tituloOcrToggle/tituloExportar/tituloAjustes/tituloLimpiar/btnGithub/githubStars/modalRecorte/tituloRecorte/recorteBase/recorteGuia/btnRecorteReset/btnRecorteOk` (`posCodigo` es `name=` de radios, no id).
+- **Contrato DOM `utils.ts:4`:** `getEl(id)` hace throw si falta `#id` en `index.html`. Ids: `btnZoomMenos/btnZoom/btnZoomMas/btnLupa/montoTotal/btnAjustes/btnTema/temaIcono/chkCodigo/numCodigo/inputCodigo/chkOcr/ocrEstado/btnCalcular/btnWord/btnPdf/btnImprimir/btnLimpiar/canvas/metaHojas/aviso/sheets/dropzone/fileInput/zonaPrint/lupa/lupaCanvas/modalAjustes/formAjustes/cfgMoneda/estadoModelos/btnDescargarModelos/btnBorrarModelos/btnResetAjustes/btnGuardarAjustes/modalLimpiar/descLimpiar/tituloCodigo/tituloOcrToggle/tituloExportar/tituloAjustes/tituloLimpiar/btnGithub/githubStars/modalRecorte/tituloRecorte/recorteBase/recorteGuia/btnRecorteReset/btnRecorteOk` (`posCodigo` es `name=` de radios, no id).
 
 ## 5. Salidas
 

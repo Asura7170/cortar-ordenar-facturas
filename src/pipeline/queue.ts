@@ -8,7 +8,12 @@ import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
 import { detectarYRecortar, obtenerSesion } from "./docaligner";
-import { aplicarTotales, extraerRapidoCents, limpiarTextoCompleto } from "./extract";
+import {
+  aplicarTotales,
+  extraerPendientes,
+  extraerRapidoCents,
+  limpiarTextoCompleto,
+} from "./extract";
 import type { Enderezado } from "./ocr";
 import { diagVacio } from "./ocr";
 /** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
@@ -196,8 +201,7 @@ export async function procesarCola(): Promise<void> {
       if (!tocada) break;
       // Re-chequeo del drenado: lo que el fast-path dejó (texto nuevo con giro,
       // intake tardío) va por extraerPendientes (síncrono, nunca tumba la cola).
-      const mod = await import("./extract").catch((): null => null);
-      await Promise.resolve(mod?.extraerPendientes({ desdeCola: true })).catch(() => {});
+      extraerPendientes({ desdeCola: true });
       try {
         renderHojas(); // estado final (extraerPendientes ya pintó si aplicó montos)
       } catch {

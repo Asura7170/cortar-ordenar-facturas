@@ -1,6 +1,6 @@
 /* Extracción del TOTAL: regex offline — 1 monto distinto = total sin red;
    ≥2 distintos, signo previo (-/() o sin montos = manual. Auto al drenar la
-   cola + botón #btnIA. Solo completa montos en null no-manuales: lo manual
+   cola + botón #btnCalcular. Solo completa montos en null no-manuales: lo manual
    siempre gana. La suma total la hace el código (sumaTotal). */
 import { buscarSlot, state } from "../state";
 import type { Cents, Comprobante } from "../types";
@@ -106,7 +106,7 @@ function avisar(texto: string): void {
   if (el) el.textContent = texto;
 }
 
-/** Re-chequeo regex de los null no-manuales (botón #btnIA, giro y drenado de la
+/** Re-chequeo regex de los null no-manuales (botón #btnCalcular, giro y drenado de la
     cola): 1 distinto fija el total; ≥2 distintos o signo previo quedan manual.
     Síncrono y sin red: nunca lanza. */
 export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: boolean }): void {

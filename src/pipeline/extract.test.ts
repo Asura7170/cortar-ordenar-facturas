@@ -199,7 +199,7 @@ describe("extraerPendientes", () => {
   it("la pasada mueve la barra global con-monto/total", async () => {
     const { renderMonto } = await import("../ui/monto");
     lote2();
-    const btn = el<HTMLButtonElement>("btnIA");
+    const btn = el<HTMLButtonElement>("btnCalcular");
     renderMonto();
     expect(btn.textContent).toBe("Calcular totales");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");

@@ -1,7 +1,8 @@
 /* Tests P0: montos en cents y colecciones (monto.ts necesita #montoTotal al importar). */
 import { describe, expect, it } from "vite-plus/test";
 
-document.body.innerHTML = '<div id="montoTotal"></div><button id="btnIA" type="button"></button>';
+document.body.innerHTML =
+  '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button>';
 const { state, crearHoja } = await import("../state");
 const {
   aplanar,
@@ -143,15 +144,15 @@ describe("renderMonto", () => {
 });
 
 describe("barraBoton", () => {
-  function botonIA(): HTMLButtonElement {
-    const b = document.getElementById("btnIA");
-    if (!(b instanceof HTMLButtonElement)) throw new Error("sin #btnIA");
+  function botonCalcular(): HTMLButtonElement {
+    const b = document.getElementById("btnCalcular");
+    if (!(b instanceof HTMLButtonElement)) throw new Error("sin #btnCalcular");
     return b;
   }
 
   it("siempre visible: 0/0, mitad y lleno", () => {
     state.moneda = "USD";
-    const btn = botonIA();
+    const btn = botonCalcular();
     renderMonto(); // sin hojas
     expect(btn.textContent).toBe("Calcular totales");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");
@@ -164,17 +165,17 @@ describe("barraBoton", () => {
     expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
   });
 
-  it("fantasma: actualiza los dos .ia-txt de prod", () => {
+  it("fantasma: actualiza los dos .calculo-txt de prod", () => {
     state.moneda = "USD";
-    const btn = botonIA();
+    const btn = botonCalcular();
     btn.innerHTML =
-      '<span class="ia-txt"></span><span class="ia-capa" aria-hidden="true"><span class="ia-txt" aria-hidden="true"></span></span>';
+      '<span class="calculo-txt"></span><span class="calculo-capa" aria-hidden="true"><span class="calculo-txt" aria-hidden="true"></span></span>';
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     state.hojas.push(h);
     renderMonto();
-    expect([...btn.querySelectorAll(".ia-txt")].map((s) => s.textContent)).toEqual([
+    expect([...btn.querySelectorAll(".calculo-txt")].map((s) => s.textContent)).toEqual([
       "Montos extraídos: 1/2",
       "Montos extraídos: 1/2",
     ]);
@@ -183,7 +184,7 @@ describe("barraBoton", () => {
 
   it("añadir sin monto encoge la barra sin tocar el total", () => {
     state.moneda = "USD";
-    const btn = botonIA();
+    const btn = botonCalcular();
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
     state.hojas.push(h);

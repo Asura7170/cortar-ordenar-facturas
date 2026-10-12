@@ -33,7 +33,7 @@ CI exige `vp check + typecheck + test + build` en cada PR.
 1. Pegar (`Ctrl+V`), arrastrar o clic en dropzone. Formatos: `jpg/png/webp/bmp/gif/pdf`.
 2. PDF: cada archivo se evalúa solo, entra si `≤5 MB` y `≤10 páginas`. Cada página no-blanca = 1 comprobante; blancas se omiten. Protegido/ilegible → aviso sin romper cola.
 3. `HEIC` → aviso `formato no soportado`, no falla la cola.
-4. La cola recorta + endereza + OCR sola. El total se fija por regex (1 monto distinto); botón `Calcular totales (btnIA)` fuerza re-chequeo; lo ambiguo queda manual.
+4. La cola recorta + endereza + OCR sola. El total se fija por regex (1 monto distinto); botón `Calcular totales (btnCalcular)` fuerza re-chequeo; lo ambiguo queda manual.
 5. Giro manual `±90°` por tarjeta (debounce 1500ms, relee OCR). Monto manual en tarjeta siempre gana y sí suma.
 6. Arrastre libre dentro de cada hoja (posición física, no cambia orden de inserción). `M`=lupa, `Esc`=soltar, `Ctrl++/−/0`=zoom. `X` elimina comprobante.
 
