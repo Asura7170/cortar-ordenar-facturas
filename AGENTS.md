@@ -7,7 +7,7 @@ Frontend-only, sin backend. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vite
 ```bash
 vp install      # instalar (delega a pnpm 12, fijado en devEngines)
 pnpm dev        # vp dev --open: dev server, abre Chrome solo (server.open)
-pnpm test       # vitest run local (~560 tests, ~20s). Ver NOTA abajo: NO usar `vp test`
+pnpm test       # vp test run (~560 tests, ~20s)
 pnpm typecheck  # tsc --noEmit
 vp check        # lint + formato + tipos (válido para loops de validación)
 pnpm build      # vp build: build prod → dist/
@@ -16,8 +16,8 @@ pnpm preview    # vp preview: previsualizar el build
 
 Hay CI (GitHub Actions: `vp check` + typecheck + test + build en cada PR, job `check` requerido por el ruleset). Verificar con `vp check`, `pnpm test` y `pnpm typecheck` (y `pnpm build` si toca config de Vite).
 
-- NOTA (`ponytail:` divergencia deliberada del toolchain): `vp test` está roto en vp 0.3.0 con pnpm — su vitest interno no resuelve el peer opcional `jsdom` (`Cannot find package 'jsdom'`, environment de los tests). Por eso `test`/`test:watch` usan el binario `vitest` local (dep explícita) en vez de `vp test`. Revertir a `vp test` cuando upstream lo arregle.
-- `vite`/`vite-plus`/`vitest` se resuelven vía `catalog:` en `pnpm-workspace.yaml` (no tocar los alias; pnpm los necesita para que el override aplique). Bump de vite-plus **manual**: las dos entradas del catálogo deben ir en la misma versión o `vp build` aborta, y dependabot solo bumpea una. `overrides.vitest` está pineado al vitest que embupa vite-plus (ver el comentario en el archivo); moverlo rompe `test:coverage`.
+- Tests viajan solo por `vp` (sin `vitest` standalone: `vite-plus` lo embutea y `vp test`/`test:coverage` usan esa copia). `@vitest/coverage-v8` + `jsdom` sí quedan en devDeps porque vp los resuelve desde la raíz; NO quitarlos. Llamar siempre vía `pnpm exec vp` o scripts (un `vp` global aparte daría otra versión).
+- `vite`/`vite-plus`/`@vitest/coverage-v8` se resuelven vía `catalog:` en `pnpm-workspace.yaml` (no tocar los alias; pnpm los necesita para que el override aplique). Bump de vite-plus **manual**: las dos entradas del catálogo deben ir en la misma versión o `vp build` aborta, y dependabot solo bumpea una. `overrides.vitest@*` apunta al catálogo y lo mantiene lockstep con el vitest embuteado (ver el comentario en el archivo); `@vitest/coverage-v8` también va lockstep porque el guard de coverage de vp exige la versión exacta.
 - `onnxruntime-web` 1.30.0 pineado en dependencies (única dep nueva; trae `protobufjs`, permitido en `allowBuilds`). EPs `webgpu`→`wasm` con `numThreads: 1` (los workers pthread los bloquea Chrome bajo COEP; single-thread ~250ms/foto basta); `ort.env.wasm.wasmPaths` apunta a `public/ort/` en dev y al CDN pineado en PROD (el .wasm supera el límite de Pages).
 - Imports: `vite-plus` en config, `vite-plus/test` en tests. Regla `vite-plus/prefer-vite-plus-imports` lo exige (`vp check` falla si importas de `vite`/`vitest`).
 - `.vite-hooks/` (pre-commit `vp staged`) se commitea; `prepare: vp config` lo activa tras instalar.

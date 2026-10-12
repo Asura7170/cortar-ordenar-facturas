@@ -18,3 +18,4 @@ archivos-test/
 
 # Referencia local generada (cheatsheets)
 docs/
+.vitest/
