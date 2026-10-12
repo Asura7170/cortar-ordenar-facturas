@@ -17,14 +17,14 @@ pnpm dev        # vp dev --open, abre Chrome
 
 ## Comandos
 
-| Comando          | Qué hace                                                                                      |
-| ---------------- | --------------------------------------------------------------------------------------------- |
-| `pnpm dev`       | dev + abre Chrome                                                                             |
-| `pnpm test`      | `vitest run` local. `ponytail: vp test` roto en vp 0.3.0 (`Cannot find jsdom`) → usar binario |
-| `pnpm typecheck` | `tsc --noEmit` estricto                                                                       |
-| `vp check`       | lint + formato + tipos (exige imports de `vite-plus`)                                         |
-| `pnpm build`     | `vp build` → `dist/`                                                                          |
-| `pnpm preview`   | previsualizar build                                                                           |
+| Comando          | Qué hace                                              |
+| ---------------- | ----------------------------------------------------- |
+| `pnpm dev`       | dev + abre Chrome                                     |
+| `pnpm test`      | `vp test run` (único runner, sin vitest standalone)   |
+| `pnpm typecheck` | `tsc --noEmit` estricto                               |
+| `vp check`       | lint + formato + tipos (exige imports de `vite-plus`) |
+| `pnpm build`     | `vp build` → `dist/`                                  |
+| `pnpm preview`   | previsualizar build                                   |
 
 CI exige `vp check + typecheck + test + build` en cada PR.
 
@@ -61,7 +61,6 @@ Nombre: `{codigo}-comprobante.{docx|pdf}` (`sincodigo-` sin código).
 - `SharedArrayBuffer` / pantalla negra: revisa COOP/COEP (solo `pnpm dev`/`preview`, no otro server).
 - `ORT sin proveedor`: primer EP con timeout 30s + latch, reintenta con wasm; revisa `public/ort/` servido en dev (en prod el wasm sale del CDN).
 - `LLM CORS/key`: revisa `baseURL`, key en Ajustes, y consola (timeout 60s).
-- `vp test` falla con `jsdom`: usa `pnpm test` (binario local).
 - `dist` >1MB: build es solo-webgpu a propósito.
 
 ## Licencias

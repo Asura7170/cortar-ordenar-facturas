@@ -90,13 +90,13 @@ Una fuente (`state.hojas` + layout + `codigoPosicion`): la vista carta es lo que
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `vp install`     | instala (pnpm 12 fijado en devEngines) + `prepare: vp config` activa `.vite-hooks/`                                                     |
 | `pnpm dev`       | `vp dev --open`, COOP/COEP para WASM threads                                                                                            |
-| `pnpm test`      | `vitest run` local. `ponytail: vp test` roto en vp 0.3.0 con pnpm/jsdom → usar binario                                                  |
+| `pnpm test`      | `vp test run` (único runner; `vite-plus` embutea vitest, sin dep standalone)                                                            |
 | `pnpm typecheck` | `tsc --noEmit` (estricto: `verbatimModuleSyntax/import type`, `erasableSyntaxOnly`, `isolatedDeclarations`, `noUncheckedIndexedAccess`) |
 | `vp check`       | lint + formato + tipos (`prefer-vite-plus-imports` exige `vite-plus`, no `vite`)                                                        |
 | `pnpm build`     | `vp build` → `dist/`, `target esnext`, solo-webgpu <1MB                                                                                 |
 | `pnpm preview`   | previsualizar build                                                                                                                     |
 
-`catalog: vite/vite-plus + overrides vitest 4.1.11`, `allowBuilds esbuild,protobufjs` (`onnxruntime-web 1.30.0` lo trae). `pdfjs-dist ^6.3.289` flotante deliberado (decisión: dejar `^`). `servir-ort-crudo` solo mapea `/ort/*.mjs` en dev; `COOP same-origin + COEP require-corp` en `server+preview` (no servir con `python -m http.server`). `vitest jsdom + setup.ts`. `ponytail:` marca simplificaciones deliberadas, no deuda.
+`catalog: vite/vite-plus/@vitest/coverage-v8 + overrides vitest@* lockstep al embuteado`, `allowBuilds esbuild,protobufjs` (`onnxruntime-web 1.30.0` lo trae). `pdfjs-dist ^6.4.299` flotante deliberado (decisión: dejar `^`). `servir-ort-crudo` solo mapea `/ort/*.mjs` en dev; `COOP same-origin + COEP require-corp` en `server+preview` (no servir con `python -m http.server`). Tests `vp test run` con `jsdom + setup.ts` (config `test` en `vite.config.ts`). `ponytail:` marca simplificaciones deliberadas, no deuda.
 
 ## 7. Diagrama de flujo (mermaid)
 

@@ -164,6 +164,9 @@ settings:
 
 catalogs:
   default:
+    '@vitest/coverage-v8':
+      specifier: 5.0.3
+      version: 5.0.3
     vite:
       specifier: npm:@voidzero-dev/vite-plus-core@1.1.0
       version: 1.1.0
@@ -173,8 +176,8 @@ catalogs:
 
 overrides:
   vite@*: npm:@voidzero-dev/vite-plus-core@1.1.0
-  vitest: 5.0.3
   source-map-js: 1.2.2
+  vitest@*: 5.0.3
 
 importers:
 
@@ -191,7 +194,7 @@ importers:
         version: 6.4.299
     devDependencies:
       '@vitest/coverage-v8':
-        specifier: 5.0.3
+        specifier: 'catalog:'
         version: 5.0.3(@vitest/browser@5.0.3)(vitest@5.0.3)
       jsdom:
         specifier: ^30.1.2
@@ -205,9 +208,6 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.1.0(@types/node@26.4.1)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(esbuild@0.28.2)(jsdom@30.1.2)(typescript@7.0.2)
-      vitest:
-        specifier: 5.0.3
-        version: 5.0.3(@types/node@26.4.1)(@vitest/browser-preview@5.0.3)(@vitest/coverage-v8@5.0.3)(@vitest/ui@5.0.3)(@voidzero-dev/vite-plus-core@1.1.0(@types/node@26.4.1)(esbuild@0.28.2)(typescript@7.0.2))(jsdom@30.1.2)
 
 packages:
 

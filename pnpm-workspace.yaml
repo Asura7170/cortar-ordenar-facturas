@@ -8,21 +8,23 @@ catalog:
   # dependabot solo bumpea la segunda, así que este bump es manual.
   vite: npm:@voidzero-dev/vite-plus-core@1.1.0
   vite-plus: 1.1.0
+  vitest: 5.0.3
+  "@vitest/coverage-v8": 5.0.3
 overrides:
   vite@*: "catalog:"
-  # ponytail: pineado al vitest que EMBUPA vite-plus, no al último de npm.
-  # vite-plus asserta que @vitest/coverage-v4 coincida con su runner y aborta
-  # el arranque si no ("vite-plus bundles vitest@X, but @vitest/coverage-v8@Y is
-  # installed"), así que subir esto sin subir vite-plus rompe `test:coverage`.
-  # Subir los dos juntos, nunca este override en solitario.
-  vitest: "5.0.3"
   # ponytail: parche de CVE (GHSA-68fv-2mgg-jv7q, event-loop DoS). Llega
   # transitivo por postcss<-vite-plus-core y jsdom<-vitest; ninguna de las dos
   # lo sube sola porque fijan ^1.2.1. 1.2.2 cabe en ese rango, asi que es un
   # override real y no un force. Quitarlo cuando postcss/jsdom suban el minimo.
   source-map-js: "1.2.2"
+  # ponytail: lockstep con el vitest que EMBUTEA vite-plus (ya no hay vitest en
+  # devDeps). Sin esto, autoInstallPeers instalaría un vitest suelto para el
+  # peer de coverage-v8 y el guard de `vp test --coverage` abortaría.
+  vitest@*: "catalog:"
 peerDependencyRules:
   allowAny:
     - vite
+    - vitest
   allowedVersions:
     vite: "*"
+    vitest: "*"
