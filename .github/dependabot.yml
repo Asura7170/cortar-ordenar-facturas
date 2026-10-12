@@ -8,6 +8,12 @@ updates:
     ignore:
       # Pineo deliberado: lo gestiona el pipeline ort-bump (vendorea public/ort/).
       - dependency-name: onnxruntime-web
+      # ponytail: un patch de vite-plus no mueve el vitest que embutea, pero un
+      # minor/major sí (1.0.0→1.1.0 lo llevó de 5.0.1 a 5.0.3) y ese bump exige
+      # mover overrides.vitest + package.json a la vez. dependabot no ve ese
+      # acoplamiento, así que solo los minor/major quedan manuales.
+      - dependency-name: vite-plus
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
