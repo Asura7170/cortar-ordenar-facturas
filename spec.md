@@ -73,7 +73,6 @@ facturas/
 - **OCR vista `ocrMode.ts:7`:** `modoOcr` no persiste; toggle muestra texto por celda + lupa (`lupaCanvas`), copiar por comprobante. Texto solo alimenta el regex del TOTAL.
 - **Ajustes `state.ts`:** persisten código (por ventana) y moneda en `localStorage`; la gestión de modelos locales vive en el caché del navegador (`docaligner`).
 - **Sheets `sheets.ts:341-342,760,773`:** zoom efímero `0.25–4`, `M`=lupa, `Esc`=soltar, `Ctrl++/−/0`=zoom, `data-accion=girar-izq/der`.
-- **Contrato DOM `utils.ts:4`:** `getEl(id)` hace throw si falta `#id` en `index.html`. Ids: `btnZoomMenos/btnZoom/btnZoomMas/btnLupa/montoTotal/btnAjustes/btnTema/temaIcono/chkCodigo/numCodigo/inputCodigo/chkOcr/ocrEstado/btnCalcular/btnWord/btnPdf/btnImprimir/btnLimpiar/canvas/metaHojas/aviso/sheets/dropzone/fileInput/zonaPrint/lupa/lupaCanvas/modalAjustes/formAjustes/cfgMoneda/estadoModelos/btnDescargarModelos/btnBorrarModelos/btnResetAjustes/btnGuardarAjustes/modalLimpiar/descLimpiar/tituloCodigo/tituloOcrToggle/tituloExportar/tituloAjustes/tituloLimpiar/btnGithub/githubStars/modalRecorte/tituloRecorte/recorteBase/recorteGuia/btnRecorteReset/btnRecorteOk` (`posCodigo` es `name=` de radios, no id).
 
 ## 5. Salidas
 
