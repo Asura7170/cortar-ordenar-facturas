@@ -6,8 +6,8 @@ catalog:
   # valida en runtime que el alias de vite coincida con su core, y `vp build`
   # falla duro si no ("Expected @voidzero-dev/vite-plus-core@X, but found Y").
   # dependabot solo bumpea la segunda, así que este bump es manual.
-  vite: npm:@voidzero-dev/vite-plus-core@1.0.0
-  vite-plus: 1.0.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.1.0
+  vite-plus: 1.1.0
 overrides:
   vite@*: "catalog:"
   # ponytail: pineado al vitest que EMBUPA vite-plus, no al último de npm.
@@ -15,7 +15,7 @@ overrides:
   # el arranque si no ("vite-plus bundles vitest@X, but @vitest/coverage-v8@Y is
   # installed"), así que subir esto sin subir vite-plus rompe `test:coverage`.
   # Subir los dos juntos, nunca este override en solitario.
-  vitest: "5.0.1"
+  vitest: "5.0.3"
   # ponytail: parche de CVE (GHSA-68fv-2mgg-jv7q, event-loop DoS). Llega
   # transitivo por postcss<-vite-plus-core y jsdom<-vitest; ninguna de las dos
   # lo sube sola porque fijan ^1.2.1. 1.2.2 cabe en ese rango, asi que es un
