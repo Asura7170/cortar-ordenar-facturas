@@ -1,15 +1,14 @@
 /* Cola secuencial de procesamiento — DocAligner recorta, PP-OCRv6_small extrae
    texto (import dinámico: dict+onnx solo bajan con el primer comprobante).
-   Cada ítem extrae su monto 1×1 al completar (extract.ts, pintado progresivo);
-   al drenar, el lote cubre lo pendiente; sin TOTAL o sin key el monto queda manual. */
+   Cada ítem fija su monto por regex al completar (fast-path, pintado progresivo);
+   al drenar, extraerPendientes re-chequea lo pendiente; sin total legible queda manual. */
 import { buscarSlot, state } from "../state";
 import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
 import { detectarYRecortar, obtenerSesion } from "./docaligner";
-import { aplicarTotales, extraerUnMonto, limpiarTextoCompleto } from "./extract";
-import { extraerRapidoCents } from "./jev";
+import { aplicarTotales, extraerRapidoCents, limpiarTextoCompleto } from "./extract";
 import type { Enderezado } from "./ocr";
 import { diagVacio } from "./ocr";
 /** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
@@ -51,9 +50,7 @@ export async function procesarCola(): Promise<void> {
   state.colaEnProceso = true;
   try {
     // ponytail: drenado por pendiente, no snapshot; token generación si el MOCK se vuelve concurrente.
-    // Fase 1: el "procesando" y el "ok" (imagen) se pintan por ítem; el monto cae progresivo.
-    // JEV vuela desacoplado (nube): el OCR del siguiente no espera al monto del actual.
-    const vuelos: Promise<boolean>[] = [];
+    // Fase 1: el "procesando" y el "ok" (imagen) se pintan por ítem; el monto cae por regex.
     for (;;) {
       let tocada = false;
       for (;;) {
@@ -167,22 +164,16 @@ export async function procesarCola(): Promise<void> {
           sig.montoCents = null;
           sig.estado = "ok";
           // ponytail: fast-path offline — 1 distinto se fija sin red (vía aplicarTotales:
-          // borrador en curso, manual y texto rancio ganan); el resto vuela a JEV.
+          // borrador en curso, manual y texto rancio ganan); el resto queda manual.
           const textoLimpio = limpiarTextoCompleto(sig.textoOcr ?? "");
           const rapido = extraerRapidoCents(textoLimpio);
           if (rapido !== null)
             aplicarTotales([{ idx: 1, id: sig.id, texto: textoLimpio }], new Map([[1, rapido]]));
           try {
-            renderHojas(); // imagen visible al instante, sin esperar al JEV (~1s/factura)
+            renderHojas(); // imagen visible al instante
           } catch {
             /* el render nunca aborta la cola */
           }
-          // JEV desacoplado: vuela en paralelo al OCR del siguiente; el monto cae progresivo.
-          // Best-effort (nunca lanza): lo no resuelto cae a la red del drenado.
-          // ponytail: Promise.resolve envuelve el mock de tests tras restoreAllMocks (devuelve
-          // undefined sin impl); en prod extraerUnMonto siempre es Promise<boolean>.
-          if (rapido === null)
-            vuelos.push(Promise.resolve(extraerUnMonto(sig.id)).catch((): boolean => false));
           const entero = (v: number): number => Math.round(v);
           // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
           if (import.meta.env.DEV)
@@ -203,18 +194,16 @@ export async function procesarCola(): Promise<void> {
         tocada = true;
       }
       if (!tocada) break;
-      // Espera a los JEV en vuelo antes de la red (evita doble fetch); la red cubre lo pendiente.
-      await Promise.allSettled(vuelos);
-      vuelos.length = 0;
-      // Red del drenado: lo que el 1×1 no resolvió va en lote (best-effort, nunca tumba la cola).
+      // Re-chequeo del drenado: lo que el fast-path dejó (texto nuevo con giro,
+      // intake tardío) va por extraerPendientes (síncrono, nunca tumba la cola).
       const mod = await import("./extract").catch((): null => null);
       await Promise.resolve(mod?.extraerPendientes({ desdeCola: true })).catch(() => {});
       try {
-        renderHojas(); // estado final del lote (la IA ya pintó si aplicó montos)
+        renderHojas(); // estado final (extraerPendientes ya pintó si aplicó montos)
       } catch {
         /* el render nunca aborta la cola */
       }
-      // Entrados durante la IA: el loop los drena sin soltar el flag (sin huérfanos).
+      // Entrados durante el re-chequeo: el loop los drena sin soltar el flag (sin huérfanos).
     }
   } finally {
     state.colaEnProceso = false;

@@ -1,48 +1,29 @@
-/* Tests P0: extract.ts — 1 llamada por lote, solo null, manual siempre gana. */
+/* Tests: extract.ts — regex offline, lo manual siempre gana. */
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture, el } from "../test/fixture";
 
-vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
+vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn(), actualizarMontoCelda: vi.fn() }));
 
 montarFixture();
 const { crearHoja, state } = await import("../state");
 const { comprobante } = await import("../test/factoria");
-const { renderHojas } = await import("../ui/sheets");
+const { renderHojas, actualizarMontoCelda } = await import("../ui/sheets");
 const {
   aplicarTotales,
   candidatos,
-  construirPrompt,
-  extraerContenido,
-  extraerJsonContenido,
+  extractCandidates,
   extraerPendientes,
-  extraerTotalesLote,
-  limpiarTexto,
+  extraerRapidoCents,
   limpiarTextoCompleto,
-  partirLote,
-  TIMEOUT_MS,
 } = await import("./extract");
 import type { ItemLote } from "./extract";
-import type { FetchFn } from "./extract";
 
 const aviso = el("aviso");
 
-function respuesta(contenido: string, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: (): Promise<unknown> =>
-      Promise.resolve({ choices: [{ message: { content: contenido } }] }),
-  } as Response;
-}
-
 function lote2(): { c1: ReturnType<typeof comprobante>; c2: ReturnType<typeof comprobante> } {
   const h = crearHoja();
-  const c1 = comprobante({
-    nombre: "factura (2).png",
-    estado: "ok",
-    textoOcr: "PROPINA 1.00 TOTAL 12.50",
-  });
-  const c2 = comprobante({ nombre: "otra.png", estado: "ok", textoOcr: "PROPINA 1.00 TOTAL 7.00" });
+  const c1 = comprobante({ nombre: "factura (2).png", estado: "ok", textoOcr: "TOTAL 12.50" });
+  const c2 = comprobante({ nombre: "otra.png", estado: "ok", textoOcr: "TOTAL 7.00" });
   h.slots[0] = c1;
   h.slots[1] = c2;
   state.hojas.push(h);
@@ -52,9 +33,9 @@ function lote2(): { c1: ReturnType<typeof comprobante>; c2: ReturnType<typeof co
 beforeEach(() => {
   state.hojas = [];
   state.colaEnProceso = false;
-  state.configIA = { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k" };
   aviso.textContent = "";
   vi.mocked(renderHojas).mockClear();
+  vi.mocked(actualizarMontoCelda).mockReset().mockReturnValue(true);
 });
 
 describe("candidatos", () => {
@@ -77,247 +58,57 @@ describe("candidatos", () => {
   });
 });
 
-describe("extraerTotalesLote", () => {
-  it("1 llamada aplica cents y respeta null", async () => {
-    const { c1, c2 } = lote2();
-    const fetchFn = vi.fn(async (): Promise<Response> => respuesta('{"1":"12.50","2":null}'));
-    const items: ItemLote[] = [
-      { idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" },
-      { idx: 2, id: c2.id, texto: "PROPINA 1.00 TOTAL 7.00" },
-    ];
-    const n = aplicarTotales(items, await extraerTotalesLote(items, state.configIA, fetchFn));
-    expect(fetchFn).toHaveBeenCalledTimes(1);
-    expect(n).toBe(1);
-    expect(c1.montoCents).toBe(1250);
-    expect(c2.montoCents).toBeNull();
+describe("regex", () => {
+  it("filtra cuentas sin decimal e ignora precios ×4 decimales", () => {
+    expect(extractCandidates("Bs 18,490.34 Cuenta 40005189200").map((c) => c.valor)).toEqual([
+      "18,490.34",
+    ]);
+    expect(extractCandidates("x Bs 8.2500 = Bs 1,650.00").map((c) => c.valor)).toEqual([
+      "1,650.00",
+    ]);
   });
 
-  it("el prompt usa [#idx], nunca el nombre de archivo", async () => {
-    const { c1 } = lote2();
-    let cuerpo = "";
-    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
-      cuerpo = String(o?.body ?? "");
-      return respuesta('{"1":"1.00"}');
-    });
-    await extraerTotalesLote(
-      [{ idx: 1, id: c1.id, texto: "TOTAL 1.00" }],
-      state.configIA,
-      fetchFn as FetchFn,
-    );
-    expect(cuerpo).toContain("[#1]");
-    expect(cuerpo).toContain('"max_tokens":8000');
-    expect(cuerpo).not.toContain("factura (2).png");
+  it("rápido: 1 distinto resuelve, repetido vale, 2 distintos = manual", () => {
+    expect(extraerRapidoCents("TOTAL 12.50")).toBe(1250);
+    expect(extraerRapidoCents("TOTAL 1,234.56 ... total 1234.56")).toBe(123456);
+    expect(extraerRapidoCents("TOTAL 12.50 PROPINA 1.00")).toBeNull();
+    expect(extraerRapidoCents("sin montos")).toBeNull();
   });
 
-  it("fences ```json e inválidos → null (manual)", async () => {
-    const { c1, c2 } = lote2();
-    const fetchFn = vi.fn(async (): Promise<Response> =>
-      respuesta('```json\n{"1":"abc","2":"7.00"}\n```'),
-    );
-    const items: ItemLote[] = [
-      { idx: 1, id: c1.id, texto: "x" },
-      { idx: 2, id: c2.id, texto: "y" },
-    ];
-    const mapa = await extraerTotalesLote(items, state.configIA, fetchFn);
-    expect(mapa.get(1)).toBeNull();
-    expect(mapa.get(2)).toBe(700);
+  it("rápido: 1 solo aunque huela a parcial es ok (no se pide etiqueta TOTAL)", () => {
+    expect(extraerRapidoCents("SUBTOTAL 45.00")).toBe(4500);
+    expect(extraerRapidoCents("1.23")).toBe(123);
   });
 
-  it("objeto/array del LLM → null (manual), no se parsea", async () => {
-    const { c1, c2 } = lote2();
-    const fetchFn = vi.fn(async (): Promise<Response> =>
-      respuesta('{"1":{"total":"12.50"},"2":[7]}'),
-    );
-    const items: ItemLote[] = [
-      { idx: 1, id: c1.id, texto: "x" },
-      { idx: 2, id: c2.id, texto: "y" },
-    ];
-    const mapa = await extraerTotalesLote(items, state.configIA, fetchFn);
-    expect(mapa.get(1)).toBeNull();
-    expect(mapa.get(2)).toBeNull(); // sin el guard, String([7])="7" → 700
+  it("rápido clasifica sobre el texto completo (TOTAL tras el char 1800 cuenta)", () => {
+    const largo = `SUBTOTAL 45.00 ${"x ".repeat(1000)}TOTAL 50.00`;
+    expect(largo.length).toBeGreaterThan(1800);
+    expect(extraerRapidoCents(largo)).toBeNull(); // 2 distintos → manual
+    expect(extraerRapidoCents(`TOTAL 50.00 ${"x ".repeat(1000)}`)).toBe(5000);
   });
 
-  it("HTTP error lanza (el orquestador lo deja manual)", async () => {
-    const { c1 } = lote2();
-    const fetchFn = vi.fn(async (): Promise<Response> => respuesta("x", false, 429));
-    await expect(
-      extraerTotalesLote([{ idx: 1, id: c1.id, texto: "x" }], state.configIA, fetchFn),
-    ).rejects.toThrow("LLM 429");
+  it("rápido rechaza signo previo (nota de crédito queda manual)", () => {
+    expect(extraerRapidoCents("TOTAL -12.50")).toBeNull();
+    expect(extraerRapidoCents("TOTAL (12.50)")).toBeNull();
+    expect(extraerRapidoCents("TOTAL 12.50")).toBe(1250);
   });
 
-  it("fetch colgado aborta a TIMEOUT_MS y queda manual (no cuelga la app)", async () => {
-    vi.useFakeTimers();
-    try {
-      const { c1 } = lote2();
-      const fetchFn = vi.fn(
-        (_u: unknown, o?: RequestInit): Promise<Response> =>
-          new Promise<never>((_, rej) => {
-            o?.signal?.addEventListener("abort", () => rej(new Error("aborted")), {
-              once: true,
-            });
-          }),
-      );
-      const p = extraerTotalesLote(
-        [{ idx: 1, id: c1.id, texto: "x" }],
-        state.configIA,
-        fetchFn as FetchFn,
-      );
-      const asercion = expect(p).rejects.toThrow("aborted"); // handler antes del abort
-      await vi.advanceTimersByTimeAsync(TIMEOUT_MS);
-      await asercion;
-      expect(c1.montoCents).toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("responses: body con input/instructions y parsea output[]", async () => {
-    const { c1 } = lote2();
-    let cuerpo = "";
-    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
-      cuerpo = String(o?.body ?? "");
-      return {
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> =>
-          Promise.resolve({
-            output: [{ content: [{ type: "output_text", text: '{"1":"9.99"}' }] }],
-          }),
-      } as Response;
-    });
-    const mapa = await extraerTotalesLote(
-      [{ idx: 1, id: c1.id, texto: "TOTAL 9.99" }],
-      { baseUrl: "https://llm.test/v1/responses", model: "m", apiKey: "k" },
-      fetchFn as FetchFn,
-    );
-    expect(cuerpo).toContain('"input"');
-    expect(cuerpo).toContain('"max_output_tokens":8000');
-    expect(cuerpo).not.toContain("messages");
-    expect(mapa.get(1)).toBe(999);
-  });
-
-  it("zen postea vía proxy dev con sesión", async () => {
-    const { c1 } = lote2();
-    let url = "";
-    let sesion = "";
-    const fetchFn = vi.fn(async (u: unknown, o?: RequestInit): Promise<Response> => {
-      url = String(u);
-      sesion = String((o?.headers as Record<string, string>)?.["x-opencode-session"] ?? "");
-      return {
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> =>
-          Promise.resolve({
-            output: [{ content: [{ type: "output_text", text: '{"1":"1.00"}' }] }],
-          }),
-      } as Response;
-    });
-    await extraerTotalesLote(
-      [{ idx: 1, id: c1.id, texto: "TOTAL 1.00" }],
-      { baseUrl: "https://opencode.ai/zen/go/v1/responses", model: "m", apiKey: "k" },
-      fetchFn as FetchFn,
-    );
-    expect(url).toBe("/zen-go/v1/responses");
-    expect(sesion.trim()).not.toBe("");
-  });
-
-  it("razonamiento que agota el presupuesto (length+null) → manual", async () => {
-    const { c1 } = lote2();
-    const fetchFn = vi.fn(
-      async (): Promise<Response> =>
-        ({
-          ok: true,
-          status: 200,
-          json: (): Promise<unknown> =>
-            Promise.resolve({
-              choices: [{ finish_reason: "length", message: { content: null } }],
-            }),
-        }) as Response,
-    );
-    const mapa = await extraerTotalesLote(
-      [{ idx: 1, id: c1.id, texto: "TOTAL 1.00" }],
-      state.configIA,
-      fetchFn,
-    );
-    expect(mapa.get(1)).toBeNull();
-  });
-
-  it("razonamiento: auto omite, none envía effort, low omite temperature", async () => {
-    const { c1 } = lote2();
-    const cuerpos: string[] = [];
-    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
-      cuerpos.push(String(o?.body ?? ""));
-      return respuesta('{"1":"1.00"}');
-    });
-    const item = { idx: 1, id: c1.id, texto: "TOTAL 1.00" };
-    await extraerTotalesLote(
-      [item],
-      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k" },
-      fetchFn as FetchFn,
-    );
-    expect(cuerpos[0]).not.toContain("reasoning");
-    await extraerTotalesLote(
-      [item],
-      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "none" },
-      fetchFn as FetchFn,
-    );
-    expect(cuerpos[1]).toContain('"reasoning_effort":"none"');
-    expect(cuerpos[1]).toContain('"temperature":0');
-    await extraerTotalesLote(
-      [item],
-      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "low" },
-      fetchFn as FetchFn,
-    );
-    expect(cuerpos[2]).toContain('"reasoning_effort":"low"');
-    expect(cuerpos[2]).not.toContain("temperature");
-  });
-
-  it("razonamiento: 400 reintenta limpio una vez", async () => {
-    const { c1 } = lote2();
-    const cuerpos: string[] = [];
-    let n = 0;
-    const fetchFn = vi.fn(async (_u: unknown, o?: RequestInit): Promise<Response> => {
-      cuerpos.push(String(o?.body ?? ""));
-      n++;
-      if (n === 1) return respuesta("x", false, 400);
-      return respuesta('{"1":"2.00"}');
-    });
-    const mapa = await extraerTotalesLote(
-      [{ idx: 1, id: c1.id, texto: "TOTAL 2.00" }],
-      { baseUrl: "https://llm.test/v1", model: "m", apiKey: "k", razonamiento: "low" },
-      fetchFn as FetchFn,
-    );
-    expect(fetchFn).toHaveBeenCalledTimes(2);
-    expect(cuerpos[1]).not.toContain("reasoning");
-    expect(mapa.get(1)).toBe(200);
-  });
-
-  it("extraerContenido: chat y responses", () => {
-    expect(extraerContenido({ choices: [{ message: { content: "hola" } }] })).toBe("hola");
-    expect(extraerContenido({ output: [{ content: [{ text: "a" }, { text: "b" }] }] })).toBe("ab");
-    expect(extraerContenido({})).toBeNull();
-  });
-
-  it("extraerContenido: chat con content array", () => {
-    expect(
-      extraerContenido({
-        choices: [{ message: { content: [{ type: "text", text: '{"1":"12.50"}' }] } }],
-      }),
-    ).toBe('{"1":"12.50"}');
-    expect(extraerContenido({ choices: [{ message: { content: [] } }] })).toBeNull();
+  it("limpiarTextoCompleto colapsa espacios sin capar", () => {
+    expect(limpiarTextoCompleto("  TOTAL   12.50\n\nIVA 1 ")).toBe("TOTAL 12.50 IVA 1");
+    expect(limpiarTextoCompleto("x".repeat(5000))).toHaveLength(5000);
   });
 });
 
 describe("aplicarTotales", () => {
-  it("manual fijado durante el fetch gana (sigue en null al aplicar)", () => {
+  it("manual fijado en el ínterin gana (sigue en null al aplicar)", () => {
     const { c1 } = lote2();
-    c1.montoCents = 9999; // el usuario escribió mientras volaba el fetch
+    c1.montoCents = 9999; // el usuario escribió mientras corría la pasada
     const n = aplicarTotales([{ idx: 1, id: c1.id, texto: "x" }], new Map([[1, 4200]]));
     expect(n).toBe(0);
     expect(c1.montoCents).toBe(9999);
   });
 
-  it("comprobante quitado durante el fetch no resucita", () => {
+  it("comprobante quitado en el ínterin no resucita", () => {
     const h = crearHoja();
     const c = comprobante({ estado: "ok", textoOcr: "TOTAL 1" });
     h.slots[0] = c;
@@ -327,15 +118,15 @@ describe("aplicarTotales", () => {
     expect(n).toBe(0);
   });
 
-  it("texto cambiado durante el fetch (giro manual): no aplica el rancio", () => {
+  it("texto cambiado en el ínterin (giro manual): no aplica el rancio", () => {
     const { c1 } = lote2();
-    const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" }];
-    c1.textoOcr = "TOTAL 99.99"; // girado a mitad del fetch
+    const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
+    c1.textoOcr = "TOTAL 99.99"; // girado a mitad de la pasada
     expect(aplicarTotales(items, new Map([[1, 1250]]))).toBe(0);
     expect(c1.montoCents).toBeNull();
   });
 
-  it("borrador en edición gana al lote en vuelo (input enfocado)", () => {
+  it("borrador en edición gana a la pasada en vuelo (input enfocado)", () => {
     const { c1 } = lote2();
     const cell = document.createElement("div");
     cell.className = "cell";
@@ -347,7 +138,7 @@ describe("aplicarTotales", () => {
     document.body.append(cell);
     input.focus();
     try {
-      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" }];
+      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
       expect(aplicarTotales(items, new Map([[1, 4200]]))).toBe(0);
       expect(c1.montoCents).toBeNull();
     } finally {
@@ -355,7 +146,7 @@ describe("aplicarTotales", () => {
     }
   });
 
-  it("borrador inválido sin foco gana al lote en vuelo (tipeado tras blur)", () => {
+  it("borrador inválido sin foco gana a la pasada (tipeado tras blur)", () => {
     const { c1 } = lote2();
     const cell = document.createElement("div");
     cell.className = "cell";
@@ -367,7 +158,7 @@ describe("aplicarTotales", () => {
     cell.append(input);
     document.body.append(cell);
     try {
-      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" }];
+      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
       expect(aplicarTotales(items, new Map([[1, 4200]]))).toBe(0);
       expect(c1.montoCents).toBeNull();
     } finally {
@@ -375,7 +166,7 @@ describe("aplicarTotales", () => {
     }
   });
 
-  it("input vacío sin foco no frena al lote (control: sigue autofill)", () => {
+  it("input vacío sin foco no frena la pasada (control: sigue autofill)", () => {
     const { c1 } = lote2();
     const cell = document.createElement("div");
     cell.className = "cell";
@@ -386,7 +177,7 @@ describe("aplicarTotales", () => {
     cell.append(input);
     document.body.append(cell);
     try {
-      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "PROPINA 1.00 TOTAL 12.50" }];
+      const items: ItemLote[] = [{ idx: 1, id: c1.id, texto: "TOTAL 12.50" }];
       expect(aplicarTotales(items, new Map([[1, 4200]]))).toBe(1);
       expect(c1.montoCents).toBe(4200);
     } finally {
@@ -396,214 +187,85 @@ describe("aplicarTotales", () => {
 });
 
 describe("extraerPendientes", () => {
-  it("auto: 1 fetch, pinta 1 vez y avisa el conteo", async () => {
+  it("auto: 1 pasada, pinta 1 vez y avisa el conteo", () => {
     const { c1, c2 } = lote2();
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> =>
-      respuesta('{"1":"12.50","2":"7.00"}')) as typeof fetch;
-    try {
-      await extraerPendientes();
-    } finally {
-      globalThis.fetch = real;
-    }
+    extraerPendientes();
     expect(c1.montoCents).toBe(1250);
     expect(c2.montoCents).toBe(700);
     expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(1);
-    expect(aviso.textContent).toBe("IA: 2/2 totales.");
+    expect(aviso.textContent).toBe("Local: 2/2 totales.");
   });
 
-  it("el lote mueve la barra global con-monto/total", async () => {
+  it("la pasada mueve la barra global con-monto/total", async () => {
     const { renderMonto } = await import("../ui/monto");
     lote2();
     const btn = el<HTMLButtonElement>("btnIA");
     renderMonto();
     expect(btn.textContent).toBe("Calcular totales");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> =>
-      respuesta('{"1":"12.50","2":"7.00"}')) as typeof fetch;
-    try {
-      await extraerPendientes();
-    } finally {
-      globalThis.fetch = real;
-    }
+    extraerPendientes();
     renderMonto(); // la app lo hace vía renderHojas (mockeado aquí)
     expect(btn.textContent).toBe("Montos extraídos: 2/2");
     expect(btn.style.getPropertyValue("--progreso")).toBe("1");
   });
 
-  it("sin apiKey sale en silencio (auto) y avisa si es forzado", async () => {
-    const { c1 } = lote2();
-    state.configIA.apiKey = "  ";
-    const real = globalThis.fetch;
-    const espia = vi.fn(real);
-    globalThis.fetch = espia;
-    try {
-      await extraerPendientes();
-      expect(aviso.textContent).toBe("");
-      await extraerPendientes({ forzado: true });
-      expect(aviso.textContent).toContain("API key");
-    } finally {
-      globalThis.fetch = real;
-    }
-    expect(espia).not.toHaveBeenCalled();
+  it("≥2 distintos: sin forzado silencioso, con forzado avisa revisión manual", () => {
+    const { c1, c2 } = lote2();
+    c1.textoOcr = "SUBTOTAL 45.00 TOTAL 50.00"; // 2 distintos → manual
+    c2.textoOcr = "SUBTOTAL 45.00 TOTAL 60.00";
+    extraerPendientes();
     expect(c1.montoCents).toBeNull();
+    expect(c2.montoCents).toBeNull();
+    expect(aviso.textContent).toBe("");
+    extraerPendientes({ forzado: true });
+    expect(aviso.textContent).toBe("Sin totales para leer: revisá manualmente o recortá de nuevo.");
   });
 
-  it("fallo de red → todo manual y aviso con conteo", async () => {
-    const { c1 } = lote2();
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> => respuesta("x", false, 500)) as typeof fetch;
-    try {
-      await extraerPendientes();
-    } finally {
-      globalThis.fetch = real;
-    }
-    expect(c1.montoCents).toBeNull();
-    expect(aviso.textContent).toBe(
-      "IA: 0/2 totales, resto manual. Revisá Ajustes (URL, clave, CORS).",
-    );
-  });
-
-  it("éxito total conserva el aviso previo del lote (N1)", async () => {
+  it("éxito total conserva el aviso previo (N1)", () => {
     const { c1 } = lote2();
     aviso.textContent = "«gordo.pdf»: pesa más de 5 MB";
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> =>
-      respuesta('{"1":"12.50","2":"7.00"}')) as typeof fetch;
-    try {
-      await extraerPendientes();
-    } finally {
-      globalThis.fetch = real;
-    }
+    extraerPendientes();
     expect(c1.montoCents).toBe(1250);
     expect(aviso.textContent).toBe("«gordo.pdf»: pesa más de 5 MB");
   });
 
-  it("chunk fallido deja console.warn con la causa (N2)", async () => {
-    lote2();
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> => respuesta("x", false, 429)) as typeof fetch;
-    try {
-      await extraerPendientes();
-      expect(warn).toHaveBeenCalledWith(expect.stringContaining("LLM 429"));
-    } finally {
-      globalThis.fetch = real;
-      warn.mockRestore();
-    }
-  });
-
-  it("auto bloqueado durante OCR salvo desdeCola (regresión)", async () => {
+  it("auto bloqueado durante OCR salvo desdeCola (regresión)", () => {
     const { c1 } = lote2();
     state.colaEnProceso = true;
-    const real = globalThis.fetch;
-    let llamadas = 0;
-    globalThis.fetch = (async (): Promise<Response> => {
-      llamadas++;
-      return respuesta('{"1":"12.50","2":"7.00"}');
-    }) as typeof fetch;
     try {
-      await extraerPendientes();
-      expect(llamadas).toBe(0);
+      extraerPendientes();
       expect(c1.montoCents).toBeNull();
-      await extraerPendientes({ desdeCola: true });
-      expect(llamadas).toBe(1);
+      expect(aviso.textContent).toBe("");
+      extraerPendientes({ desdeCola: true });
       expect(c1.montoCents).toBe(1250);
     } finally {
-      globalThis.fetch = real;
       state.colaEnProceso = false;
     }
   });
 
-  it("restaura loteEnCurso previo (no suelta un intake solapado)", async () => {
-    lote2();
-    state.loteEnCurso = true; // intake en curso durante el lote manual
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> =>
-      respuesta('{"1":"12.50","2":"7.00"}')) as typeof fetch;
-    try {
-      await extraerPendientes();
-      expect(state.loteEnCurso).toBe(true);
-    } finally {
-      globalThis.fetch = real;
-      state.loteEnCurso = false;
-    }
-  });
-
-  it("todo rápido sin keys avisa Local sin red", async () => {
-    const h = crearHoja();
-    const c1 = comprobante({ estado: "ok", textoOcr: "TOTAL 12.50" });
-    const c2 = comprobante({ estado: "ok", textoOcr: "TOTAL 7.00" });
-    h.slots[0] = c1;
-    h.slots[1] = c2;
-    state.hojas.push(h);
-    state.configIA.apiKey = "  ";
-    const real = globalThis.fetch;
-    const espia = vi.fn(real);
-    globalThis.fetch = espia;
-    try {
-      await extraerPendientes();
-    } finally {
-      globalThis.fetch = real;
-    }
-    expect(c1.montoCents).toBe(1250);
-    expect(c2.montoCents).toBe(700);
-    expect(espia).not.toHaveBeenCalled();
-    expect(aviso.textContent).toBe("Local: 2/2 totales.");
-  });
-
-  it("todo sin candidatos y forzado avisa revisión manual (ninguna key resuelve)", async () => {
+  it("sin texto legible y forzado avisa revisión manual", () => {
     const h = crearHoja();
     const c1 = comprobante({ estado: "ok", textoOcr: "recorte malo sin números" });
     h.slots[0] = c1;
     state.hojas.push(h);
-    state.configIA.apiKey = "  ";
-    const real = globalThis.fetch;
-    const espia = vi.fn(real);
-    globalThis.fetch = espia;
-    try {
-      await extraerPendientes({ forzado: true });
-    } finally {
-      globalThis.fetch = real;
-    }
+    extraerPendientes({ forzado: true });
     expect(c1.montoCents).toBeNull();
-    expect(espia).not.toHaveBeenCalled();
     expect(aviso.textContent).toBe("Sin totales para leer: revisá manualmente o recortá de nuevo.");
   });
-});
 
-describe("utilidades", () => {
-  it("limpiarTexto colapsa y capa a MAX_TEXTO", () => {
-    expect(limpiarTexto("  TOTAL   12.50\n\nIVA 1 ")).toBe("TOTAL 12.50 IVA 1");
-    expect(limpiarTexto("x".repeat(5000))).toHaveLength(1800);
+  it("todo ya con total o manual: forzado avisa sin pendientes", () => {
+    const h = crearHoja();
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
+    state.hojas.push(h);
+    extraerPendientes({ forzado: true });
+    expect(aviso.textContent).toBe("Sin pendientes (todo ya tiene total o es manual).");
   });
 
-  it("limpiarTextoCompleto no capa (clasificación sobre texto completo)", () => {
-    expect(limpiarTextoCompleto("  TOTAL   12.50\n\nIVA 1 ")).toBe("TOTAL 12.50 IVA 1");
-    expect(limpiarTextoCompleto("x".repeat(5000))).toHaveLength(5000);
-  });
-
-  it("partirLote corta por cantidad (25+5)", () => {
-    const items: ItemLote[] = Array.from({ length: 30 }, (_, i) => ({
-      idx: i + 1,
-      id: i + 1,
-      texto: "TOTAL 1.00",
-    }));
-    const lotes = partirLote(items);
-    expect(lotes).toHaveLength(2);
-    expect(lotes[0]).toHaveLength(25);
-    expect(lotes[1]).toHaveLength(5);
-  });
-
-  it("extraerJsonContenido: directo, fence y ruido alrededor", () => {
-    expect(extraerJsonContenido('{"1":"2.00"}')).toMatchObject({ "1": "2.00" });
-    expect(extraerJsonContenido('```json\n{"1":null}\n```')).toMatchObject({ "1": null });
-    expect(extraerJsonContenido('listo: {"1":"3.00"} fin')).toMatchObject({ "1": "3.00" });
-    expect(extraerJsonContenido("sin json")).toBeNull();
-  });
-
-  it("construirPrompt numera bloques cortos", () => {
-    expect(construirPrompt([{ idx: 1, texto: "TOTAL 1" }])).toContain("[#1]\nTOTAL 1");
+  it("parcial con forzado: avisa conteo y resto manual", () => {
+    lote2();
+    const amb = state.hojas[0]?.slots[1];
+    if (amb) amb.textoOcr = "PROPINA 1.00 TOTAL 7.00"; // 2 distintos → manual
+    extraerPendientes({ forzado: true });
+    expect(aviso.textContent).toBe("Local: 1/2 totales.");
   });
 });

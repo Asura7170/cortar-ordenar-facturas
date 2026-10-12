@@ -1,12 +1,10 @@
 /* Estado global + persistencia + operaciones puras de estado. */
 import type {
   Comprobante,
-  ConfigIA,
   EstadoApp,
   Hoja,
   LayoutId,
   Moneda,
-  NivelRazonamiento,
   PersistedState,
   PosicionCodigo,
 } from "./types";
@@ -24,12 +22,6 @@ export const MONEDAS: Record<Moneda, { simbolo: string }> = {
   BOB: { simbolo: "Bs" },
 };
 
-export const CONFIG_IA_DEFAULT: ConfigIA = {
-  baseUrl: "https://api.groq.com/openai/v1/chat/completions",
-  model: "qwen/qwen3.8-27b",
-  apiKey: "",
-  razonamiento: "auto",
-};
 export const MONEDA_DEFAULT: Moneda = "BOB";
 export const POSICION_DEFAULT: PosicionCodigo = "inf-der";
 
@@ -39,7 +31,6 @@ export const state: EstadoApp = {
   codigoLongitud: 6,
   codigoValor: "",
   codigoPosicion: POSICION_DEFAULT,
-  configIA: { ...CONFIG_IA_DEFAULT },
   moneda: MONEDA_DEFAULT,
   colaEnProceso: false,
   modoOcr: false,
@@ -90,7 +81,6 @@ export function guardarAjustes(): void {
     JSON.stringify({
       ...leerBlob(),
       moneda: state.moneda,
-      configIA: state.configIA,
     }),
   );
 }
@@ -112,7 +102,6 @@ export function isMoneda(v: unknown): v is Moneda {
 
 // Vuelve los ajustes del modal a sus valores de fábrica (código y tema intactos).
 export function restablecerAjustes(): void {
-  state.configIA = { ...CONFIG_IA_DEFAULT };
   state.moneda = MONEDA_DEFAULT;
   guardarAjustes();
 }
@@ -132,18 +121,31 @@ function isPersistedState(v: unknown): v is PersistedState {
     typeof p["codigoLongitud"] === "number" ||
     typeof p["codigoValor"] === "string" ||
     typeof p["codigoPosicion"] === "string" ||
-    isMoneda(p["moneda"]) ||
-    typeof p["configIA"] === "object"
+    isMoneda(p["moneda"])
   );
 }
 
 export function cargar(): void {
   try {
+    // Limpieza de la era IA: claves LLM/JEV sin dueño se borran (nunca persisten secretos muertos).
+    localStorage.removeItem("jev-api-key");
+    try {
+      sessionStorage.removeItem("jev-api-key");
+    } catch {
+      /* sin sessionStorage: nada que limpiar */
+    }
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return;
     const p: unknown = JSON.parse(raw);
-    if (!isPersistedState(p)) return; // estado corrupto o de otra versión: ignorar
+    if (typeof p !== "object" || p === null) return; // estado corrupto: ignorar
     const r = p as Record<string, unknown>;
+    if ("configIA" in r) {
+      // Sobrante de la era IA: se retira del blob (el resto del estado se conserva).
+      delete r["configIA"];
+      if (Object.keys(r).length === 0) localStorage.removeItem(LS_KEY);
+      else localStorage.setItem(LS_KEY, JSON.stringify(r));
+    }
+    if (!isPersistedState(r)) return; // estado corrupto o de otra versión: ignorar
     state.codigoActivo = typeof r["codigoActivo"] === "boolean" ? r["codigoActivo"] : false;
     const lon = r["codigoLongitud"];
     state.codigoLongitud =
@@ -154,25 +156,6 @@ export function cargar(): void {
       ? r["codigoPosicion"]
       : POSICION_DEFAULT;
     if (isMoneda(r["moneda"])) state.moneda = r["moneda"]; // ausente en blobs legacy: se conserva
-    const ia = (p as { configIA?: unknown }).configIA;
-    if (typeof ia === "object" && ia !== null) {
-      const c = ia as Record<string, unknown>;
-      if (typeof c["baseUrl"] === "string") state.configIA.baseUrl = c["baseUrl"];
-      if (typeof c["model"] === "string") state.configIA.model = c["model"];
-      if (typeof c["apiKey"] === "string") state.configIA.apiKey = c["apiKey"];
-      const nv = c["razonamiento"];
-      if (
-        nv === "auto" ||
-        nv === "none" ||
-        nv === "minimal" ||
-        nv === "low" ||
-        nv === "medium" ||
-        nv === "high" ||
-        nv === "xhigh" ||
-        nv === "max"
-      )
-        state.configIA.razonamiento = nv as NivelRazonamiento;
-    }
   } catch {
     /* estado corrupto: ignorar */
   }

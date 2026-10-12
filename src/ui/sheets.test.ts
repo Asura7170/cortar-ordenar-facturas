@@ -438,7 +438,7 @@ describe("monto manual", () => {
     expect(document.activeElement).toBe(deNuevo);
   });
 
-  it("clic en badge abre edición con el valor previo, foco y sin reintento IA", () => {
+  it("clic en badge abre edición con el valor previo, foco y sin recálculo", () => {
     state.moneda = "USD";
     const c = sembrarOk();
     const input = inputMonto();
@@ -453,7 +453,7 @@ describe("monto manual", () => {
     expect(document.activeElement).toBe(deNuevo);
     expect(deNuevo?.selectionStart).toBe(0);
     expect(deNuevo?.selectionEnd).toBe(deNuevo?.value.length);
-    // ponytail: la IA solo entra por subida/botón/giro, nunca por corregir.
+    // ponytail: el recálculo solo entra por subida/botón/giro, nunca por corregir.
     expect(vi.mocked(extraerPendientes)).not.toHaveBeenCalled();
   });
 
@@ -1104,7 +1104,7 @@ describe("giro manual", () => {
     }
   });
 
-  it("corregir-monto abre edición con el valor previo y sin reintento IA", () => {
+  it("corregir-monto abre edición con el valor previo y sin recálculo", () => {
     const h = crearHoja("u1");
     const c = comprobante({ estado: "ok", montoCents: 500, montoManual: true });
     h.slots[0] = c;
@@ -1118,7 +1118,7 @@ describe("giro manual", () => {
     const input = document.querySelector<HTMLInputElement>("input.cell-monto");
     expect(input?.value).toBe("5.00");
     expect(document.activeElement).toBe(input);
-    // ponytail: la IA solo entra por subida/botón/giro, nunca por corregir.
+    // ponytail: el recálculo solo entra por subida/botón/giro, nunca por corregir.
     expect(vi.mocked(extraerPendientes)).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,4 @@
-/* Tests P1: modal de ajustes — submit y Predeterminado (DOM aislado). */
+/* Tests P1: modal de ajustes — moneda, submit y Predeterminado (DOM aislado). */
 import { describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture, el } from "../test/fixture";
 
@@ -10,15 +10,6 @@ const { comprobante } = await import("../test/factoria");
 const modalAjustes = el<HTMLDialogElement>("modalAjustes");
 const btnAjustes = el<HTMLButtonElement>("btnAjustes");
 const formAjustes = el<HTMLFormElement>("formAjustes");
-const cfgBaseUrl = el<HTMLInputElement>("cfgBaseUrl");
-const cfgModel = el<HTMLSelectElement>("cfgModel");
-const cfgModelManual = el<HTMLInputElement>("cfgModelManual");
-const cfgRazonamiento = el<HTMLSelectElement>("cfgRazonamiento");
-const btnRefrescarModelos = el<HTMLButtonElement>("btnRefrescarModelos");
-const estadoModelosIA = el("estadoModelosIA");
-const cfgApiKey = el<HTMLInputElement>("cfgApiKey");
-const btnProbarIA = el<HTMLButtonElement>("btnProbarIA");
-const estadoPruebaIA = el("estadoPruebaIA");
 const cfgMoneda = el<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes = el<HTMLButtonElement>("btnResetAjustes");
 const estadoModelos = el("estadoModelos");
@@ -32,45 +23,24 @@ function enviar(): void {
 }
 
 describe("abrir", () => {
-  it("pinta los valores actuales y abre el modal", () => {
-    state.configIA = { baseUrl: "http://a", model: "m", apiKey: "k" };
+  it("pinta la moneda actual y abre el modal", () => {
     state.moneda = "BOB";
     btnAjustes.click();
-    expect(cfgBaseUrl.value).toBe("http://a");
-    expect(cfgModel.value).toBe("m");
-    expect(cfgApiKey.value).toBe("k");
     expect(cfgMoneda.value).toBe("BOB");
     expect(modalAjustes.hasAttribute("open")).toBe(true);
     modalAjustes.close();
   });
 });
 
-function opcion(v: string): void {
-  const o = document.createElement("option");
-  o.value = v;
-  o.textContent = v;
-  cfgModel.append(o);
-  cfgModel.value = v;
-}
-
 describe("submit", () => {
-  it("persiste config+moneda, deja el código intacto y repinta el total", () => {
+  it("persiste moneda, deja el código intacto y repinta el total", () => {
     const h = crearHoja();
     h.slots[0] = comprobante({ montoCents: 100 });
     state.hojas.push(h);
     state.codigoValor = "777";
     guardarCodigo();
-    cfgBaseUrl.value = "http://nuevo";
-    opcion("modelo-x");
-    cfgApiKey.value = "secreto";
     cfgMoneda.value = "ARS";
     enviar();
-    expect(state.configIA).toEqual({
-      baseUrl: "http://nuevo",
-      model: "modelo-x",
-      apiKey: "secreto",
-      razonamiento: "auto",
-    });
     expect(state.moneda).toBe("ARS");
     expect(document.getElementById("montoTotal")?.textContent).toBe("AR$ 1.00");
     const raw = JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}") as Record<
@@ -81,49 +51,19 @@ describe("submit", () => {
     expect(raw["codigoValor"]).toBe("777");
   });
 
-  it("vacíos caen a defaults Groq y moneda inválida a BOB", () => {
-    cfgBaseUrl.value = "";
-    cfgModel.value = "";
-    cfgApiKey.value = "";
+  it("moneda inválida cae a BOB", () => {
     cfgMoneda.value = "XXX";
     enviar();
-    expect(state.configIA.baseUrl).toContain("groq");
-    expect(state.configIA.model).toBe("qwen/qwen3.8-27b");
     expect(state.moneda).toBe("BOB");
-  });
-
-  it("pegado con espacios se persiste recortado", () => {
-    cfgBaseUrl.value = "  http://nuevo  ";
-    opcion("modelo-x");
-    cfgApiKey.value = "  secreto \n";
-    enviar();
-    expect(state.configIA.baseUrl).toBe("http://nuevo");
-    expect(state.configIA.apiKey).toBe("secreto");
   });
 });
 
 describe("Predeterminado", () => {
-  it("resetea, repinta inputs y total", () => {
-    state.configIA = { baseUrl: "xxx", model: "yyy", apiKey: "zzz" };
+  it("resetea la moneda y repinta el input", () => {
     state.moneda = "EUR";
     btnResetAjustes.click();
-    expect(state.configIA.baseUrl).toContain("groq");
     expect(state.moneda).toBe("BOB");
-    expect(cfgBaseUrl.value).toContain("groq");
-    expect(cfgModel.value).toBe("qwen/qwen3.8-27b");
-    expect(cfgApiKey.value).toBe("");
     expect(cfgMoneda.value).toBe("BOB");
-  });
-
-  it("también borra la key JEV (apaga su gasto)", async () => {
-    const { setJevKey, getJevKey } = await import("../pipeline/jev");
-    setJevKey("apik-rancia");
-    btnAjustes.click();
-    btnResetAjustes.click();
-    expect(getJevKey()).toBe("");
-    expect(localStorage.getItem("jev-api-key")).toBeNull();
-    expect(el<HTMLInputElement>("cfgJevKey").value).toBe("");
-    modalAjustes.close();
   });
 });
 
@@ -269,493 +209,11 @@ describe("Modelos", () => {
   });
 });
 
-describe("selector modelos LLM", () => {
-  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
-
-  it("refresh lista y conserva el actual si falta", async () => {
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> =>
-      ({
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> => Promise.resolve({ data: [{ id: "nuevo-1" }] }),
-      }) as unknown as Response) as typeof fetch;
-    try {
-      state.configIA = {
-        baseUrl: "https://x.test/v1/chat/completions",
-        model: "viejo",
-        apiKey: "k",
-      };
-      btnAjustes.click();
-      btnRefrescarModelos.click();
-      await pausa();
-      const valores = [...cfgModel.options].map((o) => o.value);
-      expect(valores).toContain("nuevo-1");
-      expect(valores).toContain("viejo");
-      expect(estadoModelosIA.textContent).toContain("(chat)");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("manual persiste el escrito", () => {
-    btnAjustes.click();
-    cfgModel.value = "__manual__";
-    cfgModel.dispatchEvent(new Event("change", { bubbles: true }));
-    cfgModelManual.value = "custom-x";
-    formAjustes.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    expect(state.configIA.model).toBe("custom-x");
-    modalAjustes.close();
-  });
-
-  it("CORS conserva lista previa y avisa", async () => {
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> =>
-      ({
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> => Promise.resolve({ data: [{ id: "bueno-1" }] }),
-      }) as unknown as Response) as typeof fetch;
-    try {
-      state.configIA = {
-        baseUrl: "https://x.test/v1/chat/completions",
-        model: "viejo",
-        apiKey: "k",
-      };
-      btnAjustes.click();
-      btnRefrescarModelos.click();
-      await pausa();
-      globalThis.fetch = (async (): Promise<Response> => {
-        throw new TypeError("Failed to fetch");
-      }) as typeof fetch;
-      btnRefrescarModelos.click();
-      await pausa();
-      const valores = [...cfgModel.options].map((o) => o.value);
-      expect(valores).toContain("bueno-1");
-      expect(estadoModelosIA.textContent).toContain("CORS");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("zen muestra sugeridos sin red", () => {
-    state.configIA = {
-      baseUrl: "https://opencode.ai/zen/go/v1/chat/completions",
-      model: "",
-      apiKey: "k",
-    };
-    btnAjustes.click();
-    const valores = [...cfgModel.options].map((o) => o.value);
-    expect(valores).toContain("muse-spark-1.3-contributor");
-    modalAjustes.close();
-  });
-
-  it("cambiar de endpoint no mezcla la lista del anterior", async () => {
-    const real = globalThis.fetch;
-    const llamadas: string[] = [];
-    globalThis.fetch = (async (u: unknown): Promise<Response> => {
-      llamadas.push(String(u));
-      const id = String(u).includes("a.test") ? "solo-a" : "solo-b";
-      return {
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> => Promise.resolve({ data: [{ id }] }),
-      } as unknown as Response;
-    }) as typeof fetch;
-    try {
-      state.configIA = { baseUrl: "https://a.test/v1/chat/completions", model: "m", apiKey: "k" };
-      btnAjustes.click();
-      await pausa();
-      expect([...cfgModel.options].map((o) => o.value)).toContain("solo-a");
-      modalAjustes.close();
-      state.configIA = { baseUrl: "https://b.test/v1/chat/completions", model: "m", apiKey: "k" };
-      btnAjustes.click();
-      await pausa();
-      const valores = [...cfgModel.options].map((o) => o.value);
-      expect(valores).toContain("solo-b");
-      expect(valores).not.toContain("solo-a");
-      expect(llamadas.length).toBeGreaterThan(1); // refetcheó B, no reusó A
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("fallo en B no ofrece la lista cacheada de A", async () => {
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (u: unknown): Promise<Response> => {
-      if (String(u).includes("a.test"))
-        return {
-          ok: true,
-          status: 200,
-          json: (): Promise<unknown> => Promise.resolve({ data: [{ id: "solo-a" }] }),
-        } as unknown as Response;
-      throw new TypeError("Failed to fetch");
-    }) as typeof fetch;
-    try {
-      state.configIA = { baseUrl: "https://a.test/v1/chat/completions", model: "m", apiKey: "k" };
-      btnAjustes.click();
-      await pausa();
-      modalAjustes.close();
-      state.configIA = { baseUrl: "https://b.test/v1/chat/completions", model: "m", apiKey: "k" };
-      btnAjustes.click();
-      await pausa();
-      const valores = [...cfgModel.options].map((o) => o.value);
-      expect(valores).not.toContain("solo-a");
-      expect(estadoModelosIA.textContent).toContain("no lista desde navegador");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("cargas solapadas: solo escribe la última", async () => {
-    const real = globalThis.fetch;
-    let resolver!: (v: Response) => void;
-    let n = 0;
-    const lista = (id: string): Response =>
-      ({
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> => Promise.resolve({ data: [{ id }] }),
-      }) as unknown as Response;
-    globalThis.fetch = (() => {
-      n += 1;
-      if (n === 1)
-        return new Promise<Response>((res) => {
-          resolver = res;
-        });
-      return Promise.resolve(lista("segundo"));
-    }) as typeof fetch;
-    try {
-      state.configIA = {
-        baseUrl: "https://race.test/v1/chat/completions",
-        model: "m",
-        apiKey: "k",
-      };
-      btnAjustes.click(); // carga #1 en vuelo
-      modalAjustes.close();
-      btnAjustes.click(); // carga #2 resuelve primero
-      await pausa();
-      resolver(lista("primero")); // la rancia llega tarde
-      await pausa();
-      const valores = [...cfgModel.options].map((o) => o.value);
-      expect(valores).toContain("segundo");
-      expect(valores).not.toContain("primero");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("probar recorta base y key antes del fetch", async () => {
-    const real = globalThis.fetch;
-    const vistos: { url: string; auth: string }[] = [];
-    let n = 0;
-    globalThis.fetch = (async (u: unknown, o?: RequestInit): Promise<Response> => {
-      n += 1;
-      if (n === 1)
-        return {
-          ok: true,
-          status: 200,
-          json: (): Promise<unknown> => Promise.resolve({ data: [] }),
-        } as unknown as Response;
-      vistos.push({
-        url: String(u),
-        auth: String((o?.headers as Record<string, string> | undefined)?.["Authorization"] ?? ""),
-      });
-      return {
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> => Promise.resolve({ choices: [] }),
-      } as unknown as Response;
-    }) as typeof fetch;
-    try {
-      state.configIA = { baseUrl: "https://t.test/v1/chat/completions", model: "m", apiKey: "k" };
-      btnAjustes.click();
-      await pausa();
-      cfgBaseUrl.value = "  https://t.test/v1/chat/completions  ";
-      cfgApiKey.value = "  k-secreta \n";
-      btnProbarIA.click();
-      await pausa();
-      expect(vistos).toHaveLength(1);
-      expect(vistos[0]?.url).toBe("https://t.test/v1/chat/completions");
-      expect(vistos[0]?.auth).toBe("Bearer k-secreta");
-      expect(estadoPruebaIA.textContent).toContain("✓");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("probar en vuelo se descarta si cambia la key", async () => {
-    const real = globalThis.fetch;
-    let resolver!: (v: Response) => void;
-    let n = 0;
-    const okVacio = (): Response =>
-      ({
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> => Promise.resolve({ data: [] }),
-      }) as unknown as Response;
-    globalThis.fetch = (() => {
-      n += 1;
-      if (n === 2)
-        return new Promise<Response>((res) => {
-          resolver = res;
-        });
-      return Promise.resolve(okVacio());
-    }) as typeof fetch;
-    try {
-      state.configIA = {
-        baseUrl: "https://ping.test/v1/chat/completions",
-        model: "m",
-        apiKey: "k1",
-      };
-      btnAjustes.click();
-      await pausa();
-      btnProbarIA.click(); // ping #1 en vuelo (fetch #2)
-      cfgApiKey.value = "k2";
-      cfgApiKey.dispatchEvent(new Event("input", { bubbles: true })); // invalida
-      resolver(okVacio());
-      await pausa();
-      expect(estadoPruebaIA.textContent).toBe("Sin probar.");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("razonamiento: kimi reducido, genérico completo, No segundo y persiste", () => {
-    state.configIA = {
-      baseUrl: "https://opencode.ai/zen/go/v1/chat/completions",
-      model: "kimi-k3",
-      apiKey: "k",
-    };
-    btnAjustes.click();
-    expect([...cfgRazonamiento.options].map((o) => o.value)).toEqual([
-      "auto",
-      "none",
-      "low",
-      "high",
-      "xhigh",
-      "max",
-    ]);
-    expect(cfgRazonamiento.options[1]?.text).toBe("No razonar");
-    opcion("muse-spark-1.3-contributor");
-    cfgModel.dispatchEvent(new Event("change", { bubbles: true }));
-    expect([...cfgRazonamiento.options].map((o) => o.value)).toContain("medium");
-    cfgRazonamiento.value = "none";
-    formAjustes.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    expect(state.configIA.razonamiento).toBe("none");
-    modalAjustes.close();
-  });
-});
-
-describe("probar conexión", () => {
-  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
-
-  it("sin key deshabilita y queda sin probar", () => {
-    state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "" };
-    btnAjustes.click();
-    expect(btnProbarIA.disabled).toBe(true);
-    expect(estadoPruebaIA.textContent).toBe("Sin probar.");
-    modalAjustes.close();
-  });
-
-  it("ok pinta ✓ y marca válido; error pinta ✗ e invalida", async () => {
-    const real = globalThis.fetch;
-    globalThis.fetch = (async (): Promise<Response> =>
-      ({ ok: true, status: 200 }) as Response) as typeof fetch;
-    try {
-      state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "k" };
-      btnAjustes.click();
-      btnProbarIA.click();
-      await pausa();
-      expect(estadoPruebaIA.textContent).toContain("✓ OK");
-      expect(cfgApiKey.getAttribute("aria-invalid")).toBe("false");
-      globalThis.fetch = (async (): Promise<Response> => {
-        throw new TypeError("Failed to fetch");
-      }) as typeof fetch;
-      btnProbarIA.click();
-      await pausa();
-      expect(estadoPruebaIA.textContent).toContain("✗");
-      expect(estadoPruebaIA.textContent).toContain("CORS");
-      expect(cfgApiKey.getAttribute("aria-invalid")).toBe("true");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("cambiar la key invalida la prueba", () => {
-    state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "k" };
-    btnAjustes.click();
-    cfgApiKey.value = "otra";
-    cfgApiKey.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(estadoPruebaIA.textContent).toBe("Sin probar.");
-    modalAjustes.close();
-  });
-});
-
-describe("JEV", () => {
-  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
-  const cfgJevKey = el<HTMLInputElement>("cfgJevKey");
-  const btnConectarJev = el<HTMLButtonElement>("btnConectarJev");
-  const btnBorrarJev = el<HTMLButtonElement>("btnBorrarJev");
-  const estadoJev = el("estadoJev");
-  const btnBorrarApiKey = el<HTMLButtonElement>("btnBorrarApiKey");
-
-  it("agrupa en 3 secciones visibles", () => {
+describe("secciones del modal", () => {
+  it("quedan 2 fieldsets: Moneda y Modelos en este equipo", () => {
     const leyendas = [...formAjustes.querySelectorAll("fieldset.grupo-modelos > legend")].map(
       (l) => l.textContent,
     );
-    expect(leyendas).toEqual(["Modelos IA", "Moneda", "Modelos en este equipo"]);
-  });
-
-  it("el submit grande también guarda la key JEV (no se pierde)", async () => {
-    const { getJevKey, clearJevKey } = await import("../pipeline/jev");
-    clearJevKey();
-    cfgJevKey.value = "apik-submit";
-    enviar();
-    expect(getJevKey()).toBe("apik-submit");
-    expect(localStorage.getItem("jev-api-key")).toBe("apik-submit");
-    modalAjustes.close();
-  });
-
-  it("abrir repuebla el input (se ve guardada)", async () => {
-    const { setJevKey } = await import("../pipeline/jev");
-    setJevKey("apik-guardada");
-    btnAjustes.click();
-    expect(cfgJevKey.value).toBe("apik-guardada");
-    expect(estadoJev.textContent).toContain("Guardada");
-    modalAjustes.close();
-  });
-
-  it("conectar ok pinta ✓ con ms y borde verde", async () => {
-    const real = globalThis.fetch;
-    // La sonda usa factura sintética de 1 candidato (id c0): choice válido.
-    globalThis.fetch = (async (): Promise<Response> =>
-      ({
-        ok: true,
-        status: 200,
-        headers: { get: (): null => null },
-        json: (): Promise<unknown> =>
-          Promise.resolve({
-            answers: { total: { choice: "c0", confidence: 0.95 } },
-            model: "jev-x",
-          }),
-      }) as unknown as Response) as typeof fetch;
-    try {
-      btnAjustes.click();
-      cfgJevKey.value = "apik-k";
-      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
-      btnConectarJev.click();
-      await pausa();
-      expect(estadoJev.textContent).toContain("✓ OK");
-      expect(estadoJev.textContent).toContain("ms");
-      expect(estadoJev.dataset.estado).toBe("ok");
-      expect(cfgJevKey.getAttribute("aria-invalid")).toBe("false");
-      expect(localStorage.getItem("jev-api-key")).toBe("apik-k");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("conectar con 401 pinta ✗ y borde rojo", async () => {
-    const real = globalThis.fetch;
-    const { clearJevKey } = await import("../pipeline/jev");
-    clearJevKey();
-    globalThis.fetch = (async (): Promise<Response> =>
-      ({
-        ok: false,
-        status: 401,
-        headers: { get: (): null => null },
-      }) as unknown as Response) as typeof fetch;
-    try {
-      btnAjustes.click();
-      cfgJevKey.value = "apik-mala";
-      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
-      btnConectarJev.click();
-      await pausa();
-      expect(estadoJev.textContent).toContain("✗");
-      expect(estadoJev.textContent).toContain("401");
-      expect(estadoJev.dataset.estado).toBe("error");
-      expect(cfgJevKey.getAttribute("aria-invalid")).toBe("true");
-      expect(localStorage.getItem("jev-api-key")).toBeNull(); // la mala no persiste
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("borrar durante el probe en vuelo no revive la key", async () => {
-    const { getJevKey, clearJevKey } = await import("../pipeline/jev");
-    clearJevKey();
-    const real = globalThis.fetch;
-    let resolver!: (v: Response) => void;
-    const okJev = (): Response =>
-      ({
-        ok: true,
-        status: 200,
-        headers: { get: (): null => null },
-        json: (): Promise<unknown> =>
-          Promise.resolve({ answers: { total: { choice: "none" } }, model: "jev-x" }),
-      }) as unknown as Response;
-    // Solo /api/jev queda en vuelo; el resto (lista de modelos) resuelve al acto.
-    globalThis.fetch = ((u: unknown): Promise<Response> => {
-      if (String(u) === "/api/jev") return new Promise<Response>((res) => (resolver = res));
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        json: (): Promise<unknown> => Promise.resolve({ data: [] }),
-      } as unknown as Response);
-    }) as typeof fetch;
-    try {
-      btnAjustes.click();
-      cfgJevKey.value = "apik-k";
-      cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
-      btnConectarJev.click(); // probe en vuelo
-      btnBorrarJev.click(); // borra e invalida el vuelo
-      resolver(okJev()); // el probe resuelve tarde
-      await pausa();
-      expect(getJevKey()).toBe("");
-      expect(cfgJevKey.value).toBe("");
-      expect(estadoJev.textContent).toContain("modo local");
-    } finally {
-      globalThis.fetch = real;
-      modalAjustes.close();
-    }
-  });
-
-  it("papelera del LLM vacía el input e invalida (Guardar confirma)", () => {
-    state.configIA = { baseUrl: "https://x.test/v1/chat/completions", model: "m", apiKey: "k" };
-    btnAjustes.click();
-    expect(btnProbarIA.disabled).toBe(false);
-    btnBorrarApiKey.click();
-    expect(cfgApiKey.value).toBe("");
-    expect(btnProbarIA.disabled).toBe(true);
-    expect(estadoPruebaIA.textContent).toBe("Sin probar.");
-    enviar();
-    expect(state.configIA.apiKey).toBe("");
-    modalAjustes.close();
-  });
-
-  it("editar invalida y borrar limpia", async () => {
-    const { setJevKey, getJevKey } = await import("../pipeline/jev");
-    setJevKey("apik-k");
-    btnAjustes.click();
-    cfgJevKey.value = "otra";
-    cfgJevKey.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(estadoJev.textContent).toBe("Sin probar.");
-    expect(estadoJev.dataset.estado).toBeUndefined();
-    btnBorrarJev.click();
-    expect(getJevKey()).toBe("");
-    expect(cfgJevKey.value).toBe("");
-    expect(estadoJev.textContent).toContain("modo local");
-    modalAjustes.close();
+    expect(leyendas).toEqual(["Moneda", "Modelos en este equipo"]);
   });
 });

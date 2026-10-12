@@ -20,7 +20,7 @@ Convertir fotos/PDFs de comprobantes en un lote ordenado de comprobantes recorta
 
 ## Positioning
 
-Todo el pipeline (recorte, OCR, suma, maquetado Word) corre en el navegador, sin subir información a servidores propios. El usuario no edita nada: pega, ordena lo que quiere y descarga. El monto se extrae por comprobante (1 TOTAL) con ayuda de un LLM openai-compatible configurable, con fallback a monto manual por tarjeta.
+Todo el pipeline (recorte, OCR, suma, maquetado Word) corre en el navegador, sin subir información a servidores propios. El usuario no edita nada: pega, ordena lo que quiere y descarga. El monto se extrae por comprobante (1 TOTAL) por regex offline cuando el OCR da un único valor distinto, con fallback a monto manual por tarjeta.
 
 ## Operating Context
 
@@ -31,12 +31,12 @@ Sesiones en escritorio (Chrome), abrir/pegar fotos o PDFs con Ctrl+V desde porta
 - Entrada: imágenes (jpg/png/webp/bmp/gif) + PDF multipágina (cada página = comprobante); HEIC → aviso formato no soportado, no rompe la cola.
 - Recorte DocAligner heatmap/lcnet100 con fallback a imagen completa si no hay quad plausible; EXIF respetado; resize automática (>2000px lado mayor).
 - OCR PaddleOCR PP-OCRv6_small (`lang: latin`, worker), cola secuencial FIFO.
-- Monto: 1 TOTAL por comprobante; suma exacta en cents; badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); LLM sin TOTAL → campo manual en tarjeta (sí suma).
+- Monto: 1 TOTAL por comprobante; suma exacta en cents; badge por comprobante + total; moneda configurable (default USD, formato US `1,234.56`); sin TOTAL legible → campo manual en tarjeta (sí suma).
 - Código de pedido: check on/off + longitud N (solo dígitos), ambos persisten en localStorage; esquina elegida (default inferior derecha) en todas las hojas del .docx; check activo con < N dígitos → bloquea descarga con mensaje.
 - Grilla: carta N-up default 4 (1–6), hojas blancas sobre fondo gris, scroll vertical, ajuste al ancho; arrastre libre por hoja; X elimina comprobante completo.
-- Limpiar borra comprobantes/montos/OCR; conserva check, N y configuración IA/moneda.
+- Limpiar borra comprobantes/montos/OCR; conserva check, N y moneda.
 - OCR modal: solo lectura + copiar, select por comprobante.
-- IA: modal ajustes (baseURL, apiKey en localStorage, model por defecto `gpt-4o-mini`); sin config → monto manual; la key nunca va al repo.
+- Ajustes: solo moneda y gestión de modelos locales (caché OCR en el navegador); sin API keys ni backend.
 - UI en español neutro. Nombre visible: "Cortar y Ordenar Facturas".
 
 ## Brand Commitments
@@ -53,7 +53,7 @@ Ninguna: no hay assets, capturas ni datos de demostración reales. No inventar c
 
 1. Cero edición manual: pegar → ordenar → descargar. La app hace el trabajo pesado.
 2. Estado siempre visible: cada comprobante dice si va bien (procesando/OK/error) y cuánto aporta al total.
-3. Confianza en el monto: suma exacta en cents, con fallback claro (monto manual) cuando el LLM no encuentra TOTAL.
+3. Confianza en el monto: suma exacta en cents, con fallback claro (monto manual) cuando el regex no encuentra un TOTAL único.
 4. Un clic para lo frecuente, máximo dos para lo demás: todo accesible sin navegar menús.
 5. El lote vive en hojas reales: la vista previa carta es la fuente de verdad de lo que sale en Word.
 

@@ -48,7 +48,7 @@ export interface Comprobante {
   textoOcr: string;
   /** Total en cents o null si aún no se extrajo. */
   montoCents: Cents | null;
-  /** True si el total lo escribió el usuario (el lote IA y el giro nunca lo pisan). */
+  /** True si el total lo escribió el usuario (el recálculo y el giro nunca lo pisan). */
   montoManual: boolean;
   readonly moneda: Moneda;
   estado: EstadoComprobante;
@@ -66,26 +66,6 @@ export interface Hoja {
   slots: (Comprobante | null)[];
 }
 
-/** Nivel de razonamiento/thinking (wire: chat `reasoning_effort`, responses `reasoning.effort`). */
-export type NivelRazonamiento =
-  | "auto"
-  | "none"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh"
-  | "max";
-
-/** Config del LLM openai-compatible (futura extracción del TOTAL). */
-export interface ConfigIA {
-  baseUrl: string;
-  model: string;
-  apiKey: string;
-  /** auto = omitir (default del proveedor); ausente en blobs legacy = auto. */
-  razonamiento?: NivelRazonamiento;
-}
-
 /** Esquina de la hoja donde va el código de pedido en el Word. */
 export type PosicionCodigo = "sup-izq" | "sup-der" | "inf-izq" | "inf-der";
 
@@ -96,11 +76,10 @@ export interface EstadoApp {
   codigoLongitud: number;
   codigoValor: string;
   codigoPosicion: PosicionCodigo;
-  configIA: ConfigIA;
   moneda: Moneda;
   colaEnProceso: boolean;
   modoOcr: boolean;
-  /** Lote IA en curso (botón o red del drenado): sin VT ni rebuilds por tick. Efímero, no persiste. */
+  /** Intake en curso (entrada de archivos/PDF): sin VT ni rebuilds por tick. Efímero, no persiste. */
   loteEnCurso: boolean;
   /** Timestamp del último cierre del editor de recorte (el clic que cierra no reabre). Efímero, no persiste. */
   cierreRecorte: number;
@@ -108,10 +87,7 @@ export interface EstadoApp {
 
 /** Subset persistido en localStorage (clave `libro-mayor-state`); cada ventana guarda solo lo suyo. */
 export type PersistedState = Partial<
-  Pick<
-    EstadoApp,
-    "codigoActivo" | "codigoLongitud" | "codigoValor" | "codigoPosicion" | "moneda" | "configIA"
-  >
+  Pick<EstadoApp, "codigoActivo" | "codigoLongitud" | "codigoValor" | "codigoPosicion" | "moneda">
 >;
 
 // ponytail: OcrResult/ExtractResult borrados (0 usos); vuelven con el pipeline real.

@@ -13,7 +13,7 @@ export function formatearMoneda(cents: Cents): string {
 /**
  * Texto US ("1,234.56", "500") → cents. Null si inválido.
  * Solo coma de miles (en grupos de 3, con decimal obligatorio) y punto decimal.
- * Es el formato que entregará el LLM (extract.ts futuro).
+ * Es el formato del fast-path regex (extract.ts).
  */
 export function parsearMonto(texto: string): Cents | null {
   const s = texto.trim().replace(/[\s$€£]/g, "");

@@ -6,14 +6,13 @@ import type { NucleoOcr } from "./ocr";
 
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
-// El auto IA real haría fetch: stub (cada test lo ajusta); aplicarTotales y
-// limpiarTextoCompleto siguen reales (la rama rápida de la cola los usa).
+// El re-chequeo del drenado sale de este módulo: stub (cada test lo ajusta);
+// aplicarTotales y limpiarTextoCompleto siguen reales (la rama rápida los usa).
 vi.mock("./extract", async (importOriginal) => {
   const real = await importOriginal<typeof import("./extract")>();
   return {
     ...real,
     extraerPendientes: vi.fn(async () => {}),
-    extraerUnMonto: vi.fn(async () => false),
   };
 });
 // OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
@@ -48,7 +47,7 @@ const { buscarSlot, crearHoja, state } = await import("../state");
 const { procesarCola } = await import("./queue");
 const { comprobante } = await import("../test/factoria");
 const { renderHojas } = await import("../ui/sheets");
-const { extraerPendientes, extraerUnMonto } = await import("./extract");
+const { extraerPendientes } = await import("./extract");
 const { extraerTexto } = await import("./ocr");
 
 beforeEach(() => {
@@ -85,20 +84,18 @@ describe("procesarCola", () => {
     expect(state.colaEnProceso).toBe(false);
   });
 
-  it("rápido fija el monto por aplicarTotales sin JEV (1 distinto, sin key)", async () => {
+  it("rápido fija el monto por aplicarTotales (1 distinto, sin red)", async () => {
     state.hojas = [];
     vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 12.50");
     const h = crearHoja();
     const c = comprobante({ nombre: "rapida.png", file: new Blob(["foto"]) });
     h.slots[0] = c;
     state.hojas.push(h);
-    const vuelosAntes = vi.mocked(extraerUnMonto).mock.calls.length;
     const p = procesarCola();
     await vi.advanceTimersByTimeAsync(2000);
     await p;
     expect(c.textoOcr).toBe("TOTAL 12.50");
     expect(c.montoCents).toBe(1250);
-    expect(vi.mocked(extraerUnMonto).mock.calls.length).toBe(vuelosAntes);
   });
 
   it("informa tiempos por etapa (L0: recorte/enderezar/extraer/total)", async () => {
@@ -115,7 +112,7 @@ describe("procesarCola", () => {
     expect(linea).toMatch(/cajas=\d+ batch=\[\d+,\d+\] fallback=(sí|no) recRuns=\d+ total=\d+/);
   });
 
-  it("lote de 3: 3 procesando + 3 ok inmediato + 1 final (imagen primero, JEV desacoplado)", async () => {
+  it("lote de 3: 3 procesando + 3 ok inmediato + 1 final (imagen primero)", async () => {
     for (const n of ["a.png", "b.png", "c.png"]) {
       const h = crearHoja();
       h.slots[0] = comprobante({ nombre: n });
@@ -129,7 +126,7 @@ describe("procesarCola", () => {
     expect(vi.mocked(renderHojas).mock.calls.length - antes).toBe(7);
   });
 
-  it("al drenar dispara el auto IA con desdeCola", async () => {
+  it("al drenar dispara el re-chequeo con desdeCola", async () => {
     vi.mocked(extraerPendientes).mockClear();
     const h = crearHoja();
     h.slots[0] = comprobante({ nombre: "t.png" });
@@ -140,55 +137,7 @@ describe("procesarCola", () => {
     expect(vi.mocked(extraerPendientes)).toHaveBeenCalledWith({ desdeCola: true });
   });
 
-  it("al completar cada ítem extrae su monto 1×1 (desacoplado, sin bloquear)", async () => {
-    vi.mocked(extraerUnMonto).mockClear().mockResolvedValue(false);
-    const h1 = crearHoja();
-    const a = comprobante({ nombre: "a.png" });
-    h1.slots[0] = a;
-    const h2 = crearHoja();
-    const b = comprobante({ nombre: "b.png" });
-    h2.slots[0] = b;
-    state.hojas.push(h1, h2);
-    const p = procesarCola();
-    await vi.advanceTimersByTimeAsync(3000);
-    await p;
-    expect(vi.mocked(extraerUnMonto)).toHaveBeenCalledWith(a.id);
-    expect(vi.mocked(extraerUnMonto)).toHaveBeenCalledWith(b.id);
-    expect(vi.mocked(extraerUnMonto).mock.calls.length).toBe(2);
-  });
-
-  it("la imagen se pinta antes de que el JEV resuelva (no bloquea el ok)", async () => {
-    let resolver: (v: boolean) => void = () => {};
-    vi.mocked(extraerUnMonto)
-      .mockClear()
-      .mockImplementation(
-        (): Promise<boolean> =>
-          new Promise<boolean>((res) => {
-            resolver = res;
-          }),
-      );
-    try {
-      const h = crearHoja();
-      const c = comprobante({ nombre: "t.png" });
-      h.slots[0] = c;
-      state.hojas.push(h);
-      const antes = vi.mocked(renderHojas).mock.calls.length;
-      const p = procesarCola();
-      await vi.advanceTimersByTimeAsync(2000);
-      // OCR terminó y la imagen ya está en ok aunque el JEV siga en vuelo.
-      expect(c.estado).toBe("ok");
-      expect(vi.mocked(extraerUnMonto)).toHaveBeenCalledWith(c.id);
-      expect(vi.mocked(renderHojas).mock.calls.length - antes).toBeGreaterThanOrEqual(2);
-      resolver(false);
-      await vi.advanceTimersByTimeAsync(1000);
-      await p;
-      expect(state.colaEnProceso).toBe(false);
-    } finally {
-      vi.mocked(extraerUnMonto).mockResolvedValue(false);
-    }
-  });
-
-  it("pendiente entrado durante la IA también se drena (no huérfano)", async () => {
+  it("pendiente entrado durante el re-chequeo también se drena (no huérfano)", async () => {
     let unaVez = false;
     vi.mocked(extraerPendientes).mockImplementation(async () => {
       if (unaVez) return;
