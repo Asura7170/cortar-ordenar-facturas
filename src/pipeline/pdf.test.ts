@@ -13,6 +13,16 @@ import {
 } from "./pdf";
 import type { DocumentoPdf } from "./pdf";
 
+// pdf.js real no corre en jsdom (necesita worker): abrirPdfReal se prueba con
+// documento falso, entrando por el default de expandirPdf (la función real).
+vi.mock("pdfjs-dist", () => ({
+  GlobalWorkerOptions: { workerSrc: "" },
+  getDocument: vi.fn(),
+}));
+
+const pdfjsFalso = await import("pdfjs-dist");
+const getDocumentFalso = vi.mocked(pdfjsFalso.getDocument);
+
 function pdfDe(nombre: string, type: string, size: number): File {
   const f = new File(["x"], nombre, { type });
   Object.defineProperty(f, "size", { value: size });
@@ -241,6 +251,49 @@ describe("expandirPdf", () => {
       throw new Error("ilegible");
     };
     await expect(expandirPdf(pdfDe("r.pdf", "application/pdf", 100), abrir)).resolves.toEqual([]);
+  });
+});
+
+describe("abrirPdfReal (default de expandirPdf, pdfjs falso)", () => {
+  let destruida = false;
+  function tareaFalsa(vista: { width: number; height: number }): unknown {
+    const pagina = {
+      getViewport: ({ scale }: { scale: number }): { width: number; height: number } =>
+        scale === 1 ? vista : { width: vista.width * scale, height: vista.height * scale },
+    };
+    return {
+      promise: Promise.resolve({ numPages: 2, getPage: async () => pagina }),
+      destroy: async (): Promise<void> => {
+        destruida = true;
+      },
+    };
+  }
+  function pdfReal(): File {
+    return new File(["x".repeat(100)], "a.pdf", { type: "application/pdf" });
+  }
+
+  it("página normal: abre, salta el render sin ctx 2d y cierra", async () => {
+    destruida = false;
+    getDocumentFalso.mockReturnValue(tareaFalsa({ width: 200, height: 250 }) as never);
+    const pags = await expandirPdf(pdfReal());
+    expect(pags).toEqual([]);
+    expect(destruida).toBe(true);
+  });
+
+  it("MediaBox extremo: vista insegura → null y cierra", async () => {
+    destruida = false;
+    pdfjsFalso.GlobalWorkerOptions.workerSrc = "fijado"; // cubre ||= ya configurado
+    getDocumentFalso.mockReturnValue(tareaFalsa({ width: 1, height: 4000 }) as never);
+    const pags = await expandirPdf(pdfReal());
+    expect(pags).toEqual([]);
+    expect(destruida).toBe(true);
+  });
+
+  it("documento ilegible → [] sin lanzar", async () => {
+    getDocumentFalso.mockImplementation(() => {
+      throw new Error("ilegible");
+    });
+    await expect(expandirPdf(pdfReal())).resolves.toEqual([]);
   });
 });
 
