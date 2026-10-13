@@ -6,6 +6,7 @@ import {
   eventoDrop,
   eventoDragenter,
   eventoDragleave,
+  eventoDragover,
   eventoPaste,
 } from "../test/fixture";
 import type { PaginaPdf } from "../pipeline/pdf";
@@ -42,6 +43,8 @@ vi.mock("../pipeline/pdf", async (importOriginal) => {
     expandirPdf: async (): Promise<PaginaPdf[]> => expansionSimulada,
   };
 });
+// El recálculo manual no corre de verdad en tests del sidebar.
+vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn() }));
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -55,6 +58,7 @@ const {
 } = await import("./sidebar");
 const { archivo, comprobante } = await import("../test/factoria");
 const { HOJA_FANTASMA } = await import("./sheets");
+const { extraerPendientes } = await import("../pipeline/extract");
 
 const canvas = el("canvas");
 const aviso = el("aviso");
@@ -232,6 +236,66 @@ describe("fileInput / canvas / paste", () => {
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
     document.dispatchEvent(new Event("paste", { bubbles: true }));
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
+  });
+
+  it("btnCalcular recalcula a la fuerza", () => {
+    vi.mocked(extraerPendientes).mockClear();
+    el<HTMLButtonElement>("btnCalcular").click();
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledWith({ forzado: true });
+  });
+});
+
+describe("cableado global (window/document)", () => {
+  it("dragover global con Files: preventDefault (que no navegue)", () => {
+    const e = eventoDragover();
+    window.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
+  });
+
+  it("dragover global sin archivos: sin preventDefault", () => {
+    const e = eventoDragover(["text/plain"]);
+    window.dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(false);
+  });
+
+  it("drop global fuera del canvas: marca 0 y no intake", () => {
+    canvas.dispatchEvent(eventoDragenter());
+    expect(canvas.classList.contains("arrastrando")).toBe(true);
+    window.dispatchEvent(eventoDrop([archivo("w.png", "image/png")]));
+    expect(canvas.classList.contains("arrastrando")).toBe(false);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(0);
+  });
+
+  it("dragleave global con relatedTarget null: marca 0; con target, no", () => {
+    canvas.dispatchEvent(eventoDragenter());
+    expect(canvas.classList.contains("arrastrando")).toBe(true);
+    const conDestino = eventoDragleave();
+    Object.defineProperty(conDestino, "relatedTarget", { value: {} });
+    document.dispatchEvent(conDestino);
+    expect(canvas.classList.contains("arrastrando")).toBe(true);
+    // Al dejar la ventana el navegador trae relatedTarget null (jsdom: undefined).
+    const sinDestino = eventoDragleave();
+    Object.defineProperty(sinDestino, "relatedTarget", { value: null });
+    document.dispatchEvent(sinDestino);
+    expect(canvas.classList.contains("arrastrando")).toBe(false);
+  });
+
+  it("drop sobre una hoja no vuela al intake global del canvas", async () => {
+    const sheet = document.createElement("div");
+    sheet.className = "sheet";
+    const objetivo = document.createElement("span");
+    sheet.appendChild(objetivo);
+    canvas.appendChild(sheet);
+    try {
+      const e = eventoDrop([archivo("s.png", "image/png")]);
+      objetivo.dispatchEvent(e);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(e.defaultPrevented).toBe(true);
+      expect(canvas.classList.contains("arrastrando")).toBe(false);
+      expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(0);
+    } finally {
+      sheet.remove();
+    }
   });
 });
 
@@ -528,6 +592,14 @@ describe("código de pedido", () => {
     expect(state.codigoPosicion).toBe("sup-der");
     expect(localStorage.getItem("libro-mayor-state")).toBeNull();
   });
+
+  it("radio sin checked: el change no toca el estado", () => {
+    state.codigoPosicion = "sup-izq";
+    const r = radio("inf-izq");
+    r.checked = false;
+    r.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(state.codigoPosicion).toBe("sup-izq");
+  });
 });
 
 describe("modalLimpiar", () => {
@@ -806,6 +878,45 @@ describe("pegarEnCelda (clic en vacía)", () => {
     } finally {
       state.modoOcr = false;
     }
+  });
+
+  it("fantasma con hojas vacías crea u4x2", async () => {
+    mockRead(async () => [itemPng()]);
+    await pegarEnCelda(HOJA_FANTASMA, 0);
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]?.layout).toBe("u4x2");
+    expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
+  });
+
+  it("sin navigator.clipboard avisa Ctrl+V", async () => {
+    aviso.textContent = "";
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    try {
+      const h = crearHoja("u4x2");
+      state.hojas.push(h);
+      await pegarEnCelda(h.id, 0);
+      expect(items().filter(Boolean)).toHaveLength(0);
+      expect(aviso.textContent).toContain("Ctrl+V");
+    } finally {
+      restaurarPortapapeles();
+    }
+  });
+
+  it("item con getType que falla avisa al final", async () => {
+    aviso.textContent = "";
+    mockRead(async () => [
+      {
+        types: ["image/png"],
+        getType: async () => {
+          throw new Error("roto");
+        },
+      },
+    ]);
+    const h = crearHoja("u4x2");
+    state.hojas.push(h);
+    await pegarEnCelda(h.id, 0);
+    expect(items().filter(Boolean)).toHaveLength(0);
+    expect(aviso.textContent).toContain("no hay imagen");
   });
 });
 
