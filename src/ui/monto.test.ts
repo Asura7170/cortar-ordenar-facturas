@@ -10,6 +10,11 @@ const {
   formatearMoneda,
   itemsDe,
   parsearMonto,
+  prefijoComun,
+  alinearSufijos,
+  spanFijo,
+  spanNuevo,
+  rodillo,
   renderMonto,
   sumaTotal,
   totalItems,
@@ -220,5 +225,36 @@ describe("parsearMonto", () => {
     expect(parsearMonto("1,234,56")).toBeNull(); // grupo de 2
     expect(parsearMonto("1.2.3")).toBeNull(); // grupo de 1
     expect(parsearMonto("12,34.56")).toBeNull(); // grupo de 2
+  });
+});
+
+describe("odómetro helpers", () => {
+  it("prefijoComun: largo del tramo idéntico", () => {
+    expect(prefijoComun("US$ 100.00", "US$ 350.00")).toBe(4);
+    expect(prefijoComun("", "x")).toBe(0);
+    expect(prefijoComun("abc", "abcdef")).toBe(3);
+  });
+
+  it("alinearSufijos: recorte por la derecha o pad a la izquierda", () => {
+    expect(alinearSufijos("999.99", "1,000.99")).toBe("  999.99");
+    expect(alinearSufijos("1,000.99", "999.99")).toBe("000.99");
+    expect(alinearSufijos("5", "5")).toBe("5");
+  });
+
+  it("spans fijos/nuevos/rodillo con sus clases y atributos", () => {
+    const f = spanFijo("$");
+    expect(f.tagName).toBe("SPAN");
+    expect(f.className).toBe("");
+    expect(f.textContent).toBe("$");
+    const n = spanNuevo("1");
+    expect(n.className).toBe("monto-nuevo");
+    expect(n.textContent).toBe("1");
+    const r = rodillo("7", "3", 3, 9);
+    expect(r.className).toBe("monto-rodillo");
+    expect(r.textContent).toBe("3");
+    const tira = r.querySelector(".monto-desplaza") as HTMLElement;
+    expect(tira.dataset["viejo"]).toBe("7");
+    expect(tira.style.getPropertyValue("--p")).toBe("5"); // min(9-1-3, 6)
+    expect([...tira.children].map((c) => c.textContent)).toEqual(["3"]);
   });
 });
