@@ -11,20 +11,28 @@ import {
   descargarPesos,
   borrarModelos,
   detectarYRecortar,
+  dentro,
+  eliminar,
   esConvexo,
   esQuadPlausible,
   iniciarSesion,
   LADO_MODELO,
+  masaComponente,
+  mejorComponente,
+  muestrearBilinear,
   olvidarSesionFallida,
   ordenarQuad,
   PAD_BORDE,
+  pivotar,
   quitarBorde,
   rectificar,
   reintentarEps,
+  sistemaDLT,
   tamanoModelos,
   tamanoSalida,
   UMBRAL_HEATMAP,
   URL_MODELO_HF,
+  vecinoAceptable,
   warpear,
 } from "./docaligner";
 import type { BuferPixeles, IntentarEp, Quad, SesionDetectora } from "./docaligner";
@@ -203,6 +211,151 @@ describe("calcularHomografia", () => {
     ];
     expect(() => calcularHomografia(linea, linea)).toThrow();
   });
+
+  it("lanza con menos de 4 pares", () => {
+    const q = esquinas(4, 4);
+    expect(() => calcularHomografia([{ x: 0, y: 0 }], q)).toThrow("4 pares");
+    expect(() => calcularHomografia(q, [{ x: 0, y: 0 }])).toThrow("4 pares");
+  });
+
+  it("identidad directa en el cuadrado unidad", () => {
+    const u: Quad = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    const h = calcularHomografia(u, u);
+    expect(h[0] ?? 0).toBeCloseTo(1, 9);
+    expect(h[4] ?? 0).toBeCloseTo(1, 9);
+    expect(h[8]).toBe(1);
+    for (const i of [1, 2, 3, 5, 6, 7]) expect(h[i] ?? 0).toBeCloseTo(0, 9);
+  });
+
+  it("sistemaDLT arma 8×8 de 4 pares", () => {
+    const src = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 },
+    ];
+    const { a, b } = sistemaDLT(src, src);
+    expect(a).toHaveLength(8);
+    expect(a.every((f) => f.length === 8)).toBe(true);
+    expect(b).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+  });
+});
+
+describe("pivotar/eliminar", () => {
+  it("pivotar intercambia y normaliza", () => {
+    const a = [
+      [0, 1],
+      [1, 0],
+    ];
+    const b = [1, 2];
+    pivotar(a, b, 0, 2);
+    expect(a).toEqual([
+      [1, 0],
+      [0, 1],
+    ]);
+    expect(b).toEqual([2, 1]);
+    pivotar(a, b, 1, 2); // ya pivoteado: sin swap
+    expect(a).toEqual([
+      [1, 0],
+      [0, 1],
+    ]);
+  });
+
+  it("eliminar anula la columna (con y sin trabajo)", () => {
+    const a = [
+      [1, 0],
+      [0, 1],
+    ];
+    const b = [5, 7];
+    eliminar(a, b, 0, 2); // factores 0: sin cambios
+    expect(a).toEqual([
+      [1, 0],
+      [0, 1],
+    ]);
+    expect(b).toEqual([5, 7]);
+    const c = [
+      [1, 2],
+      [3, 4],
+    ];
+    const d = [5, 11];
+    eliminar(c, d, 0, 2); // fil 1 con factor 3
+    expect(c[1]).toEqual([0, -2]);
+    expect(d).toEqual([5, -4]);
+  });
+});
+
+describe("muestrearBilinear", () => {
+  it("interpola el centro de 4 píxeles", () => {
+    const ent = new Uint8ClampedArray([0, 0, 0, 255, 100, 0, 0, 255, 0, 0, 0, 255, 200, 0, 0, 255]);
+    // (0.5, 0.5) en 2×2: promedio de los 4 rojos.
+    expect(muestrearBilinear(ent, 2, 2, 0.5, 0.5)).toEqual([75, 0, 0]);
+  });
+});
+
+describe("masaComponente/mejorComponente", () => {
+  it("dentro respeta los 4 bordes", () => {
+    expect(dentro(0, 0, 4, 4)).toBe(true);
+    expect(dentro(3, 3, 4, 4)).toBe(true);
+    expect(dentro(-1, 0, 4, 4)).toBe(false);
+    expect(dentro(0, -1, 4, 4)).toBe(false);
+    expect(dentro(4, 0, 4, 4)).toBe(false);
+    expect(dentro(0, 4, 4, 4)).toBe(false);
+  });
+
+  it("vecinoAceptable exige no-visitado y caliente", () => {
+    const visitados = new Uint8Array(4);
+    const heat = new Float32Array([0.1, 0.9, 0, 0]);
+    expect(vecinoAceptable(visitados, heat, 0, 1, 0.3)).toBe(true);
+    expect(vecinoAceptable(visitados, heat, 0, 0, 0.3)).toBe(false); // frío
+    visitados[1] = 1;
+    expect(vecinoAceptable(visitados, heat, 0, 1, 0.3)).toBe(false); // visitado
+  });
+
+  it("bloque 2×2 suma masa y centroide", () => {
+    const w = 4;
+    const h = 4;
+    const heat = new Float32Array(w * h).fill(0);
+    heat[5] = 1;
+    heat[6] = 1;
+    heat[9] = 1;
+    heat[10] = 1; // bloque (1,1)-(2,2)
+    const visitados = new Uint8Array(w * h);
+    const pila = new Int32Array(w * h);
+    const { masa, sumaX, sumaY } = masaComponente(heat, 0, w, h, 0.3, 5, visitados, pila);
+    expect(masa).toBe(4);
+    expect(sumaX).toBe(6);
+    expect(sumaY).toBe(6);
+  });
+
+  it("gana la componente de más masa", () => {
+    const w = 4;
+    const h = 4;
+    const heat = new Float32Array(w * h).fill(0);
+    heat[0] = 0.5; // componente chica en (0,0)
+    heat[10] = 1;
+    heat[11] = 1; // componente grande en (2,2)-(3,2)
+    const visitados = new Uint8Array(w * h);
+    const pila = new Int32Array(w * h);
+    const { punto, pico } = mejorComponente(heat, 0, w, h, 0.3, 40, 40, visitados, pila);
+    expect(pico).toBe(1);
+    expect(punto?.x).toBeCloseTo(30, 9);
+    expect(punto?.y).toBeCloseTo(25, 9);
+  });
+
+  it("canal sin masa → null", () => {
+    const w = 4;
+    const h = 4;
+    const visitados = new Uint8Array(w * h);
+    const pila = new Int32Array(w * h);
+    expect(mejorComponente(new Float32Array(w * h), 0, w, h, 0.3, 40, 40, visitados, pila)).toEqual(
+      { punto: null, pico: 0 },
+    );
+  });
 });
 
 describe("warpear", () => {
@@ -287,6 +440,12 @@ describe("decodificarHeatmap", () => {
   it("vacío → null sin lanzar", () => {
     const { quad } = decodificarHeatmap(new Float32Array(4 * 8 * 8), [1, 4, 8, 8], 80, 80);
     expect(quad).toBeNull();
+  });
+
+  it("plano degenerado → null sin lanzar", () => {
+    const { quad, confianzas } = decodificarHeatmap(new Float32Array(0), [1, 4, 0, 0], 80, 80);
+    expect(quad).toBeNull();
+    expect(confianzas).toEqual([]);
   });
 
   it("expansión a vecinos cubre bordes del mapa (x=0, x=w-1, y=0, y=h-1)", () => {
