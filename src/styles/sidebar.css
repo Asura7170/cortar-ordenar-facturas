@@ -286,16 +286,16 @@
 /* Extraer montos: fantasma tan como Word/PDF/Imprimir. En claro el tan
    puro no llega a AA, así que va un marrón tostado (tan queda en oscuro,
    igual que .ocr-estado). */
-.btn-ia {
+.btn-calculo {
   background: transparent;
   color: light-dark(#7a5c2e, tan);
   border: 1px solid currentColor;
 }
-.btn-ia:hover {
+.btn-calculo:hover {
   background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
 /* Realce botones: halo en ::before estático fundido por opacidad (animar
-   box-shadow repinta por cuadro); #btnIA usa --tia-tinta porque su color
+   box-shadow repinta por cuadro); #btnCalcular usa --calculo-tinta porque su color
    es transparente por el recorte, el resto usa currentColor (= tinta hover). */
 .btn-word::before,
 .btn-pdf::before,
@@ -313,21 +313,21 @@
   transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
 }
-#btnIA::before {
+#btnCalcular::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 2px 8px color-mix(in oklch, var(--tia-tinta) 30%, transparent),
-    0 14px 22px -6px color-mix(in oklch, var(--tia-tinta) 38%, transparent);
+    0 2px 8px color-mix(in oklch, var(--calculo-tinta) 30%, transparent),
+    0 14px 22px -6px color-mix(in oklch, var(--calculo-tinta) 38%, transparent);
   opacity: 0;
   transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
 }
-#btnIA:hover,
-#btnIA:focus-visible,
+#btnCalcular:hover,
+#btnCalcular:focus-visible,
 .btn-word:hover,
 .btn-word:focus-visible,
 .btn-pdf:hover,
@@ -338,8 +338,8 @@
      quieto en el borde oscila el hover (tembleque flecha/puntero). */
   transform: scale(1.03);
 }
-#btnIA:hover::before,
-#btnIA:focus-visible::before,
+#btnCalcular:hover::before,
+#btnCalcular:focus-visible::before,
 .btn-word:hover::before,
 .btn-word:focus-visible::before,
 .btn-pdf:hover::before,
@@ -359,19 +359,23 @@
   inherits: true;
   initial-value: 0;
 }
-#btnIA {
-  --tia-tinta: light-dark(#7a5c2e, tan);
-  --tia-lleno: light-dark(var(--papel-brillo), var(--panel));
+#btnCalcular {
+  --calculo-tinta: light-dark(#7a5c2e, tan);
+  --calculo-lleno: light-dark(var(--papel-brillo), var(--panel));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   position: relative;
   color: transparent;
-  border: 1px solid var(--tia-tinta);
+  border: 1px solid var(--calculo-tinta);
   background-image:
-    linear-gradient(90deg, var(--tia-lleno) 0 calc(var(--progreso, 0) * 100%), var(--tia-tinta) 0),
-    linear-gradient(var(--tia-tinta), var(--tia-tinta));
+    linear-gradient(
+      90deg,
+      var(--calculo-lleno) 0 calc(var(--progreso, 0) * 100%),
+      var(--calculo-tinta) 0
+    ),
+    linear-gradient(var(--calculo-tinta), var(--calculo-tinta));
   background-clip: text, padding-box;
   background-size:
     auto,
@@ -385,16 +389,16 @@
 }
 /* Icono sólido: el botón lleva color transparente (recorte de texto) y sin
    esto la calculadora heredaría invisible. */
-.btn-ia .ia-ico {
+.btn-calculo .calculo-ico {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  color: var(--tia-tinta);
+  color: var(--calculo-tinta);
 }
 /* Capa clara: duplica la fila y se revela de izquierda a derecha con el
    mismo avance de la barra — espeja la inversión del texto sin constantes
    de geometría (la fila duplicada se centra sola). */
-.btn-ia .ia-capa {
+.btn-calculo .calculo-capa {
   position: absolute;
   inset: 0;
   display: inline-flex;
@@ -404,12 +408,12 @@
   clip-path: inset(0 calc((1 - var(--progreso, 0)) * 100%) 0 0);
   pointer-events: none;
 }
-.btn-ia .ia-capa .ia-ico {
-  color: var(--tia-lleno);
+.btn-calculo .calculo-capa .calculo-ico {
+  color: var(--calculo-lleno);
 }
 /* Texto fantasma invisible: solo reserva el ancho para que el icono
    fantasma calce sobre el base (visible duplicaría el texto). */
-.btn-ia .ia-capa .ia-txt {
+.btn-calculo .calculo-capa .calculo-txt {
   visibility: hidden;
 }
 
@@ -422,7 +426,7 @@
   gap: 8px;
 }
 /* Exportar con iconos: logo a la izquierda, descarga a la derecha. */
-#btnDescargar2,
+#btnWord,
 #btnPdf,
 #btnImprimir {
   display: inline-flex;
@@ -447,20 +451,20 @@
   opacity: 0;
   transform-origin: 50% 50%;
 }
-#btnDescargar2:hover .flecha-caida,
-#btnDescargar2:focus-visible .flecha-caida,
+#btnWord:hover .flecha-caida,
+#btnWord:focus-visible .flecha-caida,
 #btnPdf:hover .flecha-caida,
 #btnPdf:focus-visible .flecha-caida {
   animation: caida-flecha 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-#btnDescargar2:hover .bandeja,
-#btnDescargar2:focus-visible .bandeja,
+#btnWord:hover .bandeja,
+#btnWord:focus-visible .bandeja,
 #btnPdf:hover .bandeja,
 #btnPdf:focus-visible .bandeja {
   animation: bandeja-elastica 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-#btnDescargar2:hover .destello-base,
-#btnDescargar2:focus-visible .destello-base,
+#btnWord:hover .destello-base,
+#btnWord:focus-visible .destello-base,
 #btnPdf:hover .destello-base,
 #btnPdf:focus-visible .destello-base {
   animation: destello-base 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
@@ -1016,8 +1020,8 @@
   .btn-pdf:focus-visible,
   .btn-imprimir:hover,
   .btn-imprimir:focus-visible,
-  #btnIA:hover,
-  #btnIA:focus-visible,
+  #btnCalcular:hover,
+  #btnCalcular:focus-visible,
   #btnLimpiar:hover,
   #btnLimpiar:focus-visible {
     transform: none;
@@ -1046,7 +1050,7 @@
   background-color: color-mix(in srgb, var(--sello) 12%, transparent);
   color: #f04438;
   border-color: var(--sello);
-  /* ponytail: scale en vez de translateY — ver #btnIA (tembleque de hover). */
+  /* ponytail: scale en vez de translateY — ver #btnCalcular (tembleque de hover). */
   transform: scale(1.03);
 }
 /* Escoba acrobática: quieta en reposo; ciclo de 6.4s solo en hover/foco.

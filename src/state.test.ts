@@ -56,7 +56,6 @@ describe("guardar/cargar por ventana", () => {
     state.codigoPosicion = "sup-izq";
     guardarCodigo();
     state.moneda = "BOB";
-    state.configIA = { baseUrl: "http://test", model: "m", apiKey: "k" };
     guardarAjustes();
 
     state.codigoActivo = false;
@@ -64,7 +63,6 @@ describe("guardar/cargar por ventana", () => {
     state.codigoValor = "";
     state.codigoPosicion = "inf-der";
     state.moneda = "USD";
-    state.configIA = { baseUrl: "", model: "", apiKey: "" };
     cargar();
 
     expect(state.codigoActivo).toBe(true);
@@ -72,12 +70,10 @@ describe("guardar/cargar por ventana", () => {
     expect(state.codigoValor).toBe("12345678");
     expect(state.codigoPosicion).toBe("sup-izq");
     expect(state.moneda).toBe("BOB");
-    expect(state.configIA).toEqual({ baseUrl: "http://test", model: "m", apiKey: "k" });
   });
 
   it("cada guardado preserva la otra ventana (merge, no reemplazo)", () => {
     state.moneda = "ARS";
-    state.configIA = { baseUrl: "http://a", model: "m", apiKey: "k" };
     guardarAjustes();
     state.codigoActivo = true;
     state.codigoLongitud = 8;
@@ -103,7 +99,6 @@ describe("guardar/cargar por ventana", () => {
       "codigoLongitud",
       "codigoPosicion",
       "codigoValor",
-      "configIA",
       "moneda",
     ]);
   });
@@ -126,7 +121,7 @@ describe("guardar/cargar por ventana", () => {
   });
 
   it("cargar sin código: defaults false/6/″″ y conserva ajustes", () => {
-    localStorage.setItem(LS_KEY, JSON.stringify({ moneda: "ARS", configIA: {} }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ moneda: "ARS" }));
     cargar();
     expect(state.codigoActivo).toBe(false);
     expect(state.codigoLongitud).toBe(6);
@@ -169,7 +164,7 @@ describe("guardar/cargar por ventana", () => {
   });
 
   it("clamp de longitud: 99→12, 2.7→2, 0→6", () => {
-    const base = { codigoActivo: false, codigoValor: "", moneda: "USD", configIA: {} };
+    const base = { codigoActivo: false, codigoValor: "", moneda: "USD" };
     for (const [entrada, esperado] of [
       [99, 12],
       [2.7, 2],
@@ -181,8 +176,9 @@ describe("guardar/cargar por ventana", () => {
     }
   });
 
-  it("configIA parcial: completa solo los campos presentes", () => {
-    state.configIA = { baseUrl: "a", model: "b", apiKey: "c" };
+  it("sobrante de la era IA: configIA se retira del blob y las claves se borran", () => {
+    localStorage.setItem("jev-api-key", "apik-vieja");
+    sessionStorage.setItem("jev-api-key", "apik-sesion");
     localStorage.setItem(
       LS_KEY,
       JSON.stringify({
@@ -194,7 +190,23 @@ describe("guardar/cargar por ventana", () => {
       }),
     );
     cargar();
-    expect(state.configIA).toEqual({ baseUrl: "http://solo", model: "b", apiKey: "c" });
+    expect(state.moneda).toBe("USD");
+    expect(localStorage.getItem("jev-api-key")).toBeNull();
+    expect(sessionStorage.getItem("jev-api-key")).toBeNull();
+    expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toEqual({
+      codigoActivo: false,
+      codigoLongitud: 6,
+      codigoValor: "",
+      moneda: "USD",
+    });
+  });
+
+  it("blob no-objeto: no lanza y deja el storage intacto", () => {
+    for (const raw of ['"null"', "5", "[]"]) {
+      localStorage.setItem(LS_KEY, raw);
+      expect(() => cargar()).not.toThrow();
+      expect(localStorage.getItem(LS_KEY)).toBe(raw);
+    }
   });
 });
 
@@ -219,15 +231,11 @@ describe("isPosicionCodigo", () => {
 });
 
 describe("restablecerAjustes", () => {
-  it("vuelve a defaults Groq/BOB, lo persiste y deja el código intacto", () => {
+  it("vuelve a moneda default BOB, lo persiste y deja el código intacto", () => {
     state.codigoValor = "4242";
     guardarCodigo();
-    state.configIA = { baseUrl: "xxx", model: "yyy", apiKey: "zzz" };
     state.moneda = "ARS";
     restablecerAjustes();
-    expect(state.configIA.baseUrl).toContain("groq");
-    expect(state.configIA.model).toBe("qwen/qwen3.8-27b");
-    expect(state.configIA.apiKey).toBe("");
     expect(state.moneda).toBe("BOB");
     const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "{}") as Record<string, unknown>;
     expect(raw["moneda"]).toBe("BOB");

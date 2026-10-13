@@ -6,7 +6,7 @@ App frontend-only, Chrome desktop-only. TypeScript + Vite+ (toolchain VoidZero: 
 
 ## 1. Resumen
 
-Pegar/subir/arrastrar imágenes y PDFs → normalizar (`imagen.ts`) → recorte DocAligner heatmap/fastvit_sa24 vía onnxruntime-web + warp canvas → enderezar por confianza OCR → OCR propio det+rec ONNX (PP-OCRv6_small) → extracción del TOTAL en cascada: regex offline (1 distinto = ok sin red, 0 = manual) → JEV solo con >1 distinto → fallback LLM openai-compatible en lote (o monto manual) → grilla carta N-up con 10 plantillas (default `u4x2`, arrastre libre tipo Word) → salidas Word real (.docx) / PDF (print-to-PDF) / Imprimir, con código de pedido en esquina.
+Pegar/subir/arrastrar imágenes y PDFs → normalizar (`imagen.ts`) → recorte DocAligner heatmap/fastvit_sa24 vía onnxruntime-web + warp canvas → enderezar por confianza OCR → OCR propio det+rec ONNX (PP-OCRv6_small) → extracción del TOTAL por regex offline (`extract.ts`: 1 monto distinto = ok sin red; 0, ≥2 distintos o signo previo = monto manual) → grilla carta N-up con 10 plantillas (default `u4x2`, arrastre libre tipo Word) → salidas Word real (.docx) / PDF (print-to-PDF) / Imprimir, con código de pedido en esquina.
 
 ## 2. Estructura real
 
@@ -29,11 +29,11 @@ facturas/
    ├─ utils.ts           # getEl (throw si falta #id), sanear toWellFormed, sleep AbortSignal
    ├─ ui/
    │  ├─ layout.ts       # 10 plantillas + layoutDe (fallback u4x2)
-   │  ├─ sidebar.ts      # dropzone/pegar/clic, gate PDF, avisos, btnIA, limpiar
+   │  ├─ sidebar.ts      # dropzone/pegar/clic, gate PDF, avisos, btnCalcular, limpiar
    │  ├─ sheets.ts       # render carta, drag % + z-order, zoom 0.25–4, lupa, atajos M/Esc/Ctrl
    │  ├─ monto.ts        # Cents enteros, parsearMonto US estricto, formatear en-US
    │  ├─ ocrMode.ts      # toggle chkOcr (no persiste) + renderHojas
-   │  ├─ settingsModal.ts# baseUrl/model/apiKey/moneda + cfgJevKey/razonamiento + probar/borrar + modelos locales
+   │  ├─ settingsModal.ts# moneda + modelos locales (descarga/borrado de pesos OCR)
    │  ├─ github.ts       # initGithub: estrellas en vivo, fallback estático
    │  └─ recorte.ts      # initRecorte: editor manual modalRecorte
    ├─ pipeline/
@@ -45,10 +45,8 @@ facturas/
    │  ├─ ocrDict.ts      # DICT 18710 + blank
    │  ├─ rotar.ts        # giro ±90°, QUIETUD 1500ms, releer tolerante
    │  ├─ pdf.ts          # gate ≤5MB ≤10p, MINI 720, vistaSegura, fan-out
-   │  ├─ extract.ts      # cascada regex→JEV→LLM: 1800/12000/25/60s, auto al drenar
-   │  ├─ jev.ts         # regex MONEY_RE + JEV /api/jev (solo >1 distinto) + fast-path 1 distinto
-   │  ├─ queue.ts        # drenado pendiente + precalentar + timings
-   │  └─ modelos.ts      # urlListaModelos/extraerIds + TIMEOUT 15s + ZenGo
+   │  ├─ extract.ts      # regex MONEY_RE + fast-path 1 distinto + re-chequeo al drenar
+   │  └─ queue.ts        # drenado pendiente + precalentar + timings
    ├─ export/
       └─ salidas.ts      # docx EMU+SQUARE+header/footer + print zonaPrint
    └─ styles/            # base/topbar/sidebar/canvas (4 css que carga index.html)
@@ -64,7 +62,7 @@ facturas/
 - **queue `queue.ts`:** `precalentarModelos()` al agregar, fases `detectarYRecortar→enderezar→extraerTexto→ok` (la celda pinta el full-res con lazy, sin miniaturas), guards `buscarSlot` no-resucita, `console.info` timings, auto `extraerPendientes({desdeCola:true})` al drenar.
 - **rotar `rotar.ts:16,29`:** `QUIETUD_GIRO_MS=1500`, `girarYReleer(id,90|270)` con debounce; relee OCR y reabre si era manual.
 - **pdf `pdf.ts:10,13,73,91`:** `PDF_MAX_BYTES=5MiB`, `PDF_MAX_PAGINAS=10` (por archivo), `ANCHO_MINI_PDF=720`, `vistaSegura=alto≤4000 && area≤8M`. `esPdf` por MIME+ext, `admitirPdf` con avisos sin `innerHTML`. Cada página no-blanca/no-negra = comprobante; blancas y negras se omiten.
-- **extract `extract.ts` + jev `jev.ts`:** cascada `regex → JEV → LLM`. `MAX_TEXTO=1800`, `MAX_CHARS_LOTE=12000`, `MAX_ITEMS=25`, `TIMEOUT=60s`. `extraerRapidoCents` (1 distinto = total sin red ni key, repetido N veces vale; 0 = manual sin JEV ni LLM; clasifica sobre texto completo sin tope y con `-`/`(` previo va a JEV); `>1 distinto` va a JEV (`llamarJev`, 1 request por factura, pool ≤40, `JEV_TOPE_PARALELO=50`, retry 429/529 tope 5s; `none`/confianza baja = respuesta inválida → cae al LLM, nunca adivina offline); el LLM en lote (`prompt SOLO JSON {"1":"12.50","2":null}`, `partirLote` en chunks, tope 1800 solo en payloads de red) es fallback del drenado. `extraerUnMonto` (1×1 progresivo) y `extraerPendientes({forzado?,desdeCola?})` + botón `btnIA`. `parsearMonto` US estricto rechaza `1,234` sin decimal. Monto manual en tarjeta siempre gana y sí suma.
+- **extract `extract.ts`:** regex offline, sin red. `MONEY_RE` (precios `X,XXX.XX`/`X.XX`, filtra cuentas sin decimal y precios ×4 decimales), `extractCandidates` devuelve `{valor, previo}`; `extraerRapidoCents` (1 distinto = total sin red, repetido N veces vale; ≥2 distintos, con `-`/`(` previo o sin montos = manual; clasifica sobre texto completo sin tope). `extraerPendientes({forzado?,desdeCola?})` re-chequea los null no-manuales (drenado de `queue` con `desdeCola`, botón `btnCalcular` con `forzado`, giro tras releer OCR) y pinta progresivo vía `aplicarTotales` (borrador en curso, manual y texto rancio ganan). `parsearMonto` US estricto rechaza `1,234` sin decimal. Monto manual en tarjeta siempre gana y sí suma.
 - **Entrada `sidebar.ts:83,87`:** regex `image/(jpeg|png|webp|bmp|gif)`, resto (incl. HEIC) → `formato no soportado`, no rompe cola. PDF con `>5MB/>10p/protegido/ilegible` → aviso en entrada sin entrar a cola.
 
 ## 4. UI / Estado
@@ -72,10 +70,9 @@ facturas/
 - **Código pedido:** check on/off + N solo dígitos + esquina (`sup-izq/sup-der/inf-izq/inf-der`, default `inf-der`), cada panel guarda lo suyo en `localStorage` (`guardarCodigo/guardarAjustes/borrarCodigo`, `LS_KEY=libro-mayor-state`, compartido entre ventanas, sobrevive al cierre); `borrarCodigo` solo retira lo de código. tema aparte `libro-mayor-tema`. Check activo con < N dígitos → bloquea salida + mensaje. Limpiar vacía lote y código, conserva ajustes (`modalLimpiar closedby=any`).
 - **Monto `monto.ts:8,18`:** `Cents` plano, suma exacta sin float, `formatearMoneda` en-US, `parsearMonto` `/^(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/` (miles con coma exigen decimal, `monto.ts:21`). Badge por comprobante + total + `totalItems`. Monedas `USD/ARS/EUR/BOB`, default `USD`.
 - **Grilla `layout.ts:4-103,136`:** 10 plantillas `u1,u2h,u2v,u3h,u3v,u3m,u4x2,u5m,u6x2,u6m`, `crearHoja` default `u4x2`, `redistribuir/limpiarHojas/buscarSlot`. Arrastre libre % + z-order, NO cambia orden inserción; X elimina comprobante; scroll vertical, hojas al ancho.
-- **OCR vista `ocrMode.ts:7`:** `modoOcr` no persiste; toggle muestra texto por celda + lupa (`lupaCanvas`), copiar por comprobante. Texto solo alimenta LLM.
-- **IA `state.ts:23-27`:** default Groq `https://api.groq.com/openai/v1/chat/completions` + `qwen/qwen3.8-27b`, `apiKey` en localStorage, nunca al repo. Sin config → monto manual.
+- **OCR vista `ocrMode.ts:7`:** `modoOcr` no persiste; toggle muestra texto por celda + lupa (`lupaCanvas`), copiar por comprobante. Texto solo alimenta el regex del TOTAL.
+- **Ajustes `state.ts`:** persisten código (por ventana) y moneda en `localStorage`; la gestión de modelos locales vive en el caché del navegador (`docaligner`).
 - **Sheets `sheets.ts:341-342,760,773`:** zoom efímero `0.25–4`, `M`=lupa, `Esc`=soltar, `Ctrl++/−/0`=zoom, `data-accion=girar-izq/der`.
-- **Contrato DOM `utils.ts:4`:** `getEl(id)` hace throw si falta `#id` en `index.html`. Ids: `btnZoomMenos/btnZoom/btnZoomMas/btnLupa/montoTotal/btnAjustes/btnTema/temaIcono/chkCodigo/numCodigo/inputCodigo/chkOcr/ocrEstado/btnIA/btnDescargar2/btnPdf/btnImprimir/btnLimpiar/canvas/metaHojas/aviso/sheets/dropzone/fileInput/zonaPrint/lupa/lupaCanvas/modalAjustes/formAjustes/cfgBaseUrl/cfgModel/cfgApiKey/cfgMoneda/estadoModelos/btnDescargarModelos/btnBorrarModelos/btnResetAjustes/btnGuardarAjustes/modalLimpiar/descLimpiar/tituloCodigo/tituloOcrToggle/tituloExportar/tituloAjustes/tituloLimpiar/btnGithub/githubStars/cfgRazonamiento/btnRefrescarModelos/cfgModelManual/estadoModelosIA/btnProbarIA/btnBorrarApiKey/estadoPruebaIA/cfgJevKey/btnConectarJev/btnBorrarJev/estadoJev/modalRecorte/tituloRecorte/recorteBase/recorteGuia/btnRecorteReset/btnRecorteOk` (`posCodigo` es `name=` de radios, no id).
 
 ## 5. Salidas
 
@@ -120,15 +117,7 @@ flowchart TD
     M --> N{"¿Regex cuántos<br/>distintos?"}
     N -- "1" --> Q["Suma exacta en cents<br/>badge + total"]
     N -- "0" --> O["Monto manual en tarjeta<br/>(típico: mal recorte → recorte manual)"]
-    N -- ">1" --> P1{"¿JEV configurado?"}
-    P1 -- "No" --> P2{"¿LLM configurado?"}
-    P2 -- "No" --> O
-    P2 -- "Sí" --> P["LLM lote JSON 1800/25/60s<br/>texto → cents"]
-    P1 -- "Sí" --> JV["JEV 1×1 + lote<br/>desempata entre candidatos"]
-    JV -- "Total" --> Q
-    JV -- "Sin TOTAL / error" --> P2
-    P -- "Sin TOTAL / error" --> O
-    P -- "Total" --> Q
+    N -- ">1" --> O
     O --> R["Hoja carta N-up (u4x2 default)<br/>10 plantillas · scroll vertical"]
     Q --> R
     R --> S["Arrastre libre % + z-order<br/>orden estable · giro ±90° debounce 1500ms"]

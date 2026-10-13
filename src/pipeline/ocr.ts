@@ -594,7 +594,7 @@ export async function extraerTexto(
     // L2: un solo run para todas las cajas (con fallback individual dentro).
     if (diag) diag.cajas = cajas.length;
     for (const r of await reconocerLote(rec, final, cajas, crear, diag)) {
-      // ponytail: líneas vacías fuera (el modal queda limpio para el LLM).
+      // ponytail: líneas vacías fuera (el modal queda limpio).
       if (r.texto !== "") lineas.push(r.texto);
     }
     return lineas.join("\n");

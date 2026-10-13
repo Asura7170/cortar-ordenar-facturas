@@ -183,7 +183,7 @@ function pintarCelda(
     badge.textContent = formatearMoneda(item.montoCents);
     div.append(badge);
   } else if (item.estado === "ok") {
-    // Sin LLM el total siempre es manual (flujo N del spec).
+    // Sin total legible, el monto se carga a mano (0 o ≥2 montos en el texto).
     const entrada = document.createElement("input");
     entrada.className = "cell-monto";
     entrada.type = "text";
@@ -329,7 +329,7 @@ export function renderHojas(): void {
     renderPendiente = true;
     return;
   }
-  // ponytail: el borrador manual sobrevive a los renders de fondo (cola/IA/giro).
+  // ponytail: el borrador manual sobrevive a los renders de fondo (cola/recálculo/giro).
   const borrador = borradorEnEdicion();
   // ponytail: los borradores sin foco también (inválidos tras blur): se derivan
   // del DOM, sin estado extra que limpiar o que se vuelva rancio.
@@ -342,7 +342,7 @@ export function renderHojas(): void {
     restaurarSucios(sucios);
   };
   // ponytail: sin ViewTransition con reduced-motion, durante la cola ni durante
-  // el lote IA (los snapshots compiten con el drag/scroll); es solo un adorno.
+  // el intake (los snapshots compiten con el drag/scroll); es solo un adorno.
   const reduceMovimiento = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   // ponytail: con foco dentro de las hojas el render es síncrono (el swap
   // async pierde el foco y rompe la edición en curso).
@@ -518,7 +518,7 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
   return id;
 }
 
-// Repinta SOLO el monto de una celda (tick del lote IA) sin reconstruir la
+// Repinta SOLO el monto de una celda (tick del re-chequeo) sin reconstruir la
 // grilla ni tocar la imagen: O(1 nodo) en vez de O(N imágenes + snapshot VT).
 // Nunca lanza (best-effort): false = lo cubre el render completo del final.
 export function actualizarMontoCelda(id: number): boolean {
@@ -1130,8 +1130,8 @@ export function initSheets(cb: SheetsCallbacks): void {
       case "corregir-monto": {
         const item = obtenerComprobante(id);
         // ponytail: apertura no destructiva (el valor previo se edita, no se
-        // borra); fuera de ok no hay input que mostrar. Sin reintento IA: la
-        // IA solo entra por subida/botón/giro.
+        // borra); fuera de ok no hay input que mostrar. Sin recálculo: solo
+        // entra por subida/botón/giro.
         if (!item || item.estado !== "ok") return;
         editandoMonto = id;
         renderHojas();

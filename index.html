@@ -304,13 +304,13 @@
               </label>
             </header>
             <button
-              class="btn btn-ia btn-block"
-              id="btnIA"
+              class="btn btn-calculo btn-block"
+              id="btnCalcular"
               type="button"
               title="Lee el total de cada comprobante y lo suma"
             >
               <svg
-                class="ia-ico"
+                class="calculo-ico"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -324,10 +324,10 @@
                 <line x1="16" x2="16" y1="14" y2="18" />
                 <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01" />
               </svg>
-              <span class="ia-txt">Calcular totales</span>
-              <span class="ia-capa" aria-hidden="true">
+              <span class="calculo-txt">Calcular totales</span>
+              <span class="calculo-capa" aria-hidden="true">
                 <svg
-                  class="ia-ico"
+                  class="calculo-ico"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -341,7 +341,7 @@
                   <line x1="16" x2="16" y1="14" y2="18" />
                   <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01" />
                 </svg>
-                <span class="ia-txt" aria-hidden="true">Calcular totales</span>
+                <span class="calculo-txt" aria-hidden="true">Calcular totales</span>
               </span>
             </button>
           </section>
@@ -351,7 +351,7 @@
               <h2 class="panel-title" id="tituloExportar">Exportar</h2>
             </header>
             <div class="export-doble">
-              <button class="btn btn-word btn-block" id="btnDescargar2" title="Descargar Word">
+              <button class="btn btn-word btn-block" id="btnWord" title="Descargar Word">
                 <svg class="export-ico" viewBox="0 0 165.73 156.45" aria-hidden="true">
                   <defs>
                     <linearGradient id="a" x1="0" x2="1" y1="0" y2="0">
@@ -729,7 +729,7 @@
               class="btn btn-ghost btn-block"
               id="btnAjustes"
               type="button"
-              title="Ajustes de IA y moneda"
+              title="Ajustes de moneda y modelos"
             >
               <svg
                 class="ajustes-ico"
@@ -821,182 +821,6 @@
         </div>
         <form id="formAjustes" method="dialog">
           <div class="modal-body">
-            <fieldset class="grupo-modelos">
-              <legend>Modelos IA</legend>
-              <label class="base_section"
-                >Base URL
-                <input
-                  type="url"
-                  id="cfgBaseUrl"
-                  name="cfgBaseUrl"
-                  placeholder="https://api.groq.com/openai/v1/chat/completions"
-              /></label>
-              <label for="cfgModel">Modelo</label>
-              <div class="fila-modelos">
-                <select id="cfgModel" name="cfgModel" style="flex: 1; min-width: 0"></select>
-                <select
-                  id="cfgRazonamiento"
-                  name="cfgRazonamiento"
-                  aria-label="Nivel de razonamiento"
-                  title="Nivel de razonamiento"
-                  style="max-width: 128px"
-                ></select>
-                <button
-                  class="btn btn-ghost"
-                  type="button"
-                  id="btnRefrescarModelos"
-                  title="Recargar lista de modelos"
-                  aria-label="Recargar lista de modelos"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <g class="recarga-grupo">
-                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                      <path d="M21 3v5h-5" />
-                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                      <path d="M8 16H3v5" />
-                    </g>
-                  </svg>
-                </button>
-              </div>
-              <input
-                type="text"
-                id="cfgModelManual"
-                name="cfgModelManual"
-                placeholder="otro-modelo…"
-                aria-label="Modelo personalizado"
-                spellcheck="false"
-                autocomplete="off"
-                hidden
-                style="margin-top: 5px"
-              />
-              <output id="estadoModelosIA" aria-live="polite"></output>
-              <label for="cfgApiKey">LLM API Key</label>
-              <div class="fila-modelos">
-                <input
-                  type="password"
-                  id="cfgApiKey"
-                  name="cfgApiKey"
-                  autocomplete="off"
-                  spellcheck="false"
-                  placeholder="sk-..."
-                  style="flex: 1; min-width: 0"
-                />
-                <button
-                  class="btn btn-ghost"
-                  type="button"
-                  id="btnProbarIA"
-                  title="Probar endpoint y API key"
-                  aria-label="Probar endpoint y API key"
-                >
-                  Conectar
-                </button>
-                <button
-                  class="btn btn-ghost"
-                  type="button"
-                  id="btnBorrarApiKey"
-                  title="Borrar API key"
-                  aria-label="Borrar API key"
-                >
-                  <svg
-                    class="basura-ico"
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <g class="desecho">
-                      <path
-                        d="M-1.8 -1.2l1.2 -1l2 0.6l0.6 1.8l-1.2 1.4l-2 0.2l-0.8 -1.2z"
-                        stroke-width="1.8"
-                      />
-                      <path d="M-0.3 -0.8l0.4 1.2l1.1 0.4" stroke-width="1.6" />
-                    </g>
-                    <g class="tapa-basura">
-                      <path d="M4 7l16 0" />
-                      <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
-                    </g>
-                    <g class="cuerpo-basura">
-                      <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
-                      <g class="lineas-basura">
-                        <path d="M10 11l0 6" />
-                        <path d="M14 11l0 6" />
-                      </g>
-                    </g>
-                  </svg>
-                </button>
-              </div>
-              <output id="estadoPruebaIA" aria-live="polite"></output>
-              <label for="cfgJevKey">JEV API Key</label>
-              <div class="fila-modelos">
-                <input
-                  type="password"
-                  id="cfgJevKey"
-                  name="cfgJevKey"
-                  autocomplete="off"
-                  spellcheck="false"
-                  placeholder="apik-..."
-                  style="flex: 1; min-width: 0"
-                />
-                <button
-                  class="btn btn-ghost"
-                  type="button"
-                  id="btnConectarJev"
-                  title="Guardar y probar la key JEV"
-                  aria-label="Guardar y probar la key JEV"
-                >
-                  Conectar
-                </button>
-                <button
-                  class="btn btn-ghost"
-                  type="button"
-                  id="btnBorrarJev"
-                  title="Borrar key JEV de este navegador"
-                  aria-label="Borrar key JEV"
-                >
-                  <svg
-                    class="basura-ico"
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <g class="desecho">
-                      <path
-                        d="M-1.8 -1.2l1.2 -1l2 0.6l0.6 1.8l-1.2 1.4l-2 0.2l-0.8 -1.2z"
-                        stroke-width="1.8"
-                      />
-                      <path d="M-0.3 -0.8l0.4 1.2l1.1 0.4" stroke-width="1.6" />
-                    </g>
-                    <g class="tapa-basura">
-                      <path d="M4 7l16 0" />
-                      <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
-                    </g>
-                    <g class="cuerpo-basura">
-                      <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
-                      <g class="lineas-basura">
-                        <path d="M10 11l0 6" />
-                        <path d="M14 11l0 6" />
-                      </g>
-                    </g>
-                  </svg>
-                </button>
-              </div>
-              <output id="estadoJev" aria-live="polite"></output>
-            </fieldset>
             <fieldset class="grupo-modelos">
               <legend>Moneda</legend>
               <label aria-label="Moneda">

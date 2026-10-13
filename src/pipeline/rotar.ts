@@ -151,9 +151,15 @@ async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
     if (!item.montoManual && buscarSlot(id)) {
       item.montoCents = null;
       renderHojas(); // el lote puede ser no-op: sin esto el badge viejo miente
+      // ponytail: dinámico a propósito — rotar es estático en sheets y extract
+      // importa sheets: un estático aquí haría ciclo sheets→rotar→extract→sheets.
       const mod = await import("./extract").catch((): null => null);
       if (state.colaEnProceso) await esperarDrenaje();
-      await Promise.resolve(mod?.extraerPendientes()).catch(() => {});
+      try {
+        mod?.extraerPendientes();
+      } catch {
+        /* la relectura conserva el texto leído */
+      }
     }
   } catch {
     // ponytail: sin relectura no vale el texto viejo (es de otra orientación).

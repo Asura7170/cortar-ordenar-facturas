@@ -1,2 +1,0 @@
-# /api/jev lo sirve functions/api/jev.ts (proxy POST + Authorization).
-# Sin Function, Pages responde 405 a POST en ruta estática.

@@ -1,4 +1,4 @@
-/* Sidebar: código de pedido, limpiar y reintento IA. La entrada vive en el
+/* Sidebar: código de pedido, limpiar y recálculo de totales. La entrada vive en el
    canvas (tarjeta grande + drop en el área): acá solo se cablea. */
 import {
   borrarCodigo,
@@ -32,7 +32,7 @@ function radiosPosicion(): NodeListOf<HTMLInputElement> {
 }
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
 const aviso: HTMLElement = getEl("aviso");
-const btnIA: HTMLButtonElement = getEl<HTMLButtonElement>("btnIA");
+const btnCalcular: HTMLButtonElement = getEl<HTMLButtonElement>("btnCalcular");
 const btnPegar: HTMLButtonElement = getEl<HTMLButtonElement>("btnPegar");
 
 /** Rechazo de entrada: nombre en tono tenue + motivo en rojo sello. */
@@ -495,9 +495,9 @@ export function initSidebar(): void {
     });
   });
 
-  // Reintento manual del lote IA (el auto corre al drenar la cola).
-  btnIA.addEventListener("click", () => {
-    void extraerPendientes({ forzado: true });
+  // Reintento manual del cálculo de totales (el auto corre al drenar la cola).
+  btnCalcular.addEventListener("click", () => {
+    extraerPendientes({ forzado: true });
   });
 
   // El switch solo arma el guardado de su ventana; ON no escribe, OFF retira lo suyo.

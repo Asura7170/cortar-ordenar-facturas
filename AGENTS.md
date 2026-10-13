@@ -30,14 +30,14 @@ src/main.ts         # bootstrap: cargar() → init* → renders. Entrada única
 src/types.ts        # tipos de dominio (Comprobante, Hoja, EstadoApp). Solo tipos
 src/state.ts        # estado global + localStorage + ops puras (redistribuir, limpiarHojas)
 src/ui/             # layout, sidebar, sheets, monto, ocrMode, settingsModal, github, recorte
-src/pipeline/       # docaligner.ts (DocAligner heatmap/fastvit_sa24 + borde negro 100px + warp canvas, fallback completa; EPs con timeout 30s + latch, nunca cuelga la cola) + queue.ts (recorte real + OCR real, auto IA en lote al drenar) + pdf.ts (gate PDF ≤10p/≤5MB con aviso + fan-out 1 página=1 comprobante, omite blancas/negras) + ocr.ts (det+rec+enderezar reales) + extract.ts (cascada regex→JEV→LLM texto→cents, keys JEV+LLM; monto manual suma) + imagen.ts + jev.ts + modelos.ts + ocrDb/ocrRec/ocrDict.ts + rotar.ts
+src/pipeline/       # docaligner.ts (DocAligner heatmap/fastvit_sa24 + borde negro 100px + warp canvas, fallback completa; EPs con timeout 30s + latch, nunca cuelga la cola) + queue.ts (recorte real + OCR real; re-chequeo regex al drenar) + pdf.ts (gate PDF ≤10p/≤5MB con aviso + fan-out 1 página=1 comprobante, omite blancas/negras) + ocr.ts (det+rec+enderezar reales) + extract.ts (regex offline: 1 distinto = total; ≥2 distintos o signo previo queda manual; monto manual suma) + imagen.ts + ocrDb/ocrRec/ocrDict.ts + rotar.ts
 src/export/salidas.ts  # Word real (docx: N-up flotante + footer) + PDF/Imprimir vía zonaPrint (printEnVuelo); gate y nombre comunes
-spec.md             # spec del pipeline objetivo (DocAligner → PP-OCRv6_small ONNX → regex→JEV→LLM → docx). Fuente de verdad del diseño
+spec.md             # spec del pipeline objetivo (DocAligner → PP-OCRv6_small ONNX → regex → docx). Fuente de verdad del diseño
 public/models/      # fastvit_sa24_h_e_bifpn_256_fp32.onnx + ocr/det.onnx + ocr/rec.onnx vendoreados (Apache-2.0) + NOTICE.txt. No va por CDN (COEP require-corp)
 public/ort/         # par asyncify onnxruntime-web copiado de node_modules (el build webgpu lo exige; los nombres cambian por minor). Excluido de formato (.prettierignore). En dev lo sirve en crudo el middleware servir-ort-crudo (vite prohíbe import() desde /public)
 ```
 
-- Estado: `state.hojas` (no persiste) + persistido en `localStorage["libro-mayor-state"]` (solo codigoActivo/Longitud/Valor/Posicion, moneda, configIA). Tema aparte en `libro-mayor-tema`.
+- Estado: `state.hojas` (no persiste) + persistido en `localStorage["libro-mayor-state"]` (solo codigoActivo/Longitud/Valor/Posicion, moneda). Tema aparte en `libro-mayor-tema`.
 - Montos siempre en **cents enteros** (`Cents`), nunca float. Suma/formato en `src/ui/monto.ts`.
 - `getEl(id)` en `src/utils.ts` falla fuerte si falta el id: si agregas un id en JS, créalo en `index.html`.
 - `vite.config.ts` envía COOP/COEP (necesarios para WASM con threads). No quitar los headers ni servir con `python -m http.server` (no los envía).
@@ -55,5 +55,4 @@ Solo Chrome/Chromium desktop. Se vale usar lo más moderno disponible en Chrome 
 - `type="module"`, `const` por defecto. Código en español (ids, comentarios, UI).
 - Comentarios `ponytail:` marcan simplificaciones deliberadas — no "arreglarlos" sin motivo.
 - `docs/` e `image-test/` están en `.gitignore` (referencia/scratch local): no commitear ni importar desde ahí.
-- API key del LLM vive solo en localStorage (form Ajustes). Nunca al repo.
 - Prohibido `git commit`, `push`, `merge`, crear PRs o reescribir historial (`--force`, `reset --hard`) sin petición explícita del usuario en el prompt. Sin esa orden, los cambios quedan sin commitear.

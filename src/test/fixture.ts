@@ -40,22 +40,6 @@ export const FIXTURE_HTML = `
 <dialog id="modalAjustes"></dialog>
 <button id="btnAjustes"></button>
 <form id="formAjustes" method="dialog">
-  <fieldset class="grupo-modelos"><legend>Modelos IA</legend>
-  <input id="cfgBaseUrl">
-  <select id="cfgModel"></select>
-  <select id="cfgRazonamiento"></select>
-  <input id="cfgModelManual">
-  <button id="btnRefrescarModelos" type="button"></button>
-  <output id="estadoModelosIA"></output>
-  <input id="cfgApiKey" type="password">
-  <button id="btnProbarIA" type="button"></button>
-  <button id="btnBorrarApiKey" type="button"></button>
-  <output id="estadoPruebaIA"></output>
-  <input id="cfgJevKey" type="password">
-  <button id="btnConectarJev" type="button"></button>
-  <button id="btnBorrarJev" type="button"></button>
-  <output id="estadoJev"></output>
-  </fieldset>
   <fieldset class="grupo-modelos"><legend>Moneda</legend>
   <select id="cfgMoneda">
     <option value="USD">USD</option><option value="ARS">ARS</option>
@@ -69,10 +53,10 @@ export const FIXTURE_HTML = `
   <button id="btnBorrarModelos" type="button"></button>
   </fieldset>
 </form>
-<button id="btnDescargar2"></button>
+<button id="btnWord"></button>
 <button id="btnPdf" type="button"></button>
 <button id="btnImprimir" type="button"></button>
-<button id="btnIA" type="button"></button>
+<button id="btnCalcular" type="button"></button>
 <div id="zonaPrint" hidden></div>
 `;
 

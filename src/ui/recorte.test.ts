@@ -10,7 +10,7 @@ vi.mock("../pipeline/ocr", async (importOriginal) => {
   return { ...real, extraerTexto: vi.fn(async () => "TOTAL LEÍDO") };
 });
 // El lote post-recorte no debe pegar a la red en tests.
-vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
+vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn((): void => {}) }));
 
 montarFixture();
 const { crearHoja, state } = await import("../state");
