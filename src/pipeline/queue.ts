@@ -201,13 +201,17 @@ export async function procesarCola(): Promise<void> {
       if (!tocada) break;
       // Re-chequeo del drenado: lo que el fast-path dejó (texto nuevo con giro,
       // intake tardío) va por extraerPendientes (síncrono, nunca tumba la cola).
-      extraerPendientes({ desdeCola: true });
+      try {
+        extraerPendientes({ desdeCola: true });
+      } catch {
+        /* el re-chequeo nunca tumba la cola */
+      }
       try {
         renderHojas(); // estado final (extraerPendientes ya pintó si aplicó montos)
       } catch {
         /* el render nunca aborta la cola */
       }
-      // Entrados durante el re-chequeo: el loop los drena sin soltar el flag (sin huérfanos).
+      // Entrados durante el OCR/render del ítem: el loop los drena sin soltar el flag (sin huérfanos).
     }
   } finally {
     state.colaEnProceso = false;

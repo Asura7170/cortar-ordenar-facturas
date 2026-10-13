@@ -24,7 +24,7 @@ import { layoutDe } from "../ui/layout";
 import { totalItems } from "../ui/monto";
 import { getEl } from "../utils";
 
-const btnDescargar: HTMLButtonElement = getEl<HTMLButtonElement>("btnWord");
+const btnWord: HTMLButtonElement = getEl<HTMLButtonElement>("btnWord");
 const btnPdf: HTMLButtonElement = getEl<HTMLButtonElement>("btnPdf");
 const btnImprimir: HTMLButtonElement = getEl<HTMLButtonElement>("btnImprimir");
 const zonaPrint: HTMLElement = getEl<HTMLElement>("zonaPrint");
@@ -257,7 +257,7 @@ export function initExport(): void {
   // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
   if (initListo) return;
   initListo = true;
-  btnDescargar.addEventListener("click", () => {
+  btnWord.addEventListener("click", () => {
     void descargarWord().catch(() => {});
   });
   btnPdf.addEventListener("click", () => {

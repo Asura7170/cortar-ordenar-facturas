@@ -145,7 +145,13 @@ export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: bo
       }
     }
   }
-  if (ok > 0) renderHojas(); // badges + #montoTotal con suma local exacta
+  if (ok > 0) {
+    try {
+      renderHojas(); // badges + #montoTotal con suma local exacta
+    } catch {
+      /* el parche nunca aborta el lote */
+    }
+  }
   // Éxito total con aviso previo: se restaura (este aviso no lo pisa).
   if (ok === items.length && avisoPrevio.trim() !== "") avisar(avisoPrevio);
   else avisar(`Local: ${ok}/${items.length} totales.`);

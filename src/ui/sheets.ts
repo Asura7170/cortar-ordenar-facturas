@@ -183,7 +183,7 @@ function pintarCelda(
     badge.textContent = formatearMoneda(item.montoCents);
     div.append(badge);
   } else if (item.estado === "ok") {
-    // Sin LLM el total siempre es manual (flujo N del spec).
+    // Sin total legible, el monto se carga a mano (0 o ≥2 montos en el texto).
     const entrada = document.createElement("input");
     entrada.className = "cell-monto";
     entrada.type = "text";

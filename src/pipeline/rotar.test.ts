@@ -9,8 +9,8 @@ vi.mock("./ocr", async (importOriginal) => {
   const real = await importOriginal<typeof import("./ocr")>();
   return { ...real, extraerTexto: vi.fn(async () => "TOTAL LEÍDO") };
 });
-// El lote post-giro no debe pegar a la red en tests.
-vi.mock("./extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
+// El re-chequeo post-giro va mockeado en tests (rotar lo llama tras releer OCR).
+vi.mock("./extract", () => ({ extraerPendientes: vi.fn((): void => {}) }));
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
@@ -223,7 +223,7 @@ describe("girarYReleer", () => {
     const c = sembrar();
     const { candidatos } = await vi.importActual<typeof import("./extract")>("./extract");
     // Lote simulado con la lógica real de inclusión: si la celda es candidata, la rellena.
-    vi.mocked(extraerPendientes).mockImplementationOnce(async () => {
+    vi.mocked(extraerPendientes).mockImplementationOnce((): void => {
       if (candidatos().some((x) => x.id === c.id)) c.montoCents = 999;
     });
     await girarYReleer(c.id, 90, deps);

@@ -200,6 +200,14 @@ describe("guardar/cargar por ventana", () => {
       moneda: "USD",
     });
   });
+
+  it("blob no-objeto: no lanza y deja el storage intacto", () => {
+    for (const raw of ['"null"', "5", "[]"]) {
+      localStorage.setItem(LS_KEY, raw);
+      expect(() => cargar()).not.toThrow();
+      expect(localStorage.getItem(LS_KEY)).toBe(raw);
+    }
+  });
 });
 
 describe("isMoneda", () => {

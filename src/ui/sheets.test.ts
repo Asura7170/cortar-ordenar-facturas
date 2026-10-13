@@ -7,7 +7,7 @@ vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
 // El editor real abre un modal: se aserta el cableado, no el canvas.
 vi.mock("./recorte", () => ({ abrirRecorte: vi.fn(async () => {}) }));
 // El lote post-corregir no debe pegar a la red en tests.
-vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn(async () => {}) }));
+vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn((): void => {}) }));
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -362,7 +362,7 @@ describe("celdas", () => {
 });
 
 describe("monto manual", () => {
-  /** Tarjeta ok sin monto (lo que deja la cola sin LLM). */
+  /** Tarjeta ok sin monto (lo que deja la cola sin total legible). */
   function sembrarOk(): Comprobante {
     const h = crearHoja("u1");
     const c = comprobante({ estado: "ok", montoCents: null });

@@ -12,7 +12,7 @@ vi.mock("./extract", async (importOriginal) => {
   const real = await importOriginal<typeof import("./extract")>();
   return {
     ...real,
-    extraerPendientes: vi.fn(async () => {}),
+    extraerPendientes: vi.fn((): void => {}),
   };
 });
 // OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
@@ -137,11 +137,13 @@ describe("procesarCola", () => {
     expect(vi.mocked(extraerPendientes)).toHaveBeenCalledWith({ desdeCola: true });
   });
 
-  it("pendiente entrado durante el re-chequeo también se drena (no huérfano)", async () => {
-    let unaVez = false;
-    vi.mocked(extraerPendientes).mockImplementation(async () => {
-      if (unaVez) return;
-      unaVez = true;
+  it("pendiente entrado durante el drenado también se procesa (no huérfano)", async () => {
+    // La ventana real de entrada tardía son los await de OCR/render (mockeados
+    // aquí): el re-escaneo del for levanta lo aterrizado a mitad de cola.
+    let entrada = false;
+    vi.mocked(renderHojas).mockImplementation((): void => {
+      if (entrada) return;
+      entrada = true;
       const h = crearHoja();
       h.slots[0] = comprobante({ nombre: "tardio.png" });
       state.hojas.push(h);
@@ -156,8 +158,23 @@ describe("procesarCola", () => {
       const tardio = state.hojas.flatMap((hh) => hh.slots).find((c) => c?.nombre === "tardio.png");
       expect(tardio?.estado).toBe("ok");
     } finally {
-      vi.mocked(extraerPendientes).mockResolvedValue(undefined);
+      vi.mocked(renderHojas).mockImplementation(() => {});
     }
+  });
+
+  it("throw en el re-chequeo no tumba la cola (los pendientes siguen ok)", async () => {
+    vi.mocked(extraerPendientes).mockImplementationOnce((): void => {
+      throw new Error("re-chequeo explotó");
+    });
+    const h = crearHoja();
+    const c = comprobante({ nombre: "t.png", file: new Blob(["x"]) });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(c.estado).toBe("ok");
+    expect(state.colaEnProceso).toBe(false);
   });
 
   it("throw en el render no aborta la cola (el ítem sigue a ok)", async () => {
