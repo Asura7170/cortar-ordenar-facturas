@@ -654,6 +654,41 @@ describe("monto manual", () => {
     expect(btn?.getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("keydown de monto ignora no-inputs y montos huérfanos", () => {
+    sembrarOk();
+    // Enter sobre la celda (target no-input): nada comitea
+    document
+      .querySelector(".cell")
+      ?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+      );
+    expect(document.querySelector(".cell-badge")).toBeNull();
+    // input de monto sin .cell contenedor: id NaN → return sin explotar
+    const orfan = document.createElement("input");
+    orfan.className = "cell-monto";
+    orfan.dataset["accion"] = "monto";
+    document.body.append(orfan);
+    try {
+      orfan.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+      );
+      expect(document.querySelector(".cell-badge")).toBeNull();
+    } finally {
+      orfan.remove();
+    }
+  });
+
+  it("Enter con monto inválido conserva la edición sin badge", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "abc";
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+    );
+    expect(document.querySelector(".cell-badge")).toBeNull();
+    expect(document.activeElement?.className).toBe("cell-monto"); // el borrador queda corregible
+  });
+
   it("monto entero se muestra con 2 decimales (500 → US$ 500.00)", () => {
     state.moneda = "USD";
     const c = sembrarOk();
@@ -688,6 +723,15 @@ describe("drop de archivos sobre hojas", () => {
     agregarArchivos.mockClear();
     document.querySelector(".sheet-fantasma")?.dispatchEvent(eventoDrop(files));
     expect(agregarArchivos).toHaveBeenCalledWith(files, null);
+  });
+
+  it("drop fuera de cualquier hoja no pega nada", () => {
+    sembrar("u4x2", [100]);
+    agregarArchivos.mockClear();
+    const files = [new File(["x"], "d.png", { type: "image/png" })];
+    // el botón ＋ vive en sheets pero fuera de todo .sheet (closest es null)
+    document.querySelector(".btn-sumar")?.dispatchEvent(eventoDrop(files));
+    expect(agregarArchivos).not.toHaveBeenCalled();
   });
 
   it("dragover sobre el fantasma no resalta", () => {
@@ -1014,6 +1058,42 @@ describe("lupa", () => {
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     tecla("m");
     expect(btn.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("M con target no-HTMLElement (svg) alterna igual", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.append(svg);
+    try {
+      svg.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+      );
+      expect(btn.getAttribute("aria-pressed")).toBe("true");
+      svg.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+      );
+      expect(btn.getAttribute("aria-pressed")).toBe("false");
+    } finally {
+      svg.remove();
+    }
+  });
+
+  it("M con target HTML que no es campo (span) alterna igual", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const span = document.createElement("span");
+    document.body.append(span);
+    try {
+      span.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+      );
+      expect(btn.getAttribute("aria-pressed")).toBe("true");
+      span.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+      );
+      expect(btn.getAttribute("aria-pressed")).toBe("false");
+    } finally {
+      span.remove();
+    }
   });
 
   it("pointerleave oculta y pointerenter restaura la muestra", () => {
