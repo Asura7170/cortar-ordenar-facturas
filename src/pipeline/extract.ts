@@ -24,7 +24,10 @@ export function extractCandidates(contenido = ""): Candidato[] {
   while ((m = MONEY_RE.exec(contenido)) !== null) {
     out.push({
       valor: m[1] ?? "",
-      previo: /([-(])\s*$/.exec(contenido.slice(0, m.index))?.[1] ?? "",
+      // Un "-" de un run separador no es signo (solo vale sin guion previo).
+      previo:
+        /(?:^|[^-])(-)\s*$|(\()\s*$/.exec(contenido.slice(0, m.index))?.slice(1).find(Boolean) ??
+        "",
     });
   }
   return out;

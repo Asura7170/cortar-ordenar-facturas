@@ -93,6 +93,12 @@ describe("regex", () => {
     expect(extraerRapidoCents("TOTAL 12.50")).toBe(1250);
   });
 
+  it("guiones separadores no cuentan como signo (resuelve; el simple sí)", () => {
+    expect(extraerRapidoCents("TOTAL ---------- 12.50")).toBe(1250);
+    expect(extraerRapidoCents("TOTAL ---- 12.50")).toBe(1250);
+    expect(extraerRapidoCents("TOTAL - 12.50")).toBeNull();
+  });
+
   it("limpiarTextoCompleto colapsa espacios sin capar", () => {
     expect(limpiarTextoCompleto("  TOTAL   12.50\n\nIVA 1 ")).toBe("TOTAL 12.50 IVA 1");
     expect(limpiarTextoCompleto("x".repeat(5000))).toHaveLength(5000);
