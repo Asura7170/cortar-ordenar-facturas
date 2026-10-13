@@ -191,6 +191,13 @@ describe("decodificarCtc", () => {
     expect(decodificarCtc(new Float32Array(7), 3, dict)).toEqual({ texto: "", puntaje: 0 });
     expect(decodificarCtc(new Float32Array(0), 0, dict)).toEqual({ texto: "", puntaje: 0 });
   });
+
+  it("dict de otro tamaño → vacío sin lanzar", () => {
+    expect(decodificarCtc(new Float32Array(2 * 5).fill(0.1), 2, ["blank", "a"])).toEqual({
+      texto: "",
+      puntaje: 0,
+    });
+  });
 });
 
 describe("DICT_OCR", () => {

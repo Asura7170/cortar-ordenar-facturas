@@ -3,8 +3,10 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   bgrDesdeRgba,
+  chunkValido,
   descargarPesosOcr,
   diagVacio,
+  dimEntera,
   enderezar,
   envolver,
   extraerTexto,
@@ -196,6 +198,16 @@ describe("matrizInversa", () => {
   });
 });
 
+describe("dimEntera", () => {
+  it("ausente, corta, no-entera o <1 → 0; válida pasa", () => {
+    expect(dimEntera(undefined, 2)).toBe(0);
+    expect(dimEntera([1, 3], 2)).toBe(0);
+    expect(dimEntera([1, 3, 2.5, 10], 2)).toBe(0);
+    expect(dimEntera([1, 3, 0, 10], 2)).toBe(0);
+    expect(dimEntera([1, 3, 8, 16], 2)).toBe(8);
+  });
+});
+
 describe("extraerTexto", () => {
   function base(
     mapa: { data: Float32Array; dims: number[] } = mapaUnaLinea(),
@@ -289,6 +301,75 @@ describe("extraerTexto", () => {
     expect(texto).toBe("AA");
     expect(espia.det).toHaveLength(0);
     expect(espia.rec).toHaveLength(1);
+  });
+
+  it("reuse sin base ni cajas → decode fresca", async () => {
+    const { deps, espia } = base();
+    expect(await extraerTexto(new Blob(["x"]), deps, { cajas: [], base: null })).toBe("AA");
+    expect(espia.det).toHaveLength(1);
+    const { lienzo } = lienzoFalso(BLANCO32);
+    lienzo.width = 32;
+    lienzo.height = 32;
+    expect(await extraerTexto(new Blob(["x"]), deps, { cajas: [], base: lienzo })).toBe("AA");
+  });
+
+  it("reuse chico → vacío directo sin decode", async () => {
+    const { deps, espia } = base();
+    const { lienzo } = lienzoFalso(BLANCO32);
+    lienzo.width = 4;
+    lienzo.height = 4;
+    const cajas = [
+      {
+        poli: [
+          [0, 0],
+          [10, 0],
+          [10, 10],
+          [0, 10],
+        ] as const,
+        puntaje: 0.9,
+      },
+    ];
+    expect(await extraerTexto(new Blob(["x"]), deps, { cajas, base: lienzo })).toBe("");
+    expect(espia.det).toHaveLength(0);
+    expect(espia.rec).toHaveLength(0);
+  });
+
+  it("sin contexto 2d → sin texto", async () => {
+    const { deps } = base();
+    const texto = await extraerTexto(new Blob(["x"]), {
+      ...deps,
+      crear: () => document.createElement("canvas"), // jsdom: getContext null
+    });
+    expect(texto).toBe("");
+  });
+
+  it("det sin dims → sin texto y sin rec", async () => {
+    const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
+    const sinDims = { data: mapaUnaLinea().data, dims: [1, 1] };
+    const { lienzo } = lienzoFalso(BLANCO32);
+    const texto = await extraerTexto(new Blob(["x"]), {
+      cargar: () => Promise.resolve(bitmapFalso(64, 32)),
+      crear: () => lienzo,
+      nucleo: () => Promise.resolve(nucleoFalso(sinDims, logitsAA(), espia)),
+    });
+    expect(texto).toBe("");
+    expect(espia.rec).toHaveLength(0);
+  });
+
+  it("rechazo no-Error → avisa y sin texto", async () => {
+    const { lienzo } = lienzoFalso(BLANCO32);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const texto = await extraerTexto(new Blob(["x"]), {
+        cargar: () => Promise.resolve(bitmapFalso(64, 32)),
+        crear: () => lienzo,
+        nucleo: () => Promise.reject("corte de luz"),
+      });
+      expect(texto).toBe("");
+      expect(warn).toHaveBeenCalledWith("OCR: texto omitido (corte de luz)");
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("reuse del enderezado: sin lienzo temporal, solo el del recorte (hilo #4)", async () => {
@@ -459,6 +540,20 @@ describe("reconocerCaja", () => {
     );
     // aristas 200.8×20 → 201×20 (el bbox daría 200×38 y estiraría los glifos).
     expect([w, h]).toEqual([201, 20]);
+  });
+});
+
+describe("chunkValido", () => {
+  it("acepta el chunk que cuadra", () => {
+    expect(chunkValido(new Float32Array(8), 2, 2 * DICT_OCR.length)).toBe(true);
+  });
+
+  it("rechaza datos nulos, pasos raros y porLote que no cuadra", () => {
+    const n = DICT_OCR.length;
+    expect(chunkValido(null, 2, 2 * n)).toBe(false);
+    expect(chunkValido(new Float32Array(8), 0, 0)).toBe(false);
+    expect(chunkValido(new Float32Array(8), 2.5, 4)).toBe(false);
+    expect(chunkValido(new Float32Array(8), 2, 3)).toBe(false);
   });
 });
 
@@ -638,6 +733,25 @@ describe("reconocerLote", () => {
     const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
     const { lienzo } = lienzoFalso(BLANCO32);
     expect(await reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).toEqual([]);
+    expect(espia.rec).toHaveLength(0);
+  });
+
+  it("cajas degeneradas → vacíos sin run", async () => {
+    const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
+    const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
+    const { lienzo } = lienzoFalso(BLANCO32);
+    const mala = {
+      poli: [
+        [5, 5],
+        [5, 5],
+        [5, 5],
+        [5, 5],
+      ] as const,
+      puntaje: 0.9,
+    };
+    expect(await reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).toEqual([
+      { texto: "", puntaje: 0 },
+    ]);
     expect(espia.rec).toHaveLength(0);
   });
 });
@@ -878,6 +992,89 @@ describe("enderezar (decisión rec)", () => {
     expect(r.grados).toBe(0);
     expect(detLlamadas).toEqual([]);
     expect(recLlamadas).toEqual([]);
+  });
+
+  it("sin contexto 2d → quieta (rot nulo)", async () => {
+    const blob = new Blob(["foto"]);
+    const r = await enderezar(blob, {
+      cargar: () => Promise.resolve(bitmapFalso(64, 32)),
+      crear: () => document.createElement("canvas"), // jsdom: getContext null
+      nucleo: () => Promise.resolve(nucleoGiros([mapaUnaLinea()], [0.95], [], [])),
+    });
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(r.cajas).toEqual([]);
+  });
+
+  it("det sin dims → giros vacíos y quieta", async () => {
+    const sinDims = { data: mapaUnaLinea().data, dims: [1, 1] };
+    const { blob, deps, detLlamadas, recLlamadas } = base([sinDims], [0.95]);
+    const r = await enderezar(blob, deps);
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(r.cajas).toEqual([]);
+    expect(detLlamadas).toEqual([0]);
+    expect(recLlamadas).toEqual([]);
+  });
+
+  it("det caído → quieta sin lanzar", async () => {
+    const blob = new Blob(["foto"]);
+    const detLlamadas: number[] = [];
+    const r = await enderezar(blob, {
+      cargar: () => Promise.resolve(bitmapFalso(64, 32)),
+      crear: lienzoConBlob().crear,
+      nucleo: () =>
+        Promise.resolve({
+          det: {
+            tensor: () => ({}),
+            run: (): Promise<Record<string, SalidaOcr>> => {
+              detLlamadas.push(1);
+              return Promise.reject(new Error("det roto"));
+            },
+          },
+          rec: nucleoGiros([mapaUnaLinea()], [0.95], [], []).rec,
+        }),
+    });
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(detLlamadas).toHaveLength(4);
+  });
+
+  it("toBlob nulo → original con cajas (grados 0)", async () => {
+    const { crear } = lienzoConBlob();
+    const sinBlob = (): HTMLCanvasElement => {
+      const lienzo = crear();
+      lienzo.toBlob = (cb: BlobCallback): void => cb(null);
+      return lienzo;
+    };
+    const blob = new Blob(["foto"]);
+    const r = await enderezar(blob, {
+      cargar: () => Promise.resolve(bitmapFalso(64, 32)),
+      crear: sinBlob,
+      nucleo: () =>
+        Promise.resolve(nucleoGiros([mapaUnaLinea(), mapaUnaLinea()], [0.3, 0.95], [], [])),
+    });
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(r.cajas).toHaveLength(1);
+  });
+
+  it("rec blank → conf 0 y gana 0°", async () => {
+    const { blob, deps, detLlamadas, recLlamadas } = base(
+      [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
+      [0.0, 0.0, 0.0, 0.0],
+    );
+    const r = await enderezar(blob, deps);
+    expect(r.blob).toBe(blob);
+    expect(r.grados).toBe(0);
+    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+    expect(recLlamadas).toHaveLength(4);
+  });
+
+  it("sin deps → quieta sin lanzar (reales no disponibles en jsdom)", async () => {
+    const r = await enderezar(new Blob(["x"]));
+    expect(r.grados).toBe(0);
+    expect(r.cajas).toEqual([]);
   });
 });
 

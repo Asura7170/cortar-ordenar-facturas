@@ -15,7 +15,7 @@ import {
   normalizarLinea,
   REC_ALTO,
 } from "./ocrRec";
-import type { LineaNorm, TextoRec } from "./ocrRec";
+import type { LineaNorm, LoteNorm, TextoRec } from "./ocrRec";
 import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
@@ -231,6 +231,25 @@ export interface Enderezado {
 }
 
 /** Mapa de probabilidad del det sobre un lienzo ya a tamaño det. Null sin salida válida. */
+/** Dimensión entera ≥ 1 (0 si ausente o inválida). */
+export function dimEntera(dims: ReadonlyArray<number | string> | undefined, i: number): number {
+  const v = Number(dims?.[i] ?? 0);
+  return Number.isInteger(v) && v >= 1 ? v : 0;
+}
+
+/** Valida la salida del det (mapa + dims enteras ≥ 1). */
+function mapaDetValido(
+  sal: Record<string, SalidaOcr>,
+  mapa: Float32Array | null,
+): { mapa: Float32Array; mw: number; mh: number } | null {
+  if (!mapa) return null;
+  const dims = sal[SALIDA_ONNX]?.dims;
+  const mh = dimEntera(dims, 2);
+  const mw = dimEntera(dims, 3);
+  if (mh < 1 || mw < 1) return null;
+  return { mapa, mw, mh };
+}
+
 async function pasarDet(
   det: SubsesionOcr,
   base: HTMLCanvasElement,
@@ -246,12 +265,7 @@ async function pasarDet(
       base.width,
     ]),
   });
-  const mapa = datosSalida(sal[SALIDA_ONNX]);
-  const dims = sal[SALIDA_ONNX]?.dims;
-  const mh = Number(dims?.[2] ?? 0);
-  const mw = Number(dims?.[3] ?? 0);
-  if (!mapa || !Number.isInteger(mh) || !Number.isInteger(mw) || mh < 1 || mw < 1) return null;
-  return { mapa, mw, mh };
+  return mapaDetValido(sal, datosSalida(sal[SALIDA_ONNX]));
 }
 
 /** Media del mapa (presencia de texto); 0 si vacío. */
@@ -323,6 +337,103 @@ function blobDeLienzo(lienzo: HTMLCanvasElement): Promise<Blob | null> {
   });
 }
 
+/** Giro ganador con su evidencia (null = todos fallaron). */
+interface GiroGanador {
+  g: Giro;
+  c: number;
+  cajas: CajaDb[];
+  base: HTMLCanvasElement | null;
+}
+
+/** Deps resueltas (inyectadas o reales). */
+function depsOcr(deps?: DepsOcr): {
+  cargar: CargarBitmap;
+  crear: CrearLienzo;
+  fabrica: () => Promise<NucleoOcr>;
+} {
+  return {
+    cargar: deps?.cargar ?? cargarReal,
+    crear: deps?.crear ?? crearReal,
+    fabrica: deps?.nucleo ?? obtenerNucleo,
+  };
+}
+
+/** Confianza rec media del top-2 (0 si nada legible). */
+async function confiarRec(
+  rec: SubsesionOcr,
+  base: HTMLCanvasElement,
+  cajas: CajaDb[],
+  crear: CrearLienzo,
+): Promise<number> {
+  const top = [...cajas].sort((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
+  const rs = await reconocerLote(rec, base, top, crear);
+  const confs: number[] = [];
+  for (const r of rs) if (r.texto !== "") confs.push(r.puntaje);
+  return confs.length > 0 ? confs.reduce((a, b) => a + b, 0) / confs.length : 0;
+}
+
+/** Una orientación: rota, pasa el det y vota (vacío si algo falla). */
+async function verOrientacion(
+  det: SubsesionOcr,
+  foto: ImageBitmap,
+  grados: Giro,
+  crear: CrearLienzo,
+  rec: SubsesionOcr,
+): Promise<{ c: number; masa: number; cajas: CajaDb[]; base: HTMLCanvasElement | null }> {
+  const vacio = { c: 0, masa: 0, cajas: [], base: null };
+  const rot = lienzoGirado(foto, grados, crear);
+  if (!rot) return vacio;
+  const tam = tamanoDet(rot.width, rot.height);
+  const base = crear();
+  base.width = tam.w;
+  base.height = tam.h;
+  const ctx = base.getContext("2d");
+  if (!ctx) return vacio;
+  ctx.drawImage(rot, 0, 0, tam.w, tam.h);
+  const sal = await pasarDet(det, base);
+  if (!sal) return vacio;
+  const masa = masaMapa(sal.mapa);
+  const cajas = cajasDesdeMapa(sal.mapa, sal.mw, sal.mh, { ancho: tam.w, alto: tam.h });
+  return { c: await confiarRec(rec, base, cajas, crear), masa, cajas, base };
+}
+
+/** Elige el giro ganador (null si todos fallaron o no hay texto). */
+async function elegirGiro(
+  det: SubsesionOcr,
+  rec: SubsesionOcr,
+  foto: ImageBitmap,
+  crear: CrearLienzo,
+): Promise<GiroGanador | null> {
+  let mejor: GiroGanador | null = null;
+  for (const g of GIROS_PRUEBA) {
+    let r;
+    try {
+      r = await verOrientacion(det, foto, g, crear, rec);
+    } catch {
+      continue; // giro fallido: se salta (el externo aún protege ver(0))
+    }
+    // P1: la telemetría de giros cumplió (ver lote denso); la consola queda limpia.
+    if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) return null; // sin texto: ni giros
+    if (!mejor || r.c > mejor.c) mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
+    if (r.c >= UMBRAL_REC_OK) break; // bypass: la primera que convence gana
+  }
+  return mejor; // null si todos fallaron
+}
+
+/** Materializa el giro ganador (blob rotado o el original si no se puede). */
+async function materializarGiro(
+  blob: Blob,
+  foto: ImageBitmap,
+  mejor: GiroGanador,
+  crear: CrearLienzo,
+): Promise<Enderezado> {
+  if (mejor.g === 0) return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
+  const rot = lienzoGirado(foto, mejor.g, crear);
+  const fuera = rot ? await blobDeLienzo(rot) : null;
+  if (!fuera) return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
+  return { blob: fuera, grados: mejor.g, cajas: mejor.cajas, base: mejor.base };
+}
+
 /**
  * Endereza por confianza del REC (el det solo recorta líneas, no vota):
  * primera orientación con conf ≥ OK gana al instante (bypass); si ninguna
@@ -330,63 +441,17 @@ function blobDeLienzo(lienzo: HTMLCanvasElement): Promise<Blob | null> {
  */
 export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado> {
   const quieto: Enderezado = { blob, grados: 0, cajas: [], base: null };
-  const cargar = deps?.cargar ?? cargarReal;
-  const crear = deps?.crear ?? crearReal;
-  const fabrica = deps?.nucleo ?? obtenerNucleo;
+  const { cargar, crear, fabrica } = depsOcr(deps);
   let bmp: ImageBitmap | null = null;
   try {
     bmp = await cargar(blob, { imageOrientation: "from-image" });
     if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return quieto;
-    const foto: ImageBitmap = bmp; // copia estrechada para el closure ver()
+    const foto: ImageBitmap = bmp; // copia estrechada para los helpers
     const { det, rec } = await fabrica();
-    // Confianza rec media del top-2 (0 si nada legible).
-    const confiar = async (cajas: CajaDb[], base: HTMLCanvasElement): Promise<number> => {
-      const top = [...cajas].sort((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
-      const rs = await reconocerLote(rec, base, top, crear);
-      const confs: number[] = [];
-      for (const r of rs) if (r.texto !== "") confs.push(r.puntaje);
-      return confs.length > 0 ? confs.reduce((a, b) => a + b, 0) / confs.length : 0;
-    };
-    const ver = async (
-      grados: Giro,
-    ): Promise<{ c: number; masa: number; cajas: CajaDb[]; base: HTMLCanvasElement | null }> => {
-      const vacio = { c: 0, masa: 0, cajas: [], base: null };
-      const rot = lienzoGirado(foto, grados, crear);
-      if (!rot) return vacio;
-      const tam = tamanoDet(rot.width, rot.height);
-      const base = crear();
-      base.width = tam.w;
-      base.height = tam.h;
-      const ctx = base.getContext("2d");
-      if (!ctx) return vacio;
-      ctx.drawImage(rot, 0, 0, tam.w, tam.h);
-      const sal = await pasarDet(det, base);
-      if (!sal) return vacio;
-      const masa = masaMapa(sal.mapa);
-      const cajas = cajasDesdeMapa(sal.mapa, sal.mw, sal.mh, { ancho: tam.w, alto: tam.h });
-      return { c: await confiar(cajas, base), masa, cajas, base };
-    };
-    let mejor: { g: Giro; c: number; cajas: CajaDb[]; base: HTMLCanvasElement | null } | null =
-      null;
-    for (const g of GIROS_PRUEBA) {
-      let r;
-      try {
-        r = await ver(g);
-      } catch {
-        continue; // giro fallido: se salta (el externo aún protege ver(0))
-      }
-      // P1: la telemetría de giros cumplió (ver lote denso); la consola queda limpia.
-      if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) return quieto; // sin texto: ni giros
-      if (!mejor || r.c > mejor.c) mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
-      if (r.c >= UMBRAL_REC_OK) break; // bypass: la primera que convence gana
-    }
+    const mejor = await elegirGiro(det, rec, foto, crear);
     if (!mejor) return quieto; // todos los giros fallaron
     // ponytail: sin OK gana el más alto (aunque sea bajo); solo el vacío no gira.
-    if (mejor.g === 0) return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
-    const rot = lienzoGirado(foto, mejor.g, crear);
-    const fuera = rot ? await blobDeLienzo(rot) : null;
-    if (!fuera) return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
-    return { blob: fuera, grados: mejor.g, cajas: mejor.cajas, base: mejor.base };
+    return materializarGiro(blob, foto, mejor, crear);
   } catch {
     return quieto;
   } finally {
@@ -465,6 +530,54 @@ export async function reconocerCaja(
 /** Líneas por chunk del rec (P2: un run [112,1536] tarda ~6s; trozos medianos no). */
 const TAMANO_CHUNK_REC = 16;
 
+/** Formas del run cuadran con el dict (chunk válido). */
+export function chunkValido(
+  datos: Float32Array | null,
+  pasos: number,
+  porLote: number,
+): datos is Float32Array {
+  return (
+    !!datos &&
+    Number.isInteger(pasos) &&
+    pasos >= 1 &&
+    Number.isInteger(porLote) &&
+    porLote / pasos === DICT_OCR.length
+  );
+}
+
+/** Un chunk del lote: run + validación de formas (null si no cuadra). */
+async function correrChunk(
+  rec: SubsesionOcr,
+  trozo: Array<{ lin: LineaNorm }>,
+): Promise<{ datos: Float32Array; pasos: number; porLote: number; lote: LoteNorm } | null> {
+  // ponytail: trozo no vacío ⇒ apilarLineas no falla.
+  const lote = apilarLineas(trozo.map((t) => t.lin)) as LoteNorm;
+  const sal = await rec
+    .run({ x: rec.tensor(lote.tensor, [lote.lote, 3, REC_ALTO, lote.anchoMax]) })
+    .catch((): null => null);
+  const datos = sal ? datosSalida(sal[SALIDA_ONNX]) : null;
+  const pasos = Number(sal?.[SALIDA_ONNX]?.dims?.[1] ?? 0);
+  const porLote = datos ? datos.length / lote.lote : 0;
+  if (!chunkValido(datos, pasos, porLote)) return null;
+  return { datos, pasos, porLote, lote };
+}
+
+/** Reintento individual de las líneas sin resultado (muta fuera; devuelve runs). */
+async function reintentarIndividuales(
+  rec: SubsesionOcr,
+  norms: Array<{ idx: number; lin: LineaNorm }>,
+  hechos: ReadonlySet<number>,
+  fuera: TextoRec[],
+): Promise<number> {
+  let runs = 0;
+  for (const n of norms) {
+    if (hechos.has(n.idx)) continue;
+    fuera[n.idx] = await ejecutarRec(rec, n.lin.tensor, [1, 3, REC_ALTO, n.lin.anchoTotal]);
+    runs += 1;
+  }
+  return runs;
+}
+
 /**
  * Reconoce N cajas en chunks de un solo run (lote con pad al ancho mayor del
  * grupo; el pad es el mismo del camino individual: se descarta al decodificar).
@@ -486,43 +599,28 @@ export async function reconocerLote(
   });
   if (validos.length === 0) return fuera;
   // P2: normalizar una vez (el fallback reutiliza, sin renormalizar).
-  const norms: { idx: number; lin: LineaNorm }[] = [];
-  for (const v of validos) {
-    const lin = normalizarLinea(v.bgr, v.w, v.h);
-    if (lin) norms.push({ idx: v.idx, lin });
-  }
-  if (norms.length === 0) return fuera;
+  // ponytail: recorteCaja garantiza w,h ≥ 1 y bgr exacto ⇒ normalizarLinea no falla.
+  const norms = validos.map((v) => ({
+    idx: v.idx,
+    lin: normalizarLinea(v.bgr, v.w, v.h) as LineaNorm,
+  }));
   const orden = [...norms].sort((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
   let anchoMax = 0;
   let chunks = 0;
   let ok = true;
   for (let i = 0; i < orden.length; i += TAMANO_CHUNK_REC) {
     const trozo = orden.slice(i, i + TAMANO_CHUNK_REC);
-    const lote = apilarLineas(trozo.map((t) => t.lin));
-    const sal = lote
-      ? await rec
-          .run({ x: rec.tensor(lote.tensor, [lote.lote, 3, REC_ALTO, lote.anchoMax]) })
-          .catch((): null => null)
-      : null;
-    const datos = sal ? datosSalida(sal[SALIDA_ONNX]) : null;
-    const pasos = Number(sal?.[SALIDA_ONNX]?.dims?.[1] ?? 0);
-    const porLote = datos && lote ? datos.length / lote.lote : 0;
-    if (
-      !datos ||
-      !lote ||
-      !Number.isInteger(pasos) ||
-      pasos < 1 ||
-      !Number.isInteger(porLote) ||
-      porLote / pasos !== DICT_OCR.length
-    ) {
+    const res = await correrChunk(rec, trozo);
+    if (!res) {
       ok = false; // el chunk no cuadra (EP sin batch, formas raras): individual abajo.
       break;
     }
+    const { datos, pasos, porLote } = res;
     trozo.forEach((t, b) => {
       fuera[t.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
     });
     chunks += 1;
-    if (lote.anchoMax > anchoMax) anchoMax = lote.anchoMax;
+    anchoMax = Math.max(anchoMax, res.lote.anchoMax);
   }
   if (diag) {
     diag.lote = norms.length;
@@ -533,18 +631,54 @@ export async function reconocerLote(
   // Hilo CodeRabbit #3: conserva lo ya decodificado (los chunks exitosos no
   // se re-ejecutan ni se pisan); solo las líneas sin resultado van a individual.
   const hechos = new Set(orden.slice(0, chunks * TAMANO_CHUNK_REC).map((t) => t.idx));
-  let runs = chunks; // chunks corridos (el fallido se suma abajo)
-  for (const n of norms) {
-    if (hechos.has(n.idx)) continue;
-    fuera[n.idx] = await ejecutarRec(rec, n.lin.tensor, [1, 3, REC_ALTO, n.lin.anchoTotal]);
-    runs += 1;
-  }
+  const runs = chunks + (await reintentarIndividuales(rec, norms, hechos, fuera));
   if (diag) {
     diag.fallback = true;
     diag.recRuns = runs + 1; // + el chunk que falló
     diag.anchoMax = Math.max(...norms.map((n) => n.lin.anchoTotal));
   }
   return fuera;
+}
+
+/** Base lista (reuse o nada): el reuse chico da lote vacío (= "" directo,
+    sin decode: en prod ver() siempre fija dims ≥ 32).
+    Fase 2: los píxeles ya están en memoria (reuse.base); decodificar el
+    blob otra vez es CPU regalada (el guard usa las dims del lienzo). */
+function baseReutilizada(
+  reuse: Pick<Enderezado, "cajas" | "base"> | undefined,
+): { cajas: CajaDb[]; final: HTMLCanvasElement } | null {
+  if (!reuse?.base || reuse.cajas.length === 0) return null;
+  if (reuse.base.width < DET_LADO_MIN || reuse.base.height < DET_LADO_MIN)
+    return { cajas: [], final: reuse.base };
+  return { cajas: [...reuse.cajas], final: reuse.base };
+}
+
+/** Decode fresca del blob (null si no se puede). Cierra el bitmap en finally. */
+async function baseDesdeBlob(
+  blob: Blob,
+  cargar: CargarBitmap,
+  crear: CrearLienzo,
+  det: SubsesionOcr,
+): Promise<{ cajas: CajaDb[]; final: HTMLCanvasElement } | null> {
+  const bmp = await cargar(blob, { imageOrientation: "from-image" });
+  try {
+    if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return null;
+    const tam = tamanoDet(bmp.width, bmp.height);
+    const base = crear();
+    base.width = tam.w;
+    base.height = tam.h;
+    const bctx = base.getContext("2d");
+    if (!bctx) return null;
+    bctx.imageSmoothingEnabled = true;
+    bctx.imageSmoothingQuality = "high";
+    bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
+    const salDet = await pasarDet(det, base);
+    if (!salDet) return null;
+    const { mapa, mw, mh } = salDet;
+    return { cajas: cajasDesdeMapa(mapa, mw, mh, { ancho: tam.w, alto: tam.h }), final: base };
+  } finally {
+    bmp.close();
+  }
 }
 
 /**
@@ -557,39 +691,13 @@ export async function extraerTexto(
   reuse?: Pick<Enderezado, "cajas" | "base">,
   diag?: DiagRec,
 ): Promise<string> {
-  const cargar = deps?.cargar ?? cargarReal;
-  const crear = deps?.crear ?? crearReal;
-  const fabrica = deps?.nucleo ?? obtenerNucleo;
-  let bmp: ImageBitmap | null = null;
+  const { cargar, crear, fabrica } = depsOcr(deps);
   try {
     const { det, rec } = await fabrica();
     // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan.
-    let cajas: CajaDb[];
-    let final: HTMLCanvasElement;
-    if (reuse?.base && reuse.cajas.length > 0) {
-      // Fase 2: los píxeles ya están en memoria (reuse.base); decodificar el
-      // blob otra vez es CPU regalada (el guard usa las dims del lienzo).
-      if (reuse.base.width < DET_LADO_MIN || reuse.base.height < DET_LADO_MIN) return "";
-      cajas = [...reuse.cajas];
-      final = reuse.base;
-    } else {
-      bmp = await cargar(blob, { imageOrientation: "from-image" });
-      if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return "";
-      const tam = tamanoDet(bmp.width, bmp.height);
-      const base = crear();
-      base.width = tam.w;
-      base.height = tam.h;
-      const bctx = base.getContext("2d");
-      if (!bctx) return "";
-      bctx.imageSmoothingEnabled = true;
-      bctx.imageSmoothingQuality = "high";
-      bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
-      const salDet = await pasarDet(det, base);
-      if (!salDet) return "";
-      const { mapa, mw, mh } = salDet;
-      cajas = cajasDesdeMapa(mapa, mw, mh, { ancho: tam.w, alto: tam.h });
-      final = base;
-    }
+    const pre = baseReutilizada(reuse) ?? (await baseDesdeBlob(blob, cargar, crear, det));
+    if (!pre) return "";
+    const { cajas, final } = pre;
     const lineas: string[] = [];
     // L2: un solo run para todas las cajas (con fallback individual dentro).
     if (diag) diag.cajas = cajas.length;
@@ -601,7 +709,5 @@ export async function extraerTexto(
   } catch (e: unknown) {
     console.warn(`OCR: texto omitido (${e instanceof Error ? e.message : String(e)})`);
     return "";
-  } finally {
-    bmp?.close();
   }
 }

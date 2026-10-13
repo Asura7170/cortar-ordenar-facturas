@@ -49,6 +49,29 @@ export function binarizarMapa(
   return bin;
 }
 
+/** Expande los 8 vecinos calientes sin marcar (muta marca/pila). */
+function empujarVecinos(
+  bin: Uint8Array,
+  ancho: number,
+  marca: Uint32Array,
+  x: number,
+  y: number,
+  etiqueta: number,
+  pila: number[],
+): void {
+  for (let dy = -1; dy <= 1; dy += 1) {
+    for (let dx = -1; dx <= 1; dx += 1) {
+      if (dx === 0 && dy === 0) continue;
+      const q = (y + dy) * ancho + (x + dx);
+      // ponytail: marca[q] sin ?? (si q es OOB, bin[q] ya cortó a la izquierda).
+      if ((bin[q] ?? 0) === 1 && marca[q] === 0) {
+        marca[q] = etiqueta;
+        pila.push(q);
+      }
+    }
+  }
+}
+
 /** Marca el componente conexo (8-vecinos) y devuelve sus píxeles (coords de mapa). */
 export function inundar(
   bin: Uint8Array,
@@ -66,16 +89,7 @@ export function inundar(
     const x = p % ancho;
     const y = (p - x) / ancho;
     puntos.push([x - 1, y - 1]);
-    for (let dy = -1; dy <= 1; dy += 1) {
-      for (let dx = -1; dx <= 1; dx += 1) {
-        if (dx === 0 && dy === 0) continue;
-        const q = (y + dy) * ancho + (x + dx);
-        if ((bin[q] ?? 0) === 1 && (marca[q] ?? 0) === 0) {
-          marca[q] = etiqueta;
-          pila.push(q);
-        }
-      }
-    }
+    empujarVecinos(bin, ancho, marca, x, y, etiqueta, pila);
   }
   return puntos;
 }
@@ -85,37 +99,36 @@ function cruz(o: PuntoDb, a: PuntoDb, b: PuntoDb): number {
   return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
 }
 
+/** Sin duplicados consecutivos (el sort los agrupa). */
+function sinDuplicados(pts: PuntoDb[]): PuntoDb[] {
+  return pts.filter((p, i) => i === 0 || p[0] !== pts[i - 1]?.[0] || p[1] !== pts[i - 1]?.[1]);
+}
+
+/** Una cadena del casco (delReves = superior): monotone chain con poda. */
+function cadenaCasco(unicos: readonly PuntoDb[], delReves: boolean): PuntoDb[] {
+  const cadena: PuntoDb[] = [];
+  const n = unicos.length;
+  for (let k = 0; k < n; k += 1) {
+    // ponytail: k < n en ambas direcciones.
+    const p = unicos[delReves ? n - 1 - k : k] as PuntoDb;
+    while (
+      cadena.length >= 2 &&
+      cruz(cadena[cadena.length - 2] as PuntoDb, cadena[cadena.length - 1] as PuntoDb, p) <= 0
+    ) {
+      cadena.pop();
+    }
+    cadena.push(p);
+  }
+  cadena.pop();
+  return cadena;
+}
+
 /** Casco convexo de Andrew (monotone chain), sin duplicar el cierre. */
 export function cascoConvexo(puntos: readonly PuntoDb[]): PuntoDb[] {
   const pts = [...puntos].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const unicos = pts.filter(
-    (p, i) => i === 0 || p[0] !== pts[i - 1]?.[0] || p[1] !== pts[i - 1]?.[1],
-  );
+  const unicos = sinDuplicados(pts);
   if (unicos.length < 3) return unicos;
-  const inferior: PuntoDb[] = [];
-  for (const p of unicos) {
-    while (
-      inferior.length >= 2 &&
-      cruz(inferior[inferior.length - 2] ?? [0, 0], inferior[inferior.length - 1] ?? [0, 0], p) <= 0
-    ) {
-      inferior.pop();
-    }
-    inferior.push(p);
-  }
-  const superior: PuntoDb[] = [];
-  for (let i = unicos.length - 1; i >= 0; i -= 1) {
-    const p = unicos[i] ?? [0, 0];
-    while (
-      superior.length >= 2 &&
-      cruz(superior[superior.length - 2] ?? [0, 0], superior[superior.length - 1] ?? [0, 0], p) <= 0
-    ) {
-      superior.pop();
-    }
-    superior.push(p);
-  }
-  inferior.pop();
-  superior.pop();
-  return [...inferior, ...superior];
+  return [...cadenaCasco(unicos, false), ...cadenaCasco(unicos, true)];
 }
 
 /** Área con signo (shoelace); negativa = horario. */
@@ -127,6 +140,27 @@ export function areaDoble(poli: readonly PuntoDb[]): number {
     a += p[0] * q[1] - q[0] * p[1];
   }
   return a;
+}
+
+/** Proyección del casco sobre (ux,uy): min/max en u y v. */
+export function proyectarCasco(
+  casco: readonly PuntoDb[],
+  ux: number,
+  uy: number,
+): { minU: number; maxU: number; minV: number; maxV: number } {
+  let minU = Infinity;
+  let maxU = -Infinity;
+  let minV = Infinity;
+  let maxV = -Infinity;
+  for (const p of casco) {
+    const u = p[0] * ux + p[1] * uy;
+    const v = -p[0] * uy + p[1] * ux;
+    if (u < minU) minU = u;
+    if (u > maxU) maxU = u;
+    if (v < minV) minV = v;
+    if (v > maxV) maxV = v;
+  }
+  return { minU, maxU, minV, maxV };
 }
 
 /**
@@ -147,18 +181,7 @@ export function rectanguloMinimo(casco: readonly PuntoDb[]): CajaDb["poli"] | nu
     if (mod === 0) continue;
     const ux = dx / mod;
     const uy = dy / mod;
-    let minU = Infinity;
-    let maxU = -Infinity;
-    let minV = Infinity;
-    let maxV = -Infinity;
-    for (const p of casco) {
-      const u = p[0] * ux + p[1] * uy;
-      const v = -p[0] * uy + p[1] * ux;
-      if (u < minU) minU = u;
-      if (u > maxU) maxU = u;
-      if (v < minV) minV = v;
-      if (v > maxV) maxV = v;
-    }
+    const { minU, maxU, minV, maxV } = proyectarCasco(casco, ux, uy);
     const area = (maxU - minU) * (maxV - minV);
     if (area < mejorArea) {
       mejorArea = area;
@@ -178,6 +201,17 @@ export function ordenarQuad(poli: CajaDb["poli"]): CajaDb["poli"] {
   return [izq[0] ?? p0, der[0] ?? p1, der[1] ?? p2, izq[1] ?? p3];
 }
 
+/** True si (x,y) está dentro del quad convexo (vale con cualquier enrollado). */
+export function puntoEnQuad(poli: CajaDb["poli"], x: number, y: number, horario: boolean): boolean {
+  for (let i = 0; i < 4; i += 1) {
+    const a = poli[i] ?? [0, 0];
+    const b = poli[(i + 1) % 4] ?? [0, 0];
+    const c = cruz(a, b, [x, y]);
+    if (horario ? c > 0 : c < 0) return false;
+  }
+  return true;
+}
+
 /** Media del mapa dentro del quad convexo (box_score_fast de PaddleOCR). */
 export function puntuarCaja(mapa: Float32Array, anchoMapa: number, poli: CajaDb["poli"]): number {
   const xs = poli.map((p) => p[0]);
@@ -192,17 +226,7 @@ export function puntuarCaja(mapa: Float32Array, anchoMapa: number, poli: CajaDb[
   let n = 0;
   for (let y = y0; y <= y1; y += 1) {
     for (let x = x0; x <= x1; x += 1) {
-      let dentro = true;
-      for (let i = 0; i < 4; i += 1) {
-        const a = poli[i] ?? [0, 0];
-        const b = poli[(i + 1) % 4] ?? [0, 0];
-        const c = cruz(a, b, [x, y]);
-        if (horario ? c > 0 : c < 0) {
-          dentro = false;
-          break;
-        }
-      }
-      if (dentro) {
+      if (puntoEnQuad(poli, x, y, horario)) {
         suma += mapa[y * anchoMapa + x] ?? 0;
         n += 1;
       }
@@ -222,6 +246,46 @@ function perimetro(poli: CajaDb["poli"]): number {
   return p;
 }
 
+/** Recta offset (normal unitaria + término): el cruce de vecinas da el vértice. */
+export interface RectaOffset {
+  readonly nx: number;
+  readonly ny: number;
+  readonly c: number;
+}
+
+/** Recta desplazada de una arista (null si degenerada). */
+export function rectaDesplazada(
+  a: PuntoDb,
+  b: PuntoDb,
+  gx: number,
+  gy: number,
+  d: number,
+): RectaOffset | null {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const mod = Math.hypot(dx, dy);
+  if (mod === 0) return null;
+  let nx = dy / mod;
+  let ny = -dx / mod;
+  const mx = (a[0] + b[0]) / 2 - gx;
+  const my = (a[1] + b[1]) / 2 - gy;
+  const prod = nx * mx + ny * my;
+  if (prod < 0) {
+    nx = -nx;
+    ny = -ny;
+  } else if (prod === 0) {
+    return null;
+  }
+  return { nx, ny, c: nx * (a[0] + nx * d) + ny * (a[1] + ny * d) };
+}
+
+/** Intersección de dos rectas offset (null si paralelas). */
+export function interseccionRectas(r1: RectaOffset, r2: RectaOffset): PuntoDb | null {
+  const det = r1.nx * r2.ny - r2.nx * r1.ny;
+  if (Math.abs(det) < 1e-9) return null;
+  return [(r1.c * r2.ny - r2.c * r1.ny) / det, (r1.nx * r2.c - r2.nx * r1.c) / det];
+}
+
 /**
  * Expande el quad convexo desplazando cada arista hacia fuera una distancia
  * d = área·ratio/perímetro e intersecando rectas vecinas (offset exacto de
@@ -239,33 +303,22 @@ export function expandirQuad(
   if (per <= 0 || area <= 0) return null;
   const d = (area * ratio) / per;
   const rectas = poli.map((a, i) => {
-    const b = poli[(i + 1) % 4] ?? [0, 0];
-    const dx = b[0] - a[0];
-    const dy = b[1] - a[1];
-    const mod = Math.hypot(dx, dy);
-    if (mod === 0) return null;
-    let nx = dy / mod;
-    let ny = -dx / mod;
-    const mx = (a[0] + b[0]) / 2 - gx;
-    const my = (a[1] + b[1]) / 2 - gy;
-    if (nx * mx + ny * my < 0) {
-      nx = -nx;
-      ny = -ny;
-    } else if (nx * mx + ny * my === 0) {
-      return null;
-    }
-    return { nx, ny, c: nx * (a[0] + nx * d) + ny * (a[1] + ny * d) };
+    // ponytail: poli es tupla de 4.
+    const b = poli[(i + 1) % 4] as PuntoDb;
+    return rectaDesplazada(a, b, gx, gy, d);
   });
   if (rectas.some((r) => r === null)) return null;
   const fuera: PuntoDb[] = [];
   for (let i = 0; i < 4; i += 1) {
-    const r1 = rectas[(i + 3) % 4] ?? { nx: 0, ny: 0, c: 0 };
-    const r2 = rectas[i] ?? { nx: 0, ny: 0, c: 0 };
-    const det = r1.nx * r2.ny - r2.nx * r1.ny;
-    if (Math.abs(det) < 1e-9) return null;
-    fuera.push([(r1.c * r2.ny - r2.c * r1.ny) / det, (r1.nx * r2.c - r2.nx * r1.c) / det]);
+    // ponytail: map de 4.
+    const r1 = rectas[(i + 3) % 4] as RectaOffset;
+    const r2 = rectas[i] as RectaOffset;
+    const p = interseccionRectas(r1, r2);
+    if (!p) return null;
+    fuera.push(p);
   }
-  return [fuera[0] ?? poli[0], fuera[1] ?? poli[1], fuera[2] ?? poli[2], fuera[3] ?? poli[3]];
+  // ponytail: 4 intersecciones (la única salida es el return).
+  return [fuera[0] as PuntoDb, fuera[1] as PuntoDb, fuera[2] as PuntoDb, fuera[3] as PuntoDb];
 }
 
 /**
@@ -287,44 +340,75 @@ export function cajasDesdeMapa(
     const bin = binarizarMapa(mapa, anchoMapa, altoMapa);
     // ponytail: Uint32 (un mapa con ruido puede superar las 65k componentes del Uint16).
     const marca = new Uint32Array(w * h);
-    const escX = origen.ancho / anchoMapa;
-    const escY = origen.alto / altoMapa;
-    let etiqueta = 0;
-    for (let y = 1; y <= altoMapa && cajas.length < DB_MAX_CAJAS; y += 1) {
-      for (let x = 1; x <= anchoMapa && cajas.length < DB_MAX_CAJAS; x += 1) {
-        const p = y * w + x;
-        if (bin[p] !== 1 || marca[p] !== 0) continue;
-        etiqueta += 1;
-        const pixeles = inundar(bin, w, marca, x, y, etiqueta);
-        if (pixeles.length < 3) continue; // puntito sin área
-        const casco = cascoConvexo(pixeles);
-        const mini = rectanguloMinimo(casco);
-        if (!mini) continue;
-        const puntaje = puntuarCaja(mapa, anchoMapa, mini);
-        if (puntaje < DB_UMBRAL_CAJA) continue;
-        const grande = expandirQuad(ordenarQuad(mini));
-        if (!grande) continue;
-        const esc = grande.map(
-          ([cx, cy]) =>
-            [
-              Math.min(origen.ancho, Math.max(0, cx * escX)),
-              Math.min(origen.alto, Math.max(0, cy * escY)),
-            ] as PuntoDb,
-        );
-        // ponytail: sin 2º ordenarQuad (el reescalado monótono no reordena).
-        const poli: CajaDb["poli"] = [
-          esc[0] ?? [0, 0],
-          esc[1] ?? [0, 0],
-          esc[2] ?? [0, 0],
-          esc[3] ?? [0, 0],
-        ];
-        // ponytail: shoelace (la fórmula anterior daba 0 en quads rotados).
-        if (Math.abs(areaDoble(poli)) / 2 < AREA_MINIMA_CAJA) continue;
-        cajas.push({ poli, puntaje });
-      }
-    }
+    barrerMapa(bin, w, mapa, anchoMapa, altoMapa, marca, origen, cajas);
   } catch {
     return cajas;
   }
   return cajas;
+}
+
+/** Procesa una celda caliente: componente → caja escalada (null si se descarta). */
+function cajaEnCelda(
+  bin: Uint8Array,
+  w: number,
+  marca: Uint32Array,
+  x: number,
+  y: number,
+  mapa: Float32Array,
+  anchoMapa: number,
+  altoMapa: number,
+  etiqueta: number,
+  origen: TamanoDb,
+): CajaDb | null {
+  const pixeles = inundar(bin, w, marca, x, y, etiqueta);
+  if (pixeles.length < 3) return null; // puntito sin área
+  const mini = rectanguloMinimo(cascoConvexo(pixeles));
+  if (!mini) return null;
+  const puntaje = puntuarCaja(mapa, anchoMapa, mini);
+  if (puntaje < DB_UMBRAL_CAJA) return null;
+  const grande = expandirQuad(ordenarQuad(mini));
+  if (!grande) return null;
+  const escX = origen.ancho / anchoMapa;
+  const escY = origen.alto / altoMapa;
+  const esc = grande.map(
+    ([cx, cy]) =>
+      [
+        Math.min(origen.ancho, Math.max(0, cx * escX)),
+        Math.min(origen.alto, Math.max(0, cy * escY)),
+      ] as PuntoDb,
+  );
+  // ponytail: map de 4 (grande es tupla) y sin 2º ordenarQuad
+  // (el reescalado monótono no reordena).
+  const poli: CajaDb["poli"] = [
+    esc[0] as PuntoDb,
+    esc[1] as PuntoDb,
+    esc[2] as PuntoDb,
+    esc[3] as PuntoDb,
+  ];
+  // ponytail: shoelace (la fórmula anterior daba 0 en quads rotados).
+  if (Math.abs(areaDoble(poli)) / 2 < AREA_MINIMA_CAJA) return null;
+  return { poli, puntaje };
+}
+
+/** Barre el mapa en orden de scan y acumula cajas (muta marca/cajas). */
+function barrerMapa(
+  bin: Uint8Array,
+  w: number,
+  mapa: Float32Array,
+  anchoMapa: number,
+  altoMapa: number,
+  marca: Uint32Array,
+  origen: TamanoDb,
+  cajas: CajaDb[],
+): void {
+  let etiqueta = 0;
+  for (let y = 1; y <= altoMapa && cajas.length < DB_MAX_CAJAS; y += 1) {
+    for (let x = 1; x <= anchoMapa && cajas.length < DB_MAX_CAJAS; x += 1) {
+      const p = y * w + x;
+      if (bin[p] !== 1 || marca[p] !== 0) continue;
+      etiqueta += 1;
+      const caja = cajaEnCelda(bin, w, marca, x, y, mapa, anchoMapa, altoMapa, etiqueta, origen);
+      if (caja) cajas.push(caja);
+    }
+  }
 }
