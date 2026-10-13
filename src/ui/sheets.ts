@@ -30,7 +30,7 @@ const tarjetaVacia: HTMLElement = getEl("dropzone");
 function btnPegarVacio(): HTMLButtonElement | null {
   return document.querySelector<HTMLButtonElement>("#btnPegar");
 }
-const canvasEl: HTMLElement | null = document.querySelector(".canvas");
+const canvasEl: HTMLElement = document.querySelector(".canvas") as HTMLElement;
 
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
 
@@ -712,19 +712,16 @@ function cancelarDragVisual(): void {
 }
 
 function autoScroll(x: number, y: number): void {
-  if (!canvasEl) return;
   const r = canvasEl.getBoundingClientRect();
   const margen = 70,
     vel = 14;
   scrollDir = y < r.top + margen ? -vel : y > r.bottom - margen ? vel : 0;
   if (scrollDir && scrollRaf === null) {
     const paso = (): void => {
-      if (!scrollDir) {
-        detenerScroll();
-        return;
-      }
+      // ponytail: paso solo corre con scrollDir ≠ 0 (detenerScroll cancela el
+      // rAF pendiente) y scrollRaf ≠ null (solo se anula al cancelar este paso).
       canvasEl.scrollBy?.({ top: scrollDir }); // ?. : jsdom no implementa scrollBy; en Chrome siempre existe.
-      if (scrollRaf !== null) scrollRaf = requestAnimationFrame(paso);
+      scrollRaf = requestAnimationFrame(paso);
     };
     scrollRaf = requestAnimationFrame(paso);
   } else if (!scrollDir) {

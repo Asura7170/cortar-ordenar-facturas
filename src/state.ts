@@ -202,9 +202,9 @@ export function redistribuir(): void {
     .flatMap((h) => Iterator.from(h.slots).filter((c) => c !== null))
     .toArray();
   let pos = 0;
-  const tomar = (): Comprobante | null => {
-    const item = items[pos];
-    if (item === undefined) return null;
+  // ponytail: cada llamada ocurre con pos < items.length ⇒ el índice es válido.
+  const tomar = (): Comprobante => {
+    const item = items[pos] as Comprobante;
     pos++;
     return item;
   };
@@ -214,8 +214,9 @@ export function redistribuir(): void {
     for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();
   }
   while (pos < items.length) {
-    const last = state.hojas[state.hojas.length - 1];
-    const h = crearHoja(last?.layout ?? "u4x2");
+    // ponytail: el while implica hojas no vacías ⇒ hay última con layout.
+    const ultimo = state.hojas[state.hojas.length - 1] as Hoja;
+    const h = crearHoja(ultimo.layout);
     const cap = layoutDe(h.layout).total;
     h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
     for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();

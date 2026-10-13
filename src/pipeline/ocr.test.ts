@@ -149,6 +149,13 @@ describe("tensorDet", () => {
     const rgba = new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 128, 10, 20, 30, 255]);
     expect(tensorDetDesdeRgba(rgba, 3, 1)).toEqual(tensorDet(bgrDesdeRgba(rgba), 3, 1));
   });
+
+  it("BGR corto usa 0 en los canales ausentes (guarda ??)", () => {
+    const t = tensorDet(new Uint8Array([255]), 1, 1);
+    expect(t[0]).toBeCloseTo((1 - 0.485) / 0.229, 5);
+    expect(t[1]).toBeCloseTo((0 - 0.456) / 0.224, 5);
+    expect(t[2]).toBeCloseTo((0 - 0.406) / 0.225, 5);
+  });
 });
 
 describe("envolver", () => {

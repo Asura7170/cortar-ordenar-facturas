@@ -775,6 +775,48 @@ describe("drop de archivos sobre hojas", () => {
     expect(sheet.classList.contains("file-drop")).toBe(false);
   });
 
+  it("dragover al borde inferior scrollea en loop y la zona muerta lo para", async () => {
+    sembrar("u1", [10]);
+    const canvas = el("canvas");
+    const rect = vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 1200,
+      height: 800,
+      right: 1200,
+      bottom: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    // jsdom no implementa scrollBy: se espía para asertar el loop (Chrome sí lo tiene).
+    const scrollBy = vi.fn();
+    Object.defineProperty(canvas, "scrollBy", { value: scrollBy, configurable: true });
+    const borde = (y: number): void => {
+      const sheet = document.querySelector(".sheet");
+      if (!sheet) throw new Error("sin .sheet");
+      sheet.dispatchEvent(
+        Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
+          dataTransfer: { files: [], types: ["Files"] },
+          clientX: 10,
+          clientY: y,
+        }),
+      );
+    };
+    try {
+      borde(790); // y > bottom−70 → scroll hacia abajo
+      await new Promise((r) => setTimeout(r, 60)); // paso corre en rAF reales
+      expect(scrollBy).toHaveBeenCalledWith({ top: 14 });
+      borde(400); // zona muerta → detenerScroll
+      const n = scrollBy.mock.calls.length;
+      await new Promise((r) => setTimeout(r, 60));
+      expect(scrollBy.mock.calls.length).toBe(n);
+    } finally {
+      rect.mockRestore();
+      delete (canvas as unknown as Record<string, unknown>)["scrollBy"];
+    }
+  });
+
   it("scroll invalida el caché de rects sin tirar", () => {
     sembrar("u4x2", [100]);
     expect(() => el("canvas").dispatchEvent(new Event("scroll"))).not.toThrow();
@@ -1187,6 +1229,12 @@ describe("drag: render pendiente y cancelaciones", () => {
       }),
     );
   }
+
+  it("pointerup sin drag previo no hace nada", () => {
+    const h = sembrar("u4x2", [100, 200]);
+    expect(() => soltarDoc(10, 10)).not.toThrow();
+    expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+  });
 
   it("render durante el drag se pospone hasta soltar", () => {
     sembrar("u4x2", [100]);
