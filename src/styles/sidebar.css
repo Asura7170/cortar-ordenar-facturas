@@ -417,9 +417,9 @@
   visibility: hidden;
 }
 
-/* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son
+/* Exportar: Word y PDF a la par, Imprimir grande debajo. Los tres son
    fantasma con color de marca solo en texto y borde (fondo transparente
-   para no romper el estilo del sitio); Imprimir va sólido en verde. */
+   para no romper el estilo del sitio). */
 .export-doble {
   display: grid;
   grid-template-columns: 1fr 1fr;
