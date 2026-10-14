@@ -1038,6 +1038,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 40px de aire: el texto "Limpiar" vive entre las dos escobas y el hueco
+     central evita que el label lo asfixie (o que las escobas lo invadan). */
   gap: 40px;
   position: relative;
   /* Borde reservado transparente: el rojo de hover no recoloca nada. */
