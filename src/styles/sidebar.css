@@ -47,10 +47,13 @@
     border-color 0.15s,
     background 0.15s;
 }
+/* La chica copia la semántica verde de la grande (canvas .dropzone-grande):
+   borde renglon-fuerte + tinte sutil de verde; --sello queda solo para
+   peligro real (limpiar, errores). */
 .dropzone:hover,
 .dropzone:focus-visible {
-  border-color: var(--sello);
-  background: color-mix(in srgb, var(--sello) 8%, transparent);
+  border-color: var(--renglon-fuerte);
+  background: color-mix(in srgb, var(--verde-tinta) 8%, transparent);
   box-shadow: var(--anillo);
 }
 /* Switch */
