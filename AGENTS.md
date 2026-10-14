@@ -69,3 +69,4 @@ Solo Chrome/Chromium desktop. Se vale usar lo más moderno disponible en Chrome 
 - Comentarios `ponytail:` marcan simplificaciones deliberadas — no "arreglarlos" sin motivo.
 - `docs/` e `image-test/` están en `.gitignore` (referencia/scratch local): no commitear ni importar desde ahí.
 - Prohibido `git commit`, `push`, `merge`, crear PRs o reescribir historial (`--force`, `reset --hard`) sin petición explícita del usuario en el prompt. Sin esa orden, los cambios quedan sin commitear.
+- NUNCA toques el zoom de la GUI/TUI de Orca (el programa anfitrión donde trabajan los agentes): ni con atajos (`Ctrl±`, `Ctrl+0`), ni `orca keypress`/hotkeys, ni mouse-wheel. El foco puede caer en el host, no en la página. Para hacer zoom de página se usa zoom CSS del contenido (p. ej. `document.body.style.zoom` vía `orca eval`) o los comandos del browser embebido, nunca el zoom de la app que lo contiene.
