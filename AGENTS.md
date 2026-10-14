@@ -22,6 +22,19 @@ Hay CI (GitHub Actions: `vp check` + typecheck + test + build en cada PR, job `c
 - Imports: `vite-plus` en config, `vite-plus/test` en tests. Regla `vite-plus/prefer-vite-plus-imports` lo exige (`vp check` falla si importas de `vite`/`vitest`).
 - `.vite-hooks/` (pre-commit `vp staged`) se commitea; `prepare: vp config` lo activa tras instalar.
 
+## CRAP local (crapper: solo local, sin job de CI)
+
+La disciplina CRAP vive fuera del CI (job check requerido por el ruleset: solo `vp check`/typecheck/test/build). Medir local YA:
+
+```bash
+pnpm exec vp test run --coverage
+C:/Users/kevin/Downloads/Curso_Frontend/tools-crapper/.venv/Scripts/python -m crapper --root . -s src --use-existing-coverage --threshold 15
+```
+
+- **Regla: el peor CRAP debe quedar < 15** (ofensor solo si supera 15: no "pulir" funciones que ya cumplen). exit 0 = verde; exit 2 = hay ofensores, y el reporte del stdout los lista worst-first. `.metrics/crap.edn` (gitignored) queda actualizado con la medición.
+- Si algo supera 15: playbook de los lotes 1-10 — tests nuevos verdes contra el código ORIGINAL antes de tocar, split minimal-diff en helpers (cuerpo verbatim, `ponytail:` para las podas con prueba de imposibilidad), y medir tras cada bloque.
+- El binario vive en una venv fuera del repo (`tools-crapper`, pineado a `unclebob/crapper@9f1bead`): no commitear, no invocarlo desde CI.
+
 ## Arquitectura
 
 ```
