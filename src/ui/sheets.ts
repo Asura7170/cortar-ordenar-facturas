@@ -1164,9 +1164,9 @@ function anunciarCopiado(btn: HTMLElement): void {
   if (previo !== undefined) window.clearTimeout(previo);
   btn.classList.add("copiado");
   btn.title = "Copiar OCR";
-  btn.setAttribute("aria-label", "¡Copiado!");
+  btn.setAttribute("aria-label", "Copiado");
   const anuncio = document.getElementById("estadoCopiado");
-  if (anuncio) anuncio.textContent = "¡Copiado!";
+  if (anuncio) anuncio.textContent = "Copiado";
   copiadoTimers.set(
     btn,
     window.setTimeout(() => {
