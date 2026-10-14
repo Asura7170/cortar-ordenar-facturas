@@ -108,6 +108,9 @@
   justify-content: space-between;
   margin-bottom: 16px;
   color: var(--texto-panel-suave);
+  /* zoom 200%: el aviso cae a fila propia, nunca solapa (patrón topbar). */
+  flex-wrap: wrap;
+  row-gap: 6px;
 }
 .canvas-titulo {
   font-size: 13px;
@@ -126,7 +129,13 @@
   align-items: safe center;
   gap: 30px;
 }
-/* Avisos de entrada bajo el head del canvas; vacío no ocupa lugar. */
+/* Aviso integrado al head: crece pegado al contador (izquierda de él), en
+   flujo y multilínea sin truncar. Vacío no ocupa lugar (regla siguiente). */
+.canvas-head .hint-canvas {
+  flex: 1 1 400px;
+  margin: 0;
+  text-align: right;
+}
 .hint-canvas {
   margin: 0 0 12px;
 }
