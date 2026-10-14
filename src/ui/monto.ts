@@ -58,6 +58,9 @@ function pintarBarraBoton(): void {
   const total = totalItems();
   const hechos = aplanar().filter((c) => c.montoCents !== null).length;
   btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
+  const limpiar = document.getElementById("btnLimpiar");
+  // ponytail: vaciar no ofrece nada con lote vacío (confirmaría nada).
+  if (limpiar instanceof HTMLButtonElement) limpiar.disabled = total === 0;
   // ponytail: solo el span de texto — textContent borraría el icono.
   // El fantasma solo duplica el icono (el texto lo invierte el degradado).
   const texto = hechos > 0 ? `Montos extraídos: ${hechos}/${total}` : TEXTO_INICIAL;

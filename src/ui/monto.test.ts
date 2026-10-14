@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 document.body.innerHTML =
-  '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button>';
+  '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button><button id="btnLimpiar" type="button"></button>';
 const { state, crearHoja } = await import("../state");
 const {
   aplanar,
@@ -200,6 +200,18 @@ describe("barraBoton", () => {
     expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 5.00");
     expect(btn.textContent).toBe("Montos extraídos: 1/2"); // …pero la barra sí se mueve
     expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
+  });
+
+  it("btnLimpiar deshabilitado con lote vacío, habilitado con items", () => {
+    const limpiar = document.getElementById("btnLimpiar");
+    if (!(limpiar instanceof HTMLButtonElement)) throw new Error("sin #btnLimpiar");
+    renderMonto(); // sin hojas
+    expect(limpiar.disabled).toBe(true);
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5" });
+    state.hojas.push(h);
+    renderMonto();
+    expect(limpiar.disabled).toBe(false);
   });
 });
 
