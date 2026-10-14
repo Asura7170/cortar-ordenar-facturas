@@ -30,7 +30,7 @@ const tarjetaVacia: HTMLElement = getEl("dropzone");
 function btnPegarVacio(): HTMLButtonElement | null {
   return document.querySelector<HTMLButtonElement>("#btnPegar");
 }
-const canvasEl: HTMLElement = document.querySelector(".canvas") as HTMLElement;
+const canvasEl: HTMLElement = getEl("canvas"); // <main class="canvas" id="canvas"> (fallo fuerte al boot)
 
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
 
@@ -1386,8 +1386,8 @@ function cablearArchivosSoltar(): void {
   sheetsEl.addEventListener("drop", (e) => {
     if (!esDragDeArchivos(e)) return;
     e.preventDefault();
-    const target = e.target as HTMLElement;
-    const sheet = target.closest(".sheet");
+    if (!(e.target instanceof Element)) return; // drop no-Elemento: nada que hacer (mismo guard que cablearAcciones)
+    const sheet = e.target.closest(".sheet");
     cancelarDragVisual();
     if (sheet instanceof HTMLElement) {
       const crudo = Number(sheet.dataset["hoja"]);

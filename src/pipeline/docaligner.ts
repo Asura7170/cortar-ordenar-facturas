@@ -143,7 +143,7 @@ export function esQuadPlausible(
   return true;
 }
 
-/** Pares DLT validados (largo ≥4; arrays densos en todos los llamadores). */
+/** Pares DLT validados (largo ≥4; arrays densos en todos los llamadores: uno ralo viola el contrato y lanza TypeError crudo). */
 function paresDLT(
   destino: readonly Punto[],
   origen: readonly Punto[],
@@ -284,7 +284,7 @@ function coefH(
   ];
 }
 
-/** Muestra bilineal RGB (origen acotado por clamp: índices siempre válidos). */
+/** Muestra bilineal RGB (origen acotado por clamp: índices siempre válidos; fuentes ≥2×2 — una degenerada (an/al < 2) sale negro, sin mezcla). */
 export function muestrearBilinear(
   ent: Uint8ClampedArray,
   an: number,

@@ -512,4 +512,23 @@ describe("ramas de cubrimiento (lote 10)", () => {
     expect(c.estado).toBe("ok");
     expect(document.getElementById("aviso")?.textContent).toBe("");
   });
+
+  it("item muerto durante el drenaje: el OCR no corre sobre un blob muerto", async () => {
+    vi.useFakeTimers();
+    const c = sembrar();
+    state.colaEnProceso = true;
+    try {
+      const p = releerTrasEdicion(c.id, new Blob(["x"]));
+      await vi.advanceTimersByTimeAsync(250); // la relectura espera su turno (cola activa)
+      state.hojas = [crearHoja()]; // el item murió mientras la cola trabajaba
+      state.colaEnProceso = false;
+      await vi.advanceTimersByTimeAsync(1000);
+      await p;
+      expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
+      expect(vi.mocked(extraerPendientes)).not.toHaveBeenCalled();
+    } finally {
+      state.colaEnProceso = false;
+      vi.useRealTimers();
+    }
+  });
 });
