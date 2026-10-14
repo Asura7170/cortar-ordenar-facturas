@@ -308,6 +308,12 @@ input::placeholder {
 .btn:active {
   transform: translateY(1px);
 }
+/* Deshabilitado: apagado y sin cursor de mano (el velo del opacity ya apaga
+   el hover). El wiring de btnLimpiar lo conecta el coordinador post-merge. */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .btn:focus-visible {
   box-shadow: var(--anillo);
 }

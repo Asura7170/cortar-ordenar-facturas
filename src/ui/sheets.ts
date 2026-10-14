@@ -12,7 +12,7 @@ import type { Cents, Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
 import { cuentaHoja, formatearMoneda, parsearMonto, renderMonto, totalItems } from "./monto";
 import { girarYReleer } from "../pipeline/rotar";
-import { getEl, sanear } from "../utils";
+import { avisarError, getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
 const metaHojas: HTMLElement = getEl("metaHojas");
@@ -527,9 +527,15 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
   // ponytail: el blur (change) no roba el foco: solo Enter reenfoca.
   if (cents === null) {
     const typed = input.value;
+    // Error visible solo con texto escrito (borrar = salir, no error).
+    const esError = typed.trim() !== "";
+    if (esError) avisarError("Formato no válido: usa 1234.56");
     renderHojas();
     const deNuevo = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
-    if (deNuevo) deNuevo.value = typed;
+    if (deNuevo) {
+      deNuevo.value = typed;
+      if (esError) deNuevo.classList.add("monto-error");
+    }
     if (reenfocar) enfocarMonto(id);
     return null;
   }

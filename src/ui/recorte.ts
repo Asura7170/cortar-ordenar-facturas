@@ -6,7 +6,7 @@ import { releerTrasEdicion, cancelarRelecturaProgramada } from "../pipeline/rota
 import { CALIDAD_WEBP, cargarReal, crearReal } from "../pipeline/imagen";
 import type { DepsOcr } from "../pipeline/ocr";
 import type { Comprobante } from "../types";
-import { getEl } from "../utils";
+import { avisarError, getEl } from "../utils";
 
 const modal: HTMLDialogElement = getEl<HTMLDialogElement>("modalRecorte");
 const base: HTMLCanvasElement = getEl<HTMLCanvasElement>("recorteBase");
@@ -67,9 +67,10 @@ let enArrastre = false;
 let raf: number | null = null;
 let depsVigentes: DepsOcr | undefined;
 
+// ponytail: delega en el helper compartido (F3) — misma firma, así los 4
+// llamados quedan intactos y el error ahora sale en span.motivo (rojo sello).
 function avisar(texto: string): void {
-  const el = document.getElementById("aviso");
-  if (el) el.textContent = texto;
+  avisarError(texto);
 }
 
 /** Abre el editor para el comprobante (no-op fuera de ok o sin bitmap). */

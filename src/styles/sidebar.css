@@ -96,6 +96,18 @@
 #cfgMoneda {
   cursor: pointer;
 }
+/* Hover: la pista varía apenas (apagado tinte verde; checked oscurece como
+   .btn-primary:hover). El track ya transiciona background 0.2s. */
+.switch:hover .switch-track {
+  background: color-mix(in srgb, var(--switch-bg) 85%, var(--verde-tinta) 15%);
+}
+.switch:hover input:checked + .switch-track {
+  background: color-mix(in srgb, var(--verde-tinta), #000 12%);
+}
+/* Pulsado: presión mínima en la pista (transform, como los controles de casilla). */
+.switch:active .switch-track {
+  transform: scale(0.98);
+}
 
 .codigo-row {
   display: flex;
@@ -1023,7 +1035,8 @@
   #btnCalcular:hover,
   #btnCalcular:focus-visible,
   #btnLimpiar:hover,
-  #btnLimpiar:focus-visible {
+  #btnLimpiar:focus-visible,
+  .switch:active .switch-track {
     transform: none;
   }
 }

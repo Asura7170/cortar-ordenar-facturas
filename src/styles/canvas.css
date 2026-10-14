@@ -282,7 +282,8 @@
   cursor: pointer;
   transition:
     background 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    transform 0.12s;
 }
 .grid-opt:hover {
   border-color: var(--renglon-fuerte);
@@ -330,9 +331,43 @@
   background: var(--gridopt-activo);
   color: var(--texto-panel);
   cursor: pointer;
+  transition: transform 0.12s;
 }
 .apply-all:hover {
   border-color: var(--verde-tinta);
+}
+/* Foco del panel: anillo del sistema (var(--anillo)), no el ring UA. */
+.grid-opt:focus-visible,
+.apply-all:focus-visible {
+  box-shadow: var(--anillo);
+}
+/* Presión en controles de casilla: transición corta al estilo .btn. */
+.cell-pegar,
+.cell-remove,
+.cell-girar,
+.cell-recortar {
+  transition: transform 0.12s;
+}
+/* Pulsado: presión mínima, solo transform (nunca top/left). */
+.cell-pegar:active,
+.cell-remove:active,
+.cell-girar:active,
+.cell-recortar:active,
+.cell-badge:active,
+.grid-opt:active,
+.apply-all:active {
+  transform: scale(0.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cell-pegar:active,
+  .cell-remove:active,
+  .cell-girar:active,
+  .cell-recortar:active,
+  .cell-badge:active,
+  .grid-opt:active,
+  .apply-all:active {
+    transform: none;
+  }
 }
 .sheet-grid {
   position: absolute;
@@ -514,6 +549,16 @@ body.is-dragging .cell:not(.empty) {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s,
+    transform 0.12s;
+}
+/* Hover del total: misma affordance que pegar (tinte verde + anillo interno),
+   sin outline (ese es el foco). Es el control más clicado de la app. */
+.cell-badge:hover {
+  background: var(--verde-claro);
+  box-shadow: inset 0 0 0 2px var(--verde-tinta);
 }
 /* Hit-area 44px como el × (el badge visual es bajo). */
 .cell-badge::after {
@@ -531,6 +576,15 @@ body.is-dragging .cell:not(.empty) {
 .cell-monto:focus-visible {
   outline: 2px solid var(--verde-tinta);
   outline-offset: 2px;
+}
+/* Monto manual inválido: anillo sello del código (patrón codigo-error). */
+.cell-monto.monto-error {
+  border-color: var(--sello);
+  background: color-mix(in srgb, var(--sello) 10%, var(--papel-brillo));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sello) 25%, transparent);
+}
+.cell-monto.monto-error:focus-visible {
+  outline-color: var(--sello);
 }
 .cell-remove {
   position: absolute;
