@@ -15,6 +15,10 @@
   --tinta-fina: light-dark(#7f8f7a, #7b8577); /* tinta tenue */
   --renglon: light-dark(#cfe3c6, #b8cfae); /* renglón verde del libro contable */
   --renglon-fuerte: light-dark(#9ecb96, #8fbf8a); /* renglón verde alto */
+  /* Acentos deliberados: NO unificar. La columna de salidas del sidebar mezcla
+     a propósito verde-tinta (identidad de la app), sello rojo y tan #7a5c2e
+     (papel contable) y los colores de marca de Word (azul) y PDF (naranja):
+     su color identifica el formato a un vistazo, no es un descuido de paleta. */
   --sello: #b23a2e; /* sello de goma rojo */
   --sello-suave: light-dark(#e7c4bd, #d8a29a); /* sello teñido */
   --verde-tinta: #2f6b3a; /* verde tienda */
@@ -109,7 +113,19 @@
   /* Medidas */
   --radio: 10px;
   --radio-s: 6px;
-  --sombra-hoja: 0 6px 14px rgba(0, 0, 0, 0.4), 0 18px 50px rgba(0, 0, 0, 0.25);
+  --topbar-alto: 72px; /* alto real del topbar: 14px de padding × 2 + 44px de controles; si cambia el padding, se cambia aquí */
+  /* Familia de sombras teñidas con la tinta (antes rgba(0,0,0)): el negro puro
+     chanclaba contra la paleta verde-tinta. Jerarquía por elevación:
+     celda < botón < barra/flotante < hoja < modal; en oklch conserva el matiz. */
+  --sombra-celda: 0 2px 6px color-mix(in oklch, var(--tinta) 18%, transparent);
+  --sombra-celda-hover: 0 4px 10px color-mix(in oklch, var(--tinta) 25%, transparent);
+  --sombra-boton: 0 3px 8px color-mix(in oklch, var(--tinta) 30%, transparent);
+  --sombra-barra: 0 8px 24px color-mix(in oklch, var(--tinta) 40%, transparent);
+  --sombra-flotante: 0 12px 28px color-mix(in oklch, var(--tinta) 40%, transparent);
+  --sombra-hoja:
+    0 6px 14px color-mix(in oklch, var(--tinta) 40%, transparent),
+    0 18px 50px color-mix(in oklch, var(--tinta) 25%, transparent);
+  --sombra-modal: 0 20px 60px color-mix(in oklch, var(--tinta) 50%, transparent);
   --anillo: 0 0 0 3px color-mix(in srgb, var(--renglon-fuerte) 50%, transparent);
 
   color-scheme: dark;
@@ -315,7 +331,7 @@ input::placeholder {
 .btn-primary {
   background: var(--verde-tinta);
   color: #fff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--sombra-boton);
 }
 .btn-primary:hover {
   background: color-mix(in srgb, var(--verde-tinta), #000 12%);
@@ -362,7 +378,7 @@ input::placeholder {
   background: var(--footer-barra);
   border: 1px solid var(--borde-panel);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--sombra-barra);
   z-index: 50;
   backdrop-filter: blur(6px);
 }
@@ -422,7 +438,7 @@ input::placeholder {
   max-height: 82vh;
   background: var(--modal-bg);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--sombra-modal);
   display: flex;
   flex-direction: column;
   overflow: hidden;

@@ -29,7 +29,7 @@
   border-radius: var(--radio-s);
   box-shadow:
     inset 0 0 0 1px var(--renglon),
-    0 3px 8px rgba(0, 0, 0, 0.3);
+    var(--sombra-boton);
 }
 
 .brand-title {
@@ -132,12 +132,10 @@
   gap: 10px;
 }
 
-/* Grupo de zoom: centrado absoluto (+/− siempre; reset solo con zoom).
-   ponytail: `translate`, no `transform`: así no choca con .btn:active. */
+/* Grupo de zoom en el flujo flex (antes centrado absoluto): en ventanas
+   angostas el título del brand y el monto invadían su zona sin scroll que lo
+   revelara (body overflow: hidden). +/− siempre; reset solo con zoom. */
 .zoom-grupo {
-  position: absolute;
-  left: 50%;
-  translate: -50% 0;
   display: flex;
   gap: 8px;
   align-items: center;
