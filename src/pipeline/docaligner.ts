@@ -40,36 +40,49 @@ const RUTA_MODELO: string = import.meta.env.PROD
   ? URL_MODELO_HF
   : `${import.meta.env.BASE_URL}models/fastvit_sa24_h_e_bifpn_256_fp32.onnx`;
 
-/** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
-export function ordenarQuad(puntos: readonly Punto[]): Quad {
+/** El quarteto denso (o lanza: pocas coords o un hueco). */
+function cuatroPuntosDe(puntos: readonly Punto[]): [Punto, Punto, Punto, Punto] {
   if (puntos.length !== 4) throw new Error(`ordenarQuad espera 4 puntos, llegan ${puntos.length}`);
   const a = puntos[0];
   const b = puntos[1];
   const c = puntos[2];
   const d = puntos[3];
   if (!a || !b || !c || !d) throw new Error("ordenarQuad: puntos ausentes");
-  const cx = (a.x + b.x + c.x + d.x) / 4;
-  const cy = (a.y + b.y + c.y + d.y) / 4;
-  const orden = [a, b, c, d].sort(
-    (p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx),
-  );
+  return [a, b, c, d];
+}
+
+/** Índice del punto más arriba-izquierda (mínima x+y): arranca el Quad ahí. */
+function inicioSupIzquierda(orden: readonly Punto[]): number {
   let inicio = 0;
   let mejor = Infinity;
   for (let i = 0; i < 4; i++) {
-    const p = orden[i];
-    if (!p) continue;
+    // ponytail: orden viene del quarteto validado: índice denso por construcción.
+    const p = orden[i] as Punto;
     const s = p.x + p.y;
     if (s < mejor) {
       mejor = s;
       inicio = i;
     }
   }
-  const p0 = orden[inicio];
-  const p1 = orden[(inicio + 1) % 4];
-  const p2 = orden[(inicio + 2) % 4];
-  const p3 = orden[(inicio + 3) % 4];
-  if (!p0 || !p1 || !p2 || !p3) throw new Error("ordenarQuad: orden incompleto");
-  return [p0, p1, p2, p3];
+  return inicio;
+}
+
+/** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
+export function ordenarQuad(puntos: readonly Punto[]): Quad {
+  const [a, b, c, d] = cuatroPuntosDe(puntos);
+  const cx = (a.x + b.x + c.x + d.x) / 4;
+  const cy = (a.y + b.y + c.y + d.y) / 4;
+  const orden = [a, b, c, d].sort(
+    (p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx),
+  );
+  const inicio = inicioSupIzquierda(orden);
+  // ponytail: denso por construcción — el orden modular nunca sale undefined.
+  return [
+    orden[inicio] as Punto,
+    orden[(inicio + 1) % 4] as Punto,
+    orden[(inicio + 2) % 4] as Punto,
+    orden[(inicio + 3) % 4] as Punto,
+  ];
 }
 
 /** True si el quad es convexo (sin autointersección ni esquina reflexiva). */
@@ -652,41 +665,66 @@ export async function descargarConCache(
 ): Promise<ArrayBuffer> {
   const enCurso = enVuelo.get(clave);
   if (enCurso) return enCurso;
-  const tarea = (async (): Promise<ArrayBuffer> => {
-    const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
-    const guardada = await cache?.match(clave);
-    if (guardada) {
-      const buf = await guardada.arrayBuffer();
-      if (buf.byteLength >= minBytes) return buf;
-      await cache?.delete(clave).catch(() => false);
-    }
-    // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
-    const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
-    if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
-    const pesos = await res.arrayBuffer();
-    if (pesos.byteLength < minBytes) {
-      throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
-    }
-    // ponytail: put con await (un put local cuesta ms; perderlo cuesta una re-descarga) + warn si falla.
-    try {
-      if (cache) {
-        await cache.put(
-          clave,
-          new Response(pesos.slice(0), {
-            headers: { "Content-Length": String(pesos.byteLength) },
-          }),
-        );
-      }
-    } catch (e: unknown) {
-      console.warn("modelos: caché put falló", e);
-    }
-    return pesos;
-  })();
+  const tarea = intentoDeDescarga(clave, timeoutMs, minBytes);
   enVuelo.set(clave, tarea);
   try {
     return await tarea;
   } finally {
     enVuelo.delete(clave);
+  }
+}
+
+/** El peso cacheado si sirve (≥ minBytes); null: hay que ir a red. */
+async function pesoGuardado(
+  cache: Cache | undefined,
+  clave: string,
+  minBytes: number,
+): Promise<ArrayBuffer | null> {
+  const guardada = await cache?.match(clave);
+  if (!guardada) return null;
+  const buf = await guardada.arrayBuffer();
+  if (buf.byteLength >= minBytes) return buf;
+  // ponytail: guardada no-null implica cache vivo; el delete fallido solo cuesta un re-hit.
+  await (cache as Cache).delete(clave).catch(() => false);
+  return null;
+}
+
+/** Un intento físico: caché-miss → red → persistir. Lanza (el dedup lo extiende). */
+async function intentoDeDescarga(
+  clave: string,
+  timeoutMs: number,
+  minBytes: number,
+): Promise<ArrayBuffer> {
+  const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
+  const local = await pesoGuardado(cache, clave, minBytes);
+  if (local) return local;
+  // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
+  const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
+  const pesos = await res.arrayBuffer();
+  if (pesos.byteLength < minBytes) {
+    throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
+  }
+  await guardarEnCache(cache, clave, pesos);
+  return pesos;
+}
+
+/** Best-effort: un put con await (perderlo cuesta una re-descarga) + warn si falla. */
+async function guardarEnCache(
+  cache: Cache | undefined,
+  clave: string,
+  pesos: ArrayBuffer,
+): Promise<void> {
+  if (!cache) return;
+  try {
+    await cache.put(
+      clave,
+      new Response(pesos.slice(0), {
+        headers: { "Content-Length": String(pesos.byteLength) },
+      }),
+    );
+  } catch (e: unknown) {
+    console.warn("modelos: caché put falló", e);
   }
 }
 
@@ -788,11 +826,22 @@ export function quitarBorde(quad: Quad, pad: number = PAD_BORDE): Quad {
   return [mueve(a), mueve(b), mueve(c), mueve(d)];
 }
 
+/** El equipo del paso: decodificador, lienzos y sesión (los reales por omisión). */
+function equipoDelPaso(deps?: DepsRecorte): {
+  cargar: CargarBitmap;
+  crear: CrearLienzo;
+  fabrica: () => Promise<SesionDetectora>;
+} {
+  return {
+    cargar: deps?.cargar ?? cargarReal,
+    crear: deps?.crear ?? crearReal,
+    fabrica: deps?.sesion ?? obtenerSesion,
+  };
+}
+
 /** Paso completo: blob → esquinas (sobre foto con borde) → JPEG recortado. Nunca lanza: sin esquinas o con error devuelve el original. */
 export async function detectarYRecortar(blob: Blob, deps?: DepsRecorte): Promise<Blob> {
-  const cargar = deps?.cargar ?? cargarReal;
-  const crear = deps?.crear ?? crearReal;
-  const fabrica = deps?.sesion ?? obtenerSesion;
+  const { cargar, crear, fabrica } = equipoDelPaso(deps);
   let bmp: ImageBitmap | null = null;
   try {
     bmp = await cargar(blob, { imageOrientation: "from-image" });

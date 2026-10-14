@@ -173,6 +173,23 @@ describe("ordenarQuad/esConvexo", () => {
       ]),
     ).toBe(false);
   });
+
+  it("lanza si no son 4 puntos (mensaje verbatim)", () => {
+    expect(() =>
+      ordenarQuad([
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+        { x: 2, y: 2 },
+      ]),
+    ).toThrow("ordenarQuad espera 4 puntos, llegan 3");
+  });
+
+  it("lanza con un hueco en el quarteto (mensaje verbatim)", () => {
+    const hueco = undefined as unknown as { x: number; y: number };
+    expect(() => ordenarQuad([{ x: 0, y: 0 }, { x: 9, y: 9 }, hueco, { x: 0, y: 9 }])).toThrow(
+      "ordenarQuad: puntos ausentes",
+    );
+  });
 });
 
 describe("esQuadPlausible", () => {

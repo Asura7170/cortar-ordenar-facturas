@@ -427,3 +427,89 @@ describe("girarYReleer", () => {
     }
   });
 });
+
+describe("ramas de cubrimiento (lote 10)", () => {
+  it("giro sin file: recurre a fetch(imgUrl) y commitea igual", async () => {
+    vi.useFakeTimers();
+    const { deps } = depsGiro();
+    const h = crearHoja();
+    const c = comprobante({ estado: "ok", montoCents: 123, textoOcr: "VIEJO" }); // sin file
+    h.slots[0] = c;
+    state.hojas.push(h);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      blob: async () => new Blob(["de red"]),
+    } as unknown as Response);
+    const urlOrigen = c.imgUrl;
+    try {
+      await girarYReleer(c.id, 90, deps);
+      expect(fetchSpy).toHaveBeenCalledWith(urlOrigen);
+      expect(c.file).toBeInstanceOf(Blob);
+      expect(await (c.file as Blob).text()).toBe("girado");
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("contexto 2d ausente: aborta el giro con aviso y sin commit", async () => {
+    const bmp = { width: 10, height: 20, close: vi.fn() };
+    const c = sembrar();
+    const antes = c.file;
+    await girarYReleer(c.id, 90, {
+      cargar: vi.fn(async () => bmp as unknown as ImageBitmap),
+      crear: vi.fn(
+        () =>
+          ({
+            width: 0,
+            height: 0,
+            getContext: () => null,
+            toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
+          }) as unknown as HTMLCanvasElement,
+      ),
+    });
+    expect(c.file).toBe(antes);
+    expect(c.imgUrl).toBe("blob:mock-1"); // el giro abortó: ni file ni url nuevos
+    expect(document.getElementById("aviso")?.textContent).toBe("No se pudo girar la imagen.");
+  });
+
+  it("toBlob nulo en el giro principal: aborta con aviso sin commit", async () => {
+    const bmp = { width: 10, height: 20, close: vi.fn() };
+    const c = sembrar();
+    const antes = c.file;
+    await girarYReleer(c.id, 90, {
+      cargar: vi.fn(async () => bmp as unknown as ImageBitmap),
+      crear: vi.fn(
+        () =>
+          ({
+            width: 0,
+            height: 0,
+            getContext: () => ({ setTransform: () => {}, drawImage: () => {} }),
+            toBlob: (cb: (b: Blob | null) => void) => cb(null),
+          }) as unknown as HTMLCanvasElement,
+      ),
+    });
+    expect(c.file).toBe(antes);
+    expect(document.getElementById("aviso")?.textContent).toBe("No se pudo girar la imagen.");
+  });
+
+  it("relectura con id ausente: no-op silenciosa", async () => {
+    if (document.getElementById("aviso")) document.getElementById("aviso")!.textContent = "";
+    await expect(releerTrasEdicion(999999, new Blob(["x"]))).resolves.toBeUndefined();
+    expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
+    expect(vi.mocked(renderHojas)).not.toHaveBeenCalled();
+    expect(document.getElementById("aviso")?.textContent).toBe("");
+  });
+
+  it("reapertura que lanza: conserva el texto leído y el ok, sin aviso", async () => {
+    vi.useFakeTimers();
+    const { deps } = depsGiro();
+    const c = sembrar();
+    await girarYReleer(c.id, 90, deps);
+    vi.mocked(extraerPendientes).mockImplementationOnce(() => {
+      throw new Error("lote caído");
+    });
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(c.textoOcr).toBe("TOTAL LEÍDO");
+    expect(c.estado).toBe("ok");
+    expect(document.getElementById("aviso")?.textContent).toBe("");
+  });
+});

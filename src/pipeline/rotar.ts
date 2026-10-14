@@ -4,6 +4,7 @@
    1 OCR). Sin enderezar (que podría devolver el giro) ni re-recortar. Manual
    intacto; no-manual se reabre y el lote lo relee. Nunca lanza. */
 import { buscarSlot, obtenerComprobante, state } from "../state";
+import type { Comprobante } from "../types";
 import { sanear } from "../utils";
 import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
 import type { DepsOcr } from "./ocr";
@@ -22,6 +23,64 @@ const girosEnCurso = new Map<number, Promise<void>>();
 function avisar(texto: string): void {
   const el = document.getElementById("aviso");
   if (el) el.textContent = texto;
+}
+
+/** Cargador/factory para el giro o el real (mejoras de deps fuera del cuerpo). */
+function cargarVigente(deps: DepsOcr | undefined): typeof cargarReal {
+  return deps?.cargar ?? cargarReal;
+}
+
+/** Factory para el giro o la real (mejoras de deps fuera del cuerpo). */
+function crearVigente(deps: DepsOcr | undefined): typeof crearReal {
+  return deps?.crear ?? crearReal;
+}
+
+/** El blob definido por el item, o lo vivo en el URL de mock (recobros intake sin file). */
+async function fuenteDelItem(item: Comprobante): Promise<Blob> {
+  return item.file ?? (await (await fetch(item.imgUrl)).blob());
+}
+
+/** Gira el bitmap para un WebP (o lanza; el catch del giro avisa). */
+async function blobGiradoDe(
+  bmp: ImageBitmap,
+  grados: GiroManual,
+  crear: typeof crearReal,
+): Promise<Blob> {
+  const lienzo = lienzoGirado(bmp, grados, crear);
+  if (!lienzo) throw new Error("sin contexto 2d");
+  const girado = await new Promise<Blob | null>((res) =>
+    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
+  );
+  if (!girado) throw new Error("sin blob girado");
+  return girado;
+}
+
+/** ponytail: el previo acompaña al giro (con orientación rancia el próximo
+    recorte manual ensancharía sobre píxeles viejos: se aborta, no se mezcla). */
+async function previoGirado(
+  item: Comprobante,
+  grados: GiroManual,
+  cargar: typeof cargarReal,
+  crear: typeof crearReal,
+): Promise<Blob | null> {
+  if (!item.previoDocAligner) return null;
+  const girado = await girarBlob(item.previoDocAligner, grados, cargar, crear);
+  if (!girado) throw new Error("sin previo girado");
+  return girado;
+}
+
+/** Reprograma la relectura: el OCR corre una sola vez tras la quietud. */
+function programarRelectura(id: number, girado: Blob, deps?: DepsOcr): void {
+  clearTimeout(relecturas.get(id));
+  relecturas.set(
+    id,
+    setTimeout(() => {
+      relecturas.delete(id);
+      // ponytail: si un recorte commitió después, el giro es rancio: no relee.
+      if (obtenerComprobante(id)?.file !== girado) return;
+      void releerTrasEdicion(id, girado, deps);
+    }, QUIETUD_GIRO_MS),
+  );
 }
 
 /** Gira al instante y programa la relectura diferida. No-op si no está ok. */
@@ -47,23 +106,12 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
   // estático sería ciclo; fuera del try un chunk fallido era rejection muda).
   try {
     const { renderHojas } = await import("../ui/sheets");
-    const cargar = deps?.cargar ?? cargarReal;
-    const crear = deps?.crear ?? crearReal;
-    const original = item.file ?? (await (await fetch(item.imgUrl)).blob());
-    const bmp = await cargar(original, { imageOrientation: "from-image" });
+    const cargar = cargarVigente(deps);
+    const crear = crearVigente(deps);
+    const bmp = await cargar(await fuenteDelItem(item), { imageOrientation: "from-image" });
     try {
-      const lienzo = lienzoGirado(bmp, grados, crear);
-      if (!lienzo) throw new Error("sin contexto 2d");
-      const girado = await new Promise<Blob | null>((res) =>
-        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-      );
-      if (!girado) throw new Error("sin blob girado");
-      // ponytail: el previo acompaña al giro (con orientación rancia el próximo
-      // recorte manual ensancharía sobre píxeles viejos: se aborta, no se mezcla).
-      const giradoPrevio = item.previoDocAligner
-        ? await girarBlob(item.previoDocAligner, grados, cargar, crear)
-        : null;
-      if (item.previoDocAligner && !giradoPrevio) throw new Error("sin previo girado");
+      const girado = await blobGiradoDe(bmp, grados, crear);
+      const giradoPrevio = await previoGirado(item, grados, cargar, crear);
       const imgNueva = URL.createObjectURL(girado);
       // ponytail: commit atómico tras los awaits (giro vs recorte en vuelo:
       // mutar partido mezclaba imgUrl de uno con file del otro).
@@ -76,16 +124,7 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
       item.file = girado;
       if (giradoPrevio) item.previoDocAligner = giradoPrevio;
       renderHojas();
-      clearTimeout(relecturas.get(id));
-      relecturas.set(
-        id,
-        setTimeout(() => {
-          relecturas.delete(id);
-          // ponytail: si un recorte commitió después, el giro es rancio: no relee.
-          if (obtenerComprobante(id)?.file !== girado) return;
-          void releerTrasEdicion(id, girado, deps);
-        }, QUIETUD_GIRO_MS),
-      );
+      programarRelectura(id, girado, deps);
     } finally {
       bmp.close();
     }
@@ -124,6 +163,44 @@ async function esperarDrenaje(): Promise<void> {
   }
 }
 
+/** El OCR del lote/espera: flap 250ms×480 — nunca queda huérfano en el turno. */
+async function drenarSiLaColaTrabaja(): Promise<void> {
+  if (state.colaEnProceso) await esperarDrenaje();
+}
+
+/** OCR del blob girado; "" si el módulo cargó roto (mejor vacío que rancio). */
+async function textoDeOcr(blob: Blob, deps?: DepsOcr): Promise<string> {
+  const ocr = await import("./ocr").catch((): null => null);
+  return ocr ? await ocr.extraerTexto(blob, deps) : "";
+}
+
+/** Reabre el lote de extracción: el monto no-manual lo recaptura tras la quietud. */
+async function reabrirMonto(): Promise<void> {
+  // ponytail: dinámico a propósito — rotar es estático en sheets y extract
+  // importa sheets: un estático aquí haría ciclo sheets→rotar→extract→sheets.
+  const mod = await import("./extract").catch((): null => null);
+  // Si la cola trabaja se espera a que drene: el batch excluye al "procesando"
+  // y sin espera el monto quedaba huérfano hasta el próximo disparo.
+  await drenarSiLaColaTrabaja();
+  try {
+    mod?.extraerPendientes();
+  } catch {
+    /* la relectura conserva el texto leído */
+  }
+}
+
+/** Tras un OCR caído: vacía el texto rancio y repone el item en ok si sigue vivo. */
+async function restaurarSinTexto(item: Comprobante, id: number): Promise<void> {
+  // ponytail: sin relectura no vale el texto viejo (es de otra orientación).
+  if (buscarSlot(id)) {
+    item.textoOcr = "";
+    if (!item.montoManual) item.montoCents = null;
+    item.estado = "ok";
+    await import("../ui/sheets").then((m) => m.renderHojas()).catch(() => {});
+  }
+  avisar("No se pudo releer el texto girado.");
+}
+
 /** Fase diferida: un solo OCR tras la quietud + refresco del monto. Nunca lanza.
  * (Trabajadora privada: entrar por releerTrasEdicion, que serializa por item.
  * También la usa el recorte manual, que invalida texto y monto igual.) */
@@ -136,39 +213,22 @@ async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
     renderHojas();
     // ponytail: las sesiones ORT son singletons sin mutex interno (un run()
     // concurrente de la cola + este cuelga a ambos): el OCR espera su turno.
-    if (state.colaEnProceso) await esperarDrenaje();
-    const ocr = await import("./ocr").catch((): null => null);
-    if (buscarSlot(id)) item.textoOcr = sanear(ocr ? await ocr.extraerTexto(blob, deps) : "");
+    await drenarSiLaColaTrabaja();
+    const texto = await textoDeOcr(blob, deps);
     // ponytail: ok ANTES del lote (candidatos exige ok: en procesando se autoexcluía).
     if (buscarSlot(id)) {
+      item.textoOcr = sanear(texto);
       item.estado = "ok";
       renderHojas();
     }
-    // No-manual: el total se reabre y el lote lo relee. Si la cola trabaja se
-    // espera a que drene: el batch excluye al "procesando" y sin espera el
-    // monto quedaba huérfano hasta el próximo disparo.
-    // El lote pinta solo si aplica (el ok + texto ya quedaron pintados arriba).
+    // No-manual: el total lo reabre el lote (pinta solo si aplica; el ok y el
+    // texto ya quedaron pintados arriba).
     if (!item.montoManual && buscarSlot(id)) {
       item.montoCents = null;
       renderHojas(); // el lote puede ser no-op: sin esto el badge viejo miente
-      // ponytail: dinámico a propósito — rotar es estático en sheets y extract
-      // importa sheets: un estático aquí haría ciclo sheets→rotar→extract→sheets.
-      const mod = await import("./extract").catch((): null => null);
-      if (state.colaEnProceso) await esperarDrenaje();
-      try {
-        mod?.extraerPendientes();
-      } catch {
-        /* la relectura conserva el texto leído */
-      }
+      await reabrirMonto();
     }
   } catch {
-    // ponytail: sin relectura no vale el texto viejo (es de otra orientación).
-    if (buscarSlot(id)) {
-      item.textoOcr = "";
-      if (!item.montoManual) item.montoCents = null;
-      item.estado = "ok";
-      await import("../ui/sheets").then((m) => m.renderHojas()).catch(() => {});
-    }
-    avisar("No se pudo releer el texto girado.");
+    await restaurarSinTexto(item, id);
   }
 }

@@ -125,36 +125,48 @@ function isPersistedState(v: unknown): v is PersistedState {
   );
 }
 
+/** Limpieza de la era IA: claves LLM/JEV sin dueño se borran (nunca persisten secretos muertos). */
+function limpiarClavesIa(): void {
+  localStorage.removeItem("jev-api-key");
+  try {
+    sessionStorage.removeItem("jev-api-key");
+  } catch {
+    /* sin sessionStorage: nada que limpiar */
+  }
+}
+
+/** Sobrante de la era IA: se retira del blob (el resto del estado se conserva). */
+function retirarConfigIa(r: Record<string, unknown>): void {
+  if (!("configIA" in r)) return;
+  delete r["configIA"];
+  if (Object.keys(r).length === 0) localStorage.removeItem(LS_KEY);
+  else localStorage.setItem(LS_KEY, JSON.stringify(r));
+}
+
+/** Ventana Código: booleans y números con clamps (blobs legacy caen al default). */
+function aplicarCodigo(r: Record<string, unknown>): void {
+  state.codigoActivo = typeof r["codigoActivo"] === "boolean" ? r["codigoActivo"] : false;
+  const lon = r["codigoLongitud"];
+  state.codigoLongitud =
+    typeof lon === "number" ? Math.max(1, Math.min(12, Math.floor(lon) || 6)) : 6;
+  state.codigoValor = typeof r["codigoValor"] === "string" ? r["codigoValor"] : "";
+  // Blobs legacy o basura: la esquina cae al default (inferior derecha).
+  state.codigoPosicion = isPosicionCodigo(r["codigoPosicion"])
+    ? r["codigoPosicion"]
+    : POSICION_DEFAULT;
+}
+
 export function cargar(): void {
   try {
     // Limpieza de la era IA: claves LLM/JEV sin dueño se borran (nunca persisten secretos muertos).
-    localStorage.removeItem("jev-api-key");
-    try {
-      sessionStorage.removeItem("jev-api-key");
-    } catch {
-      /* sin sessionStorage: nada que limpiar */
-    }
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
-    const p: unknown = JSON.parse(raw);
-    if (typeof p !== "object" || p === null) return; // estado corrupto: ignorar
-    const r = p as Record<string, unknown>;
-    if ("configIA" in r) {
-      // Sobrante de la era IA: se retira del blob (el resto del estado se conserva).
-      delete r["configIA"];
-      if (Object.keys(r).length === 0) localStorage.removeItem(LS_KEY);
-      else localStorage.setItem(LS_KEY, JSON.stringify(r));
-    }
+    limpiarClavesIa();
+    // El blob parseado: raw ausente / JSON roto / no-objeto llegan como {} y
+    // el guard isPersistedState los ignora (sin escribir estado ni storage):
+    // el re-parseo propio era un duplicado de leerBlob().
+    const r = leerBlob();
+    retirarConfigIa(r);
     if (!isPersistedState(r)) return; // estado corrupto o de otra versión: ignorar
-    state.codigoActivo = typeof r["codigoActivo"] === "boolean" ? r["codigoActivo"] : false;
-    const lon = r["codigoLongitud"];
-    state.codigoLongitud =
-      typeof lon === "number" ? Math.max(1, Math.min(12, Math.floor(lon) || 6)) : 6;
-    state.codigoValor = typeof r["codigoValor"] === "string" ? r["codigoValor"] : "";
-    // Blobs legacy o basura: la esquina cae al default (inferior derecha).
-    state.codigoPosicion = isPosicionCodigo(r["codigoPosicion"])
-      ? r["codigoPosicion"]
-      : POSICION_DEFAULT;
+    aplicarCodigo(r);
     if (isMoneda(r["moneda"])) state.moneda = r["moneda"]; // ausente en blobs legacy: se conserva
   } catch {
     /* estado corrupto: ignorar */

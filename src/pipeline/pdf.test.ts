@@ -175,32 +175,44 @@ describe("esPaginaNegra", () => {
 });
 
 describe("expandirPdf", () => {
-  function abrirFalso(opc: { total?: number; blancas?: number[]; rotas?: number[] } = {}): {
+  function abrirFalso(
+    opc: {
+      total?: number;
+      blancas?: number[];
+      negras?: number[];
+      nulas?: number[];
+      rotas?: number[];
+      cerrarRota?: boolean;
+    } = {},
+  ): {
     abrir: (f: File) => Promise<DocumentoPdf>;
     fueCerrado: () => boolean;
   } {
     let cerrado = false;
     // Tinta gris media: ni blanca ni negra para los gates (el 2x2 solo muestrea el píxel 0).
-    const tin = (blanca: boolean): number[] =>
-      blanca ? [255, 255, 255, 255] : [100, 100, 100, 255];
+    const tin = (blanca: boolean, negra: boolean): number[] =>
+      negra ? [0, 0, 0, 255] : blanca ? [255, 255, 255, 255] : [100, 100, 100, 255];
     const abrir = async (): Promise<DocumentoPdf> => ({
       total: opc.total ?? 3,
       renderizar: async (i: number): Promise<HTMLCanvasElement | null> => {
         if (opc.rotas?.includes(i)) throw new Error("rota");
-        const t = tin(opc.blancas?.includes(i) ?? false);
+        const nula = opc.nulas?.includes(i) ?? false;
+        const negra = opc.negras?.includes(i) ?? false;
+        const t = tin(opc.blancas?.includes(i) ?? false, negra);
+        const relleno = negra ? 0 : 255;
         const datos = new Uint8ClampedArray([
           ...t,
+          relleno,
+          relleno,
+          relleno,
           255,
+          relleno,
+          relleno,
+          relleno,
           255,
-          255,
-          255,
-          255,
-          255,
-          255,
-          255,
-          255,
-          255,
-          255,
+          relleno,
+          relleno,
+          relleno,
         ]);
         return {
           width: 2,
@@ -209,11 +221,12 @@ describe("expandirPdf", () => {
             getImageData: (): { data: Uint8ClampedArray } => ({ data: datos }),
           }),
           toBlob: (cb: (b: Blob | null) => void): void => {
-            cb(new Blob(["x"], { type: "image/jpeg" }));
+            cb(nula ? null : new Blob(["x"], { type: "image/jpeg" }));
           },
         } as unknown as HTMLCanvasElement;
       },
       cerrar: async (): Promise<void> => {
+        if (opc.cerrarRota) throw new Error("destroy caído");
         cerrado = true;
       },
     });
@@ -251,6 +264,29 @@ describe("expandirPdf", () => {
       throw new Error("ilegible");
     };
     await expect(expandirPdf(pdfDe("r.pdf", "application/pdf", 100), abrir)).resolves.toEqual([]);
+  });
+
+  it("más de 10 páginas → [] (gate de contador)", async () => {
+    const { abrir, fueCerrado } = abrirFalso({ total: 12 });
+    expect(await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).toEqual([]);
+    expect(fueCerrado()).toBe(true);
+  });
+
+  it("0 páginas → [] (gate inferior)", async () => {
+    const { abrir } = abrirFalso({ total: 0 });
+    expect(await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).toEqual([]);
+  });
+
+  it("página negra y toBlob nulo se saltan (la útil sobrevive)", async () => {
+    const { abrir } = abrirFalso({ total: 3, negras: [1], nulas: [3] });
+    const pags = await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir);
+    expect(pags.map((p) => p.indice)).toEqual([2]);
+  });
+
+  it("cerrar que lanza no afecta la expansión", async () => {
+    const { abrir } = abrirFalso({ cerrarRota: true });
+    const pags = await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir);
+    expect(pags.map((p) => p.indice)).toEqual([1, 2, 3]);
   });
 });
 
