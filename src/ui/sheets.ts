@@ -229,7 +229,8 @@ function panelHoja(hoja: Hoja, idx: number): string {
       .toArray()
       .join("");
     const activa = id === hoja.layout ? " active" : "";
-    return `<button class="grid-opt${activa}" data-accion="layout" data-hoja="${hoja.id}" data-layout="${id}" title="${NOMBRES_LAYOUT[id]}">
+    const presionado = id === hoja.layout ? "true" : "false";
+    return `<button class="grid-opt${activa}" data-accion="layout" data-hoja="${hoja.id}" data-layout="${id}" title="${NOMBRES_LAYOUT[id]}" aria-pressed="${presionado}">
       <span class="layout-mini" style="grid-template-columns:repeat(${l.cols},1fr);grid-template-rows:repeat(${l.filas},1fr);" aria-hidden="true">${fichas}</span>
       <span class="layout-name">${NOMBRES_LAYOUT[id]}</span>
     </button>`;
@@ -534,7 +535,10 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
     const deNuevo = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
     if (deNuevo) {
       deNuevo.value = typed;
-      if (esError) deNuevo.classList.add("monto-error");
+      if (esError) {
+        deNuevo.classList.add("monto-error");
+        deNuevo.setAttribute("aria-invalid", "true");
+      }
     }
     if (reenfocar) enfocarMonto(id);
     return null;

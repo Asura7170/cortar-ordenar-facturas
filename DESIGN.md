@@ -60,13 +60,17 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 
 ## 4. Typography
 
-- Familia única: `"Public Sans", "Segoe UI", Verdana, sans-serif` (`--serif` y
-  `--mono` son el mismo stack). Vendoreada en `public/fonts` (400/600/700/800 +
-  latin-ext, OFL, `font-display: swap`). Prohibida otra familia.
-- Roles: brand 20px/700; monto total 22px/600 tabular; títulos de sección
-  12-13px uppercase con tracking 0.1-0.14em; cuerpo 13-14px/1.5; datos
-  (montos, códigos, badges) 11-12px mono con `tabular-nums`; dropzone
-  24px/700 + icono 64px.
+- Familia única: `"Public Sans", "Segoe UI", Verdana, sans-serif` (`--serif`).
+  Vendoreada en `public/fonts` (400/600/700 + latin-ext, OFL,
+  `font-display: swap`; el peso 800 se podó del CSS y de los woff2 — commit
+  Lote 3). Prohibida otra familia. `--mono` ya no existe: era el mismo stack.
+- Roles: brand 18px/700 (CSS vivo; el doc decía 20px — pendiente de decidir,
+  ver §11); monto total 22px/600 tabular; títulos de sección 12-13px uppercase
+  con tracking 0.1-0.14em; cuerpo 13-14px/1.5; datos (montos, códigos, badges)
+  11-14px con `tabular-nums` (la celda usa 14px — decisión 12 vs 14 en §11);
+  dropzone 24px/700 + icono 64px.
+- Las cifras se formatean **en-US** ("1,234.56"): deliberado, acoplado a
+  `parsearMonto` y al fast-path regex del extractor.
 - `line-height` unitless salvo contextos fijos. Sin all-caps fuera de títulos.
 
 ## 5. Layout & Spacing

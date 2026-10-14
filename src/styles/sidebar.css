@@ -1001,7 +1001,7 @@
 }
 .btn-pdf {
   background: transparent;
-  color: #fe5721;
+  color: var(--pdf-marca);
   border: 1px solid currentColor;
 }
 .btn-pdf:hover:not(:disabled) {
@@ -1063,7 +1063,7 @@
 #btnLimpiar:hover:not(:disabled),
 #btnLimpiar:focus-visible {
   background-color: color-mix(in srgb, var(--sello) 12%, transparent);
-  color: #f04438;
+  color: var(--aviso-motivo);
   border-color: var(--sello);
   /* ponytail: scale en vez de translateY — ver #btnCalcular (tembleque de hover). */
   transform: scale(1.03);

@@ -2,6 +2,8 @@
 /* ============ TOPBAR ============ */
 .topbar {
   display: flex;
+  flex-wrap: wrap; /* zoom 200%: las zonas apiladas, nunca controles solapados (verificado en captura). */
+  row-gap: 8px;
   align-items: center;
   gap: 20px;
   padding: 14px 22px;

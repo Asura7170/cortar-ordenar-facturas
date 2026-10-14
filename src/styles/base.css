@@ -23,6 +23,10 @@
   --sello-suave: light-dark(#e7c4bd, #d8a29a); /* sello teñido */
   --verde-tinta: #2f6b3a; /* verde tienda */
   --verde-claro: #eef4ea; /* verde suave */
+  --pdf-marca: light-dark(
+    #c2410c,
+    #ff8a5c
+  ); /* marca PDF con par por tema: el label del botón exige AA (antes #fe5721 único, 3.05:1) */
 
   /* Superficies de la app */
   --mesa: light-dark(#eceadf, #2e2b24); /* mesa ejecutiva */
@@ -125,7 +129,7 @@
     0 6px 14px color-mix(in oklch, var(--tinta) 40%, transparent),
     0 18px 50px color-mix(in oklch, var(--tinta) 25%, transparent);
   --sombra-modal: 0 20px 60px color-mix(in oklch, var(--tinta) 50%, transparent);
-  --anillo: 0 0 0 3px color-mix(in srgb, var(--renglon-fuerte) 50%, transparent);
+  --anillo: 0 0 0 3px light-dark(var(--verde-tinta), var(--monto-valor));
 
   color-scheme: dark;
 }
