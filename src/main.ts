@@ -21,7 +21,9 @@ const btnTema: HTMLButtonElement = getEl<HTMLButtonElement>("btnTema");
 
 function aplicarTema(tema: string): void {
   document.documentElement.dataset["tema"] = tema;
+  // El aria-label sigue al title: el estático del HTML queda desfasado al toggle.
   btnTema.title = tema === "claro" ? "Cambiar a oscuro" : "Cambiar a claro";
+  btnTema.setAttribute("aria-label", btnTema.title);
 }
 
 // ponytail: pura e inyectada para testear sin arrancar el bootstrap.

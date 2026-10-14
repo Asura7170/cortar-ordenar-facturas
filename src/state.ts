@@ -74,7 +74,7 @@ export function guardarCodigo(): void {
   );
 }
 
-// Solo la ventana Ajustes (Guardar y Predeterminado): el código queda intacto.
+// Solo la ventana Ajustes (Guardar y Restablecer): el código queda intacto.
 export function guardarAjustes(): void {
   localStorage.setItem(
     LS_KEY,

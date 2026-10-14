@@ -121,10 +121,12 @@
 }
 .codigo-row input[type="number"] {
   width: 56px;
+  text-align: right;
 }
 .codigo-row input[type="text"] {
   flex: 1;
   min-width: 0;
+  text-align: right;
 }
 /* El código solo pide atención cuando su switch está activo (el JS lo
    refleja en disabled); apagado conserva el fondo neutro. */
