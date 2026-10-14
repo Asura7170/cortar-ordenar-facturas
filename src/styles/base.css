@@ -54,9 +54,11 @@
   );
   --monto-valor: light-dark(#2f6b3a, #cfe6c2);
   --celda-alto-intrinseco: 240px; /* alto estimado para content-visibility */
+  /* 60% ≈ 3.3:1 de contraste de componente no texto (AA) en ambos temas;
+     la mezcla 30% medía 1.77/2.18:1 (W3). Solo sube el mix, no el token. */
   --dropzone-borde: light-dark(
-    color-mix(in srgb, #2c3a28 30%, transparent),
-    color-mix(in srgb, #f0ead9 30%, transparent)
+    color-mix(in srgb, #2c3a28 60%, transparent),
+    color-mix(in srgb, #f0ead9 60%, transparent)
   );
   --hover-claro: light-dark(
     color-mix(in srgb, #2c3a28 7%, transparent),
@@ -120,15 +122,58 @@
   /* Familia de sombras teñidas con la tinta (antes rgba(0,0,0)): el negro puro
      chanclaba contra la paleta verde-tinta. Jerarquía por elevación:
      celda < botón < barra/flotante < hoja < modal; en oklch conserva el matiz. */
-  --sombra-celda: 0 2px 6px color-mix(in oklch, var(--tinta) 18%, transparent);
-  --sombra-celda-hover: 0 4px 10px color-mix(in oklch, var(--tinta) 25%, transparent);
-  --sombra-boton: 0 3px 8px color-mix(in oklch, var(--tinta) 30%, transparent);
-  --sombra-barra: 0 8px 24px color-mix(in oklch, var(--tinta) 40%, transparent);
-  --sombra-flotante: 0 12px 28px color-mix(in oklch, var(--tinta) 40%, transparent);
+  /* En oscuro la tinta (dark) ya es casi negra: ΔL vs --mesa ≈0 y la elevación
+     desaparece. Cada token pasa a par light-dark: el claro queda byte-igual, el
+     oscuro mezcla negro puro (ΔL compuesto sobre #2e2b24 ≥ 0.036, calculado en
+     scratch). La jerarquía clara se respeta en oscuro. */
+  /* dark ΔL 0.036 */
+  --sombra-celda: 0 2px 6px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 18%, transparent),
+      color-mix(in oklch, #000 20%, transparent)
+    );
+  /* dark ΔL 0.054 */
+  --sombra-celda-hover: 0 4px 10px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 25%, transparent),
+      color-mix(in oklch, #000 30%, transparent)
+    );
+  /* dark ΔL 0.063 */
+  --sombra-boton: 0 3px 8px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 30%, transparent),
+      color-mix(in oklch, #000 35%, transparent)
+    );
+  /* dark ΔL 0.082 */
+  --sombra-barra: 0 8px 24px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 40%, transparent),
+      color-mix(in oklch, #000 45%, transparent)
+    );
+  /* dark ΔL 0.082 */
+  --sombra-flotante: 0 12px 28px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 40%, transparent),
+      color-mix(in oklch, #000 45%, transparent)
+    );
+  /* dark ΔL 0.082/0.054 */
   --sombra-hoja:
-    0 6px 14px color-mix(in oklch, var(--tinta) 40%, transparent),
-    0 18px 50px color-mix(in oklch, var(--tinta) 25%, transparent);
-  --sombra-modal: 0 20px 60px color-mix(in oklch, var(--tinta) 50%, transparent);
+    0 6px 14px
+      light-dark(
+        color-mix(in oklch, var(--tinta) 40%, transparent),
+        color-mix(in oklch, #000 45%, transparent)
+      ),
+    0 18px 50px
+      light-dark(
+        color-mix(in oklch, var(--tinta) 25%, transparent),
+        color-mix(in oklch, #000 30%, transparent)
+      );
+  /* dark ΔL 0.100 */
+  --sombra-modal: 0 20px 60px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 50%, transparent),
+      color-mix(in oklch, #000 55%, transparent)
+    );
   --anillo: 0 0 0 3px light-dark(var(--verde-tinta), var(--monto-valor));
 
   color-scheme: dark;
@@ -296,7 +341,7 @@ input::placeholder {
   padding: 9px 14px;
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   transition:
     transform 0.12s,
@@ -354,6 +399,14 @@ input::placeholder {
   color: var(--texto-panel);
   line-height: 1;
   padding: 4px;
+  position: relative;
+}
+/* Hit-area 44px como el × (el ::after transparente recibe el tap; los vecinos
+   en modal-head son el título, sin interacción propia: no hay solape real). */
+.btn-icon::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 
 /* ============ BOTONES DE PIE (accesibles 1 clic) ============ */

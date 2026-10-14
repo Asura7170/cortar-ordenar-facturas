@@ -975,6 +975,72 @@ function moverSlot(
   renderMonto();
 }
 
+/** Centro de una celda (la "soltura" del FLIP cuando mueve el teclado). */
+function centroDeCelda(cell: HTMLElement): { x: number; y: number } {
+  const r = cell.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+/** Si un hueco existe en la hoja: índice; si está llena, null. */
+function primerHueco(h: Hoja): number | null {
+  const hueco = h.slots.indexOf(null);
+  return hueco < 0 ? null : hueco;
+}
+
+/** Vecino lineal del lote (hoja + slot), cruzando el borde de la hoja si toca;
+    null en el borde del lote (no hay vecino). */
+function vecinoLineal(
+  hoja: Hoja,
+  slot: number,
+  avanza: boolean,
+): { hoja: Hoja; slot: number } | null {
+  const destino = slot + (avanza ? 1 : -1);
+  if (destino >= 0 && destino < hoja.slots.length) return { hoja, slot: destino };
+  const otra = state.hojas[state.hojas.indexOf(hoja) + (avanza ? 1 : -1)];
+  return otra ? { hoja: otra, slot: avanza ? 0 : otra.slots.length - 1 } : null;
+}
+
+/** Reorden por teclado (2.5.7): Ctrl/Alt+flecha mueve la celda (convive con el
+    drag: ambos entran por moverSlot). ←/→ son el vecino lineal del lote;
+    ↑/↓ cambian de hoja conservando el slot, con caída al primer hueco si la
+    fila destino es más corta. El re-enfoque sigue el patrón escaparMonto. */
+function cablearReordenTeclado(): void {
+  sheetsEl.addEventListener("keydown", (e) => {
+    if (state.modoOcr || pointerDrag) return; // mismo bloqueo que el drag manual
+    if (esCampoTexto(e.target)) return; // las flechas editan texto (no mover)
+    const cell = e.target instanceof Element ? e.target.closest(".cell") : null;
+    if (!(cell instanceof HTMLElement) || !cell.dataset["id"]) return;
+    // El alias del Ctrl solo es horizontal (lo aprobado): Alt+vertical no actúa.
+    const conMod =
+      (e.ctrlKey || (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight"))) &&
+      !e.metaKey &&
+      !e.shiftKey;
+    if (!conMod || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault();
+    const id = Number(cell.dataset["id"]);
+    const actual = buscarSlot(id);
+    if (!actual) return;
+
+    let destino: { hoja: Hoja; slot: number };
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const vecino = vecinoLineal(actual.hoja, actual.idx, e.key === "ArrowRight");
+      if (!vecino) return; // borde del lote: no hay vecino
+      destino = vecino;
+    } else {
+      const otra = state.hojas[state.hojas.indexOf(actual.hoja) + (e.key === "ArrowDown" ? 1 : -1)];
+      // ponytail: hoja inexistente (borde del lote) u hoja llena sin hueco:
+      // silencio — la flecha se repite rápido y un #aviso sería ruido.
+      if (!otra) return;
+      const slot = actual.idx < otra.slots.length ? actual.idx : primerHueco(otra);
+      if (slot === null) return;
+      destino = { hoja: otra, slot };
+    }
+    moverSlot({ id }, destino.hoja, destino.slot, centroDeCelda(cell));
+    // El render pudo reconstruir la grilla (hoja vaciada): nodo fresco.
+    (nodoCeldaHoja(destino.hoja.id, destino.slot) as HTMLElement | null)?.focus();
+  });
+}
+
 // Único camino de cierre del drag (pointerup + red de lostpointercapture).
 function finalizarDrag(x: number, y: number): void {
   if (!pointerDrag) return;
@@ -1528,6 +1594,7 @@ export function initSheets(cb: SheetsCallbacks): void {
   cablearAcciones();
   cablearMontoCambio();
   cablearMontoTeclado();
+  cablearReordenTeclado();
   cablearArchivosEntrada();
   cablearArchivosFuera();
   cablearArchivosSoltar();
