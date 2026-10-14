@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+.metrics/
 .DS_Store
 *.log
 .playwright-mcp/

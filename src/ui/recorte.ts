@@ -5,6 +5,7 @@ import { buscarSlot, obtenerComprobante, state } from "../state";
 import { releerTrasEdicion, cancelarRelecturaProgramada } from "../pipeline/rotar";
 import { CALIDAD_WEBP, cargarReal, crearReal } from "../pipeline/imagen";
 import type { DepsOcr } from "../pipeline/ocr";
+import type { Comprobante } from "../types";
 import { getEl } from "../utils";
 
 const modal: HTMLDialogElement = getEl<HTMLDialogElement>("modalRecorte");
@@ -76,40 +77,40 @@ function avisar(texto: string): void {
     hasta el showModal) y el segundo mataría el bitmap del primero. */
 let aperturaEnCurso = false;
 
-export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
-  if (modal.open || aperturaEnCurso) return;
-  const item = obtenerComprobante(id);
-  if (!item || item.estado !== "ok") return;
-  const cargar = deps?.cargar ?? cargarReal;
-  aperturaEnCurso = true;
-  let foto: ImageBitmap;
+/** El cargador del abrir o el real (todo abre por la misma puerta). */
+function cargarVigente(deps: DepsOcr | undefined): typeof cargarReal {
+  return deps?.cargar ?? cargarReal;
+}
+
+/** Decodifica la fuente del comprobante (pre-warp si existe) o null si falla. */
+async function fotoComprobante(
+  item: Comprobante,
+  cargar: typeof cargarReal,
+): Promise<ImageBitmap | null> {
   try {
     // ponytail: el editor abre el intake pre-warp (recupera lo cortado de más);
     // sin previo (DocAligner no-op), la imagen actual.
     const fuente = item.previoDocAligner ?? item.file ?? (await (await fetch(item.imgUrl)).blob());
-    foto = await cargar(fuente, { imageOrientation: "from-image" });
+    return await cargar(fuente, { imageOrientation: "from-image" });
   } catch {
     avisar("No se pudo abrir el recorte.");
-    return;
-  } finally {
-    aperturaEnCurso = false;
+    return null;
   }
-  if (foto.width < 2 || foto.height < 2) {
-    foto.close();
-    return;
-  }
-  // ponytail: el decode tarda (~100ms): si el item se fue en la ventana, no
-  // se abre un editor fantasma (igual que cola/rotar re-chequean al dueño).
+}
+
+/** La foto es tan chica que el editor no puede operar en ella. */
+function esFotoInsuficiente(foto: ImageBitmap): boolean {
+  return foto.width < 2 || foto.height < 2;
+}
+
+/** Re-chequeo del dueño tras el decode (la ventana es asíncrona). */
+function sigueVigente(id: number): boolean {
   const vigente = obtenerComprobante(id);
-  if (!vigente || vigente.estado !== "ok" || !buscarSlot(id)) {
-    foto.close();
-    return;
-  }
-  cerrarAnterior();
-  idAbierto = id;
-  bmp = foto;
-  depsVigentes = deps;
-  modal.showModal();
+  return vigente !== undefined && vigente.estado === "ok" && buscarSlot(id) !== null;
+}
+
+/** Encaja la foto en el viewport disponible y fija el tamaño de los lienzos. */
+function dimensionarCanvases(foto: ImageBitmap): void {
   // La escena ya tiene layout (el dialog está abierto): llenar ampliando o reduciendo.
   // ponytail: el marco flotante se encoge al canvas (medir la escena sería
   // circular): el espacio sale del viewport, igual que maxH.
@@ -129,16 +130,53 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
     c.style.width = `${anchoLienzo}px`;
     c.style.height = `${altoLienzo}px`;
   }
+}
+
+/** Pinta la foto en el canvas base; false (y cierra) si falto el contexto 2d. */
+function pintarBase(foto: ImageBitmap): boolean {
   const ctxBase = base.getContext("2d");
   if (!ctxBase) {
     cerrarAnterior();
     modal.close();
     avisar("No se pudo abrir el recorte.");
-    return;
+    return false;
   }
+  const dpr = window.devicePixelRatio || 1;
   ctxBase.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctxBase.imageSmoothingQuality = "high";
   ctxBase.drawImage(foto, MARGEN, MARGEN, cw, ch);
+  return true;
+}
+
+export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
+  if (modal.open || aperturaEnCurso) return;
+  const item = obtenerComprobante(id);
+  if (!item || item.estado !== "ok") return;
+  aperturaEnCurso = true;
+  let foto: ImageBitmap | null = null;
+  try {
+    foto = await fotoComprobante(item, cargarVigente(deps));
+  } finally {
+    aperturaEnCurso = false;
+  }
+  if (!foto) return;
+  if (esFotoInsuficiente(foto)) {
+    foto.close();
+    return;
+  }
+  // ponytail: el decode tarda (~100ms): si el item se fue en la ventana, no
+  // se abre un editor fantasma (igual que cola/rotar re-chequean al dueño).
+  if (!sigueVigente(id)) {
+    foto.close();
+    return;
+  }
+  cerrarAnterior();
+  idAbierto = id;
+  bmp = foto;
+  depsVigentes = deps;
+  modal.showModal();
+  dimensionarCanvases(foto);
+  if (!pintarBase(foto)) return;
   restablecer();
 }
 
@@ -214,10 +252,44 @@ function tiradorEn(p: { x: number; y: number }): number {
   return -1;
 }
 
+/** Esquina si el punto pega a un vértice de esa línea; el lado puro si no. */
+function conVertice(
+  p: number,
+  ini: number,
+  fin: number,
+  esqIni: Borde,
+  esqFin: Borde,
+  lado: Borde,
+): Borde {
+  return p < ini + RADIO_ESQUINA ? esqIni : p > fin - RADIO_ESQUINA ? esqFin : lado;
+}
+
+/** Línea más próxima en banda, con esquinas que mandan cerca del vértice. */
+function bandaGanadora(
+  p: { x: number; y: number },
+  izq: number,
+  arr: number,
+  der: number,
+  aba: number,
+): Borde | null {
+  const dN = Math.abs(p.y - arr);
+  const dS = Math.abs(p.y - aba);
+  const dO = Math.abs(p.x - izq);
+  const dE = Math.abs(p.x - der);
+  const d = Math.min(dN, dS, dO, dE);
+  if (d > BANDA_BORDE) return null;
+  // Cerca de un vértice manda la esquina (coherente con el radio generoso).
+  if (d === dN) return conVertice(p.x, izq, der, "no", "ne", "n");
+  if (d === dS) return conVertice(p.x, izq, der, "so", "se", "s");
+  if (d === dO) return conVertice(p.y, arr, aba, "no", "so", "o");
+  return conVertice(p.y, arr, aba, "ne", "se", "e");
+}
+
 /** Borde bajo el punto: tirador cercano, o la línea más próxima en banda. */
 function bordeEn(p: { x: number; y: number }): Borde | null {
   const i = tiradorEn(p);
-  if (i >= 0) return TIRADORES[i]?.b ?? null;
+  // ponytail: i viene de tiradorEn (índice válido de la tabla); sin fallback.
+  if (i >= 0) return (TIRADORES[i] as Tirador).b;
   const izq = rect.x;
   const arr = rect.y;
   const der = rect.x + rect.w;
@@ -229,17 +301,7 @@ function bordeEn(p: { x: number; y: number }): Borde | null {
     p.y > aba + BANDA_BORDE
   )
     return null;
-  const dN = Math.abs(p.y - arr);
-  const dS = Math.abs(p.y - aba);
-  const dO = Math.abs(p.x - izq);
-  const dE = Math.abs(p.x - der);
-  const d = Math.min(dN, dS, dO, dE);
-  if (d > BANDA_BORDE) return null;
-  // Cerca de un vértice manda la esquina (coherente con el radio generoso).
-  if (d === dN) return p.x < izq + RADIO_ESQUINA ? "no" : p.x > der - RADIO_ESQUINA ? "ne" : "n";
-  if (d === dS) return p.x < izq + RADIO_ESQUINA ? "so" : p.x > der - RADIO_ESQUINA ? "se" : "s";
-  if (d === dO) return p.y < arr + RADIO_ESQUINA ? "no" : p.y > aba - RADIO_ESQUINA ? "so" : "o";
-  return p.y < arr + RADIO_ESQUINA ? "ne" : p.y > aba - RADIO_ESQUINA ? "se" : "e";
+  return bandaGanadora(p, izq, arr, der, aba);
 }
 
 /** True si el punto cae dentro del rect (para mover el área completa). */
@@ -258,6 +320,20 @@ function moverEntero(p: { x: number; y: number }): void {
   pedirGuia();
 }
 
+/** ¿Este borde arrastra el lado? (una esquina toca dos lados). */
+function tocaArriba(b: Borde): boolean {
+  return b === "n" || b === "ne" || b === "no";
+}
+function tocaAbajo(b: Borde): boolean {
+  return b === "s" || b === "se" || b === "so";
+}
+function tocaIzquierda(b: Borde): boolean {
+  return b === "o" || b === "no" || b === "so";
+}
+function tocaDerecha(b: Borde): boolean {
+  return b === "e" || b === "ne" || b === "se";
+}
+
 /** Mueve los bordes del tirador al punto (siempre dentro de la foto). */
 function moverA(b: Borde, p: { x: number; y: number }): void {
   const der0 = rect.x + rect.w;
@@ -270,12 +346,77 @@ function moverA(b: Borde, p: { x: number; y: number }): void {
   let aba = aba0;
   // ponytail: mínimo en ambas unidades (con upscale, 24 display < 8 naturales).
   const minLado = Math.max(MIN_LADO, Math.ceil(MIN_NATURAL / escala));
-  if (b === "n" || b === "ne" || b === "no") arr = Math.min(Math.max(p.y, MARGEN), aba0 - minLado);
-  if (b === "s" || b === "se" || b === "so") aba = Math.max(Math.min(p.y, abaMax), arr + minLado);
-  if (b === "o" || b === "no" || b === "so") izq = Math.min(Math.max(p.x, MARGEN), der0 - minLado);
-  if (b === "e" || b === "ne" || b === "se") der = Math.max(Math.min(p.x, derMax), izq + minLado);
+  if (tocaArriba(b)) arr = Math.min(Math.max(p.y, MARGEN), aba0 - minLado);
+  if (tocaAbajo(b)) aba = Math.max(Math.min(p.y, abaMax), arr + minLado);
+  if (tocaIzquierda(b)) izq = Math.min(Math.max(p.x, MARGEN), der0 - minLado);
+  if (tocaDerecha(b)) der = Math.max(Math.min(p.x, derMax), izq + minLado);
   rect = { x: izq, y: arr, w: der - izq, h: aba - arr };
   pedirGuia();
+}
+
+/** El factory vigente (el del abrir) o el real. */
+function crearVigente(): typeof crearReal {
+  return depsVigentes?.crear ?? crearReal;
+}
+
+/** Recorta en naturales y devuelve el blob WebP; null si era demasiado
+    pequeño (avisando). Los fallos de lienzo/blob lanzan. */
+async function recortarBlobDe(foto: ImageBitmap, crear: typeof crearReal): Promise<Blob | null> {
+  const sx = Math.min(Math.round((rect.x - MARGEN) * escala), foto.width - 1);
+  const sy = Math.min(Math.round((rect.y - MARGEN) * escala), foto.height - 1);
+  const w = Math.min(Math.round(rect.w * escala), foto.width - sx);
+  const h = Math.min(Math.round(rect.h * escala), foto.height - sy);
+  if (w < MIN_NATURAL || h < MIN_NATURAL) {
+    avisar("El recorte es demasiado pequeño.");
+    return null;
+  }
+  const lienzo = crear();
+  lienzo.width = w;
+  lienzo.height = h;
+  const ctx = lienzo.getContext("2d");
+  if (!ctx) throw new Error("sin contexto 2d");
+  ctx.drawImage(foto, sx, sy, w, h, 0, 0, w, h);
+  const recortado = await new Promise<Blob | null>((res) =>
+    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
+  );
+  if (!recortado) throw new Error("sin blob recortado");
+  return recortado;
+}
+
+/** Commitea el blob en el comprobante (con dueño vivo) y relee el OCR.
+    False si la sesión cruzó o el dueño murió. */
+async function commitearYReleer(
+  item: Comprobante,
+  recortado: Blob,
+  id: number,
+  miSesion: number,
+): Promise<boolean> {
+  // ponytail: sesión cruzada (cerrar+reabrir en vuelo): la confirmación vieja
+  // no commitea y no toca el diálogo nuevo (sin close: ya no es suyo).
+  if (sesion !== miSesion) return false;
+  // ponytail: commit tras los awaits (igual que la cola: sin dueño no se
+  // guarda). Sin dueño o descarte en vuelo se cierra (el evento close limpia
+  // el bitmap rancio).
+  if (idAbierto !== id || !buscarSlot(id)) {
+    modal.close();
+    return false;
+  }
+  URL.revokeObjectURL(item.imgUrl);
+  item.imgUrl = URL.createObjectURL(recortado);
+  item.file = recortado;
+  // ponytail: el previo se conserva (cada sesión parte de la imagen más
+  // ancha: así un sobre-recorte siempre se puede rectificar ensanchando).
+  // ponytail: import antes del close (si falla, el catch dice la verdad:
+  // nada se commiteó todavía). Sesión cruzada: el diálogo nuevo sigue abierto.
+  const { renderHojas } = await import("./sheets");
+  if (sesion !== miSesion) return false;
+  modal.close();
+  renderHojas();
+  // ponytail: el giro programa su relectura con debounce (si el recorte
+  // llega antes, el timer rancio la pisaría después con texto viejo).
+  cancelarRelecturaProgramada(id);
+  void releerTrasEdicion(id, recortado, depsVigentes);
+  return true;
 }
 
 /** Confirma: recorta en píxeles naturales, commitea y relee el OCR. Nunca lanza. */
@@ -287,58 +428,12 @@ async function confirmar(): Promise<void> {
   if (id === null || !foto || confirmando) return;
   const item = obtenerComprobante(id);
   if (!item || item.estado !== "ok") return;
-  const crear = depsVigentes?.crear ?? crearReal;
+  const crear = crearVigente();
   confirmando = true;
   try {
-    const sx = Math.min(Math.round((rect.x - MARGEN) * escala), foto.width - 1);
-    const sy = Math.min(Math.round((rect.y - MARGEN) * escala), foto.height - 1);
-    const w = Math.min(Math.round(rect.w * escala), foto.width - sx);
-    const h = Math.min(Math.round(rect.h * escala), foto.height - sy);
-    if (w < MIN_NATURAL || h < MIN_NATURAL) {
-      avisar("El recorte es demasiado pequeño.");
-      return;
-    }
-    const lienzo = crear();
-    lienzo.width = w;
-    lienzo.height = h;
-    const ctx = lienzo.getContext("2d");
-    if (!ctx) throw new Error("sin contexto 2d");
-    ctx.drawImage(foto, sx, sy, w, h, 0, 0, w, h);
-    const recortado = await new Promise<Blob | null>((res) =>
-      lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-    );
-    if (!recortado) throw new Error("sin blob recortado");
-    // ponytail: sesión cruzada (cerrar+reabrir en vuelo): la confirmación vieja
-    // no commitea y no toca el diálogo nuevo (sin close: ya no es suyo).
-    if (sesion !== miSesion) return;
-    // ponytail: commit tras los awaits (igual que la cola: sin dueño no se
-    // guarda). Sin dueño o descarte en vuelo se cierra (el evento close limpia
-    // el bitmap rancio).
-    if (idAbierto !== id || !buscarSlot(id)) {
-      modal.close();
-      return;
-    }
-    // ponytail: commit atómico (giro en vuelo: mutar partido mezclaba imágenes).
-    // Sin dueño o descarte en vuelo se cierra.
-    if (idAbierto !== id || !buscarSlot(id)) {
-      modal.close();
-      return;
-    }
-    URL.revokeObjectURL(item.imgUrl);
-    item.imgUrl = URL.createObjectURL(recortado);
-    item.file = recortado;
-    // ponytail: el previo se conserva (cada sesión parte de la imagen más
-    // ancha: así un sobre-recorte siempre se puede rectificar ensanchando).
-    // ponytail: import antes del close (si falla, el catch dice la verdad:
-    // nada se commiteó todavía). Sesión cruzada: el diálogo nuevo sigue abierto.
-    const { renderHojas } = await import("./sheets");
-    if (sesion !== miSesion) return;
-    modal.close();
-    renderHojas();
-    // ponytail: el giro programa su relectura con debounce (si el recorte
-    // llega antes, el timer rancio la pisaría después con texto viejo).
-    cancelarRelecturaProgramada(id);
-    void releerTrasEdicion(id, recortado, depsVigentes);
+    const recortado = await recortarBlobDe(foto, crear);
+    if (!recortado) return;
+    await commitearYReleer(item, recortado, id, miSesion);
   } catch {
     avisar("No se pudo recortar la imagen.");
   } finally {
@@ -346,11 +441,8 @@ async function confirmar(): Promise<void> {
   }
 }
 
-export function initRecorte(): void {
-  // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
-  if (modal.dataset["init"] === "1") return;
-  modal.dataset["init"] = "1";
-
+/** Botones del modal, cierre por velo y limpieza al cerrar. */
+function cablearBotonesModal(): void {
   btnOk.addEventListener("click", () => {
     void confirmar();
   });
@@ -366,7 +458,10 @@ export function initRecorte(): void {
   modal.addEventListener("click", (e) => {
     if (e.target === modal && modal.open) modal.close();
   });
+}
 
+/** Arranque de arrastre: tirador o interior; captura el puntero. */
+function cablearPunteroAbajo(): void {
   guia.addEventListener("pointerdown", (e) => {
     if (!bmp || !e.isPrimary) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -394,6 +489,20 @@ export function initRecorte(): void {
     }
     dibujarGuia();
   });
+}
+
+/** Cursor de la zona bajo el puntero: tirador, plena línea o interior. */
+function cursorDeGuia(p: { x: number; y: number }): string {
+  const b = bordeEn(p);
+  if (b) {
+    // ponytail: la tabla es exhaustiva para todo borde que devuelve bordeEn.
+    return (TIRADORES.find((t) => t.b === b) as Tirador).cursor;
+  }
+  return dentroDe(p) ? "move" : "default";
+}
+
+/** Arrastre y cursor de la zona bajo el puntero. */
+function cablearPunteroGuia(): void {
   guia.addEventListener("pointermove", (e) => {
     if (!bmp) return;
     const p = punto(e);
@@ -406,9 +515,7 @@ export function initRecorte(): void {
       return;
     }
     // ponytail: cursor de la zona bajo el puntero sin redibujar (barato).
-    const b = bordeEn(p);
-    if (b) guia.style.cursor = TIRADORES.find((t) => t.b === b)?.cursor ?? "default";
-    else guia.style.cursor = dentroDe(p) ? "move" : "default";
+    guia.style.cursor = cursorDeGuia(p);
   });
   const soltar = (): void => {
     enArrastre = false;
@@ -416,40 +523,61 @@ export function initRecorte(): void {
   };
   guia.addEventListener("pointerup", soltar);
   guia.addEventListener("pointercancel", soltar);
+}
 
-  // Teclado: [ ] rotan el tirador activo, flechas lo mueven, Enter confirma.
-  // Tab queda libre: el orden nativo del <dialog> alcanza barra y cerrar.
+/** [ ] rotan el tirador activo (y su borde); false si la tecla no es esa. */
+function rotarTirador(e: KeyboardEvent): boolean {
+  if (e.key !== "[" && e.key !== "]") return false;
+  e.preventDefault();
+  activo = (activo + (e.key === "[" ? TIRADORES.length - 1 : 1)) % TIRADORES.length;
+  // ponytail: activo se mantiene módulo TIRADORES.length; índice válido.
+  borde = (TIRADORES[activo] as Tirador).b;
+  dibujarGuia();
+  return true;
+}
+
+/** Flechas: destino del tirador activo; null si la tecla no es flecha.
+    Tab queda libre: el orden nativo del <dialog> alcanza barra y cerrar. */
+function destinoTecla(e: KeyboardEvent, t: Tirador): { x: number; y: number } | null {
+  const hx = rect.x + rect.w * t.fx;
+  const hy = rect.y + rect.h * t.fy;
+  const paso = (e.shiftKey ? 5 : 1) * PASO_TECLA;
+  return e.key === "ArrowUp"
+    ? { x: hx, y: hy - paso }
+    : e.key === "ArrowDown"
+      ? { x: hx, y: hy + paso }
+      : e.key === "ArrowLeft"
+        ? { x: hx - paso, y: hy }
+        : e.key === "ArrowRight"
+          ? { x: hx + paso, y: hy }
+          : null;
+}
+
+/** Teclado: [ ] rotan el tirador activo, flechas lo mueven, Enter confirma. */
+function cablearTecladoGuia(): void {
   guia.addEventListener("keydown", (e) => {
     if (!bmp) return;
-    if (e.key === "[" || e.key === "]") {
-      e.preventDefault();
-      activo = (activo + (e.key === "[" ? TIRADORES.length - 1 : 1)) % TIRADORES.length;
-      borde = TIRADORES[activo]?.b ?? borde;
-      dibujarGuia();
-      return;
-    }
+    if (rotarTirador(e)) return;
     if (e.key === "Enter") {
       e.preventDefault();
       void confirmar();
       return;
     }
-    const paso = (e.shiftKey ? 5 : 1) * PASO_TECLA;
-    const t = TIRADORES[activo];
-    if (!t) return;
-    const hx = rect.x + rect.w * t.fx;
-    const hy = rect.y + rect.h * t.fy;
-    const d =
-      e.key === "ArrowUp"
-        ? { x: hx, y: hy - paso }
-        : e.key === "ArrowDown"
-          ? { x: hx, y: hy + paso }
-          : e.key === "ArrowLeft"
-            ? { x: hx - paso, y: hy }
-            : e.key === "ArrowRight"
-              ? { x: hx + paso, y: hy }
-              : null;
+    // ponytail: activo se mantiene módulo TIRADORES.length; índice válido.
+    const t = TIRADORES[activo] as Tirador;
+    const d = destinoTecla(e, t);
     if (!d) return;
     e.preventDefault();
     moverA(t.b, d);
   });
+}
+
+export function initRecorte(): void {
+  // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
+  if (modal.dataset["init"] === "1") return;
+  modal.dataset["init"] = "1";
+  cablearBotonesModal();
+  cablearPunteroAbajo();
+  cablearPunteroGuia();
+  cablearTecladoGuia();
 }

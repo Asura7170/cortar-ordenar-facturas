@@ -278,6 +278,23 @@ describe("procesarCola", () => {
     expect(c.estado).toBe("ok");
   });
 
+  it("enderezar que rechaza deja el blob sin girar y sigue a ok (catch de la fase)", async () => {
+    const { enderezar, extraerTexto } = await import("./ocr");
+    const h = crearHoja();
+    const intake = new Blob(["intake"]);
+    const c = comprobante({ nombre: "t.png", file: intake });
+    h.slots[0] = c;
+    state.hojas.push(h);
+    vi.mocked(enderezar).mockRejectedValueOnce(new Error("giro roto"));
+    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 30");
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(2000);
+    await p;
+    expect(c.file).toBe(intake); // el giro no se commiteó
+    expect(c.textoOcr).toBe("TOTAL 30"); // el OCR corrió sobre el blob sin girar (reuse undefined)
+    expect(c.estado).toBe("ok");
+  });
+
   it("PDF sin file recupera el blob por fetch", async () => {
     const bytes = new Blob(["pdf"]);
     const red = vi

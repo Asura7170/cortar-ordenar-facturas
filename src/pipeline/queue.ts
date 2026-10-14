@@ -14,7 +14,7 @@ import {
   extraerRapidoCents,
   limpiarTextoCompleto,
 } from "./extract";
-import type { Enderezado } from "./ocr";
+import type { Enderezado, Giro } from "./ocr";
 import { diagVacio } from "./ocr";
 /** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
 async function blobDeItem(sig: Comprobante): Promise<Blob> {
@@ -50,6 +50,208 @@ export function precalentarModelos(): void {
   })();
 }
 
+/** Tipo del módulo ocr que llega por el import dinámico (nulo si no resolvió). */
+type ModuloOcr = typeof import("./ocr");
+
+/** Tiempos por etapa del ítem (telemetría dev L0). */
+interface Tiempos {
+  recorte: number;
+  enderezar: number;
+  extraer: number;
+  diag: string;
+}
+
+const entero = (v: number): number => Math.round(v);
+
+/** Blob vigente para el OCR: file del commit (recorte/giro) o refetch en PDF. */
+async function blobActual(sig: Comprobante): Promise<Blob | null> {
+  // ponytail: L1 — el blob ya está en memoria tras el recorte (file) o se refetchea (PDF, sin file guardado). Un solo decode por comprobante.
+  if (sig.file) return sig.file;
+  try {
+    return await blobDeItem(sig);
+  } catch {
+    return null;
+  }
+}
+
+/** Recorta con DocAligner y commitea la imagen si cambió; llena ms.recorte. */
+async function faseRecorte(sig: Comprobante, ms: Tiempos): Promise<void> {
+  try {
+    const t = performance.now();
+    const original = await blobDeItem(sig);
+    const recortada = await detectarYRecortar(original);
+    ms.recorte = performance.now() - t;
+    if (recortada !== original) {
+      // ponytail: commit tras el await — si se limpió durante la espera, se
+      // revocan las nuevas y el guard de abajo evita resucitar.
+      const imgNueva = URL.createObjectURL(recortada);
+      if (!buscarSlot(sig.id)) {
+        URL.revokeObjectURL(imgNueva);
+      } else {
+        URL.revokeObjectURL(sig.imgUrl);
+        sig.imgUrl = imgNueva;
+        // ponytail: el intake pre-warp se conserva para el recorte manual
+        // (recuperar lo cortado de más); sin object URL, el GC lo recoge.
+        sig.previoDocAligner = original;
+        sig.file = recortada;
+      }
+    }
+  } catch {
+    // ponytail: sin recorte se sigue con el original; la cola no se detiene
+  }
+}
+
+/** Gira el intake previo al mismo grados (el rechazo lo toma el catch de la fase). */
+function girarPrevio(
+  sig: Comprobante,
+  ocr: NonNullable<ModuloOcr>,
+  grados: Giro,
+): Promise<Blob | null> {
+  // ponytail: el previo acompaña a la rotación (ver giro manual); si falla se
+  // conserva el viejo (un fallo transitorio no destruye la recuperación del
+  // sobre-recorte) y la URL rotada ya commiteada permanece.
+  return sig.previoDocAligner ? ocr.girarBlob(sig.previoDocAligner, grados) : Promise.resolve(null);
+}
+
+/** Endereza por confianza del rec y commitea el giro; devuelve el end para el reuse OCR. */
+async function faseEnderezar(
+  sig: Comprobante,
+  blob: Blob | null,
+  ocr: ModuloOcr | null,
+  ms: Tiempos,
+): Promise<Enderezado | null> {
+  let end: Enderezado | null = null;
+  try {
+    if (ocr && blob) {
+      const t = performance.now();
+      end = await ocr.enderezar(blob);
+      ms.enderezar = performance.now() - t;
+      if (end.grados !== 0 && buscarSlot(sig.id)) {
+        // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
+        const imgNueva = URL.createObjectURL(end.blob);
+        if (!buscarSlot(sig.id)) {
+          URL.revokeObjectURL(imgNueva);
+        } else {
+          URL.revokeObjectURL(sig.imgUrl);
+          sig.imgUrl = imgNueva;
+          const previoGirado = await girarPrevio(sig, ocr, end.grados);
+          // ponytail: re-chequeo tras el await (limpiado en la ventana:
+          // se revoca lo nuevo, no se muta el sig huérfano).
+          if (!buscarSlot(sig.id)) {
+            URL.revokeObjectURL(imgNueva);
+          } else {
+            if (previoGirado) sig.previoDocAligner = previoGirado;
+            // ponytail: si el giro del previo falló, se conserva el viejo (fallo
+            // transitorio no destruye la fuente de recuperación del sobre-recorte).
+            sig.file = end.blob;
+          }
+        }
+      }
+    }
+  } catch {
+    // ponytail: sin enderezar se sigue con la imagen tal cual
+  }
+  return end;
+}
+
+/** OCR real (perezoso): texto saneado en el ítem + telemetría det/rec. */
+async function faseOcr(
+  sig: Comprobante,
+  blob: Blob | null,
+  ocr: ModuloOcr | null,
+  end: Enderezado | null,
+  ms: Tiempos,
+): Promise<void> {
+  try {
+    const t = performance.now();
+    // L1: reuse evita repetir el det del giro ganador (end trae cajas/base).
+    const diag = diagVacio();
+    sig.textoOcr =
+      ocr && blob ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined, diag)) : "";
+    ms.extraer = performance.now() - t;
+    // P1: cajas, forma del lote, fallback y nº de runs del rec.
+    ms.diag =
+      `cajas=${diag.cajas} batch=[${diag.lote},${diag.anchoMax}] ` +
+      `fallback=${diag.fallback ? "sí" : "no"} recRuns=${diag.recRuns}`;
+  } catch {
+    sig.textoOcr = "";
+  }
+}
+
+/** Cierra el ítem: ok + monto fast-path offline + render + log dev. */
+function completarItem(sig: Comprobante, ms: Tiempos, t0: number): void {
+  // L1: sin miniatura (la celda pinta el full-res con lazy).
+  sig.montoCents = null;
+  sig.estado = "ok";
+  // ponytail: fast-path offline — 1 distinto se fija sin red (vía aplicarTotales:
+  // borrador en curso, manual y texto rancio ganan); el resto queda manual.
+  // (textoOcr ya asignado por faseOcr en ambas salidas.)
+  const textoLimpio = limpiarTextoCompleto(sig.textoOcr as string);
+  const rapido = extraerRapidoCents(textoLimpio);
+  if (rapido !== null)
+    aplicarTotales([{ idx: 1, id: sig.id, texto: textoLimpio }], new Map([[1, rapido]]));
+  try {
+    renderHojas(); // imagen visible al instante
+  } catch {
+    /* el render nunca aborta la cola */
+  }
+  // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
+  if (import.meta.env.DEV)
+    console.info(
+      `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} ` +
+        `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
+        `${ms.diag} total=${entero(performance.now() - t0)}`,
+    );
+}
+
+/** Procesa un pendiente completo. False si lo limpiaron durante los awaits: no se cuenta tocada. */
+async function procesarItem(sig: Comprobante): Promise<boolean> {
+  sig.estado = "procesando";
+  try {
+    renderHojas(); // el recorte tarda: que se vea el estado (antes el mock era instantáneo)
+  } catch {
+    /* el render nunca aborta la cola */
+  }
+  // L0: tiempos por etapa (medir antes de optimizar).
+  const ms: Tiempos = { recorte: 0, enderezar: 0, extraer: 0, diag: "" };
+  const t0 = performance.now();
+  await faseRecorte(sig, ms);
+  if (!buscarSlot(sig.id)) return false; // limpiado durante la espera: no resucita
+  // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
+  const ocr = await import("./ocr").catch((): null => null);
+  const blob: Blob | null = await blobActual(sig);
+  // Endereza por confianza del rec (det solo recorta líneas, no vota).
+  const end = await faseEnderezar(sig, blob, ocr, ms);
+  if (!buscarSlot(sig.id)) return false; // limpiado durante el enderezado: no resucita
+  await faseOcr(sig, sig.file ?? blob, ocr, end, ms);
+  if (!buscarSlot(sig.id)) return false; // limpiado durante el OCR: no resucita
+  completarItem(sig, ms, t0);
+  return true;
+}
+
+/** Drena pendientes en orden de scan. True si tocó al menos un ítem. */
+async function drenarCola(): Promise<boolean> {
+  let tocada = false;
+  for (;;) {
+    // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
+    const sig = aplanar().find((c) => c.estado === "pendiente");
+    if (!sig) break;
+    try {
+      if (await procesarItem(sig)) tocada = true;
+    } catch {
+      // ponytail: ítem envenenado → celda de error visible; los hermanos
+      // siguen (antes un throw dejaba a todos "cargando" para siempre).
+      if (buscarSlot(sig.id)) {
+        sig.textoOcr = "";
+        sig.montoCents = null;
+        sig.estado = "error";
+      }
+      tocada = true;
+    }
+  }
+  return tocada;
+}
+
 export async function procesarCola(): Promise<void> {
   if (state.colaEnProceso) return;
   state.colaEnProceso = true;
@@ -57,148 +259,7 @@ export async function procesarCola(): Promise<void> {
     // ponytail: drenado por pendiente, no snapshot; token generación si el MOCK se vuelve concurrente.
     // Fase 1: el "procesando" y el "ok" (imagen) se pintan por ítem; el monto cae por regex.
     for (;;) {
-      let tocada = false;
-      for (;;) {
-        // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
-        const sig = aplanar().find((c) => c.estado === "pendiente");
-        if (!sig) break;
-        try {
-          sig.estado = "procesando";
-          try {
-            renderHojas(); // el recorte tarda: que se vea el estado (antes el mock era instantáneo)
-          } catch {
-            /* el render nunca aborta la cola */
-          }
-          // L0: tiempos por etapa (medir antes de optimizar).
-          const t0 = performance.now();
-          const ms = { recorte: 0, enderezar: 0, extraer: 0, diag: "" };
-          try {
-            const t = performance.now();
-            const original = await blobDeItem(sig);
-            const recortada = await detectarYRecortar(original);
-            ms.recorte = performance.now() - t;
-            if (recortada !== original) {
-              // ponytail: commit tras el await — si se limpió durante la espera, se
-              // revocan las nuevas y el guard de abajo evita resucitar.
-              const imgNueva = URL.createObjectURL(recortada);
-              if (!buscarSlot(sig.id)) {
-                URL.revokeObjectURL(imgNueva);
-              } else {
-                URL.revokeObjectURL(sig.imgUrl);
-                sig.imgUrl = imgNueva;
-                // ponytail: el intake pre-warp se conserva para el recorte manual
-                // (recuperar lo cortado de más); sin object URL, el GC lo recoge.
-                sig.previoDocAligner = original;
-                sig.file = recortada;
-              }
-            }
-          } catch {
-            // ponytail: sin recorte se sigue con el original; la cola no se detiene
-          }
-          if (!buscarSlot(sig.id)) continue; // limpiado durante la espera: no resucita
-          // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
-          const ocr = await import("./ocr").catch((): null => null);
-          // L1: el blob ya está en memoria (recorte) o en sig.file (foto); sin file
-          // se refetchea (PDF). Un solo decode por comprobante.
-          let blob: Blob | null = sig.file ?? null;
-          if (!blob) {
-            try {
-              blob = await blobDeItem(sig);
-            } catch {
-              blob = null;
-            }
-          }
-          // Endereza por confianza del rec (det solo recorta líneas, no vota).
-          let end: Enderezado | null = null;
-          try {
-            if (ocr && blob) {
-              const t = performance.now();
-              end = await ocr.enderezar(blob);
-              ms.enderezar = performance.now() - t;
-              if (end.grados !== 0 && buscarSlot(sig.id)) {
-                // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
-                const imgNueva = URL.createObjectURL(end.blob);
-                if (!buscarSlot(sig.id)) {
-                  URL.revokeObjectURL(imgNueva);
-                } else {
-                  URL.revokeObjectURL(sig.imgUrl);
-                  sig.imgUrl = imgNueva;
-                  // ponytail: el previo acompaña a la rotación (ver giro manual).
-                  // Sin re-import (ocr ya está cargado arriba).
-                  const previoGirado =
-                    sig.previoDocAligner && ocr
-                      ? await ocr.girarBlob(sig.previoDocAligner, end.grados)
-                      : null;
-                  // ponytail: re-chequeo tras el await (limpiado en la ventana:
-                  // se revoca lo nuevo, no se muta el sig huérfano).
-                  if (!buscarSlot(sig.id)) {
-                    URL.revokeObjectURL(imgNueva);
-                  } else {
-                    if (previoGirado) sig.previoDocAligner = previoGirado;
-                    // ponytail: si falla, se conserva el viejo (un fallo transitorio
-                    // no debe destruir la fuente de recuperación del sobre-recorte).
-                    sig.file = end.blob;
-                    blob = end.blob;
-                  }
-                }
-              }
-            }
-          } catch {
-            // ponytail: sin enderezar se sigue con la imagen tal cual
-          }
-          if (!buscarSlot(sig.id)) continue; // limpiado durante el enderezado: no resucita
-          // OCR real (PP-OCRv6_small, perezoso); sin texto o con fallo el monto queda manual.
-          try {
-            const t = performance.now();
-            // L1: reuse evita repetir el det del giro ganador (end trae cajas/base).
-            const diag = diagVacio();
-            sig.textoOcr =
-              ocr && blob
-                ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined, diag))
-                : "";
-            ms.extraer = performance.now() - t;
-            // P1: cajas, forma del lote, fallback y nº de runs del rec.
-            ms.diag =
-              `cajas=${diag.cajas} batch=[${diag.lote},${diag.anchoMax}] ` +
-              `fallback=${diag.fallback ? "sí" : "no"} recRuns=${diag.recRuns}`;
-          } catch {
-            sig.textoOcr = "";
-          }
-          // L1: sin miniatura (la celda pinta el full-res con lazy).
-          if (!buscarSlot(sig.id)) continue; // limpiado durante el OCR: no resucita
-          sig.montoCents = null;
-          sig.estado = "ok";
-          // ponytail: fast-path offline — 1 distinto se fija sin red (vía aplicarTotales:
-          // borrador en curso, manual y texto rancio ganan); el resto queda manual.
-          const textoLimpio = limpiarTextoCompleto(sig.textoOcr ?? "");
-          const rapido = extraerRapidoCents(textoLimpio);
-          if (rapido !== null)
-            aplicarTotales([{ idx: 1, id: sig.id, texto: textoLimpio }], new Map([[1, rapido]]));
-          try {
-            renderHojas(); // imagen visible al instante
-          } catch {
-            /* el render nunca aborta la cola */
-          }
-          const entero = (v: number): number => Math.round(v);
-          // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
-          if (import.meta.env.DEV)
-            console.info(
-              `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} ` +
-                `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
-                `${ms.diag} total=${entero(performance.now() - t0)}`,
-            );
-        } catch {
-          // ponytail: ítem envenenado → celda de error visible; los hermanos
-          // siguen (antes un throw dejaba a todos "cargando" para siempre).
-          if (buscarSlot(sig.id)) {
-            sig.textoOcr = "";
-            sig.montoCents = null;
-            sig.estado = "error";
-          }
-        }
-        tocada = true;
-      }
-      if (!tocada) break;
+      if (!(await drenarCola())) break;
       // Re-chequeo del drenado: lo que el fast-path dejó (texto nuevo con giro,
       // intake tardío) va por extraerPendientes (síncrono, nunca tumba la cola).
       try {

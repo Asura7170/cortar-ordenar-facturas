@@ -73,6 +73,50 @@ function pintarBarraBoton(): void {
 // a la derecha y lento a la izquierda); sin cambio no hay animación.
 let previoTotal: Cents | null = null;
 
+/** Largo del prefijo común posicional de dos textos (el odómetro lo deja fijo). */
+export function prefijoComun(viejo: string, texto: string): number {
+  let k = 0;
+  while (k < viejo.length && k < texto.length && viejo[k] === texto[k]) k += 1;
+  return k;
+}
+
+/** Sufijo viejo alineado por la derecha al ancho del nuevo (valor posicional). */
+export function alinearSufijos(sufV: string, sufN: string): string {
+  return sufV.length > sufN.length
+    ? sufV.slice(sufV.length - sufN.length)
+    : sufV.padStart(sufN.length);
+}
+
+/** Span quieto del prefijo común. */
+export function spanFijo(ch: string): HTMLElement {
+  const s = document.createElement("span");
+  s.textContent = ch;
+  return s;
+}
+
+/** Span de posición que no existía antes: entra con pop vía .monto-nuevo. */
+export function spanNuevo(ch: string): HTMLElement {
+  const s = document.createElement("span");
+  s.className = "monto-nuevo";
+  s.textContent = ch;
+  return s;
+}
+
+/** Rueda del odómetro: tira .monto-desplaza con el viejo debajo y desplazo limitado. */
+export function rodillo(v: string, ch: string, j: number, n: number): HTMLElement {
+  const r = document.createElement("span");
+  r.className = "monto-rodillo";
+  const tira = document.createElement("span");
+  tira.className = "monto-desplaza";
+  tira.dataset["viejo"] = v;
+  tira.style.setProperty("--p", String(Math.min(n - 1 - j, 6)));
+  const nuevo = document.createElement("span");
+  nuevo.textContent = ch;
+  tira.append(nuevo);
+  r.append(tira);
+  return r;
+}
+
 export function renderMonto(): void {
   pintarBarraBoton();
   const total = sumaTotal();
@@ -92,46 +136,25 @@ export function renderMonto(): void {
   const dir = total > previoTotal ? "-1" : "1";
   previoTotal = total;
   // Prefijo común quieto; el resto se alinea a la derecha por valor posicional.
-  const viejo = montoEl.textContent ?? "";
-  let k = 0;
-  while (k < viejo.length && k < texto.length && viejo[k] === texto[k]) k++;
+  const viejo = montoEl.textContent as string; // ponytail: textContent de elemento nunca null
+  const k = prefijoComun(viejo, texto);
   const sufV = viejo.slice(k);
   const sufN = texto.slice(k);
-  const acolchado =
-    sufV.length > sufN.length ? sufV.slice(sufV.length - sufN.length) : sufV.padStart(sufN.length);
+  const acolchado = alinearSufijos(sufV, sufN);
   const fijos: HTMLElement[] = [];
-  for (let i = 0; i < k; i++) {
-    const s = document.createElement("span");
-    s.textContent = texto[i] ?? "";
-    fijos.push(s);
+  for (let i = 0; i < k; i += 1) {
+    // ponytail: i < k ≤ texto.length ⇒ in-bounds (el ?? "" era rama muerta).
+    fijos.push(spanFijo(texto[i] as string));
   }
   montoEl.dataset["dir"] = dir;
   montoEl.replaceChildren(
     ...fijos,
     ...sufN.split("").map((ch, j) => {
-      const v = acolchado[j] ?? " ";
-      if (v === ch) {
-        const s = document.createElement("span");
-        s.textContent = ch;
-        return s;
-      }
-      if (v === " ") {
-        const s = document.createElement("span");
-        s.className = "monto-nuevo";
-        s.textContent = ch;
-        return s;
-      }
-      const r = document.createElement("span");
-      r.className = "monto-rodillo";
-      const tira = document.createElement("span");
-      tira.className = "monto-desplaza";
-      tira.dataset["viejo"] = v;
-      tira.style.setProperty("--p", String(Math.min(sufN.length - 1 - j, 6)));
-      const nuevo = document.createElement("span");
-      nuevo.textContent = ch;
-      tira.append(nuevo);
-      r.append(tira);
-      return r;
+      // ponytail: alinearSufijos SIEMPRE retorna sufN.length ⇒ j in-bounds.
+      const v = acolchado[j] as string;
+      if (v === ch) return spanFijo(ch);
+      if (v === " ") return spanNuevo(ch);
+      return rodillo(v, ch, j, sufN.length);
     }),
   );
 }

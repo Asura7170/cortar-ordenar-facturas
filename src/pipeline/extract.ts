@@ -109,36 +109,52 @@ function avisar(texto: string): void {
   if (el) el.textContent = texto;
 }
 
-/** Re-chequeo regex de los null no-manuales (botón #btnCalcular, giro y drenado de la
-    cola): 1 distinto fija el total; ≥2 distintos o signo previo quedan manual.
-    Síncrono y sin red: nunca lanza. */
-export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: boolean }): void {
-  if (state.colaEnProceso && !opciones?.desdeCola) {
-    if (opciones?.forzado) avisar("OCR en curso: los totales se calculan al terminar.");
-    return;
-  }
-  const lista = candidatos();
-  if (lista.length === 0) {
-    if (opciones?.forzado) avisar("Sin pendientes (todo ya tiene total o es manual).");
-    return;
-  }
+/** Cómputo puro del lote (sin DOM ni estado): candidatos → items → mapa. */
+export type LoteListo =
+  | { readonly tipo: "sin-candidatos" }
+  | { readonly tipo: "sin-texto" }
+  | { readonly tipo: "sin-totales" }
+  | {
+      readonly tipo: "listo";
+      readonly items: ItemLote[];
+      readonly mapa: ReadonlyMap<number, Cents>;
+    };
+
+/** Clasifica el lote sin efectos (testeable sin fixture). */
+export function computarLote(lista: readonly Comprobante[]): LoteListo {
+  if (lista.length === 0) return { tipo: "sin-candidatos" };
   const items: ItemLote[] = [];
   lista.forEach((c, i) => {
     const texto = limpiarTextoCompleto(c.textoOcr);
     if (texto !== "") items.push({ idx: i + 1, id: c.id, texto });
   });
-  if (items.length === 0) return;
-  const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
-  const mapa = new Map<number, Cents | null>();
+  if (items.length === 0) return { tipo: "sin-texto" };
+  const mapa = new Map<number, Cents>();
   for (const it of items) {
     const r = extraerRapidoCents(it.texto);
     if (r !== null) mapa.set(it.idx, r);
   }
-  if (mapa.size === 0) {
-    if (opciones?.forzado) avisar("Sin totales para leer: revisá manualmente o recortá de nuevo.");
-    return;
-  }
-  const ok = aplicarTotales(items, mapa);
+  if (mapa.size === 0) return { tipo: "sin-totales" };
+  return { tipo: "listo", items, mapa };
+}
+
+/** Aviso del lote vacío: null = silencio (sin-texto o no forzado). */
+function avisoVacio(tipo: LoteListo["tipo"], opciones?: { forzado?: boolean }): string | null {
+  if (!opciones?.forzado) return null;
+  if (tipo === "sin-candidatos") return "Sin pendientes (todo ya tiene total o es manual).";
+  if (tipo === "sin-totales")
+    return "Sin totales para leer: revisá manualmente o recortá de nuevo.";
+  return null; // sin-texto: silencioso aunque sea forzado
+}
+
+/** Mensaje final del lote (puro): éxito total con aviso previo lo restaura. */
+export function mensajeLote(ok: number, total: number, avisoPrevio: string): string {
+  if (ok === total && avisoPrevio.trim() !== "") return avisoPrevio;
+  return `Local: ${ok}/${total} totales.`;
+}
+
+/** Parchea las celdas del lote (best-effort: nunca aborta). */
+function parchearCeldas(items: readonly ItemLote[], mapa: ReadonlyMap<number, Cents>): void {
   for (const it of items) {
     if (mapa.get(it.idx) != null) {
       try {
@@ -148,6 +164,31 @@ export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: bo
       }
     }
   }
+}
+
+/** Gate de cola en proceso (con aviso si es forzado): true = no extraer ahora. */
+function bloqueadoPorCola(opciones?: { forzado?: boolean; desdeCola?: boolean }): boolean {
+  if (state.colaEnProceso && !opciones?.desdeCola) {
+    if (opciones?.forzado) avisar("OCR en curso: los totales se calculan al terminar.");
+    return true;
+  }
+  return false;
+}
+
+/** Re-chequeo regex de los null no-manuales (botón #btnCalcular, giro y drenado de la
+    cola): 1 distinto fija el total; ≥2 distintos o signo previo quedan manual.
+    Síncrono y sin red: nunca lanza. */
+export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: boolean }): void {
+  if (bloqueadoPorCola(opciones)) return;
+  const lote = computarLote(candidatos());
+  if (lote.tipo !== "listo") {
+    const aviso = avisoVacio(lote.tipo, opciones);
+    if (aviso !== null) avisar(aviso);
+    return;
+  }
+  const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
+  const ok = aplicarTotales(lote.items, lote.mapa);
+  parchearCeldas(lote.items, lote.mapa);
   if (ok > 0) {
     try {
       renderHojas(); // badges + #montoTotal con suma local exacta
@@ -155,7 +196,5 @@ export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: bo
       /* el parche nunca aborta el lote */
     }
   }
-  // Éxito total con aviso previo: se restaura (este aviso no lo pisa).
-  if (ok === items.length && avisoPrevio.trim() !== "") avisar(avisoPrevio);
-  else avisar(`Local: ${ok}/${items.length} totales.`);
+  avisar(mensajeLote(ok, lote.items.length, avisoPrevio));
 }

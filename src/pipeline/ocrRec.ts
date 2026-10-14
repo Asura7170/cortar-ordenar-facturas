@@ -163,6 +163,25 @@ export interface TextoRec {
   readonly puntaje: number;
 }
 
+/** Argmax del paso t (clase y valor). */
+function mejorClase(
+  logits: Float32Array,
+  t: number,
+  clases: number,
+): { clase: number; valor: number } {
+  let mejor = 0;
+  let mejorV = -Infinity;
+  for (let c = 0; c < clases; c += 1) {
+    // ponytail: t < pasos y c < clases con largo = pasos·clases (ver guardas).
+    const v = logits[t * clases + c] as number;
+    if (v > mejorV) {
+      mejorV = v;
+      mejor = c;
+    }
+  }
+  return { clase: mejor, valor: mejorV };
+}
+
 /**
  * CTC greedy sobre logits [pasos, clases]: argmax, colapsar repetidos,
  * quitar blank (0). Vacío si las formas no cuadran con el dict.
@@ -180,17 +199,10 @@ export function decodificarCtc(
   let n = 0;
   let previo = -1;
   for (let t = 0; t < pasos; t += 1) {
-    let mejor = 0;
-    let mejorV = -Infinity;
-    for (let c = 0; c < clases; c += 1) {
-      const v = logits[t * clases + c] ?? -Infinity;
-      if (v > mejorV) {
-        mejorV = v;
-        mejor = c;
-      }
-    }
+    const { clase: mejor, valor: mejorV } = mejorClase(logits, t, clases);
     if (mejor !== 0 && mejor !== previo) {
-      texto += dict[mejor] ?? "";
+      // ponytail: mejor < clases === dict.length (ver guarda).
+      texto += dict[mejor] as string;
       suma += mejorV;
       n += 1;
     }

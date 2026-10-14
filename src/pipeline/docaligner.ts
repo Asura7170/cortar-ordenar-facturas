@@ -40,36 +40,49 @@ const RUTA_MODELO: string = import.meta.env.PROD
   ? URL_MODELO_HF
   : `${import.meta.env.BASE_URL}models/fastvit_sa24_h_e_bifpn_256_fp32.onnx`;
 
-/** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
-export function ordenarQuad(puntos: readonly Punto[]): Quad {
+/** El quarteto denso (o lanza: pocas coords o un hueco). */
+function cuatroPuntosDe(puntos: readonly Punto[]): [Punto, Punto, Punto, Punto] {
   if (puntos.length !== 4) throw new Error(`ordenarQuad espera 4 puntos, llegan ${puntos.length}`);
   const a = puntos[0];
   const b = puntos[1];
   const c = puntos[2];
   const d = puntos[3];
   if (!a || !b || !c || !d) throw new Error("ordenarQuad: puntos ausentes");
-  const cx = (a.x + b.x + c.x + d.x) / 4;
-  const cy = (a.y + b.y + c.y + d.y) / 4;
-  const orden = [a, b, c, d].sort(
-    (p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx),
-  );
+  return [a, b, c, d];
+}
+
+/** Índice del punto más arriba-izquierda (mínima x+y): arranca el Quad ahí. */
+function inicioSupIzquierda(orden: readonly Punto[]): number {
   let inicio = 0;
   let mejor = Infinity;
   for (let i = 0; i < 4; i++) {
-    const p = orden[i];
-    if (!p) continue;
+    // ponytail: orden viene del quarteto validado: índice denso por construcción.
+    const p = orden[i] as Punto;
     const s = p.x + p.y;
     if (s < mejor) {
       mejor = s;
       inicio = i;
     }
   }
-  const p0 = orden[inicio];
-  const p1 = orden[(inicio + 1) % 4];
-  const p2 = orden[(inicio + 2) % 4];
-  const p3 = orden[(inicio + 3) % 4];
-  if (!p0 || !p1 || !p2 || !p3) throw new Error("ordenarQuad: orden incompleto");
-  return [p0, p1, p2, p3];
+  return inicio;
+}
+
+/** Ordena 4 puntos arbitrarios como Quad por ángulo alrededor del centroide. Lanza si no son 4. */
+export function ordenarQuad(puntos: readonly Punto[]): Quad {
+  const [a, b, c, d] = cuatroPuntosDe(puntos);
+  const cx = (a.x + b.x + c.x + d.x) / 4;
+  const cy = (a.y + b.y + c.y + d.y) / 4;
+  const orden = [a, b, c, d].sort(
+    (p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx),
+  );
+  const inicio = inicioSupIzquierda(orden);
+  // ponytail: denso por construcción — el orden modular nunca sale undefined.
+  return [
+    orden[inicio] as Punto,
+    orden[(inicio + 1) % 4] as Punto,
+    orden[(inicio + 2) % 4] as Punto,
+    orden[(inicio + 3) % 4] as Punto,
+  ];
 }
 
 /** True si el quad es convexo (sin autointersección ni esquina reflexiva). */
@@ -130,78 +143,114 @@ export function esQuadPlausible(
   return true;
 }
 
+/** Pares DLT validados (largo ≥4; arrays densos en todos los llamadores: uno ralo viola el contrato y lanza TypeError crudo). */
+function paresDLT(
+  destino: readonly Punto[],
+  origen: readonly Punto[],
+): { src: Punto[]; dst: Punto[] } {
+  if (destino.length < 4 || origen.length < 4)
+    throw new Error("calcularHomografia espera 4 pares de puntos");
+  // ponytail: largo validado + arrays densos ⇒ el índice es válido.
+  const src = [destino[0] as Punto, destino[1] as Punto, destino[2] as Punto, destino[3] as Punto];
+  const dst = [origen[0] as Punto, origen[1] as Punto, origen[2] as Punto, origen[3] as Punto];
+  return { src, dst };
+}
+
+/** Filas DLT de un par (2 ecuaciones × 8 incógnitas + 2 RHS). */
+function filasParDLT(s: Punto, d: Punto): { f1: number[]; f2: number[]; r1: number; r2: number } {
+  return {
+    f1: [s.x, s.y, 1, 0, 0, 0, -s.x * d.x, -s.y * d.x],
+    f2: [0, 0, 0, s.x, s.y, 1, -s.x * d.y, -s.y * d.y],
+    r1: d.x,
+    r2: d.y,
+  };
+}
+
+/** Sistema DLT 8×8 de 4 pares. */
+export function sistemaDLT(
+  src: readonly Punto[],
+  dst: readonly Punto[],
+): {
+  a: number[][];
+  b: number[];
+} {
+  const a: number[][] = [];
+  const b: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    // ponytail: paresDLT garantiza 4 densos.
+    const s = src[i] as Punto;
+    const d = dst[i] as Punto;
+    const { f1, f2, r1, r2 } = filasParDLT(s, d);
+    a.push(f1, f2);
+    b.push(r1, r2);
+  }
+  return { a, b };
+}
+
+// ponytail: índices acotados por los bucles + filas densas por construcción;
+// el ?? solo apacigua al tipado (nunca dispara en la práctica).
+function celda(a: number[][], f: number, c: number): number {
+  return a[f]?.[c] ?? 0;
+}
+
+// ponytail: la fila existe (sistemaDLT la crea densa; pivotar la conserva).
+function filaMut(a: number[][], f: number): number[] {
+  return a[f] as number[];
+}
+
+/** Pivoteo parcial + normalización de la columna col (muta a/b). */
+export function pivotar(a: number[][], b: number[], col: number, n: number): void {
+  let piv = col;
+  for (let fil = col + 1; fil < n; fil++) {
+    if (Math.abs(celda(a, fil, col)) > Math.abs(celda(a, piv, col))) piv = fil;
+  }
+  if (Math.abs(celda(a, piv, col)) < 1e-12)
+    throw new Error("calcularHomografia: configuración degenerada");
+  if (piv !== col) {
+    const fa = filaMut(a, col);
+    const fb = filaMut(a, piv);
+    a[col] = fb;
+    a[piv] = fa;
+    // ponytail: b denso de 8 (sistemaDLT lo llena; el swap lo conserva).
+    const ba = b[col] as number;
+    b[col] = b[piv] as number;
+    b[piv] = ba;
+  }
+  const div = celda(a, col, col);
+  const fila = filaMut(a, col);
+  for (let k = col; k < n; k++) fila[k] = celda(a, col, k) / div;
+  b[col] = (b[col] as number) / div;
+}
+
+/** Anula la columna col en las demás filas (muta a/b). */
+export function eliminar(a: number[][], b: number[], col: number, n: number): void {
+  for (let fil = 0; fil < n; fil++) {
+    if (fil === col) continue;
+    const factor = celda(a, fil, col);
+    if (factor === 0) continue;
+    const fr = filaMut(a, fil);
+    for (let k = col; k < n; k++) fr[k] = celda(a, fil, k) - factor * celda(a, col, k);
+    // ponytail: b denso (ver pivotar).
+    b[fil] = (b[fil] as number) - factor * (b[col] as number);
+  }
+}
+
 /** Homografía 3×3 (fila-mayor, h[8]=1) tal que H·src[i] ~ dst[i]. Lanza si degenera. */
 export function calcularHomografia(
   destino: readonly Punto[],
   origen: readonly Punto[],
 ): Float64Array {
   // ponytail: DLT 4 puntos con Gauss+privoteo; librería solo si otro módulo lo pide.
-  const s0 = destino[0];
-  const s1 = destino[1];
-  const s2 = destino[2];
-  const s3 = destino[3];
-  const d0 = origen[0];
-  const d1 = origen[1];
-  const d2 = origen[2];
-  const d3 = origen[3];
-  if (!s0 || !s1 || !s2 || !s3 || !d0 || !d1 || !d2 || !d3) {
-    throw new Error("calcularHomografia espera 4 pares de puntos");
-  }
-  const src = [s0, s1, s2, s3];
-  const dst = [d0, d1, d2, d3];
-  const a: number[][] = [];
-  const b: number[] = [];
-  for (let i = 0; i < 4; i++) {
-    const s = src[i];
-    const d = dst[i];
-    if (!s || !d) throw new Error("calcularHomografia: par ausente");
-    a.push([s.x, s.y, 1, 0, 0, 0, -s.x * d.x, -s.y * d.x]);
-    b.push(d.x);
-    a.push([0, 0, 0, s.x, s.y, 1, -s.x * d.y, -s.y * d.y]);
-    b.push(d.y);
-  }
+  const { src, dst } = paresDLT(destino, origen);
+  const { a, b } = sistemaDLT(src, dst);
   const n = 8;
   for (let col = 0; col < n; col++) {
-    let piv = col;
-    for (let fil = col + 1; fil < n; fil++) {
-      const actual = a[fil]?.[col] ?? 0;
-      const mejor = a[piv]?.[col] ?? 0;
-      if (Math.abs(actual) > Math.abs(mejor)) piv = fil;
-    }
-    if (Math.abs(a[piv]?.[col] ?? 0) < 1e-12) {
-      throw new Error("calcularHomografia: configuración degenerada");
-    }
-    if (piv !== col) {
-      const fa = a[col];
-      const fb = a[piv];
-      if (fa && fb) {
-        a[col] = fb;
-        a[piv] = fa;
-      }
-      const ba = b[col] ?? 0;
-      b[col] = b[piv] ?? 0;
-      b[piv] = ba;
-    }
-    const div = a[col]?.[col] ?? 1;
-    for (let k = col; k < n; k++) {
-      const fila = a[col];
-      if (fila) fila[k] = (fila[k] ?? 0) / div;
-    }
-    b[col] = (b[col] ?? 0) / div;
-    for (let fil = 0; fil < n; fil++) {
-      if (fil === col) continue;
-      const factor = a[fil]?.[col] ?? 0;
-      if (factor === 0) continue;
-      for (let k = col; k < n; k++) {
-        const fr = a[fil];
-        const fc = a[col];
-        if (fr && fc) fr[k] = (fr[k] ?? 0) - factor * (fc[k] ?? 0);
-      }
-      b[fil] = (b[fil] ?? 0) - factor * (b[col] ?? 0);
-    }
+    pivotar(a, b, col, n);
+    eliminar(a, b, col, n);
   }
   const h = new Float64Array(9);
-  for (let i = 0; i < 8; i++) h[i] = b[i] ?? 0;
+  // ponytail: b trae 8 (sistemaDLT).
+  for (let i = 0; i < 8; i++) h[i] = b[i] as number;
   h[8] = 1;
   return h;
 }
@@ -217,6 +266,64 @@ export function tamanoSalida(quad: Quad): { width: number; height: number } {
 }
 
 /** Warp perspectiva por mapeo inverso + muestreo bilineal. Fuera del quad: blanco (el JPEG no tiene alpha). */
+/** Coeficientes h0..h8 (la homografía trae 9: fila-mayor con h[8]=1). */
+function coefH(
+  h: Float64Array,
+): [number, number, number, number, number, number, number, number, number] {
+  // ponytail: h trae 9 (calcularHomografia); el índice es válido.
+  return [
+    h[0] as number,
+    h[1] as number,
+    h[2] as number,
+    h[3] as number,
+    h[4] as number,
+    h[5] as number,
+    h[6] as number,
+    h[7] as number,
+    h[8] as number,
+  ];
+}
+
+/** Muestra bilineal RGB (origen acotado por clamp: índices siempre válidos; fuentes ≥2×2 — una degenerada (an/al < 2) sale negro, sin mezcla). */
+export function muestrearBilinear(
+  ent: Uint8ClampedArray,
+  an: number,
+  al: number,
+  sx: number,
+  sy: number,
+): [number, number, number] {
+  // ponytail: clamp en vez de saltar el borde (la referencia lo recortaba: en video no se nota, en foto sí).
+  const x0 = Math.max(0, Math.min(an - 2, Math.floor(sx)));
+  const y0 = Math.max(0, Math.min(al - 2, Math.floor(sy)));
+  const fx = sx - x0;
+  const fy = sy - y0;
+  const w00 = (1 - fx) * (1 - fy);
+  const w10 = fx * (1 - fy);
+  const w01 = (1 - fx) * fy;
+  const w11 = fx * fy;
+  const i00 = (y0 * an + x0) * 4;
+  const i10 = i00 + 4;
+  const i01 = i00 + an * 4;
+  const i11 = i01 + 4;
+  // ponytail: i00..i11 dentro del búfer (clamp a an-2/al-2).
+  const r =
+    (ent[i00] as number) * w00 +
+    (ent[i10] as number) * w10 +
+    (ent[i01] as number) * w01 +
+    (ent[i11] as number) * w11;
+  const g =
+    (ent[i00 + 1] as number) * w00 +
+    (ent[i10 + 1] as number) * w10 +
+    (ent[i01 + 1] as number) * w01 +
+    (ent[i11 + 1] as number) * w11;
+  const b =
+    (ent[i00 + 2] as number) * w00 +
+    (ent[i10 + 2] as number) * w10 +
+    (ent[i01 + 2] as number) * w01 +
+    (ent[i11 + 2] as number) * w11;
+  return [r, g, b];
+}
+
 export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: number): BuferPixeles {
   // ponytail: homografía inline (un solo llamador).
   const h = calcularHomografia(
@@ -228,20 +335,12 @@ export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: numb
     ],
     [...quad],
   );
+  const [h0, h1, h2, h3, h4, h5, h6, h7, h8] = coefH(h);
   const fuera = new Uint8ClampedArray(ancho * alto * 4);
   fuera.fill(255);
   const ent = src.datos;
   const an = src.ancho;
   const al = src.alto;
-  const h0 = h[0] ?? 0;
-  const h1 = h[1] ?? 0;
-  const h2 = h[2] ?? 0;
-  const h3 = h[3] ?? 0;
-  const h4 = h[4] ?? 0;
-  const h5 = h[5] ?? 0;
-  const h6 = h[6] ?? 0;
-  const h7 = h[7] ?? 0;
-  const h8 = h[8] ?? 1;
   for (let v = 0; v < alto; v++) {
     let X = h1 * v + h2;
     let Y = h4 * v + h5;
@@ -250,35 +349,12 @@ export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: numb
     for (let u = 0; u < ancho; u++, X += h0, Y += h3, W += h6, o += 4) {
       const sx = X / W;
       const sy = Y / W;
-      // ponytail: clamp en vez de saltar el borde (la referencia lo recortaba: en video no se nota, en foto sí).
+      // Fuera de la fuente: queda el blanco de fondo.
       if (sx < 0 || sy < 0 || sx > an - 1 || sy > al - 1) continue;
-      const x0 = Math.max(0, Math.min(an - 2, Math.floor(sx)));
-      const y0 = Math.max(0, Math.min(al - 2, Math.floor(sy)));
-      const fx = sx - x0;
-      const fy = sy - y0;
-      const w00 = (1 - fx) * (1 - fy);
-      const w10 = fx * (1 - fy);
-      const w01 = (1 - fx) * fy;
-      const w11 = fx * fy;
-      const i00 = (y0 * an + x0) * 4;
-      const i10 = i00 + 4;
-      const i01 = i00 + an * 4;
-      const i11 = i01 + 4;
-      fuera[o] =
-        (ent[i00] ?? 0) * w00 +
-        (ent[i10] ?? 0) * w10 +
-        (ent[i01] ?? 0) * w01 +
-        (ent[i11] ?? 0) * w11;
-      fuera[o + 1] =
-        (ent[i00 + 1] ?? 0) * w00 +
-        (ent[i10 + 1] ?? 0) * w10 +
-        (ent[i01 + 1] ?? 0) * w01 +
-        (ent[i11 + 1] ?? 0) * w11;
-      fuera[o + 2] =
-        (ent[i00 + 2] ?? 0) * w00 +
-        (ent[i10 + 2] ?? 0) * w10 +
-        (ent[i01 + 2] ?? 0) * w01 +
-        (ent[i11 + 2] ?? 0) * w11;
+      const [r, g, b] = muestrearBilinear(ent, an, al, sx, sy);
+      fuera[o] = r;
+      fuera[o + 1] = g;
+      fuera[o + 2] = b;
       fuera[o + 3] = 255;
     }
   }
@@ -287,6 +363,102 @@ export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: numb
 
 /** Decodifica un heatmap (1,4,H,W) a esquinas en píxeles: por canal, centroide ponderado del blob mayor. */
 // ponytail: búfers locales por llamada (plano ~4K, barato); evita estado global mutable entre disparos.
+/** Cruces 4-vecinos dentro del mapa. */
+const VECINOS: ReadonlyArray<readonly [number, number]> = [
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1],
+];
+
+/** True si (x,y) cae dentro del mapa de w×h. */
+export function dentro(x: number, y: number, w: number, h: number): boolean {
+  return x >= 0 && y >= 0 && x < w && y < h;
+}
+
+/** Vecino aceptable: no visitado y caliente (datos del modelo: el ?? tolera vistas raras). */
+export function vecinoAceptable(
+  visitados: Uint8Array,
+  heat: Float32Array,
+  base: number,
+  ni: number,
+  umbral: number,
+): boolean {
+  return (visitados[ni] ?? 0) === 0 && (heat[base + ni] ?? 0) >= umbral;
+}
+
+/** Flood-fill 4-vecinos desde ini: masa y centroide; marca visitados (muta). */
+export function masaComponente(
+  heat: Float32Array,
+  base: number,
+  w: number,
+  h: number,
+  umbral: number,
+  ini: number,
+  visitados: Uint8Array,
+  pila: Int32Array,
+): { masa: number; sumaX: number; sumaY: number } {
+  let cima = 0;
+  pila[cima++] = ini;
+  visitados[ini] = 1;
+  let masa = 0;
+  let sumaX = 0;
+  let sumaY = 0;
+  while (cima > 0) {
+    // ponytail: índices acotados (semilla < plano; vecinos chequeados).
+    const idx = pila[--cima] as number;
+    const val = heat[base + idx] ?? 0;
+    const x = idx % w;
+    const y = (idx / w) | 0;
+    masa += val;
+    sumaX += x * val;
+    sumaY += y * val;
+    for (const [dx, dy] of VECINOS) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!dentro(nx, ny, w, h)) continue;
+      const ni = ny * w + nx;
+      if (!vecinoAceptable(visitados, heat, base, ni, umbral)) continue;
+      visitados[ni] = 1;
+      pila[cima++] = ni;
+    }
+  }
+  return { masa, sumaX, sumaY };
+}
+
+/** Mejor componente del canal: centroide escalado + pico (null si no hay masa). */
+export function mejorComponente(
+  heat: Float32Array,
+  base: number,
+  w: number,
+  h: number,
+  umbral: number,
+  ancho: number,
+  alto: number,
+  visitados: Uint8Array,
+  pila: Int32Array,
+): { punto: Punto | null; pico: number } {
+  let mejorMasa = 0;
+  let mejorX = -1;
+  let mejorY = -1;
+  let pico = 0;
+  const plano = w * h;
+  for (let ini = 0; ini < plano; ini++) {
+    const v = heat[base + ini] ?? 0;
+    if (v > pico) pico = v;
+    if (v < umbral || (visitados[ini] ?? 0) === 1) continue;
+    const { masa, sumaX, sumaY } = masaComponente(heat, base, w, h, umbral, ini, visitados, pila);
+    if (masa > mejorMasa) {
+      mejorMasa = masa;
+      mejorX = sumaX / masa;
+      mejorY = sumaY / masa;
+    }
+  }
+  if (mejorMasa === 0) return { punto: null, pico };
+  // +0.5 centra la muestra en su celda antes de escalar.
+  return { punto: { x: ((mejorX + 0.5) / w) * ancho, y: ((mejorY + 0.5) / h) * alto }, pico };
+}
+
 export function decodificarHeatmap(
   heat: Float32Array,
   dims: readonly number[],
@@ -303,57 +475,21 @@ export function decodificarHeatmap(
   const puntos: Punto[] = [];
   const confianzas: number[] = [];
   for (let c = 0; c < 4; c++) {
-    const base = c * plano;
+    const { punto, pico } = mejorComponente(
+      heat,
+      c * plano,
+      w,
+      h,
+      umbral,
+      ancho,
+      alto,
+      visitados,
+      pila,
+    );
     visitados.fill(0);
-    let mejorMasa = 0;
-    let mejorX = -1;
-    let mejorY = -1;
-    let pico = 0;
-    for (let ini = 0; ini < plano; ini++) {
-      const v = heat[base + ini] ?? 0;
-      if (v > pico) pico = v;
-      if (v < umbral || (visitados[ini] ?? 0) === 1) continue;
-      let cima = 0;
-      pila[cima++] = ini;
-      visitados[ini] = 1;
-      let masa = 0;
-      let sumaX = 0;
-      let sumaY = 0;
-      while (cima > 0) {
-        const idx = pila[--cima] ?? 0;
-        const val = heat[base + idx] ?? 0;
-        const x = idx % w;
-        const y = (idx / w) | 0;
-        masa += val;
-        sumaX += x * val;
-        sumaY += y * val;
-        if (x > 0 && (visitados[idx - 1] ?? 0) === 0 && (heat[base + idx - 1] ?? 0) >= umbral) {
-          visitados[idx - 1] = 1;
-          pila[cima++] = idx - 1;
-        }
-        if (x < w - 1 && (visitados[idx + 1] ?? 0) === 0 && (heat[base + idx + 1] ?? 0) >= umbral) {
-          visitados[idx + 1] = 1;
-          pila[cima++] = idx + 1;
-        }
-        if (y > 0 && (visitados[idx - w] ?? 0) === 0 && (heat[base + idx - w] ?? 0) >= umbral) {
-          visitados[idx - w] = 1;
-          pila[cima++] = idx - w;
-        }
-        if (y < h - 1 && (visitados[idx + w] ?? 0) === 0 && (heat[base + idx + w] ?? 0) >= umbral) {
-          visitados[idx + w] = 1;
-          pila[cima++] = idx + w;
-        }
-      }
-      if (masa > mejorMasa) {
-        mejorMasa = masa;
-        mejorX = sumaX / masa;
-        mejorY = sumaY / masa;
-      }
-    }
     confianzas.push(pico);
-    if (mejorMasa === 0) continue;
-    // +0.5 centra la muestra en su celda antes de escalar.
-    puntos.push({ x: ((mejorX + 0.5) / w) * ancho, y: ((mejorY + 0.5) / h) * alto });
+    if (punto === null) continue;
+    puntos.push(punto);
   }
   if (puntos.length !== 4) return { quad: null, confianzas };
   const quad = ordenarQuad(puntos);
@@ -529,41 +665,66 @@ export async function descargarConCache(
 ): Promise<ArrayBuffer> {
   const enCurso = enVuelo.get(clave);
   if (enCurso) return enCurso;
-  const tarea = (async (): Promise<ArrayBuffer> => {
-    const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
-    const guardada = await cache?.match(clave);
-    if (guardada) {
-      const buf = await guardada.arrayBuffer();
-      if (buf.byteLength >= minBytes) return buf;
-      await cache?.delete(clave).catch(() => false);
-    }
-    // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
-    const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
-    if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
-    const pesos = await res.arrayBuffer();
-    if (pesos.byteLength < minBytes) {
-      throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
-    }
-    // ponytail: put con await (un put local cuesta ms; perderlo cuesta una re-descarga) + warn si falla.
-    try {
-      if (cache) {
-        await cache.put(
-          clave,
-          new Response(pesos.slice(0), {
-            headers: { "Content-Length": String(pesos.byteLength) },
-          }),
-        );
-      }
-    } catch (e: unknown) {
-      console.warn("modelos: caché put falló", e);
-    }
-    return pesos;
-  })();
+  const tarea = intentoDeDescarga(clave, timeoutMs, minBytes);
   enVuelo.set(clave, tarea);
   try {
     return await tarea;
   } finally {
     enVuelo.delete(clave);
+  }
+}
+
+/** El peso cacheado si sirve (≥ minBytes); null: hay que ir a red. */
+async function pesoGuardado(
+  cache: Cache | undefined,
+  clave: string,
+  minBytes: number,
+): Promise<ArrayBuffer | null> {
+  const guardada = await cache?.match(clave);
+  if (!guardada) return null;
+  const buf = await guardada.arrayBuffer();
+  if (buf.byteLength >= minBytes) return buf;
+  // ponytail: guardada no-null implica cache vivo; el delete fallido solo cuesta un re-hit.
+  await (cache as Cache).delete(clave).catch(() => false);
+  return null;
+}
+
+/** Un intento físico: caché-miss → red → persistir. Lanza (el dedup lo extiende). */
+async function intentoDeDescarga(
+  clave: string,
+  timeoutMs: number,
+  minBytes: number,
+): Promise<ArrayBuffer> {
+  const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
+  const local = await pesoGuardado(cache, clave, minBytes);
+  if (local) return local;
+  // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
+  const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
+  const pesos = await res.arrayBuffer();
+  if (pesos.byteLength < minBytes) {
+    throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
+  }
+  await guardarEnCache(cache, clave, pesos);
+  return pesos;
+}
+
+/** Best-effort: un put con await (perderlo cuesta una re-descarga) + warn si falla. */
+async function guardarEnCache(
+  cache: Cache | undefined,
+  clave: string,
+  pesos: ArrayBuffer,
+): Promise<void> {
+  if (!cache) return;
+  try {
+    await cache.put(
+      clave,
+      new Response(pesos.slice(0), {
+        headers: { "Content-Length": String(pesos.byteLength) },
+      }),
+    );
+  } catch (e: unknown) {
+    console.warn("modelos: caché put falló", e);
   }
 }
 
@@ -665,11 +826,22 @@ export function quitarBorde(quad: Quad, pad: number = PAD_BORDE): Quad {
   return [mueve(a), mueve(b), mueve(c), mueve(d)];
 }
 
+/** El equipo del paso: decodificador, lienzos y sesión (los reales por omisión). */
+function equipoDelPaso(deps?: DepsRecorte): {
+  cargar: CargarBitmap;
+  crear: CrearLienzo;
+  fabrica: () => Promise<SesionDetectora>;
+} {
+  return {
+    cargar: deps?.cargar ?? cargarReal,
+    crear: deps?.crear ?? crearReal,
+    fabrica: deps?.sesion ?? obtenerSesion,
+  };
+}
+
 /** Paso completo: blob → esquinas (sobre foto con borde) → JPEG recortado. Nunca lanza: sin esquinas o con error devuelve el original. */
 export async function detectarYRecortar(blob: Blob, deps?: DepsRecorte): Promise<Blob> {
-  const cargar = deps?.cargar ?? cargarReal;
-  const crear = deps?.crear ?? crearReal;
-  const fabrica = deps?.sesion ?? obtenerSesion;
+  const { cargar, crear, fabrica } = equipoDelPaso(deps);
   let bmp: ImageBitmap | null = null;
   try {
     bmp = await cargar(blob, { imageOrientation: "from-image" });

@@ -80,9 +80,7 @@ export default defineConfig({
         "**/test/**",
         "**/*.d.ts",
         "dist/**",
-        // Sin runtime que cubrir: main es bootstrap con side-effects al importar
-        // (cubierto indirectamente vía init*), types solo declara tipos.
-        "src/main.ts",
+        // Sin runtime que cubrir: types solo declara tipos.
         "src/types.ts",
       ],
       thresholds: { lines: 85, statements: 80 },

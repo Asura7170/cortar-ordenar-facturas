@@ -9,7 +9,7 @@ import {
   nextComprobanteId,
   state,
 } from "../state";
-import type { Comprobante } from "../types";
+import type { Comprobante, Hoja, LayoutId } from "../types";
 import { cuentaHoja, itemsDe } from "./monto";
 import { layoutDe } from "./layout";
 import { HOJA_FANTASMA, esDragDeArchivos, renderHojas } from "./sheets";
@@ -81,6 +81,16 @@ const MIME_IMAGEN: RegExp = /^image\/(jpeg|png|webp|bmp|gif)$/i;
 /** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
 let hojaPedida: number | null = null;
 
+/** ¿El archivo pasa el allowlist del intake? */
+function esImagen(f: File): boolean {
+  return MIME_IMAGEN.test(f.type);
+}
+
+/** FileList (o files nullable) a lista plana de Files. */
+function aListaDeArchivos(files: FileList | readonly File[] | null | undefined): File[] {
+  return files instanceof FileList ? Array.from(files) : [...(files ?? [])];
+}
+
 /** Comprobante pendiente desde un blob normalizado (vías clic e intake). */
 function comprobanteDesdeBlob(blob: Blob, nombre: string): Comprobante {
   return {
@@ -96,60 +106,54 @@ function comprobanteDesdeBlob(blob: Blob, nombre: string): Comprobante {
     posicion: 0,
   };
 }
-export async function agregarArchivos(
-  files: FileList | readonly File[] | null | undefined,
-  hojaId: number | null = null,
-): Promise<void> {
-  // Cualquier intake consume la hoja pedida (picker, drop, paste): si no, la
-  // pendiente sobrevive y el próximo picker cae en una hoja abandonada.
-  const destino = hojaId ?? hojaPedida;
-  hojaPedida = null;
-  const lista: File[] = files instanceof FileList ? Array.from(files) : [...(files ?? [])];
-  const esImagen = (f: File): boolean => MIME_IMAGEN.test(f.type);
-  const avisos: AvisoRechazo[] = lista
+/** Rechazos del filtro de formato (ni imagen ni pdf). */
+function avisosDeFormato(lista: readonly File[]): AvisoRechazo[] {
+  return lista
     .filter((f) => !esImagen(f) && !esPdf(f))
     .map((f) => ({ archivo: sanear(f.name), motivo: "formato no soportado" }));
+}
+
+/** ¿Queda hueco en esta hoja? */
+function tieneHueco(h: Hoja): boolean {
+  return cuentaHoja(h) < layoutDe(h.layout).total;
+}
+
+/** Despacha el resto en la fila de huecos. */
+function llenarHuecos(slots: (Comprobante | null)[], resto: Comprobante[]): void {
+  for (let j = 0; j < slots.length && resto.length; j++) {
+    if (!slots[j]) slots[j] = resto.shift() ?? null;
+  }
+}
+
+// ponytail: cede el turno por archivo (scheduler.yield en Chrome = ventana de
+// paint/scroll; microtask en tests/jsdom para no colgar los timers falsos).
+const cederTurno = (): Promise<void> =>
+  (globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }).scheduler?.yield?.() ??
+  Promise.resolve();
+
+/** El colocador incremental del lote: llena la hoja destino (o la primera con
+    hueco), desborda creando hojas que heredan layout y pinta con techo 300ms. */
+function crearColocacion(destino: number | null): (items: Comprobante[]) => void {
   // Commit incremental: cada archivo se pinta antes del siguiente. Los gaps
   // async del decode/encode le dan al navegador ventanas de paint con DOM ya
   // comprometido (antes solo había un render al final del lote: freeze).
-  let hoja = destino != null ? hojaPorId(destino) : undefined;
-  // Perezosa: el intake vacío o todo-rechazado no crea hojas (el test
-  // "null o vacío" lo exige; antes el return temprano lo garantizaba).
-  const asegurarHoja = (): NonNullable<typeof hoja> => {
-    if (!hoja) {
-      hoja =
-        state.hojas.find((h) => cuentaHoja(h) < layoutDe(h.layout).total) ??
-        state.hojas[state.hojas.length - 1] ??
-        crearHoja();
-      if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
-    }
-    return hoja;
-  };
-  const llenar = (slots: (Comprobante | null)[], resto: Comprobante[]): void => {
-    for (let j = 0; j < slots.length && resto.length; j++) {
-      if (!slots[j]) slots[j] = resto.shift() ?? null;
-    }
-  };
+  let hoja: Hoja | undefined = destino != null ? hojaPorId(destino) : undefined;
   let colocados = 0;
   let ultimoRender = 0;
-  // ponytail: cede el turno por archivo (scheduler.yield en Chrome = ventana de
-  // paint/scroll; microtask en tests/jsdom para no colgar los timers falsos).
-  const cederTurno = (): Promise<void> =>
-    (
-      globalThis as unknown as { scheduler?: { yield?: () => Promise<void> } }
-    ).scheduler?.yield?.() ?? Promise.resolve();
-  // Telemetría del intake (solo DEV): pared vs costo de normalización por foto.
-  const tIntake = performance.now();
-  const msNorm: number[] = [];
-  const colocar = (items: Comprobante[]): void => {
-    if (items.length === 0) return;
-    let actual = asegurarHoja();
-    llenar(actual.slots, items);
+  return (items: Comprobante[]): void => {
+    if (!hoja) {
+      // Perezosa: el intake vacío o todo-rechazado no crea hojas (el test
+      // "null o vacío" lo exige; antes el return temprano lo garantizaba).
+      hoja = state.hojas.find(tieneHueco) ?? state.hojas[state.hojas.length - 1] ?? crearHoja();
+      if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
+    }
+    llenarHuecos(hoja.slots, items);
+    // Los desbordes continúan en la hoja recién creada (la próxima llamada
+    // del mismo lote sigue llenando ahí).
     while (items.length) {
-      actual = crearHoja(actual.layout);
-      hoja = actual;
-      state.hojas.push(actual);
-      llenar(actual.slots, items);
+      hoja = crearHoja(hoja.layout);
+      state.hojas.push(hoja);
+      llenarHuecos(hoja.slots, items);
     }
     colocados += 1;
     const ahora = performance.now();
@@ -159,6 +163,88 @@ export async function agregarArchivos(
       renderHojas();
     }
   };
+}
+
+/** Gate + fan-out de un PDF: comprobantes por página útil; null si avisó. */
+async function paginasUtiles(f: File, avisos: AvisoRechazo[]): Promise<Comprobante[] | null> {
+  // Gate + fan-out por archivo (secuencial): cada página no-blanca = un
+  // comprobante "base p.i/N". Blancas en silencio; sin útiles → aviso.
+  const veredicto = await admitirPdf(f, contarPaginasPdf);
+  // ponytail: admitirPdf no es nulable y el rechazo siempre trae motivo.
+  if (veredicto.admite !== true) {
+    avisos.push({ archivo: sanear(f.name), motivo: textoMotivo(veredicto.motivo) });
+    return null;
+  }
+  const pags = await expandirPdf(f);
+  if (pags.length === 0) {
+    avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+    return null;
+  }
+  const base = sanear(f.name).replace(/\.pdf$/i, "");
+  return pags.map((p) => {
+    const url = URL.createObjectURL(p.blob);
+    return {
+      id: nextComprobanteId(),
+      nombre: `${base} p.${p.indice}/${p.total}`,
+      imgUrl: url,
+      textoOcr: "",
+      montoCents: null,
+      montoManual: false,
+      moneda: "USD",
+      estado: "pendiente",
+      posicion: 0,
+    } satisfies Comprobante;
+  });
+}
+
+/** Una imagen del intake: normaliza y coloca; aviso si sale blanca/corrupta. */
+async function intakeImagen(
+  f: File,
+  colocar: (items: Comprobante[]) => void,
+  avisos: AvisoRechazo[],
+  msNorm: number[],
+): Promise<boolean> {
+  // Intake: jpg/png/webp sin nada que corregir pasa crudo (0 gens);
+  // lo demás se empaqueta a WebP. Blanca/corrupta → aviso, sin tumbar el lote.
+  // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
+  try {
+    const tN = performance.now();
+    const blob = await normalizarImagen(f);
+    if (import.meta.env.DEV) msNorm.push(performance.now() - tN);
+    colocar([comprobanteDesdeBlob(blob, f.name)]);
+    return true;
+  } catch {
+    avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+    return false;
+  }
+}
+
+/** Telemetría del intake (solo DEV): pared vs costo de normalización por foto. */
+function telemetriaIntake(tIntake: number, msNorm: readonly number[]): void {
+  if (!import.meta.env.DEV || msNorm.length === 0) return;
+  const ordenadas = [...msNorm].sort((a, b) => a - b);
+  const cuantil = (q: number): number =>
+    Math.round(ordenadas[Math.min(ordenadas.length - 1, Math.ceil(q * ordenadas.length) - 1)] ?? 0);
+  console.info(
+    `intake ms pared=${Math.round(performance.now() - tIntake)} n=${msNorm.length} ` +
+      `normP50=${cuantil(0.5)} normMax=${cuantil(1)}`,
+  );
+}
+
+export async function agregarArchivos(
+  files: FileList | readonly File[] | null | undefined,
+  hojaId: number | null = null,
+): Promise<void> {
+  // Cualquier intake consume la hoja pedida (picker, drop, paste): si no, la
+  // pendiente sobrevive y el próximo picker cae en una hoja abandonada.
+  const destino = hojaId ?? hojaPedida;
+  hojaPedida = null;
+  const lista: File[] = aListaDeArchivos(files);
+  const avisos = avisosDeFormato(lista);
+  const colocar = crearColocacion(destino);
+  let colocados = 0;
+  const tIntake = performance.now();
+  const msNorm: number[] = [];
   // Sin VT ni rebuilds por archivo durante el intake (ver sheets.renderHojas):
   // el flag cubre todo el loop y el finally lo suelta aunque un PDF falle.
   intakesActivos++;
@@ -167,68 +253,21 @@ export async function agregarArchivos(
     for (const f of lista) {
       await cederTurno();
       if (esImagen(f)) {
-        // Intake: jpg/png/webp sin nada que corregir pasa crudo (0 gens);
-        // lo demás se empaqueta a WebP. Blanca/corrupta → aviso, sin tumbar el lote.
-        // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
-        try {
-          const tN = performance.now();
-          const blob = await normalizarImagen(f);
-          if (import.meta.env.DEV) msNorm.push(performance.now() - tN);
-          colocar([comprobanteDesdeBlob(blob, f.name)]);
-        } catch {
-          avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
-        }
+        if (await intakeImagen(f, colocar, avisos, msNorm)) colocados += 1;
         continue;
       }
       if (!esPdf(f)) continue;
-      // Gate + fan-out por archivo (secuencial): cada página no-blanca = un
-      // comprobante "base p.i/N". Blancas en silencio; sin útiles → aviso.
-      const veredicto = await admitirPdf(f, contarPaginasPdf);
-      if (veredicto?.admite !== true) {
-        avisos.push({
-          archivo: sanear(f.name),
-          motivo: textoMotivo(veredicto?.motivo ?? "ilegible"),
-        });
-        continue;
+      const pags = await paginasUtiles(f, avisos);
+      if (pags) {
+        colocar(pags);
+        colocados += 1;
       }
-      const pags = await expandirPdf(f);
-      if (pags.length === 0) {
-        avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
-        continue;
-      }
-      const base = sanear(f.name).replace(/\.pdf$/i, "");
-      colocar(
-        pags.map((p) => {
-          const url = URL.createObjectURL(p.blob);
-          return {
-            id: nextComprobanteId(),
-            nombre: `${base} p.${p.indice}/${p.total}`,
-            imgUrl: url,
-            textoOcr: "",
-            montoCents: null,
-            montoManual: false,
-            moneda: "USD",
-            estado: "pendiente",
-            posicion: 0,
-          } satisfies Comprobante;
-        }),
-      );
     }
   } finally {
     intakesActivos--;
     state.loteEnCurso = intakesActivos > 0;
   }
-  if (import.meta.env.DEV && msNorm.length > 0) {
-    const ordenadas = [...msNorm].sort((a, b) => a - b);
-    const cuantil = (q: number): number =>
-      Math.round(
-        ordenadas[Math.min(ordenadas.length - 1, Math.ceil(q * ordenadas.length) - 1)] ?? 0,
-      );
-    console.info(
-      `intake ms pared=${Math.round(performance.now() - tIntake)} n=${msNorm.length} ` +
-        `normP50=${cuantil(0.5)} normMax=${cuantil(1)}`,
-    );
-  }
+  telemetriaIntake(tIntake, msNorm);
   avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
   if (colocados === 0) return;
 
@@ -248,6 +287,22 @@ interface ItemConImagen {
 // read() — ese caso solo entra por Ctrl+V o la tarjeta. El mensaje cubre ambos.
 const MOTIVO_SIN_IMAGEN: string =
   "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pega con Ctrl+V";
+
+/** Primer tipo image/* del item (null si no trae). */
+function tipoImagenDe(item: ItemConImagen): string | null {
+  return (item.types ?? []).find((t) => t.startsWith("image/")) ?? null;
+}
+
+/** Subtipo crudo de un tipo image/x (png, jpeg): sin parámetros ;. */
+function subtipoImagen(tipo: string): string {
+  // ponytail: split(";") siempre trae [0]; el tipo ya pasó el find image/.
+  return tipo.slice("image/".length).split(";")[0]!.toLowerCase();
+}
+
+/** Motivo del aviso final: el formato raro encontrado o el genérico. */
+function motivoDePortapapeles(formatoNoSoportado: boolean): string {
+  return formatoNoSoportado ? "formato no soportado" : MOTIVO_SIN_IMAGEN;
+}
 
 // Lee los bytes de imagen del portapapeles del SO. Null = ya se avisó.
 // El read() corre sin await previo: el gesto del clic lo autoriza en Chrome.
@@ -276,9 +331,9 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   const archivos: File[] = [];
   let formatoNoSoportado = false;
   for (const item of items) {
-    const tipo = (item.types ?? []).find((t) => t.startsWith("image/"));
+    const tipo = tipoImagenDe(item);
     if (!tipo) continue;
-    const cruda = (tipo.split("/")[1] ?? "").split(";")[0]?.toLowerCase() ?? "";
+    const cruda = subtipoImagen(tipo);
     if (!MIME_IMAGEN.test(`image/${cruda}`)) {
       formatoNoSoportado = true; // mismo mensaje que Ctrl+V para esos bytes
       continue;
@@ -294,7 +349,7 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
     avisar([
       {
         archivo: "Portapapeles",
-        motivo: formatoNoSoportado ? "formato no soportado" : MOTIVO_SIN_IMAGEN,
+        motivo: motivoDePortapapeles(formatoNoSoportado),
       },
     ]);
     return null;
@@ -304,6 +359,73 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
 
 // Clic en celda vacía: lee la imagen del portapapeles del SO (copiada en
 // WhatsApp con clic derecho > Copiar imagen) y la coloca en ese slot exacto.
+
+/** La hoja del clic fantasma: la última si tiene huecos, o una nueva (aún
+    sin apuntar a state) heredando su layout. */
+function destinoFantasma(): Hoja {
+  const ultima = state.hojas[state.hojas.length - 1];
+  return ultima && ultima.slots.includes(null) ? ultima : crearHoja(ultima?.layout ?? "u4x2");
+}
+
+/** Hoja real para el clic: la pedida, o la fantasma resuelta. */
+function destinoDelClic(hojaId: number): Hoja | null {
+  let destino = hojaId === HOJA_FANTASMA ? undefined : hojaPorId(hojaId);
+  if (!destino && hojaId === HOJA_FANTASMA) destino = destinoFantasma();
+  return destino ?? null;
+}
+
+/** Re-resuelve la hoja tras el await: materializa el fantasma solo si sigue
+    sin hueco abierto y nunca devuelve una hoja desvinculada. */
+function vigenteParaEscribir(destino: Hoja, hojaId: number): Hoja | null {
+  // Materializa recién con la normalización buena (si falla, no queda hoja
+  // vacía) y solo si sigue haciendo falta: misma política compacta del
+  // fallback de abajo — si otro intake abrió un hueco, manda ese.
+  if (
+    hojaId === HOJA_FANTASMA &&
+    !state.hojas.includes(destino) &&
+    !state.hojas.some((x) => x.slots.includes(null))
+  ) {
+    state.hojas.push(destino);
+  }
+  // Re-resuelve tras el await: la hoja pudo barrerse (limpiar/cambio de
+  // layout) mientras la normalización pendía; nunca se escribe en un
+  // objeto desvinculado.
+  const vigente = hojaPorId(destino.id);
+  return vigente && state.hojas.includes(vigente) ? vigente : null;
+}
+
+/** Última hoja con hueco, o una nueva (ya en state) heredando el layout. */
+function huecoOAnueva(layoutRespaldo: LayoutId, vinculado: LayoutId | undefined): Hoja {
+  const conHueco = state.hojas.find((x) => x.slots.includes(null));
+  if (conHueco) return conHueco;
+  const nueva = crearHoja(vinculado ?? layoutRespaldo);
+  state.hojas.push(nueva);
+  return nueva;
+}
+
+/** Coloca comp en la hoja vigente (slot exacto o hueco) o en el flujo normal.
+    Devuelve la hoja donde cayó (para la afinidad del resto). */
+function colocarEnVigente(
+  h: Hoja | null,
+  slotIdx: number,
+  layoutRespaldo: LayoutId,
+  comp: Comprobante,
+): Hoja {
+  if (h && slotIdx >= 0 && slotIdx < h.slots.length && h.slots[slotIdx] == null) {
+    h.slots[slotIdx] = comp;
+    return h;
+  }
+  if (h && h.slots.includes(null)) {
+    h.slots[h.slots.indexOf(null)] = comp; // ponytail: includes acaba de verificar: indexOf no da -1
+    return h;
+  }
+  // Hoja llena o barrida en el ínterin: flujo normal (última con hueco o
+  // nueva heredando layout).
+  const actual = huecoOAnueva(layoutRespaldo, h?.layout);
+  actual.slots[actual.slots.indexOf(null)] = comp; // ponytail: huecoOAnueva solo devuelve hojas con hueco
+  return actual;
+}
+
 export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
   if (state.modoOcr) return;
   // Lee antes de mutar: si no hay imagen no se toca el estado (el fantasma
@@ -313,14 +435,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
   if (!archivos) return;
   const primero = archivos[0];
   if (!primero) return;
-  let destino = hojaId === HOJA_FANTASMA ? undefined : hojaPorId(hojaId);
-  if (!destino && hojaId === HOJA_FANTASMA) {
-    // Clic en la hoja fantasma (solo visual): hoja pendiente con el layout de
-    // la última, que se materializa recién con la normalización buena (abajo).
-    // Si la última ya tiene huecos (carrera con otro intake), se reutiliza.
-    const ultima = state.hojas[state.hojas.length - 1];
-    destino = ultima && ultima.slots.includes(null) ? ultima : crearHoja(ultima?.layout ?? "u4x2");
-  }
+  const destino = destinoDelClic(hojaId);
   if (!destino) return;
   // Elección explícita de destino: consume la pendiente del picker (si no, el
   // próximo intake caería en una hoja abandonada).
@@ -336,45 +451,12 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
       avisar([{ archivo: sanear(primero.name), motivo: "no se pudo leer" }]);
       return;
     }
-    // Materializa recién con la normalización buena (si falla, no queda hoja
-    // vacía) y solo si sigue haciendo falta: misma política compacta del
-    // fallback de abajo — si otro intake abrió un hueco, manda ese.
-    if (
-      hojaId === HOJA_FANTASMA &&
-      !state.hojas.includes(destino) &&
-      !state.hojas.some((x) => x.slots.includes(null))
-    ) {
-      state.hojas.push(destino);
-    }
-    // Re-resuelve tras el await: la hoja pudo barrerse (limpiar/cambio de
-    // layout) mientras la normalización pendía; nunca se escribe en un
-    // objeto desvinculado.
-    const vigente = hojaPorId(destino.id);
-    const h = vigente && state.hojas.includes(vigente) ? vigente : null;
-    let afinidad: number | null = h?.id ?? null;
-    if (h && slotIdx >= 0 && slotIdx < h.slots.length && h.slots[slotIdx] == null) {
-      h.slots[slotIdx] = comp;
-    } else if (h && h.slots.includes(null)) {
-      const libre = h.slots.indexOf(null);
-      if (libre >= 0) h.slots[libre] = comp;
-    } else {
-      // Hoja llena o barrida en el ínterin: flujo normal (última con hueco o
-      // nueva heredando layout).
-      const actual =
-        state.hojas.find((x) => x.slots.includes(null)) ??
-        (() => {
-          const nueva = crearHoja(h?.layout ?? layoutRespaldo);
-          state.hojas.push(nueva);
-          return nueva;
-        })();
-      const libre = actual.slots.indexOf(null);
-      if (libre >= 0) actual.slots[libre] = comp;
-      afinidad = actual.id;
-    }
+    const h = vigenteParaEscribir(destino, hojaId);
+    const hojaFinal = colocarEnVigente(h, slotIdx, layoutRespaldo, comp);
     renderHojas();
     // Resto (raro desde WhatsApp): sigue a la hoja donde cayó `primero`.
     const resto = archivos.slice(1);
-    if (resto.length > 0) await agregarArchivos(resto, afinidad);
+    if (resto.length > 0) await agregarArchivos(resto, hojaFinal.id);
     else avisar([]); // éxito: limpia un rechazo viejo de otro intento
     precalentarModelos();
     void procesarCola();
@@ -417,7 +499,15 @@ export function elegirArchivos(hojaId: number): void {
   fileInput.showPicker();
 }
 
-export function initSidebar(): void {
+/** Contador dragenter/dragleave: sin esto el overlay parpadea por cada hijo. */
+let arrastresCanvas = 0;
+function marcarArrastre(n: number): void {
+  arrastresCanvas = Math.max(0, n);
+  canvas.classList.toggle("arrastrando", arrastresCanvas > 0);
+}
+
+/** Picker de la tarjeta: clic (label nativo), Enter/Espacio (manual) y change. */
+function cablearPicker(): void {
   // El label solo reenvía clics: Enter/Espacio sobre él no abren el picker
   // (sin activation behavior propio), por eso el keydown es manual.
   dropzone.addEventListener("keydown", (e) => {
@@ -435,21 +525,18 @@ export function initSidebar(): void {
   fileInput.addEventListener("cancel", () => {
     hojaPedida = null;
   });
-  // Entrada a nivel canvas: cualquier punto del área (fondo, tarjeta, botón)
-  // acepta archivos; sobre una hoja manda sheets.ts con su hojaId.
-  // La entrada nunca se bloquea por el modo OCR (solo el reordenamiento).
-  // Contador dragenter/dragleave: sin esto el overlay parpadea por cada hijo.
-  let arrastres = 0;
-  const marcar = (n: number): void => {
-    arrastres = Math.max(0, n);
-    canvas.classList.toggle("arrastrando", arrastres > 0);
-  };
+}
+
+/** Entrada a nivel canvas: cualquier punto del área (fondo, tarjeta, botón)
+    acepta archivos; la entrada nunca se bloquea por el modo OCR (solo el
+    reordenamiento). */
+function cablearArrastreCanvas(): void {
   // Head-start: entrar al canvas anticipa la intención (una sola vez).
   canvas.addEventListener("pointerenter", () => precalentarModelos(), { once: true });
   canvas.addEventListener("dragenter", (e) => {
     if (!esDragDeArchivos(e)) return;
     e.preventDefault();
-    marcar(arrastres + 1);
+    marcarArrastre(arrastresCanvas + 1);
   });
   canvas.addEventListener("dragover", (e) => {
     if (!esDragDeArchivos(e)) return;
@@ -457,36 +544,51 @@ export function initSidebar(): void {
   });
   canvas.addEventListener("dragleave", (e) => {
     if (!esDragDeArchivos(e)) return;
-    marcar(arrastres - 1);
+    marcarArrastre(arrastresCanvas - 1);
   });
+}
+
+/** El drop del canvas (sobre una hoja manda sheets.ts con su hojaId) y la red
+    de seguridad: un drop fallado fuera del canvas no navega el navegador
+    (perdería el lote en memoria). Fuera del canvas no se sube nada. */
+function cablearSoltar(): void {
   canvas.addEventListener("drop", (e) => {
-    marcar(0);
+    marcarArrastre(0);
     if (!esDragDeArchivos(e)) return;
     e.preventDefault();
     if ((e.target as HTMLElement | null)?.closest?.(".sheet")) return;
     void agregarArchivos(e.dataTransfer?.files);
   });
-  // Red de seguridad: un drop fallado fuera del canvas no navega el navegador
-  // (perdería el lote en memoria). Fuera del canvas no se sube nada.
   window.addEventListener("dragover", (e) => {
     if (esDragDeArchivos(e)) e.preventDefault();
   });
   window.addEventListener("drop", (e) => {
-    marcar(0);
+    marcarArrastre(0);
     if (esDragDeArchivos(e)) e.preventDefault();
   });
   document.addEventListener("dragleave", (e) => {
-    if (e.relatedTarget === null) marcar(0); // el arrastre salió de la ventana
+    if (e.relatedTarget === null) marcarArrastre(0); // el arrastre salió de la ventana
   });
+}
+
+/** Los archivos image-les de un evento paste (con Files en el clipboardData). */
+function archivosDePaste(e: ClipboardEvent): File[] {
+  return Array.from(e.clipboardData?.items ?? [])
+    .filter((it) => it.kind === "file")
+    .map((it) => it.getAsFile())
+    .filter((f): f is File => f !== null);
+}
+
+function cablearPaste(): void {
   document.addEventListener("paste", (e) => {
-    const files = Array.from(e.clipboardData?.items ?? [])
-      .filter((it) => it.kind === "file")
-      .map((it) => it.getAsFile())
-      .filter((f): f is File => f !== null);
+    const files = archivosDePaste(e);
     if (files.length) void agregarArchivos(files);
   });
-  // Lote vacío: el botón pega lo copiado sin abrir el buscador.
-  // ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces).
+}
+
+/** Lote vacío: el botón pega lo copiado sin abrir el buscador.
+    ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces). */
+function cablearBtnPegar(): void {
   btnPegar.addEventListener("click", () => {
     if (btnPegar.dataset["pegando"] === "1") return;
     btnPegar.dataset["pegando"] = "1";
@@ -494,13 +596,10 @@ export function initSidebar(): void {
       delete btnPegar.dataset["pegando"];
     });
   });
+}
 
-  // Reintento manual del cálculo de totales (el auto corre al drenar la cola).
-  btnCalcular.addEventListener("click", () => {
-    extraerPendientes({ forzado: true });
-  });
-
-  // El switch solo arma el guardado de su ventana; ON no escribe, OFF retira lo suyo.
+/** El switch solo arma el guardado de su ventana; ON no escribe, OFF retira lo suyo. */
+function cablearSwitchCodigo(): void {
   chkCodigo.addEventListener("change", () => {
     state.codigoActivo = chkCodigo.checked;
     if (!chkCodigo.checked) borrarCodigo();
@@ -511,14 +610,6 @@ export function initSidebar(): void {
     if (chkCodigo.checked) guardarCodigo();
     renderCodigo();
   });
-  // La esquina es otro dato de la ventana Código: cambiarla persiste igual.
-  radiosPosicion().forEach((r) =>
-    r.addEventListener("change", () => {
-      if (!r.checked || !isPosicionCodigo(r.value)) return;
-      state.codigoPosicion = r.value;
-      if (chkCodigo.checked) guardarCodigo();
-    }),
-  );
   inputCodigo.addEventListener("input", () => {
     state.codigoValor = inputCodigo.value.replace(/\D/g, "").slice(0, state.codigoLongitud);
     inputCodigo.value = state.codigoValor;
@@ -527,9 +618,22 @@ export function initSidebar(): void {
     inputCodigo.removeAttribute("aria-invalid");
     if (chkCodigo.checked) guardarCodigo();
   });
+}
 
-  // El botón Limpiar abre el dialog vía commandfor (cero JS); acá solo se
-  // ejecuta el vaciado si se confirmó. Esc/backdrop/Cancelar → returnValue ''.
+/** La esquina es otro dato de la ventana Código: cambiarla persiste igual. */
+function cablearRadiosPosicion(): void {
+  radiosPosicion().forEach((r) =>
+    r.addEventListener("change", () => {
+      if (!r.checked || !isPosicionCodigo(r.value)) return;
+      state.codigoPosicion = r.value;
+      if (chkCodigo.checked) guardarCodigo();
+    }),
+  );
+}
+
+/** El botón Limpiar abre el dialog vía commandfor (cero JS); acá solo se
+    ejecuta el vaciado si se confirmó. Esc/backdrop/Cancelar → returnValue ''. */
+function cablearModalLimpiar(): void {
   modalLimpiar.addEventListener("close", () => {
     if (modalLimpiar.returnValue !== "ok") return;
     hojaPedida = null; // la hoja destino pudo dejar de existir
@@ -544,5 +648,24 @@ export function initSidebar(): void {
     renderHojas();
     // Último: si el storage falla, los renders ya corrieron.
     if (state.codigoActivo) guardarCodigo();
+  });
+}
+
+export function initSidebar(): void {
+  cablearPicker();
+  cablearArrastreCanvas();
+  cablearSoltar();
+  cablearPaste();
+  cablearBtnPegar();
+  cablearBtnCalcular();
+  cablearSwitchCodigo();
+  cablearRadiosPosicion();
+  cablearModalLimpiar();
+}
+
+/** Reintento manual del cálculo de totales (el auto corre al drenar la cola). */
+function cablearBtnCalcular(): void {
+  btnCalcular.addEventListener("click", () => {
+    extraerPendientes({ forzado: true });
   });
 }

@@ -11,10 +11,12 @@ const { renderHojas, actualizarMontoCelda } = await import("../ui/sheets");
 const {
   aplicarTotales,
   candidatos,
+  computarLote,
   extractCandidates,
   extraerPendientes,
   extraerRapidoCents,
   limpiarTextoCompleto,
+  mensajeLote,
 } = await import("./extract");
 import type { ItemLote } from "./extract";
 
@@ -192,6 +194,53 @@ describe("aplicarTotales", () => {
   });
 });
 
+describe("computarLote", () => {
+  it("sin candidatos → sin-candidatos", () => {
+    expect(computarLote([])).toEqual({ tipo: "sin-candidatos" });
+  });
+
+  it("candidatos sin texto → sin-texto", () => {
+    expect(computarLote([comprobante({ textoOcr: "   " })])).toEqual({ tipo: "sin-texto" });
+  });
+
+  it("sin montos → sin-totales", () => {
+    const c = comprobante({ textoOcr: "recorte malo sin números" });
+    expect(computarLote([c])).toEqual({ tipo: "sin-totales" });
+  });
+
+  it("listo mapea idx/id/texto y el mapa de totales", () => {
+    const c1 = comprobante({ textoOcr: "TOTAL 12.50" });
+    const c2 = comprobante({ textoOcr: "TOTAL 7.00" });
+    expect(computarLote([c1, c2])).toEqual({
+      tipo: "listo",
+      items: [
+        { idx: 1, id: c1.id, texto: "TOTAL 12.50" },
+        { idx: 2, id: c2.id, texto: "TOTAL 7.00" },
+      ],
+      mapa: new Map([
+        [1, 1250],
+        [2, 700],
+      ]),
+    });
+  });
+});
+
+describe("mensajeLote", () => {
+  it("éxito total con aviso previo lo restaura", () => {
+    expect(mensajeLote(2, 2, "«gordo.pdf»: pesa más de 5 MB")).toBe(
+      "«gordo.pdf»: pesa más de 5 MB",
+    );
+  });
+
+  it("éxito total sin aviso previo informa el conteo", () => {
+    expect(mensajeLote(2, 2, "  ")).toBe("Local: 2/2 totales.");
+  });
+
+  it("parcial informa el conteo aunque haya aviso previo", () => {
+    expect(mensajeLote(1, 2, "previo")).toBe("Local: 1/2 totales.");
+  });
+});
+
 describe("extraerPendientes", () => {
   it("auto: 1 pasada, pinta 1 vez y avisa el conteo", () => {
     const { c1, c2 } = lote2();
@@ -267,11 +316,36 @@ describe("extraerPendientes", () => {
     expect(aviso.textContent).toBe("Sin pendientes (todo ya tiene total o es manual).");
   });
 
+  it("forzado durante OCR avisa que se calcula al terminar", () => {
+    const { c1 } = lote2();
+    state.colaEnProceso = true;
+    try {
+      extraerPendientes({ forzado: true });
+      expect(c1.montoCents).toBeNull();
+      expect(aviso.textContent).toBe("OCR en curso: los totales se calculan al terminar.");
+    } finally {
+      state.colaEnProceso = false;
+    }
+  });
+
   it("parcial con forzado: avisa conteo y resto manual", () => {
     lote2();
     const amb = state.hojas[0]?.slots[1];
     if (amb) amb.textoOcr = "PROPINA 1.00 TOTAL 7.00"; // 2 distintos → manual
     extraerPendientes({ forzado: true });
     expect(aviso.textContent).toBe("Local: 1/2 totales.");
+  });
+
+  it("sin nodo de aviso no tira (aviso previo vacío)", () => {
+    const { c1 } = lote2();
+    const nodo = document.getElementById("aviso");
+    if (!nodo) throw new Error("sin #aviso en el fixture");
+    nodo.remove();
+    try {
+      extraerPendientes();
+      expect(c1.montoCents).toBe(1250);
+    } finally {
+      document.body.append(nodo); // mismo nodo: la const aviso sigue válida
+    }
   });
 });

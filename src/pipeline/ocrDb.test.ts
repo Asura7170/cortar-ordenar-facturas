@@ -6,9 +6,13 @@ import {
   cajasDesdeMapa,
   cascoConvexo,
   expandirQuad,
+  interseccionRectas,
   inundar,
   ordenarQuad,
+  proyectarCasco,
   puntuarCaja,
+  puntoEnQuad,
+  rectaDesplazada,
   rectanguloMinimo,
 } from "./ocrDb";
 import type { CajaDb } from "./ocrDb";
@@ -69,6 +73,12 @@ describe("inundar", () => {
     ]);
     expect(inundar(bin, 5, new Uint32Array(25), 1, 1, 1)).toHaveLength(2);
   });
+
+  it("borde caliente no se sale del mapa (toleran vistas raras)", () => {
+    // Sin borde de 1px a propósito: los vecinos OOB dan undefined.
+    const bin = new Uint8Array([1, 0, 0, 0]);
+    expect(inundar(bin, 2, new Uint32Array(4), 0, 0, 1)).toEqual([[-1, -1]]);
+  });
 });
 
 describe("cascoConvexo", () => {
@@ -81,6 +91,30 @@ describe("cascoConvexo", () => {
       [1, 1],
     ]);
     expect(h).toHaveLength(4);
+  });
+
+  it("duplicados no duplican vértices", () => {
+    expect(
+      cascoConvexo([
+        [0, 0],
+        [0, 0],
+        [2, 0],
+        [2, 2],
+        [0, 2],
+      ]),
+    ).toHaveLength(4);
+  });
+
+  it("menos de 3 únicos se devuelven tal cual", () => {
+    expect(
+      cascoConvexo([
+        [0, 0],
+        [1, 1],
+      ]),
+    ).toEqual([
+      [0, 0],
+      [1, 1],
+    ]);
   });
 });
 
@@ -106,6 +140,60 @@ describe("rectanguloMinimo", () => {
         [1, 1],
       ]),
     ).toBeNull();
+  });
+
+  it("arista de largo cero se salta", () => {
+    const r = rectanguloMinimo([
+      [0, 0],
+      [0, 0],
+      [2, 0],
+      [2, 2],
+      [0, 2],
+    ]);
+    expect(r).not.toBeNull();
+  });
+});
+
+describe("proyectarCasco", () => {
+  it("proyecta el cuadrado sobre X", () => {
+    expect(
+      proyectarCasco(
+        [
+          [0, 0],
+          [2, 0],
+          [2, 2],
+          [0, 2],
+        ],
+        1,
+        0,
+      ),
+    ).toEqual({ minU: 0, maxU: 2, minV: 0, maxV: 2 });
+  });
+});
+
+describe("puntoEnQuad", () => {
+  // enrollados verificados a mano (shoelace ±32).
+  const ccw: CajaDb["poli"] = [
+    [0, 0],
+    [4, 0],
+    [4, 4],
+    [0, 4],
+  ];
+  const cw: CajaDb["poli"] = [
+    [0, 0],
+    [0, 4],
+    [4, 4],
+    [4, 0],
+  ];
+
+  it("dentro/fuera en antihorario", () => {
+    expect(puntoEnQuad(ccw, 2, 2, false)).toBe(true);
+    expect(puntoEnQuad(ccw, 5, 5, false)).toBe(false);
+  });
+
+  it("dentro/fuera en horario", () => {
+    expect(puntoEnQuad(cw, 2, 2, true)).toBe(true);
+    expect(puntoEnQuad(cw, 5, 5, true)).toBe(false);
   });
 });
 
@@ -150,6 +238,30 @@ describe("puntuarCaja", () => {
       ]),
     ).toBeCloseTo(0.5, 6);
   });
+
+  it("quad horario puntúa igual (enrollado independiente)", () => {
+    const mapa = new Float32Array(16).fill(0.9);
+    expect(
+      puntuarCaja(mapa, 4, [
+        [0, 0],
+        [0, 3],
+        [3, 3],
+        [3, 0],
+      ]),
+    ).toBeCloseTo(0.9, 6);
+  });
+
+  it("quad fuera del mapa → 0 sin lanzar", () => {
+    const mapa = new Float32Array(16).fill(0.9);
+    expect(
+      puntuarCaja(mapa, 4, [
+        [100, 100],
+        [103, 100],
+        [103, 103],
+        [100, 103],
+      ]),
+    ).toBe(0);
+  });
 });
 
 describe("expandirQuad", () => {
@@ -192,6 +304,66 @@ describe("expandirQuad", () => {
         [0, 10],
       ]),
     ).toBeNull();
+  });
+
+  it("horario expande igual (vale con cualquier enrollado)", () => {
+    const q = expandirQuad(
+      [
+        [0, 0],
+        [0, 10],
+        [10, 10],
+        [10, 0],
+      ],
+      1.4,
+    );
+    expect(q).not.toBeNull();
+    const xs = (q ?? []).map((p) => p[0]);
+    const ys = (q ?? []).map((p) => p[1]);
+    expect(Math.min(...xs)).toBeCloseTo(-3.5, 6);
+    expect(Math.max(...xs)).toBeCloseTo(13.5, 6);
+    expect(Math.min(...ys)).toBeCloseTo(-3.5, 6);
+    expect(Math.max(...ys)).toBeCloseTo(13.5, 6);
+  });
+
+  it("línea sin área → null", () => {
+    expect(
+      expandirQuad([
+        [0, 0],
+        [10, 0],
+        [20, 0],
+        [30, 0],
+      ]),
+    ).toBeNull();
+  });
+
+  it("pico colineal (aristas adyacentes paralelas) → null", () => {
+    expect(
+      expandirQuad([
+        [0, 0],
+        [10, 0],
+        [5, 0],
+        [0, 10],
+      ]),
+    ).toBeNull();
+  });
+});
+
+describe("rectaDesplazada/interseccionRectas", () => {
+  it("arista nula → null", () => {
+    expect(rectaDesplazada([1, 1], [1, 1], 0, 0, 1)).toBeNull();
+  });
+
+  it("normal hacia dentro se invierte", () => {
+    // Arista izq (0,0)->(0,10) con centroide a la derecha: la normal mira dentro.
+    expect(rectaDesplazada([0, 0], [0, 10], 5, 5, 0)).toEqual({ nx: -1, ny: 0, c: 0 });
+  });
+
+  it("paralelas no se cortan", () => {
+    expect(interseccionRectas({ nx: 0, ny: -1, c: 5 }, { nx: 0, ny: -1, c: 3 })).toBeNull();
+  });
+
+  it("perpendiculares se cortan en el origen", () => {
+    expect(interseccionRectas({ nx: 1, ny: 0, c: 0 }, { nx: 0, ny: 1, c: 0 })).toEqual([0, 0]);
   });
 });
 
@@ -283,5 +455,32 @@ describe("cajasDesdeMapa", () => {
     expect(cajasDesdeMapa(new Float32Array(100), 10, 0, { ancho: 40, alto: 20 })).toEqual([]);
     expect(cajasDesdeMapa(new Float32Array(100), 10, 10, { ancho: 0, alto: 20 })).toEqual([]);
     expect(cajasDesdeMapa(new Float32Array(100), 10, 10, { ancho: 40, alto: 0 })).toEqual([]);
+  });
+
+  it("píxel suelto sin área se descarta", () => {
+    const mapa = new Float32Array(100).fill(0.05);
+    mapa[55] = 0.9;
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toEqual([]);
+  });
+
+  it("dúo sin rectángulo se descarta", () => {
+    const mapa = new Float32Array(100).fill(0.05);
+    mapa[55] = 0.9;
+    mapa[56] = 0.9;
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toEqual([]);
+  });
+
+  it("triplete colineal sin expansión se descarta", () => {
+    const mapa = new Float32Array(100).fill(0.05);
+    mapa[55] = 0.9;
+    mapa[56] = 0.9;
+    mapa[57] = 0.9;
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toEqual([]);
+  });
+
+  it("caja reescalada bajo el área mínima se descarta", () => {
+    const mapa = mapaConRect(10, 10, 3, 3, 6, 6);
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toHaveLength(1);
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 2, alto: 2 })).toEqual([]);
   });
 });

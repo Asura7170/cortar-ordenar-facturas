@@ -15,6 +15,41 @@ export const CALIDAD_WEBP: number = 0.85;
 /** Formatos que pasan crudos si no hay nada que corregir (sin recompresión). */
 const TIPOS_DIRECTOS: ReadonlySet<string> = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+/** Firma JPEG (SOI, 3 bytes; el dispatcher garantiza head ≥ 4). */
+export function esJpeg(head: Uint8Array): boolean {
+  return head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
+}
+
+/** Firma PNG (magic de 8 bytes). */
+export function esPng(head: Uint8Array): boolean {
+  return (
+    head.length >= 8 &&
+    head[0] === 0x89 &&
+    head[1] === 0x50 &&
+    head[2] === 0x4e &&
+    head[3] === 0x47 &&
+    head[4] === 0x0d &&
+    head[5] === 0x0a &&
+    head[6] === 0x1a &&
+    head[7] === 0x0a
+  );
+}
+
+/** Firma WebP (RIFF + "WEBP", 12 bytes; el tamaño va en los 4 del medio). */
+export function esWebp(head: Uint8Array): boolean {
+  return (
+    head.length >= 12 &&
+    head[0] === 0x52 &&
+    head[1] === 0x49 &&
+    head[2] === 0x46 &&
+    head[3] === 0x46 &&
+    head[8] === 0x57 &&
+    head[9] === 0x45 &&
+    head[10] === 0x42 &&
+    head[11] === 0x50
+  );
+}
+
 /** true si el blob ya es jpg/png/webp (por MIME o firma mágica si el type viene vacío). */
 export async function esFormatoDirecto(f: Blob): Promise<boolean> {
   const t = (f.type ?? "").toLowerCase().trim();
@@ -27,28 +62,8 @@ export async function esFormatoDirecto(f: Blob): Promise<boolean> {
     return false;
   }
   if (head.length < 4) return false;
-  const jpeg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff;
-  const png =
-    head.length >= 8 &&
-    head[0] === 0x89 &&
-    head[1] === 0x50 &&
-    head[2] === 0x4e &&
-    head[3] === 0x47 &&
-    head[4] === 0x0d &&
-    head[5] === 0x0a &&
-    head[6] === 0x1a &&
-    head[7] === 0x0a;
-  const webp =
-    head.length >= 12 &&
-    head[0] === 0x52 &&
-    head[1] === 0x49 &&
-    head[2] === 0x46 &&
-    head[3] === 0x46 &&
-    head[8] === 0x57 &&
-    head[9] === 0x45 &&
-    head[10] === 0x42 &&
-    head[11] === 0x50;
-  return jpeg || png || webp;
+  // ponytail: índices OOB dan undefined y `===` corta a false igual que el original.
+  return esJpeg(head) || esPng(head) || esWebp(head);
 }
 
 /** Canal >245 = blanco (antes 250: el gris app #f7f8fa también vacía); píxeles muestreados cada 4px. */
@@ -56,6 +71,17 @@ const BLANCO_UMBRAL = 245;
 const BLANCO_MUESTRA = 4;
 /** ≥99.5% blancos/transparentes → imagen vacía (se omite). */
 const BLANCO_RATIO = 0.995;
+
+/** Píxel muestreado es fondo blanco: alfa<128 o los 3 canales sobre el umbral. */
+export function esFondoBlanco(datos: Uint8ClampedArray, i: number): boolean {
+  // ponytail: i..i+3 in-bounds garantizado por el loop (i + 3 < datos.length).
+  return (
+    (datos[i + 3] as number) < 128 ||
+    ((datos[i] as number) > BLANCO_UMBRAL &&
+      (datos[i + 1] as number) > BLANCO_UMBRAL &&
+      (datos[i + 2] as number) > BLANCO_UMBRAL)
+  );
+}
 
 /**
  * Imagen vacía: casi todo blanco o transparente (el PDF sin fondo se
@@ -75,15 +101,7 @@ export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
   let total = 0;
   for (let i = 0; i + 3 < datos.length; i += 4 * BLANCO_MUESTRA) {
     total += 1;
-    if ((datos[i + 3] ?? 0) < 128) {
-      blancos += 1;
-    } else if (
-      (datos[i] ?? 0) > BLANCO_UMBRAL &&
-      (datos[i + 1] ?? 0) > BLANCO_UMBRAL &&
-      (datos[i + 2] ?? 0) > BLANCO_UMBRAL
-    ) {
-      blancos += 1;
-    }
+    if (esFondoBlanco(datos, i)) blancos += 1;
   }
   return total > 0 && blancos / total >= BLANCO_RATIO;
 }
@@ -92,6 +110,16 @@ export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
 const NEGRO_UMBRAL = 20;
 /** ≥99.5% negros/transparentes → imagen vacía, igual que blanca (se omite). */
 const NEGRO_RATIO = 0.995;
+
+/** Espejo de esFondoBlanco con el umbral negro (misma invariante de in-bounds). */
+export function esFondoNegro(datos: Uint8ClampedArray, i: number): boolean {
+  return (
+    (datos[i + 3] as number) < 128 ||
+    ((datos[i] as number) < NEGRO_UMBRAL &&
+      (datos[i + 1] as number) < NEGRO_UMBRAL &&
+      (datos[i + 2] as number) < NEGRO_UMBRAL)
+  );
+}
 
 /**
  * Imagen oscura: casi todo negro o transparente. Espejo de esPaginaBlanca
@@ -112,15 +140,7 @@ export function esPaginaNegra(lienzo: HTMLCanvasElement): boolean {
   let total = 0;
   for (let i = 0; i + 3 < datos.length; i += 4 * BLANCO_MUESTRA) {
     total += 1;
-    if ((datos[i + 3] ?? 0) < 128) {
-      negros += 1;
-    } else if (
-      (datos[i] ?? 255) < NEGRO_UMBRAL &&
-      (datos[i + 1] ?? 255) < NEGRO_UMBRAL &&
-      (datos[i + 2] ?? 255) < NEGRO_UMBRAL
-    ) {
-      negros += 1;
-    }
+    if (esFondoNegro(datos, i)) negros += 1;
   }
   return total > 0 && negros / total >= NEGRO_RATIO;
 }
@@ -148,6 +168,145 @@ const MARGEN_RECORTE = 0;
 /** Bbox <15% del área → no recortar (ticket ralo, evita colapso). */
 const AREA_MINIMA = 0.15;
 
+type RGB = readonly [number, number, number];
+
+/** Tramo a recortar, en coordenadas del lienzo. */
+interface Bbox {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+/** Mediana por canal (elemento central del ordenado; vacío → 0). */
+export function medianaCanal(v: number[]): number {
+  if (v.length === 0) return 0;
+  const o = [...v].sort((a, b) => a - b);
+  // ponytail: length ≥ 1 ⇒ floor(len/2) < len.
+  return o[Math.floor(o.length / 2)] as number;
+}
+
+/** Mediana por canal del borde (robusta a motas 1px; ignora transparentes). */
+export function medianaBorde(
+  datos: Uint8ClampedArray,
+  toma: (k: number) => number,
+  n: number,
+): RGB {
+  const rs: number[] = [];
+  const gs: number[] = [];
+  const bs: number[] = [];
+  for (let k = 0; k < n; k += 1) {
+    const i = toma(k);
+    // ponytail: toma calcula índices dentro de la imagen (i..i+3 in-bounds).
+    if ((datos[i + 3] as number) < 128) continue;
+    rs.push(datos[i] as number);
+    gs.push(datos[i + 1] as number);
+    bs.push(datos[i + 2] as number);
+  }
+  return [medianaCanal(rs), medianaCanal(gs), medianaCanal(bs)];
+}
+
+/** Tinta del color del borde: distancia ≤ TOL en los 3 canales, o alfa bajo. */
+export function iguala(datos: Uint8ClampedArray, i: number, ref: RGB): boolean {
+  // ponytail: i..i+3 in-bounds garantizado por el loop/guard del llamador.
+  return (
+    (datos[i + 3] as number) < 128 ||
+    (Math.abs((datos[i] as number) - ref[0]) <= TOL_LADO &&
+      Math.abs((datos[i + 1] as number) - ref[1]) <= TOL_LADO &&
+      Math.abs((datos[i + 2] as number) - ref[2]) <= TOL_LADO)
+  );
+}
+
+/**
+ * Tramo fondo de una línea (fila o columna): empieza con el color del extremo
+ * inicial, termina con el del final y el interior es del color ref.
+ * null si el interior trae tinta entre los dos bordes.
+ */
+export function tramoFondo(
+  datos: Uint8ClampedArray,
+  largo: number,
+  toma: (k: number) => number,
+  refIni: RGB,
+  refFin: RGB,
+  ref: RGB,
+): [number, number] | null {
+  let a = 0;
+  while (a < largo && iguala(datos, toma(a), refIni)) a += 1;
+  let b = largo - 1;
+  while (b >= a && iguala(datos, toma(b), refFin)) b -= 1;
+  for (let k = a; k <= b; k += 1) {
+    if (!iguala(datos, toma(k), ref)) return null;
+  }
+  return [a, b];
+}
+/** Fila recortable: franjas laterales del color de su lado + centro del ref. */
+function filaFondo(
+  datos: Uint8ClampedArray,
+  ancho: number,
+  y: number,
+  refIzq: RGB,
+  refDer: RGB,
+  ref: RGB,
+): boolean {
+  return tramoFondo(datos, ancho, (x) => (y * ancho + x) * 4, refIzq, refDer, ref) !== null;
+}
+
+/** Columna recortable (espejo de filaFondo con sus extremos verticales). */
+function colFondo(
+  datos: Uint8ClampedArray,
+  ancho: number,
+  alto: number,
+  x: number,
+  refArriba: RGB,
+  refAbajo: RGB,
+  ref: RGB,
+): boolean {
+  return tramoFondo(datos, alto, (y) => (y * ancho + x) * 4, refArriba, refAbajo, ref) !== null;
+}
+
+/** Avanza k mientras el tramo siga siendo fondo (pasada ascendente). */
+export function sube(k: number, hasta: number, fondo: (n: number) => boolean): number {
+  while (k < hasta && fondo(k)) k += 1;
+  return k;
+}
+
+/** Retrocede k mientras el tramo siga siendo fondo (pasada descendente). */
+export function baja(k: number, hasta: number, fondo: (n: number) => boolean): number {
+  while (k > hasta && fondo(k)) k -= 1;
+  return k;
+}
+
+/**
+ * Bbox del contenido: encoge por los 4 lados (cada lado con su color) y
+ * null si tras encoger queda todo uniforme (imagen de un solo color).
+ */
+export function bboxRecorte(
+  datos: Uint8ClampedArray,
+  ancho: number,
+  alto: number,
+  refArriba: RGB,
+  refAbajo: RGB,
+  refIzq: RGB,
+  refDer: RGB,
+): Bbox | null {
+  const fila = (y: number, ref: RGB): boolean => filaFondo(datos, ancho, y, refIzq, refDer, ref);
+  const col = (x: number, ref: RGB): boolean =>
+    colFondo(datos, ancho, alto, x, refArriba, refAbajo, ref);
+  const y0 = sube(0, alto - 1, (k) => fila(k, refArriba));
+  const y1 = baja(alto - 1, y0, (k) => fila(k, refAbajo));
+  const x0 = sube(0, ancho - 1, (k) => col(k, refIzq));
+  const x1 = baja(ancho - 1, x0, (k) => col(k, refDer));
+  if (fila(y0, refArriba) && col(x0, refIzq)) return null;
+  return { x0, y0, x1, y1 };
+}
+
+/** El recorte no colapsa (≥15% del área) ni es ya el lienzo entero. */
+export function recorteViable(w: number, h: number, ancho: number, alto: number): boolean {
+  if (w * h < ancho * alto * AREA_MINIMA) return false;
+  if (w >= ancho && h >= alto) return false;
+  return true;
+}
+
 /**
  * Recorta franjas uniformes por lado, del color que sea (cada lado con el suyo).
  * La sombra de la mesa no es uniforme: frena como antes y el bbox conserva la
@@ -169,75 +328,20 @@ export function recortarMargenesBlancos(
   } catch {
     return src;
   }
-  type RGB = readonly [number, number, number];
   const px = (x: number, y: number): number => (y * ancho + x) * 4;
-  /** Mediana por canal del borde (robusta a motas 1px; ignora transparentes). */
-  const medianaBorde = (toma: (k: number) => number, n: number): RGB => {
-    const rs: number[] = [];
-    const gs: number[] = [];
-    const bs: number[] = [];
-    for (let k = 0; k < n; k += 1) {
-      const i = toma(k);
-      if ((datos[i + 3] ?? 0) < 128) continue;
-      rs.push(datos[i] ?? 0);
-      gs.push(datos[i + 1] ?? 0);
-      bs.push(datos[i + 2] ?? 0);
-    }
-    const med = (v: number[]): number => {
-      if (v.length === 0) return 0;
-      const o = [...v].sort((a, b) => a - b);
-      return o[Math.floor(o.length / 2)] ?? 0;
-    };
-    return [med(rs), med(gs), med(bs)];
-  };
-  const iguala = (i: number, ref: RGB): boolean =>
-    (datos[i + 3] ?? 0) < 128 ||
-    (Math.abs((datos[i] ?? 0) - ref[0]) <= TOL_LADO &&
-      Math.abs((datos[i + 1] ?? 0) - ref[1]) <= TOL_LADO &&
-      Math.abs((datos[i + 2] ?? 0) - ref[2]) <= TOL_LADO);
-  const refArriba = medianaBorde((x) => px(x, 0), ancho);
-  const refAbajo = medianaBorde((x) => px(x, alto - 1), ancho);
-  const refIzq = medianaBorde((y) => px(0, y), alto);
-  const refDer = medianaBorde((y) => px(ancho - 1, y), alto);
-  // Fila recortable: franjas laterales del color de su lado + centro del de arriba/abajo
-  // (cada lado puede traer su propio color sin bloquear al vecino).
-  const filaFondo = (y: number, ref: RGB): boolean => {
-    let a = 0;
-    while (a < ancho && iguala(px(a, y), refIzq)) a += 1;
-    let b = ancho - 1;
-    while (b >= a && iguala(px(b, y), refDer)) b -= 1;
-    for (let x = a; x <= b; x += 1) {
-      if (!iguala(px(x, y), ref)) return false;
-    }
-    return true;
-  };
-  const colFondo = (x: number, ref: RGB): boolean => {
-    let a = 0;
-    while (a < alto && iguala(px(x, a), refArriba)) a += 1;
-    let b = alto - 1;
-    while (b >= a && iguala(px(x, b), refAbajo)) b -= 1;
-    for (let y = a; y <= b; y += 1) {
-      if (!iguala(px(x, y), ref)) return false;
-    }
-    return true;
-  };
-  let x0 = 0;
-  let y0 = 0;
-  let x1 = ancho - 1;
-  let y1 = alto - 1;
-  while (y0 < y1 && filaFondo(y0, refArriba)) y0 += 1;
-  while (y1 > y0 && filaFondo(y1, refAbajo)) y1 -= 1;
-  while (x0 < x1 && colFondo(x0, refIzq)) x0 += 1;
-  while (x1 > x0 && colFondo(x1, refDer)) x1 -= 1;
-  if (filaFondo(y0, refArriba) && colFondo(x0, refIzq)) return src;
-  const sx = Math.max(0, x0 - MARGEN_RECORTE);
-  const sy = Math.max(0, y0 - MARGEN_RECORTE);
-  const ex = Math.min(ancho - 1, x1 + MARGEN_RECORTE);
-  const ey = Math.min(alto - 1, y1 + MARGEN_RECORTE);
+  const refArriba = medianaBorde(datos, (x) => px(x, 0), ancho);
+  const refAbajo = medianaBorde(datos, (x) => px(x, alto - 1), ancho);
+  const refIzq = medianaBorde(datos, (y) => px(0, y), alto);
+  const refDer = medianaBorde(datos, (y) => px(ancho - 1, y), alto);
+  const box = bboxRecorte(datos, ancho, alto, refArriba, refAbajo, refIzq, refDer);
+  if (!box) return src;
+  const sx = Math.max(0, box.x0 - MARGEN_RECORTE);
+  const sy = Math.max(0, box.y0 - MARGEN_RECORTE);
+  const ex = Math.min(ancho - 1, box.x1 + MARGEN_RECORTE);
+  const ey = Math.min(alto - 1, box.y1 + MARGEN_RECORTE);
   const w = ex - sx + 1;
   const h = ey - sy + 1;
-  if (w * h < ancho * alto * AREA_MINIMA) return src;
-  if (w >= ancho && h >= alto) return src;
+  if (!recorteViable(w, h, ancho, alto)) return src;
   const out = crear();
   out.width = Math.max(1, w);
   out.height = Math.max(1, h);

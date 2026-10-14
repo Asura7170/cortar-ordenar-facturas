@@ -654,6 +654,41 @@ describe("monto manual", () => {
     expect(btn?.getAttribute("aria-pressed")).toBe("false");
   });
 
+  it("keydown de monto ignora no-inputs y montos huérfanos", () => {
+    sembrarOk();
+    // Enter sobre la celda (target no-input): nada comitea
+    document
+      .querySelector(".cell")
+      ?.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+      );
+    expect(document.querySelector(".cell-badge")).toBeNull();
+    // input de monto sin .cell contenedor: id NaN → return sin explotar
+    const orfan = document.createElement("input");
+    orfan.className = "cell-monto";
+    orfan.dataset["accion"] = "monto";
+    document.body.append(orfan);
+    try {
+      orfan.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+      );
+      expect(document.querySelector(".cell-badge")).toBeNull();
+    } finally {
+      orfan.remove();
+    }
+  });
+
+  it("Enter con monto inválido conserva la edición sin badge", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "abc";
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+    );
+    expect(document.querySelector(".cell-badge")).toBeNull();
+    expect(document.activeElement?.className).toBe("cell-monto"); // el borrador queda corregible
+  });
+
   it("monto entero se muestra con 2 decimales (500 → US$ 500.00)", () => {
     state.moneda = "USD";
     const c = sembrarOk();
@@ -688,6 +723,15 @@ describe("drop de archivos sobre hojas", () => {
     agregarArchivos.mockClear();
     document.querySelector(".sheet-fantasma")?.dispatchEvent(eventoDrop(files));
     expect(agregarArchivos).toHaveBeenCalledWith(files, null);
+  });
+
+  it("drop fuera de cualquier hoja no pega nada", () => {
+    sembrar("u4x2", [100]);
+    agregarArchivos.mockClear();
+    const files = [new File(["x"], "d.png", { type: "image/png" })];
+    // el botón ＋ vive en sheets pero fuera de todo .sheet (closest es null)
+    document.querySelector(".btn-sumar")?.dispatchEvent(eventoDrop(files));
+    expect(agregarArchivos).not.toHaveBeenCalled();
   });
 
   it("dragover sobre el fantasma no resalta", () => {
@@ -773,6 +817,48 @@ describe("drop de archivos sobre hojas", () => {
     expect(sheet.classList.contains("file-drop")).toBe(true);
     sheet.dispatchEvent(Object.assign(eventoDragleave(), { relatedTarget: document.body }));
     expect(sheet.classList.contains("file-drop")).toBe(false);
+  });
+
+  it("dragover al borde inferior scrollea en loop y la zona muerta lo para", async () => {
+    sembrar("u1", [10]);
+    const canvas = el("canvas");
+    const rect = vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 1200,
+      height: 800,
+      right: 1200,
+      bottom: 800,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+    // jsdom no implementa scrollBy: se espía para asertar el loop (Chrome sí lo tiene).
+    const scrollBy = vi.fn();
+    Object.defineProperty(canvas, "scrollBy", { value: scrollBy, configurable: true });
+    const borde = (y: number): void => {
+      const sheet = document.querySelector(".sheet");
+      if (!sheet) throw new Error("sin .sheet");
+      sheet.dispatchEvent(
+        Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
+          dataTransfer: { files: [], types: ["Files"] },
+          clientX: 10,
+          clientY: y,
+        }),
+      );
+    };
+    try {
+      borde(790); // y > bottom−70 → scroll hacia abajo
+      await new Promise((r) => setTimeout(r, 60)); // paso corre en rAF reales
+      expect(scrollBy).toHaveBeenCalledWith({ top: 14 });
+      borde(400); // zona muerta → detenerScroll
+      const n = scrollBy.mock.calls.length;
+      await new Promise((r) => setTimeout(r, 60));
+      expect(scrollBy.mock.calls.length).toBe(n);
+    } finally {
+      rect.mockRestore();
+      delete (canvas as unknown as Record<string, unknown>)["scrollBy"];
+    }
   });
 
   it("scroll invalida el caché de rects sin tirar", () => {
@@ -972,6 +1058,42 @@ describe("lupa", () => {
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     tecla("m");
     expect(btn.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("M con target no-HTMLElement (svg) alterna igual", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    document.body.append(svg);
+    try {
+      svg.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+      );
+      expect(btn.getAttribute("aria-pressed")).toBe("true");
+      svg.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+      );
+      expect(btn.getAttribute("aria-pressed")).toBe("false");
+    } finally {
+      svg.remove();
+    }
+  });
+
+  it("M con target HTML que no es campo (span) alterna igual", () => {
+    const btn = el<HTMLButtonElement>("btnLupa");
+    const span = document.createElement("span");
+    document.body.append(span);
+    try {
+      span.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+      );
+      expect(btn.getAttribute("aria-pressed")).toBe("true");
+      span.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "m" }),
+      );
+      expect(btn.getAttribute("aria-pressed")).toBe("false");
+    } finally {
+      span.remove();
+    }
   });
 
   it("pointerleave oculta y pointerenter restaura la muestra", () => {
@@ -1187,6 +1309,12 @@ describe("drag: render pendiente y cancelaciones", () => {
       }),
     );
   }
+
+  it("pointerup sin drag previo no hace nada", () => {
+    const h = sembrar("u4x2", [100, 200]);
+    expect(() => soltarDoc(10, 10)).not.toThrow();
+    expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+  });
 
   it("render durante el drag se pospone hasta soltar", () => {
     sembrar("u4x2", [100]);

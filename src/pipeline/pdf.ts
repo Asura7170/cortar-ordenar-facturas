@@ -160,18 +160,8 @@ export async function expandirPdf(
     if (total < 1 || total > PDF_MAX_PAGINAS) return utiles;
     // ponytail: secuencial a propósito; N renders en paralelo saturan memoria.
     for (let i = 1; i <= total; i++) {
-      try {
-        const original = await doc.renderizar(i);
-        if (!original) continue;
-        const lienzo = recortarMargenesBlancos(original, crear);
-        if (esPaginaBlanca(lienzo) || esPaginaNegra(lienzo)) continue;
-        const blob = await new Promise<Blob | null>((res) =>
-          lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-        );
-        if (blob) utiles.push({ indice: i, total, blob });
-      } catch {
-        continue; // ponytail: página mala no tumba a las hermanas
-      }
+      const pagina = await paginaUtil(doc, total, i, crear);
+      if (pagina) utiles.push(pagina);
     }
   } catch {
     return utiles;
@@ -183,4 +173,25 @@ export async function expandirPdf(
     }
   }
   return utiles;
+}
+
+/** Una página renderizada y recortada: null si blanca, negra, null-render o mal rendida (nunca lanza). */
+async function paginaUtil(
+  doc: DocumentoPdf,
+  total: number,
+  i: number,
+  crear: CrearLienzo,
+): Promise<PaginaPdf | null> {
+  try {
+    const original = await doc.renderizar(i);
+    if (!original) return null;
+    const lienzo = recortarMargenesBlancos(original, crear);
+    if (esPaginaBlanca(lienzo) || esPaginaNegra(lienzo)) return null;
+    const blob = await new Promise<Blob | null>((res) =>
+      lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
+    );
+    return blob ? { indice: i, total, blob } : null;
+  } catch {
+    return null; // ponytail: página mala no tumba a las hermanas
+  }
 }

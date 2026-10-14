@@ -1,5 +1,5 @@
 /* Tests P0: estado, persistencia y operaciones puras (sin DOM). */
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   LS_KEY,
   borrarCodigo,
@@ -207,6 +207,26 @@ describe("guardar/cargar por ventana", () => {
       expect(() => cargar()).not.toThrow();
       expect(localStorage.getItem(LS_KEY)).toBe(raw);
     }
+  });
+
+  it("sessionStorage caído: la limpieza igual corre y el estado carga", () => {
+    state.moneda = "ARS";
+    localStorage.setItem(LS_KEY, JSON.stringify({ moneda: "ARS" }));
+    const espiado = vi.spyOn(sessionStorage, "removeItem").mockImplementation(() => {
+      throw new Error("sin sesión");
+    });
+    try {
+      expect(() => cargar()).not.toThrow();
+      expect(state.moneda).toBe("ARS");
+    } finally {
+      espiado.mockRestore();
+    }
+  });
+
+  it("blob solo de configIA: se retira y la clave queda eliminada", () => {
+    localStorage.setItem(LS_KEY, JSON.stringify({ configIA: { baseUrl: "http://solo" } }));
+    cargar();
+    expect(localStorage.getItem(LS_KEY)).toBeNull();
   });
 });
 
