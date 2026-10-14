@@ -413,6 +413,29 @@ describe("monto manual", () => {
     expect(document.activeElement).not.toBe(deNuevo);
   });
 
+  it("change inválido marca la celda (monto-error) y avisa en #aviso", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "12,3"; // coma sin grupo de miles: parsearMonto la rechaza
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    const deNuevo = inputMonto();
+    expect(deNuevo.classList.contains("monto-error")).toBe(true);
+    expect(deNuevo.value).toBe("12,3"); // borrador intacto
+    expect(document.getElementById("aviso")?.textContent).toContain("Formato no válido");
+    expect(document.querySelector("#aviso > span.motivo")).not.toBeNull();
+  });
+
+  it("change con campo vacío no marca error ni avisa", () => {
+    sembrarOk();
+    // Limpio el aviso del test anterior (el fixture es un DOM compartido).
+    if (document.getElementById("aviso")) document.getElementById("aviso")!.textContent = "";
+    const input = inputMonto();
+    input.value = "";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(inputMonto().classList.contains("monto-error")).toBe(false);
+    expect(document.getElementById("aviso")?.textContent).toBe("");
+  });
+
   it("esEcoDeRemocion: desatachado es eco, atachado con foco no", () => {
     sembrarOk();
     const input = inputMonto();
@@ -686,7 +709,9 @@ describe("monto manual", () => {
       new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
     );
     expect(document.querySelector(".cell-badge")).toBeNull();
-    expect(document.activeElement?.className).toBe("cell-monto"); // el borrador queda corregible
+    // El foco queda en el input (con la marca de error; el borrador queda corregible).
+    expect(document.activeElement).toBe(inputMonto());
+    expect(inputMonto().classList.contains("monto-error")).toBe(true);
   });
 
   it("monto entero se muestra con 2 decimales (500 → US$ 500.00)", () => {
