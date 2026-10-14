@@ -16,6 +16,8 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
+  /* Flanco izquierdo igual al derecho (flex-basis 0 + grow): centera el zoom */
+  flex: 1 1 0;
 }
 
 .brand-mark {
@@ -45,7 +47,6 @@
 }
 
 .monto-box {
-  margin-left: auto;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -132,13 +133,25 @@
   gap: 10px;
 }
 
-/* Grupo de zoom en el flujo flex (antes centrado absoluto): en ventanas
-   angostas el título del brand y el monto invadían su zona sin scroll que lo
-   revelara (body overflow: hidden). +/− siempre; reset solo con zoom. */
+/* Zona derecha (monto + acciones): flanco derecho de la misma medida que el
+   brand — juntos centeran el grupo de zoom en el topbar. */
+.topbar-derecha {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: flex-end;
+}
+
+/* Grupo de zoom muerto al centro: .brand y .topbar-derecha son flancos iguales
+   (flex-basis 0 + grow). En ventanas angostas se comprimen los flancos; nunca
+   se solapan con el centro (antes: centrado absoluto, sin garantía alguna). */
 .zoom-grupo {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex: 0 0 auto;
 }
 .zoom-grupo .btn {
   min-height: 44px;
