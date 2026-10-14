@@ -50,6 +50,10 @@ export function totalItems(): number {
 
 const TEXTO_INICIAL = "Calcular totales";
 
+// Botones de acción de la sidebar que se apagan con el lote vacío. Ajustes
+// fuera: configurar siempre es posible (regla del usuario).
+const BOTONES_LOTE = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLimpiar"];
+
 // ponytail: el botón es el estado (con-monto/total, siempre visible): cada
 // renderMonto lo sincroniza, sin importar qué camino mutó las hojas.
 function pintarBarraBoton(): void {
@@ -58,9 +62,13 @@ function pintarBarraBoton(): void {
   const total = totalItems();
   const hechos = aplanar().filter((c) => c.montoCents !== null).length;
   btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
-  const limpiar = document.getElementById("btnLimpiar");
-  // ponytail: vaciar no ofrece nada con lote vacío (confirmaría nada).
-  if (limpiar instanceof HTMLButtonElement) limpiar.disabled = total === 0;
+  // ponytail: vaciar no ofrece nada con lote vacío (confirmaría nada); por la
+  // misma razón ninguna otra acción de la sidebar tampoco. Único escritor de
+  // .disabled de estos ids en src/ (grep previo): el sync no pisa a nadie.
+  for (const id of BOTONES_LOTE) {
+    const boton = document.getElementById(id);
+    if (boton instanceof HTMLButtonElement) boton.disabled = total === 0;
+  }
   // ponytail: solo el span de texto — textContent borraría el icono.
   // El fantasma solo duplica el icono (el texto lo invierte el degradado).
   const texto = hechos > 0 ? `Montos extraídos: ${hechos}/${total}` : TEXTO_INICIAL;

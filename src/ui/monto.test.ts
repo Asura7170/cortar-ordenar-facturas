@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 document.body.innerHTML =
-  '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button><button id="btnLimpiar" type="button"></button>';
+  '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button><button id="btnWord" type="button"></button><button id="btnPdf" type="button"></button><button id="btnImprimir" type="button"></button><button id="btnLimpiar" type="button"></button>';
 const { state, crearHoja } = await import("../state");
 const {
   aplanar,
@@ -212,6 +212,21 @@ describe("barraBoton", () => {
     state.hojas.push(h);
     renderMonto();
     expect(limpiar.disabled).toBe(false);
+  });
+
+  it("lote vacío: TODOS los botones de acción de la sidebar deshabilitados", () => {
+    const botones = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLimpiar"].map((id) => {
+      const b = document.getElementById(id);
+      if (!(b instanceof HTMLButtonElement)) throw new Error(`sin #${id}`);
+      return b;
+    });
+    renderMonto(); // sin hojas
+    botones.forEach((b) => expect(b.disabled).toBe(true));
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5" });
+    state.hojas.push(h);
+    renderMonto();
+    botones.forEach((b) => expect(b.disabled).toBe(false));
   });
 });
 

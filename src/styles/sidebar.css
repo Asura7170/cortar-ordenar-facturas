@@ -303,7 +303,7 @@
   color: light-dark(#7a5c2e, tan);
   border: 1px solid currentColor;
 }
-.btn-calculo:hover {
+.btn-calculo:hover:not(:disabled) {
   background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
 /* Realce botones: halo en ::before estático fundido por opacidad (animar
@@ -338,27 +338,27 @@
   transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
 }
-#btnCalcular:hover,
+#btnCalcular:hover:not(:disabled),
 #btnCalcular:focus-visible,
-.btn-word:hover,
+.btn-word:hover:not(:disabled),
 .btn-word:focus-visible,
-.btn-pdf:hover,
+.btn-pdf:hover:not(:disabled),
 .btn-pdf:focus-visible,
-.btn-imprimir:hover,
+.btn-imprimir:hover:not(:disabled),
 .btn-imprimir:focus-visible {
   /* ponytail: scale en vez de translateY — trasladar la caja bajo un cursor
      quieto en el borde oscila el hover (tembleque flecha/puntero). */
   transform: scale(1.03);
 }
-#btnCalcular:hover::before,
+#btnCalcular:hover:not(:disabled)::before,
 #btnCalcular:focus-visible::before,
-.btn-word:hover::before,
+.btn-word:hover:not(:disabled)::before,
 .btn-word:focus-visible::before,
-.btn-pdf:hover::before,
+.btn-pdf:hover:not(:disabled)::before,
 .btn-pdf:focus-visible::before,
-.btn-imprimir:hover::before,
+.btn-imprimir:hover:not(:disabled)::before,
 .btn-imprimir:focus-visible::before,
-#btnLimpiar:hover::before,
+#btnLimpiar:hover:not(:disabled)::before,
 #btnLimpiar:focus-visible::before {
   opacity: 1;
 }
@@ -463,21 +463,21 @@
   opacity: 0;
   transform-origin: 50% 50%;
 }
-#btnWord:hover .flecha-caida,
+#btnWord:hover:not(:disabled) .flecha-caida,
 #btnWord:focus-visible .flecha-caida,
-#btnPdf:hover .flecha-caida,
+#btnPdf:hover:not(:disabled) .flecha-caida,
 #btnPdf:focus-visible .flecha-caida {
   animation: caida-flecha 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-#btnWord:hover .bandeja,
+#btnWord:hover:not(:disabled) .bandeja,
 #btnWord:focus-visible .bandeja,
-#btnPdf:hover .bandeja,
+#btnPdf:hover:not(:disabled) .bandeja,
 #btnPdf:focus-visible .bandeja {
   animation: bandeja-elastica 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-#btnWord:hover .destello-base,
+#btnWord:hover:not(:disabled) .destello-base,
 #btnWord:focus-visible .destello-base,
-#btnPdf:hover .destello-base,
+#btnPdf:hover:not(:disabled) .destello-base,
 #btnPdf:focus-visible .destello-base {
   animation: destello-base 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
@@ -596,7 +596,7 @@
 #btnImprimir .prn-stream {
   opacity: 0;
 }
-#btnImprimir:hover,
+#btnImprimir:hover:not(:disabled),
 #btnImprimir:focus-visible {
   .prn-ambient-rig {
     animation: prn-amb-float 6.8s ease-in-out infinite;
@@ -996,7 +996,7 @@
   color: light-dark(#0e4ae2, #8fb0ff);
   border: 1px solid currentColor;
 }
-.btn-word:hover {
+.btn-word:hover:not(:disabled) {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 .btn-pdf {
@@ -1004,7 +1004,7 @@
   color: #fe5721;
   border: 1px solid currentColor;
 }
-.btn-pdf:hover {
+.btn-pdf:hover:not(:disabled) {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 .btn-imprimir {
@@ -1015,7 +1015,7 @@
   color: light-dark(var(--verde-tinta), var(--monto-valor));
   border: 1px solid currentColor;
 }
-.btn-imprimir:hover {
+.btn-imprimir:hover:not(:disabled) {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 /* Realce orgánico de exportar: elevación en el botón y halo/sombra en
@@ -1026,15 +1026,15 @@
   position: relative;
 }
 @media (prefers-reduced-motion: reduce) {
-  .btn-word:hover,
+  .btn-word:hover:not(:disabled),
   .btn-word:focus-visible,
-  .btn-pdf:hover,
+  .btn-pdf:hover:not(:disabled),
   .btn-pdf:focus-visible,
-  .btn-imprimir:hover,
+  .btn-imprimir:hover:not(:disabled),
   .btn-imprimir:focus-visible,
-  #btnCalcular:hover,
+  #btnCalcular:hover:not(:disabled),
   #btnCalcular:focus-visible,
-  #btnLimpiar:hover,
+  #btnLimpiar:hover:not(:disabled),
   #btnLimpiar:focus-visible,
   .switch:active .switch-track {
     transform: none;
@@ -1060,7 +1060,7 @@
 }
 /* Inversión fantasma + realce en hover/foco (las escobas heredan el rojo
    por currentColor; el halo común vive arriba y usa currentColor). */
-#btnLimpiar:hover,
+#btnLimpiar:hover:not(:disabled),
 #btnLimpiar:focus-visible {
   background-color: color-mix(in srgb, var(--sello) 12%, transparent);
   color: #f04438;
@@ -1122,7 +1122,7 @@
   transform-origin: 50% 50%;
   opacity: 0;
 }
-#btnLimpiar:hover,
+#btnLimpiar:hover:not(:disabled),
 #btnLimpiar:focus-visible {
   .esc-ambient {
     animation: esc-kf-ambient 7.3s ease-in-out infinite alternate;

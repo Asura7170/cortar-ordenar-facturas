@@ -316,7 +316,9 @@ input::placeholder {
   color: #fff;
   box-shadow: var(--sombra-boton);
 }
-.btn-primary:hover {
+/* Hover solo cuando habilitado: el deshabilitado queda tenue e inerte
+   (regla genérica aplicada por variante; también cubre modales). */
+.btn-primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--verde-tinta), #000 12%);
 }
 
@@ -325,7 +327,7 @@ input::placeholder {
   color: var(--texto-panel);
   border: 1px solid var(--borde-panel);
 }
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled) {
   background: var(--hover-ghost);
 }
 
@@ -333,7 +335,7 @@ input::placeholder {
   background: var(--sello);
   color: #fff;
 }
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sello), #000 12%);
 }
 
