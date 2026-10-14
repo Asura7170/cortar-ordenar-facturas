@@ -31,6 +31,7 @@ vi.mock("./export/salidas", () => ({ initExport: vi.fn() }));
 vi.mock("./utils", () => ({
   getEl: vi.fn(() => ({
     title: "",
+    setAttribute: (_k: string, _v: string) => {},
     addEventListener: (_ev: string, fn: () => void) => {
       const g = globalThis as unknown as { __temaClicks?: Array<() => void> };
       g.__temaClicks ??= [];

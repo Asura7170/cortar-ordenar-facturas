@@ -438,8 +438,8 @@ describe("gate PDF (tamaño + páginas)", () => {
     aviso.textContent = "";
     await agregarArchivos([pdfTamano("gordo.pdf", 6 * 1024 * 1024)]);
     const m = aviso.querySelector(".motivo");
-    expect(m?.textContent).toBe("pesa más de 5 MB");
-    expect(m?.innerHTML).toBe("pesa más de 5 MB"); // sin marcado inyectado
+    expect(m?.textContent).toBe("pesa más de 5 MB, comprimila y probá de nuevo");
+    expect(m?.innerHTML).toBe("pesa más de 5 MB, comprimila y probá de nuevo"); // sin marcado inyectado
   });
 
   it("lote válido limpia el aviso viejo de otro lote", async () => {

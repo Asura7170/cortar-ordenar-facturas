@@ -247,6 +247,7 @@ select {
 .sheet-panel-count,
 .canvas-meta,
 .cell-monto,
+.calculo-txt,
 .dz-fmt {
   font-variant-numeric: tabular-nums;
 }

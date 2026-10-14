@@ -131,7 +131,7 @@ function pintarCeldaVacia(div: HTMLElement, slotIdx: number, hojaId: number): vo
   const mas = document.createElement("span");
   mas.className = "cell-pegar-mas";
   mas.setAttribute("aria-hidden", "true");
-  mas.textContent = "＋";
+  mas.textContent = "+";
   const txt = document.createElement("span");
   txt.className = "cell-pegar-txt";
   txt.textContent = "Clic para pegar";
@@ -149,8 +149,8 @@ function pintarCeldaOcr(div: HTMLElement, item: Comprobante): void {
       (item.estado === "procesando"
         ? "Procesando…"
         : item.estado === "pendiente"
-          ? "(pendiente)"
-          : "(sin texto OCR)"),
+          ? "Pendiente"
+          : "Sin texto OCR"),
   );
   const btn = document.createElement("button");
   btn.className = "cell-remove";
@@ -206,7 +206,7 @@ function pintarBadgeOMonto(div: HTMLElement, item: Comprobante): void {
     entrada.className = "cell-monto";
     entrada.type = "text";
     entrada.inputMode = "decimal";
-    entrada.placeholder = "Total…";
+    entrada.placeholder = "1234.56";
     entrada.title = "Total del comprobante (ej. 1234.56)";
     entrada.setAttribute("aria-label", `Total de ${item.nombre}`);
     entrada.dataset["accion"] = "monto";
@@ -288,8 +288,8 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
   const ico = document.createElement("span");
   ico.className = "btn-sumar-mas";
   ico.setAttribute("aria-hidden", "true");
-  ico.textContent = "＋";
-  mas.append(ico, " Agregar factura");
+  ico.textContent = "+";
+  mas.append(ico, " Agregar comprobantes");
   lado.append(mas);
   row.append(lado);
   return row;
@@ -1207,17 +1207,21 @@ function copiarOcrAlPortapapeles(id: number, btn: HTMLElement): void {
   if (!item || !item.textoOcr) return;
   // Sin Promise.try (ausente en Node 22 del CI): writeText ya devuelve promesa.
   // clipboard no existe fuera de contexto seguro (http): TypeError antes de la promesa.
-  // ponytail: en fallo solo el title (el check es solo éxito, sin error visual nuevo).
+  // El fallo avisa en #aviso (visible) y también queda en el title del botón.
   const fallo = "Copiar falló (sin permiso del portapapeles)";
   const portapapeles = navigator.clipboard;
   if (typeof portapapeles?.writeText !== "function") {
+    avisarError("No se pudo copiar el texto: dale permiso al portapapeles e intentá de nuevo.");
     btn.title = fallo;
     return;
   }
   void portapapeles
     .writeText(item.textoOcr)
     .then(() => anunciarCopiado(btn))
-    .catch(() => deshacerCopiado(btn, fallo));
+    .catch(() => {
+      avisarError("No se pudo copiar el texto: dale permiso al portapapeles e intentá de nuevo.");
+      deshacerCopiado(btn, fallo);
+    });
 }
 
 /** Acción `corregir-monto`: abre la edición no destructiva del total. */

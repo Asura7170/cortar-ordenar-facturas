@@ -59,13 +59,13 @@ function avisar(rechazos: readonly AvisoRechazo[]): void {
 function textoMotivo(m: MotivoRechazo): string {
   switch (m) {
     case "tamano":
-      return "pesa más de 5 MB";
+      return "pesa más de 5 MB, comprimila y probá de nuevo";
     case "paginas":
-      return "tiene más de 10 páginas";
+      return "tiene más de 10 páginas, partila en dos PDF";
     case "cifrado":
-      return "protegido con contraseña";
+      return "protegido con contraseña, quitásela y volvé a subir";
     case "ilegible":
-      return "no se pudo leer";
+      return "no se pudo leer: puede estar corrupta, probá con otra foto";
   }
 }
 
@@ -110,7 +110,7 @@ function comprobanteDesdeBlob(blob: Blob, nombre: string): Comprobante {
 function avisosDeFormato(lista: readonly File[]): AvisoRechazo[] {
   return lista
     .filter((f) => !esImagen(f) && !esPdf(f))
-    .map((f) => ({ archivo: sanear(f.name), motivo: "formato no soportado" }));
+    .map((f) => ({ archivo: sanear(f.name), motivo: MOTIVO_FORMATO }));
 }
 
 /** ¿Queda hueco en esta hoja? */
@@ -177,7 +177,7 @@ async function paginasUtiles(f: File, avisos: AvisoRechazo[]): Promise<Comproban
   }
   const pags = await expandirPdf(f);
   if (pags.length === 0) {
-    avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+    avisos.push({ archivo: sanear(f.name), motivo: textoMotivo("ilegible") });
     return null;
   }
   const base = sanear(f.name).replace(/\.pdf$/i, "");
@@ -214,7 +214,7 @@ async function intakeImagen(
     colocar([comprobanteDesdeBlob(blob, f.name)]);
     return true;
   } catch {
-    avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+    avisos.push({ archivo: sanear(f.name), motivo: textoMotivo("ilegible") });
     return false;
   }
 }
@@ -285,8 +285,9 @@ interface ItemConImagen {
 // Sin bytes de imagen el clic no puede pegar: el Ctrl+C al ARCHIVO en el
 // Explorador deja una referencia (no bytes) y el navegador no la entrega vía
 // read() — ese caso solo entra por Ctrl+V o la tarjeta. El mensaje cubre ambos.
+const MOTIVO_FORMATO: string = "formato no soportado: usá JPG, PNG, WEBP o PDF";
 const MOTIVO_SIN_IMAGEN: string =
-  "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pega con Ctrl+V";
+  "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pegá con Ctrl+V";
 
 /** Primer tipo image/* del item (null si no trae). */
 function tipoImagenDe(item: ItemConImagen): string | null {
@@ -301,7 +302,7 @@ function subtipoImagen(tipo: string): string {
 
 /** Motivo del aviso final: el formato raro encontrado o el genérico. */
 function motivoDePortapapeles(formatoNoSoportado: boolean): string {
-  return formatoNoSoportado ? "formato no soportado" : MOTIVO_SIN_IMAGEN;
+  return formatoNoSoportado ? MOTIVO_FORMATO : MOTIVO_SIN_IMAGEN;
 }
 
 // Lee los bytes de imagen del portapapeles del SO. Null = ya se avisó.
@@ -448,7 +449,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     try {
       comp = comprobanteDesdeBlob(await normalizarImagen(primero), primero.name);
     } catch {
-      avisar([{ archivo: sanear(primero.name), motivo: "no se pudo leer" }]);
+      avisar([{ archivo: sanear(primero.name), motivo: textoMotivo("ilegible") }]);
       return;
     }
     const h = vigenteParaEscribir(destino, hojaId);
@@ -481,7 +482,7 @@ export function renderCodigo(): void {
   inputCodigo.maxLength = state.codigoLongitud;
   inputCodigo.disabled = !state.codigoActivo;
   inputCodigo.placeholder = state.codigoActivo
-    ? `Código (${state.codigoLongitud} dígitos)`
+    ? "123456789012".slice(0, state.codigoLongitud)
     : "Código";
   // ponytail: el error visual vive hasta que el usuario corrige o se re-renderiza.
   inputCodigo.classList.remove("codigo-error", "sacudir");

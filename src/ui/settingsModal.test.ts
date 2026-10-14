@@ -1,4 +1,4 @@
-/* Tests P1: modal de ajustes — moneda, submit y Predeterminado (DOM aislado). */
+/* Tests P1: modal de ajustes — moneda, submit y Restablecer (DOM aislado). */
 import { describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture, el } from "../test/fixture";
 
@@ -58,7 +58,7 @@ describe("submit", () => {
   });
 });
 
-describe("Predeterminado", () => {
+describe("Restablecer", () => {
   it("resetea la moneda y repinta el input", () => {
     state.moneda = "EUR";
     btnResetAjustes.click();
@@ -152,7 +152,7 @@ describe("Modelos", () => {
     }
   });
 
-  it("descarga fallida muestra la causa y libera los botones", async () => {
+  it("descarga fallida muestra el motivo fijo y libera los botones", async () => {
     const tienda = new Map<unknown, unknown>();
     const fetchFn = vi.fn(async () => {
       throw new Error("red caída");
@@ -161,7 +161,8 @@ describe("Modelos", () => {
     try {
       btnDescargarModelos.click();
       await pausa();
-      expect(estadoModelos.textContent).toContain("red caída");
+      expect(estadoModelos.textContent).toContain("no se pudo descargar");
+      expect(estadoModelos.textContent).not.toContain("red caída");
       expect(btnDescargarModelos.disabled).toBe(false);
       expect(btnBorrarModelos.disabled).toBe(false);
     } finally {
@@ -188,7 +189,7 @@ describe("Modelos", () => {
     }
   });
 
-  it("borrado que falla muestra la causa", async () => {
+  it("borrado que falla muestra el motivo fijo", async () => {
     const g = globalThis as Record<string, unknown>;
     const realCaches = g["caches"];
     g["caches"] = {
@@ -201,7 +202,7 @@ describe("Modelos", () => {
       btnBorrarModelos.click();
       await pausa();
       expect(estadoModelos.textContent).toContain("no se pudo borrar");
-      expect(estadoModelos.textContent).toContain("denegado");
+      expect(estadoModelos.textContent).not.toContain("denegado");
     } finally {
       if (realCaches === undefined) delete g["caches"];
       else g["caches"] = realCaches;

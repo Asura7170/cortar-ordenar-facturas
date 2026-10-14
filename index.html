@@ -132,8 +132,8 @@
             <button
               class="btn btn-ghost"
               id="btnTema"
-              title="Cambiar tema claro/oscuro"
-              aria-label="Cambiar tema"
+              title="Cambiar a oscuro"
+              aria-label="Cambiar a oscuro"
             >
               <span class="tema-ico" aria-hidden="true">
                 <svg class="ico-sol" viewBox="0 0 180 180">
@@ -222,12 +222,12 @@
             <header class="panel-head">
               <h2 class="panel-title" id="tituloCodigo">Código de pedido</h2>
               <label class="switch">
-                <input type="checkbox" id="chkCodigo" aria-label="Activar código de pedido" />
+                <input type="checkbox" id="chkCodigo" aria-label="Código de pedido" />
                 <span class="switch-track"></span>
               </label>
             </header>
             <div class="codigo-row">
-              <label class="field-mini" for="numCodigo">N° dígitos</label>
+              <label class="field-mini" for="numCodigo">N.º dígitos</label>
               <input type="number" id="numCodigo" min="1" max="12" value="6" />
               <input
                 type="text"
@@ -304,7 +304,7 @@
                 </span>
               </h2>
               <label class="switch">
-                <input type="checkbox" id="chkOcr" aria-label="Activar modo OCR" />
+                <input type="checkbox" id="chkOcr" aria-label="Modo OCR" />
                 <span class="switch-track"></span>
               </label>
             </header>
@@ -619,6 +619,7 @@
               id="btnLimpiar"
               command="show-modal"
               commandfor="modalLimpiar"
+              title="Vaciar el lote completo"
             >
               <svg
                 class="export-ico escoba-der"
@@ -675,7 +676,7 @@
                   </g>
                 </g>
               </svg>
-              <span>Limpiar</span>
+              <span>Vaciar lote</span>
               <!-- ponytail: copia completa (no symbol/use): las ~60 reglas .esc-* animan
                    elementos internos del SVG y un shadow tree de <use> no las ve. -->
               <svg class="export-ico" viewBox="0 0 192 192" fill="currentColor" aria-hidden="true">
@@ -772,11 +773,11 @@
             <!-- <article class="sheet">... generado por JS ...</article> -->
           </div>
           <label class="dropzone dropzone-grande" id="dropzone" for="fileInput" tabindex="0">
-            <span class="dz-ico" aria-hidden="true">＋</span>
+            <span class="dz-ico" aria-hidden="true">+</span>
             <span class="dz-titulo">Subí tus comprobantes</span>
             <span class="dz-txt"
-              >Arrastrá archivos a esta área, pegalos con <strong>Ctrl+V</strong>, hacé clic para
-              buscarlos o clic en una celda vacía para pegar</span
+              >Arrastrá archivos a esta área, pegálos con <strong>Ctrl+V</strong>, hacé clic para
+              buscarlos o clic en una celda vacía para pegá</span
             >
             <span class="dz-fmt">JPG · PNG · WEBP · PDF</span>
           </label>
@@ -784,7 +785,7 @@
             class="btn btn-ghost btn-block btn-pegar"
             id="btnPegar"
             type="button"
-            title="Pega la imagen que copiaste en WhatsApp"
+            title="Pegá la imagen que copiaste en WhatsApp"
           >
             <svg
               class="pegar-ico"
@@ -850,7 +851,7 @@
             </fieldset>
           </div>
           <div class="modal-foot">
-            <button class="btn btn-ghost" type="button" id="btnResetAjustes">Predeterminado</button>
+            <button class="btn btn-ghost" type="button" id="btnResetAjustes">Restablecer</button>
             <button class="btn btn-primary" type="submit" id="btnGuardarAjustes">Guardar</button>
           </div>
         </form>
@@ -887,7 +888,7 @@
         </div>
         <form method="dialog" class="modal-foot">
           <button class="btn btn-ghost" type="submit" value="cancel" autofocus>Cancelar</button>
-          <button class="btn btn-danger" type="submit" value="ok">Sí, vaciar</button>
+          <button class="btn btn-danger" type="submit" value="ok">Vaciar lote</button>
         </form>
       </div>
     </dialog>
