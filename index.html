@@ -765,9 +765,11 @@
         <main class="canvas" id="canvas">
           <div class="canvas-head">
             <h2 class="canvas-titulo">Hojas</h2>
-            <p class="hint hint-canvas" id="aviso" role="status"></p>
             <span class="canvas-meta" id="metaHojas">0 hojas</span>
           </div>
+          <!-- #aviso: canal de avisos (los módulos lo exigen con getEl), invisible
+               visualmente; sigue anunciando a lectores de pantalla (role=status). -->
+          <p id="aviso" class="sr-only" role="status"></p>
           <span id="estadoCopiado" class="sr-only" role="status" aria-live="polite"></span>
           <div class="sheets" id="sheets">
             <!-- <article class="sheet">... generado por JS ...</article> -->

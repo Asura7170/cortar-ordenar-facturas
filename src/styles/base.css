@@ -321,19 +321,6 @@ input::placeholder {
   color: var(--input-placeholder);
 }
 
-.hint {
-  font-size: 12px;
-  color: var(--texto-panel-suave);
-  margin-top: 10px;
-  line-height: 1.5;
-  text-wrap: pretty;
-}
-/* Motivo del rechazo: rojo sello semibold (el nombre queda tenue). */
-.hint .motivo {
-  color: var(--aviso-motivo);
-  font-weight: 600;
-  font-size: 13px;
-}
 /* Botones */
 .btn {
   border: none;
