@@ -44,7 +44,7 @@ const EMU_POR_PX = 9525;
 
 export function codigoValido(): boolean {
   if (!state.codigoActivo) return true;
-  return state.codigoValor.length === state.codigoLongitud && /^\d+$/.test(state.codigoValor);
+  return /^\d+$/.test(state.codigoValor);
 }
 
 export function nombreArchivo(ext: string = "docx"): string {

@@ -64,7 +64,6 @@ const canvas = el("canvas");
 const aviso = el("aviso");
 const fileInput = el<HTMLInputElement>("fileInput");
 const chkCodigo = el<HTMLInputElement>("chkCodigo");
-const numCodigo = el<HTMLInputElement>("numCodigo");
 const inputCodigo = el<HTMLInputElement>("inputCodigo");
 const modalLimpiar = el<HTMLDialogElement>("modalLimpiar");
 
@@ -501,43 +500,25 @@ describe("código de pedido", () => {
     expect(localStorage.getItem("libro-mayor-state")).toBeNull();
   });
 
-  it("editar longitud/valor guarda solo armado; OFF retira el código", () => {
+  it("editar valor guarda solo armado; OFF retira el código", () => {
     armar();
-    numCodigo.value = "8";
-    numCodigo.dispatchEvent(new Event("input", { bubbles: true }));
-    inputCodigo.value = "12345678";
+    inputCodigo.value = "123456";
     inputCodigo.dispatchEvent(new Event("input", { bubbles: true }));
     expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toMatchObject({
       codigoActivo: true,
-      codigoLongitud: 8,
-      codigoValor: "12345678",
+      codigoValor: "123456",
     });
 
     chkCodigo.checked = false;
     chkCodigo.dispatchEvent(new Event("change", { bubbles: true }));
     expect(localStorage.getItem("libro-mayor-state")).toBeNull();
-
-    numCodigo.value = "5";
-    numCodigo.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(localStorage.getItem("libro-mayor-state")).toBeNull();
   });
 
-  it("longitud clamp 1..12 y fallback 6", () => {
-    numCodigo.value = "99";
-    numCodigo.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(state.codigoLongitud).toBe(12);
-    expect(numCodigo.value).toBe("12");
-    numCodigo.value = "abc";
-    numCodigo.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(state.codigoLongitud).toBe(6);
-  });
-
-  it("valor deja solo dígitos y corta a la longitud", () => {
-    state.codigoLongitud = 6;
-    inputCodigo.value = "12ab3456789";
+  it("valor deja solo dígitos (el tope 24 vive en maxlength del DOM)", () => {
+    inputCodigo.value = "12ab345678901234567890";
     inputCodigo.dispatchEvent(new Event("input", { bubbles: true }));
-    expect(state.codigoValor).toBe("123456");
-    expect(inputCodigo.value).toBe("123456");
+    expect(state.codigoValor).toBe("12345678901234567890");
+    expect(inputCodigo.value).toBe("12345678901234567890");
   });
 
   it("teclear levanta el error visual del gate", () => {
@@ -620,7 +601,6 @@ describe("modalLimpiar", () => {
   it("confirmar vacía también el número y lo persiste, resto intacto", () => {
     state.hojas = [crearHoja()];
     state.codigoActivo = true;
-    state.codigoLongitud = 8;
     state.codigoValor = "12345678";
     state.codigoPosicion = "sup-izq";
     inputCodigo.value = "12345678";
@@ -628,7 +608,6 @@ describe("modalLimpiar", () => {
       "libro-mayor-state",
       JSON.stringify({
         codigoActivo: true,
-        codigoLongitud: 8,
         codigoValor: "12345678",
         codigoPosicion: "sup-izq",
       }),
@@ -638,11 +617,9 @@ describe("modalLimpiar", () => {
     expect(state.codigoValor).toBe("");
     expect(inputCodigo.value).toBe("");
     expect(state.codigoActivo).toBe(true);
-    expect(state.codigoLongitud).toBe(8);
     expect(state.codigoPosicion).toBe("sup-izq");
     expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toMatchObject({
       codigoActivo: true,
-      codigoLongitud: 8,
       codigoValor: "",
       codigoPosicion: "sup-izq",
     });
@@ -655,7 +632,6 @@ describe("modalLimpiar", () => {
     state.codigoValor = "123456";
     const blob = {
       codigoActivo: true,
-      codigoLongitud: 6,
       codigoValor: "123456",
       codigoPosicion: "inf-der",
     };

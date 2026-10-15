@@ -172,14 +172,15 @@ describe("codigoValido", () => {
   });
 
   it.each([
-    ["123456", 6, true],
-    ["12345", 6, false],
-    ["1234567", 6, false],
-    ["12345a", 6, false],
-    ["", 6, false],
-  ])("valor %s con longitud %i → %s", (valor, longitud, esperado) => {
+    ["123456", true],
+    ["2", true],
+    ["12", true],
+    ["12345", true],
+    ["1234567", true],
+    ["12345a", false],
+    ["", false],
+  ])("valor %s → %s", (valor, esperado) => {
     state.codigoActivo = true;
-    state.codigoLongitud = longitud;
     state.codigoValor = valor;
     expect(codigoValido()).toBe(esperado);
   });

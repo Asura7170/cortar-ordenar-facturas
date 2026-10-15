@@ -51,7 +51,6 @@ HTMLDialogElement.prototype.close = function (this: HTMLDialogElement, returnVal
 export function resetEstado(): void {
   state.hojas = [];
   state.codigoActivo = false;
-  state.codigoLongitud = 6;
   state.codigoValor = "";
   state.codigoPosicion = POSICION_DEFAULT;
   state.moneda = MONEDA_DEFAULT;

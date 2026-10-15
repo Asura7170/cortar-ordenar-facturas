@@ -28,7 +28,6 @@ export const POSICION_DEFAULT: PosicionCodigo = "inf-der";
 export const state: EstadoApp = {
   hojas: [],
   codigoActivo: false,
-  codigoLongitud: 6,
   codigoValor: "",
   codigoPosicion: POSICION_DEFAULT,
   moneda: MONEDA_DEFAULT,
@@ -60,14 +59,13 @@ function leerBlob(): Record<string, unknown> {
   }
 }
 
-// Solo la ventana Código: el switch arma el guardado, editar longitud/valor lo dispara.
+// Solo la ventana Código: el switch arma el guardado, editar el valor lo dispara.
 export function guardarCodigo(): void {
   localStorage.setItem(
     LS_KEY,
     JSON.stringify({
       ...leerBlob(),
       codigoActivo: state.codigoActivo,
-      codigoLongitud: state.codigoLongitud,
       codigoValor: state.codigoValor,
       codigoPosicion: state.codigoPosicion,
     }),
@@ -89,7 +87,6 @@ export function guardarAjustes(): void {
 export function borrarCodigo(): void {
   const blob = leerBlob();
   delete blob["codigoActivo"];
-  delete blob["codigoLongitud"];
   delete blob["codigoValor"];
   delete blob["codigoPosicion"];
   if (Object.keys(blob).length === 0) localStorage.removeItem(LS_KEY);
@@ -118,7 +115,6 @@ function isPersistedState(v: unknown): v is PersistedState {
   if ("moneda" in p && !isMoneda(p["moneda"])) return false;
   return (
     typeof p["codigoActivo"] === "boolean" ||
-    typeof p["codigoLongitud"] === "number" ||
     typeof p["codigoValor"] === "string" ||
     typeof p["codigoPosicion"] === "string" ||
     isMoneda(p["moneda"])
@@ -146,9 +142,6 @@ function retirarConfigIa(r: Record<string, unknown>): void {
 /** Ventana Código: booleans y números con clamps (blobs legacy caen al default). */
 function aplicarCodigo(r: Record<string, unknown>): void {
   state.codigoActivo = typeof r["codigoActivo"] === "boolean" ? r["codigoActivo"] : false;
-  const lon = r["codigoLongitud"];
-  state.codigoLongitud =
-    typeof lon === "number" ? Math.max(1, Math.min(12, Math.floor(lon) || 6)) : 6;
   state.codigoValor = typeof r["codigoValor"] === "string" ? r["codigoValor"] : "";
   // Blobs legacy o basura: la esquina cae al default (inferior derecha).
   state.codigoPosicion = isPosicionCodigo(r["codigoPosicion"])

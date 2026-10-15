@@ -20,7 +20,6 @@ export const FIXTURE_HTML = `
 </main>
 <div id="lupa" aria-hidden="true"><canvas id="lupaCanvas"></canvas></div>
 <input id="chkCodigo" type="checkbox">
-<input id="numCodigo" type="number" value="6">
 <input id="inputCodigo" type="text">
 <fieldset>
   <input type="radio" name="posCodigo" value="sup-izq">

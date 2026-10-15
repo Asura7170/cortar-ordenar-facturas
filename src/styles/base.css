@@ -309,7 +309,7 @@ select {
   color: var(--texto-panel);
   border-radius: var(--radio-s);
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: 14px;
 }
 input:focus-visible,
 select:focus-visible {

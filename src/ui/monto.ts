@@ -73,7 +73,7 @@ function pintarBarraBoton(): void {
   // líneas y la caja de la cuenta queda fija; así el icono no se corre).
   const progreso = hechos > 0;
   btn.classList.toggle("con-monto", progreso);
-  const etiqueta = progreso ? "Montos extraídos " : TEXTO_INICIAL;
+  const etiqueta = progreso ? "Montos extraídos: " : TEXTO_INICIAL;
   const cuenta = progreso ? `${hechos}/${total}` : "";
   const textos = btn.querySelectorAll(".calculo-txt");
   if (textos.length === 0) {

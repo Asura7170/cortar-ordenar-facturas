@@ -51,7 +51,6 @@ describe("crearHoja", () => {
 describe("guardar/cargar por ventana", () => {
   it("round-trip: cada ventana persiste lo suyo y lo restaura", () => {
     state.codigoActivo = true;
-    state.codigoLongitud = 8;
     state.codigoValor = "12345678";
     state.codigoPosicion = "sup-izq";
     guardarCodigo();
@@ -59,14 +58,12 @@ describe("guardar/cargar por ventana", () => {
     guardarAjustes();
 
     state.codigoActivo = false;
-    state.codigoLongitud = 6;
     state.codigoValor = "";
     state.codigoPosicion = "inf-der";
     state.moneda = "USD";
     cargar();
 
     expect(state.codigoActivo).toBe(true);
-    expect(state.codigoLongitud).toBe(8);
     expect(state.codigoValor).toBe("12345678");
     expect(state.codigoPosicion).toBe("sup-izq");
     expect(state.moneda).toBe("BOB");
@@ -76,7 +73,6 @@ describe("guardar/cargar por ventana", () => {
     state.moneda = "ARS";
     guardarAjustes();
     state.codigoActivo = true;
-    state.codigoLongitud = 8;
     state.codigoValor = "87654321";
     guardarCodigo();
 
@@ -96,7 +92,6 @@ describe("guardar/cargar por ventana", () => {
     const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "{}") as Record<string, unknown>;
     expect(Object.keys(raw).sort()).toEqual([
       "codigoActivo",
-      "codigoLongitud",
       "codigoPosicion",
       "codigoValor",
       "moneda",
@@ -124,20 +119,15 @@ describe("guardar/cargar por ventana", () => {
     localStorage.setItem(LS_KEY, JSON.stringify({ moneda: "ARS" }));
     cargar();
     expect(state.codigoActivo).toBe(false);
-    expect(state.codigoLongitud).toBe(6);
     expect(state.codigoValor).toBe("");
     expect(state.moneda).toBe("ARS");
   });
 
   it("blob legacy solo-código (sin moneda ni posición): restaura el código y usa defaults", () => {
     state.moneda = "EUR";
-    localStorage.setItem(
-      LS_KEY,
-      JSON.stringify({ codigoActivo: true, codigoLongitud: 8, codigoValor: "12345678" }),
-    );
+    localStorage.setItem(LS_KEY, JSON.stringify({ codigoActivo: true, codigoValor: "12345678" }));
     cargar();
     expect(state.codigoActivo).toBe(true);
-    expect(state.codigoLongitud).toBe(8);
     expect(state.codigoValor).toBe("12345678");
     expect(state.codigoPosicion).toBe("inf-der");
     expect(state.moneda).toBe("EUR");
@@ -163,19 +153,6 @@ describe("guardar/cargar por ventana", () => {
     expect(state.moneda).toBe("EUR");
   });
 
-  it("clamp de longitud: 99→12, 2.7→2, 0→6", () => {
-    const base = { codigoActivo: false, codigoValor: "", moneda: "USD" };
-    for (const [entrada, esperado] of [
-      [99, 12],
-      [2.7, 2],
-      [0, 6],
-    ] as const) {
-      localStorage.setItem(LS_KEY, JSON.stringify({ ...base, codigoLongitud: entrada }));
-      cargar();
-      expect(state.codigoLongitud).toBe(esperado);
-    }
-  });
-
   it("sobrante de la era IA: configIA se retira del blob y las claves se borran", () => {
     localStorage.setItem("jev-api-key", "apik-vieja");
     sessionStorage.setItem("jev-api-key", "apik-sesion");
@@ -183,7 +160,6 @@ describe("guardar/cargar por ventana", () => {
       LS_KEY,
       JSON.stringify({
         codigoActivo: false,
-        codigoLongitud: 6,
         codigoValor: "",
         moneda: "USD",
         configIA: { baseUrl: "http://solo" },
@@ -195,7 +171,6 @@ describe("guardar/cargar por ventana", () => {
     expect(sessionStorage.getItem("jev-api-key")).toBeNull();
     expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toEqual({
       codigoActivo: false,
-      codigoLongitud: 6,
       codigoValor: "",
       moneda: "USD",
     });

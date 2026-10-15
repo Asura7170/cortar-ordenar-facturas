@@ -270,22 +270,20 @@
               </label>
             </header>
             <div class="codigo-row">
-              <label class="field-mini" for="numCodigo">N.º dígitos</label>
-              <input type="number" id="numCodigo" min="1" max="12" value="6" />
               <input
                 type="text"
                 id="inputCodigo"
                 aria-label="Código de pedido"
                 inputmode="numeric"
                 placeholder="Código"
-                maxlength="12"
+                maxlength="24"
                 spellcheck="false"
                 autocorrect="off"
                 autocomplete="off"
               />
             </div>
             <fieldset class="codigo-pos">
-              <legend class="field-mini">Posición en hoja</legend>
+              <legend class="field-mini">Posición del código</legend>
               <div class="pos-grid">
                 <label class="pos-opt" title="Superior izquierda">
                   <input type="radio" name="posCodigo" value="sup-izq" />

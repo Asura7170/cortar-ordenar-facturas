@@ -24,7 +24,6 @@ const canvas: HTMLElement = getEl("canvas");
 const fileInput: HTMLInputElement = getEl<HTMLInputElement>("fileInput");
 const dropzone: HTMLElement = getEl("dropzone");
 const chkCodigo: HTMLInputElement = getEl<HTMLInputElement>("chkCodigo");
-const numCodigo: HTMLInputElement = getEl<HTMLInputElement>("numCodigo");
 const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>("inputCodigo");
 // ponytail: por name (no getEl): si el fieldset falta, lista vacía sin reventar.
 function radiosPosicion(): NodeListOf<HTMLInputElement> {
@@ -459,13 +458,9 @@ export async function pegarDelPortapapeles(): Promise<void> {
 
 export function renderCodigo(): void {
   chkCodigo.checked = state.codigoActivo;
-  numCodigo.value = String(state.codigoLongitud);
   inputCodigo.value = state.codigoValor;
-  inputCodigo.maxLength = state.codigoLongitud;
   inputCodigo.disabled = !state.codigoActivo;
-  inputCodigo.placeholder = state.codigoActivo
-    ? "123456789012".slice(0, state.codigoLongitud)
-    : "Código";
+  // ponytail: el placeholder "Código" del markup vale en ambos estados.
   // ponytail: el error visual vive hasta que el usuario corrige o se re-renderiza.
   inputCodigo.classList.remove("codigo-error", "sacudir");
   inputCodigo.removeAttribute("aria-invalid");
@@ -588,13 +583,8 @@ function cablearSwitchCodigo(): void {
     if (!chkCodigo.checked) borrarCodigo();
     renderCodigo();
   });
-  numCodigo.addEventListener("input", () => {
-    state.codigoLongitud = Math.max(1, Math.min(12, Math.floor(Number(numCodigo.value)) || 6));
-    if (chkCodigo.checked) guardarCodigo();
-    renderCodigo();
-  });
   inputCodigo.addEventListener("input", () => {
-    state.codigoValor = inputCodigo.value.replace(/\D/g, "").slice(0, state.codigoLongitud);
+    state.codigoValor = inputCodigo.value.replace(/\D/g, "");
     inputCodigo.value = state.codigoValor;
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
     inputCodigo.classList.remove("codigo-error", "sacudir");
