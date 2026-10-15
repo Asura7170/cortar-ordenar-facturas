@@ -421,17 +421,35 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   clip-path: inset(0 calc((1 - var(--progreso, 0)) * 100%) 0 0);
   pointer-events: none;
 }
 .btn-calculo .calculo-capa .calculo-ico {
   color: var(--calculo-lleno);
 }
-/* Texto fantasma invisible: solo reserva el ancho para que el icono
-   fantasma calce sobre el base (visible duplicaría el texto). */
-.btn-calculo .calculo-capa .calculo-txt {
+/* Texto fantasma invisible: SOLO reserva el ancho para que el icono
+   fantasma calce sobre el base (visible duplicaría el texto/cuenta; la
+   inversión de ambos la pinta el gradiente del texto base). */
+.btn-calculo .calculo-capa .calculo-txt,
+.btn-calculo .calculo-capa .calculo-cuenta {
   visibility: hidden;
+}
+/* Cuenta separada: caja fija (el icono no baila cuando cambian los dígitos)
+   y oculta en reposo; centrada en el eje vertical del botón. */
+.btn-calculo .calculo-cuenta {
+  display: none;
+  width: 6ch;
+  font-variant-numeric: tabular-nums;
+}
+.btn-calculo.con-monto .calculo-cuenta {
+  display: block;
+}
+/* Etiqueta partida en 2 líneas: min-content (su palabra más ancha) deja la
+   fila casi tan ancha como "Calcular totales", y el icono no se corre. */
+.btn-calculo.con-monto .calculo-txt {
+  width: min-content;
+  padding-left: 16px;
 }
 
 /* Exportar: Word y PDF a la par, Imprimir grande debajo. Los tres son
@@ -449,7 +467,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
 }
 .export-ico {
   width: 20px;

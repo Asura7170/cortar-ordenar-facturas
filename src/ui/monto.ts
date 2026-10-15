@@ -69,15 +69,23 @@ function pintarBarraBoton(): void {
     const boton = document.getElementById(id);
     if (boton instanceof HTMLButtonElement) boton.disabled = total === 0;
   }
-  // ponytail: solo el span de texto — textContent borraría el icono.
-  // El fantasma solo duplica el icono (el texto lo invierte el degradado).
-  const texto = hechos > 0 ? `Montos extraídos: ${hechos}/${total}` : TEXTO_INICIAL;
-  // ponytail: texto único en el DOM (el fantasma solo lleva el icono).
+  // ponytail: etiqueta y cuenta en spans separados (la etiqueta parte en 2
+  // líneas y la caja de la cuenta queda fija; así el icono no se corre).
+  const progreso = hechos > 0;
+  btn.classList.toggle("con-monto", progreso);
+  const etiqueta = progreso ? "Montos extraídos " : TEXTO_INICIAL;
+  const cuenta = progreso ? `${hechos}/${total}` : "";
   const textos = btn.querySelectorAll(".calculo-txt");
-  if (textos.length === 0) btn.textContent = texto;
-  textos.forEach((txt) => {
-    txt.textContent = texto;
-  });
+  if (textos.length === 0) {
+    btn.textContent = etiqueta + cuenta; // fixture: botón sin spans
+  } else {
+    textos.forEach((txt) => {
+      txt.textContent = etiqueta;
+    });
+    btn.querySelectorAll(".calculo-cuenta").forEach((cta) => {
+      cta.textContent = cuenta;
+    });
+  }
 }
 
 // ponytail: el total es un odómetro (rueda cada posición que cambia, rápido

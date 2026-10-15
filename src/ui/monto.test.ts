@@ -174,15 +174,19 @@ describe("barraBoton", () => {
     state.moneda = "USD";
     const btn = botonCalcular();
     btn.innerHTML =
-      '<span class="calculo-txt"></span><span class="calculo-capa" aria-hidden="true"><span class="calculo-txt" aria-hidden="true"></span></span>';
+      '<span class="calculo-txt"></span><span class="calculo-cuenta"></span><span class="calculo-capa" aria-hidden="true"><span class="calculo-txt" aria-hidden="true"></span><span class="calculo-cuenta" aria-hidden="true"></span></span>';
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     state.hojas.push(h);
     renderMonto();
     expect([...btn.querySelectorAll(".calculo-txt")].map((s) => s.textContent)).toEqual([
-      "Montos extraídos: 1/2",
-      "Montos extraídos: 1/2",
+      "Montos extraídos: ",
+      "Montos extraídos: ",
+    ]);
+    expect([...btn.querySelectorAll(".calculo-cuenta")].map((s) => s.textContent)).toEqual([
+      "1/2",
+      "1/2",
     ]);
     btn.innerHTML = "";
   });
