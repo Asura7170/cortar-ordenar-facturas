@@ -226,9 +226,9 @@ export function redistribuir(): void {
     for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();
   }
   while (pos < items.length) {
-    // ponytail: el while implica hojas no vacías ⇒ hay última con layout.
-    const ultimo = state.hojas[state.hojas.length - 1] as Hoja;
-    const h = crearHoja(ultimo.layout);
+    // Hojas nuevas con el default: el layout elegido es de la hoja, no del lote
+    // (el intake desborda igual con ?? crearHoja() — una sola regla).
+    const h = crearHoja();
     const cap = layoutDe(h.layout).total;
     h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
     for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();

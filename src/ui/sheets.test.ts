@@ -78,11 +78,13 @@ describe("cambiarLayoutHoja / aplicarATodas", () => {
     expect(state.hojas).toHaveLength(1);
   });
 
-  it("achica y refluye: 4 items u4x2 → u1 deja 4 hojas", () => {
+  it("achica y refluye: 4 items u4x2 → u1 deja la u1 + el resto en una u4x2 default", () => {
     const h = sembrar("u4x2", [1, 2, 3, 4]);
     cambiarLayoutHoja(h.id, "u1");
-    expect(state.hojas).toHaveLength(4);
-    expect(state.hojas.every((x) => x.slots.filter(Boolean).length <= 1)).toBe(true);
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[0]?.layout).toBe("u1");
+    expect(state.hojas[1]?.layout).toBe("u4x2");
+    expect(state.hojas[1]?.slots.filter(Boolean)).toHaveLength(3);
   });
 
   it("aplicarATodas propaga el layout origen", () => {

@@ -293,7 +293,7 @@ describe("redistribuir", () => {
     expect(state.hojas[0]?.slots).toEqual([a, b, null, null]);
   });
 
-  it("desborda a hojas nuevas heredando el layout", () => {
+  it("recompacta en hojas existentes preservando su layout", () => {
     const h = crearHoja("u2h");
     const items = [1, 2, 3, 4, 5].map(() => comprobante());
     h.slots = [items[0] ?? null, items[1] ?? null];
@@ -312,15 +312,33 @@ describe("redistribuir", () => {
     expect(ids).toEqual([...items.map((c) => c.id), null]);
   });
 
-  it("cambio de plantilla con hojas ocupadas: refluye sin perder items", () => {
+  it("cambio de plantilla: el resto refluye a hojas nuevas con el default", () => {
     const h = crearHoja();
-    h.slots = [1, 2, 3, 4].map(() => comprobante());
+    const items = [1, 2, 3, 4].map(() => comprobante());
+    h.slots = items;
     state.hojas.push(h);
     h.layout = "u1";
     redistribuir();
-    expect(state.hojas).toHaveLength(4);
-    expect(state.hojas.flatMap((x) => x.slots)).toHaveLength(4);
-    expect(state.hojas.every((x) => x.slots[0] !== null)).toBe(true);
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[0]?.layout).toBe("u1");
+    expect(state.hojas[1]?.layout).toBe("u4x2");
+    // orden preservado: 1 en la u1, 3 en la nueva
+    expect(state.hojas[0]?.slots).toEqual([items[0] ?? null]);
+    expect(state.hojas[1]?.slots).toEqual([...items.slice(1), null]);
+  });
+
+  it("el resto no hereda el layout de la última hoja aunque sea no-default", () => {
+    const a = crearHoja("u2h");
+    const b = crearHoja("u2h");
+    const items = [1, 2, 3, 4].map(() => comprobante());
+    a.slots = [items[0] ?? null, items[1] ?? null];
+    b.slots = [items[2] ?? null, items[3] ?? null];
+    state.hojas.push(a, b);
+    a.layout = "u1";
+    redistribuir();
+    // u1(1) + u2h(2) + la sobrante a una u4x2 (no u2h heredado)
+    expect(state.hojas.map((x) => x.layout)).toEqual(["u1", "u2h", "u4x2"]);
+    expect(state.hojas[2]?.slots).toEqual([items[3] ?? null, null, null, null]);
   });
 
   it("descarta hojas que quedan vacías (recompacta en las primeras)", () => {
