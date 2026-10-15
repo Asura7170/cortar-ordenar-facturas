@@ -131,6 +131,12 @@ export function pasos(d1: number, d2: number, sube: boolean): number {
   return sube ? vueltas : -vueltas;
 }
 
+/** Conteo de células (con signo) para girar de `actual` a `objetivo` en el sentido global (0 ⇒ ya está). */
+export function pasoDesde(actual: number, objetivo: number, sube: boolean): number {
+  const min = (((sube ? objetivo - actual : actual - objetivo) % 10) + 10) % 10;
+  return sube ? min : -min;
+}
+
 function esDigito(ch: string): boolean {
   return ch >= "0" && ch <= "9";
 }
@@ -274,6 +280,21 @@ export function renderMonto(): void {
   const sufV = viejo.slice(k);
   const sufN = texto.slice(k);
   const alineado = alinearSufijos(sufV, sufN);
+  let totalColas = 0;
+  for (const ch of sufN) {
+    if (esDigito(ch)) totalColas += 1;
+  }
+  // Estado visual de las tiras viejas (derecha→izquierda empareja los dígitos
+  // posicionalmente, como el odómetro) y el cell actual, medidos ANTES del rebuild.
+  const enVuelo = rafId !== null;
+  const previas: { matriz: string; base: number }[] = [];
+  for (const t of montoEl.querySelectorAll<HTMLElement>(".monto-tira")) {
+    const primeraTira = t.querySelector<HTMLElement>(".monto-digito");
+    if (primeraTira?.dataset["i"] === undefined) continue;
+    previas.push({ matriz: getComputedStyle(t).transform, base: +primeraTira.dataset["i"] });
+  }
+  const viejaCol = montoEl.querySelector<HTMLElement>(".monto-col");
+  const cell = viejaCol ? viejaCol.offsetHeight || 24 : 0;
   const hijos: Node[] = [];
   const colas: Cola[] = [];
   for (let i = 0; i < k; i += 1) {
@@ -287,29 +308,31 @@ export function renderMonto(): void {
       hijos.push(spanFijo(ch)); // separador que aparece (coma) o marca de moneda
       return;
     }
-    const d1 = esDigito(v) ? +v : 0;
-    const fin = d1 === +ch ? d1 : d1 + pasos(d1, +ch, sube);
-    const col = crearCola(d1, fin);
+    let arranque = esDigito(v) ? +v : 0;
+    // Sin vuelo: barrido de la referencia desde el dígito viejo. En vuelo: la ruleta
+    // CONTINÚA desde su posición visual hacia el nuevo dígito, siempre en el sentido
+    // del delta — fin−arranque nunca queda del lado contrario (dirección única).
+    let fin = arranque === +ch ? arranque : arranque + pasos(arranque, +ch, sube);
+    const previa = enVuelo ? previas[previas.length - totalColas + colas.length] : undefined;
+    if (previa !== undefined) {
+      const kk = celdaDesdeMatriz(previa.matriz, previa.base, cell);
+      if (kk !== null) {
+        arranque = kk;
+        fin = arranque + pasoDesde(arranque, +ch, sube); // 0 ⇒ ya está en el objetivo (estática)
+      }
+    }
+    const col = crearCola(arranque, fin);
     colas.push(col);
     hijos.push(col.col);
   });
-  // Retarget suave: posición visual actual de las tiras viejas (derecha→izquierda
-  // empareja los dígitos posicionalmente, como el odómetro). Antes del rebuild.
-  const previas: { matriz: string; base: number }[] = [];
-  for (const t of montoEl.querySelectorAll<HTMLElement>(".monto-tira")) {
-    const primeraTira = t.querySelector<HTMLElement>(".monto-digito");
-    if (primeraTira?.dataset["i"] === undefined) continue;
-    previas.push({ matriz: getComputedStyle(t).transform, base: +primeraTira.dataset["i"] });
-  }
   montoEl.replaceChildren(...hijos);
-  const primera = colas[0];
-  const cell = primera ? primera.col.offsetHeight || 24 : 0;
   const reducir =
     typeof window.matchMedia === "function" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let giran = 0;
   for (const c of colas) {
     c.col.dataset["muestra"] = String(c.fin);
+    c.col.dataset["arranque"] = String(c.inicio);
     if (c.fin !== c.inicio) {
       c.blurIdx = giran % FILTROS;
       c.tira.style.filter = `url(#monto-blur-${c.blurIdx})`;
@@ -323,24 +346,11 @@ export function renderMonto(): void {
     }
     return;
   }
-  // Punto de partida: la posición visual actual (retarget en plena rueda, con
-  // clamp para nunca salir de la tira) o el dígito viejo en el primer armado.
-  for (const [i, c] of colas.entries()) {
-    if (c.fin === c.inicio) {
-      c.tira.style.transition = "none";
-      c.tira.style.transform = `translateY(${desplazamiento(c.base, c.fin, cell)}px)`;
-      continue;
-    }
-    let arranque = c.inicio;
-    const previa = previas[previas.length - colas.length + i];
-    if (previa !== undefined) {
-      const kk = celdaDesdeMatriz(previa.matriz, previa.base, cell);
-      if (kk !== null) {
-        arranque = Math.min(Math.max(kk, c.base + 1), Math.max(c.inicio, c.fin) + 1);
-      }
-    }
+  // Punto de partida ya decidido: en vuelo, la posición visual actual; en reposo,
+  // el dígito viejo. La base de la tira lo contiene por construcción (sin clamp).
+  for (const c of colas) {
     c.tira.style.transition = "none";
-    c.tira.style.transform = `translateY(${desplazamiento(c.base, arranque, cell)}px)`;
+    c.tira.style.transform = `translateY(${desplazamiento(c.base, c.inicio, cell)}px)`;
   }
   if (colas.every((c) => c.fin === c.inicio)) return;
   void montoEl.offsetWidth; // reflow: clava el punto de partida

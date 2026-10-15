@@ -13,6 +13,7 @@ const {
   itemsDe,
   parsearMonto,
   pasos,
+  pasoDesde,
   prefijoComun,
   alinearSufijos,
   spanFijo,
@@ -90,6 +91,15 @@ describe("pasos", () => {
   });
 });
 
+describe("pasoDesde", () => {
+  it("continuación: camina desde donde está la ruleta, con el signo del delta", () => {
+    expect(pasoDesde(14, 1, true)).toBe(7); // el arranque que antes bajaba (14→1) ya camina arriba
+    expect(pasoDesde(11, 1, true)).toBe(0); // ya está en el objetivo ⇒ estática
+    expect(pasoDesde(5, 1, false)).toBe(-4); // baja camina hacia abajo
+    expect(pasoDesde(6, 2, true)).toBe(6); // 6→…→12: aterriza en 2 (8 células arriba)
+  });
+});
+
 describe("desplazamiento y aterrizaje", () => {
   it("desplazamiento rebasa por el origen de la tira (regresión del 8 inicial)", () => {
     // plano "0": la tira arranca en k=-2 y la célula 0 queda en la 3ª posición
@@ -136,7 +146,11 @@ describe("renderMonto", () => {
   it("aumento: lo que cambia rueda hacia arriba, incluidas las posiciones nuevas", () => {
     state.moneda = "USD";
     hojaCon([99999]);
-    renderMonto(); // sincroniza el previo (US$ 999.99)
+    // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
+    state.moneda = "BOB";
+    renderMonto();
+    state.moneda = "USD";
+    renderMonto();
     state.hojas.pop();
     hojaCon([100099]); // US$ 1,000.99 → crece una cifra
     renderMonto();
@@ -160,7 +174,11 @@ describe("renderMonto", () => {
   it("disminución: la rueda baja (fin negativo = descendió por el ciclo)", () => {
     state.moneda = "USD";
     hojaCon([35000]);
-    renderMonto(); // sincroniza (US$ 350.00)
+    // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
+    state.moneda = "BOB";
+    renderMonto();
+    state.moneda = "USD";
+    renderMonto();
     state.hojas.pop();
     hojaCon([10000]); // US$ 100.00
     renderMonto();
@@ -171,7 +189,11 @@ describe("renderMonto", () => {
   it("dígito sin cambio queda fijo: transition none y clavado en su dígito", () => {
     state.moneda = "USD";
     hojaCon([35000]);
-    renderMonto(); // sincroniza
+    // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
+    state.moneda = "BOB";
+    renderMonto();
+    state.moneda = "USD";
+    renderMonto();
     state.hojas.pop();
     hojaCon([35100]); // US$ 351.00: solo el 0→1 del sufijo rueda
     renderMonto();
@@ -198,6 +220,46 @@ describe("renderMonto", () => {
     const antes = document.getElementById("montoTotal")?.innerHTML ?? "";
     renderMonto();
     expect(document.getElementById("montoTotal")?.innerHTML).toBe(antes);
+  });
+
+  it("vuelo a mitad (retarget): la dirección sigue la del delta total", () => {
+    state.moneda = "USD";
+    hojaCon([99999]);
+    renderMonto(); // agenda rAF ⇒ el siguiente render corre EN VUELO
+    state.hojas.pop();
+    hojaCon([100099]); // sube: US$ 1,000.99
+    renderMonto();
+    // aterriza en el dígito correcto (sea barrido limpio o continuación)
+    const normal = (nn: number): number => ((nn % 10) + 10) % 10;
+    const esperados = [1, 0, 0, 0, 9, 9];
+    cols().forEach((c, i) =>
+      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
+    );
+    // y toda rueda avanza hacia arriba, nunca hacia abajo (delta +)
+    for (const c of cols()) {
+      const fin = Number(c.dataset["muestra"]);
+      const arranque = Number(c.dataset["arranque"]);
+      if (fin !== arranque) expect(fin - arranque).toBeGreaterThan(0);
+    }
+  });
+
+  it("vuelo a mitad condelta invertido: el cambio de sentido también respeta el delta", () => {
+    state.moneda = "USD";
+    hojaCon([100099]); // dejamos una rueda agendada del vuelo previo
+    renderMonto();
+    state.hojas.pop();
+    hojaCon([35000]); // baja: US$ 350.00
+    renderMonto();
+    const normal = (nn: number): number => ((nn % 10) + 10) % 10;
+    const esperados = [3, 5, 0, 0, 0];
+    cols().forEach((c, i) =>
+      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
+    );
+    for (const c of cols()) {
+      const fin = Number(c.dataset["muestra"]);
+      const arranque = Number(c.dataset["arranque"]);
+      if (fin !== arranque) expect(fin - arranque).toBeLessThan(0);
+    }
   });
 });
 
