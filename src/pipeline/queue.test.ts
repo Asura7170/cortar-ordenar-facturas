@@ -98,20 +98,6 @@ describe("procesarCola", () => {
     expect(c.montoCents).toBe(1250);
   });
 
-  it("informa tiempos por etapa (L0: recorte/enderezar/extraer/total)", async () => {
-    const h = crearHoja();
-    const c = comprobante({ nombre: "t.png" });
-    h.slots[0] = c;
-    state.hojas.push(h);
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
-    const p = procesarCola();
-    await vi.advanceTimersByTimeAsync(2000);
-    await p;
-    const linea = info.mock.calls.map((a) => String(a[0])).find((s) => s.startsWith("OCR ms"));
-    expect(linea).toMatch(/recorte=\d+ enderezar=\d+ extraer=\d+/);
-    expect(linea).toMatch(/cajas=\d+ batch=\[\d+,\d+\] fallback=(sí|no) recRuns=\d+ total=\d+/);
-  });
-
   it("lote de 3: 3 procesando + 3 ok inmediato + 1 final (imagen primero)", async () => {
     for (const n of ["a.png", "b.png", "c.png"]) {
       const h = crearHoja();
@@ -189,27 +175,6 @@ describe("procesarCola", () => {
     await vi.advanceTimersByTimeAsync(2000);
     await p;
     expect(c.estado).toBe("ok");
-    expect(state.colaEnProceso).toBe(false);
-  });
-
-  it("throw a mitad de drenaje: el ítem falla en error, los hermanos siguen", async () => {
-    const h1 = crearHoja();
-    const malo = comprobante({ nombre: "malo.png", file: new Blob(["x"]) });
-    h1.slots[0] = malo;
-    const h2 = crearHoja();
-    const bueno = comprobante({ nombre: "bueno.png", file: new Blob(["y"]) });
-    h2.slots[0] = bueno;
-    state.hojas.push(h1, h2);
-    // Inyección del fallo fuera de las etapas con catch: el log final lanza una vez.
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    vi.mocked(console.info).mockImplementationOnce(() => {
-      throw new Error("log");
-    });
-    const p = procesarCola();
-    await vi.advanceTimersByTimeAsync(3000);
-    await p;
-    expect(malo.estado).toBe("error");
-    expect(bueno.estado).toBe("ok");
     expect(state.colaEnProceso).toBe(false);
   });
 

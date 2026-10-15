@@ -380,18 +380,11 @@ export function renderHojas(): void {
     restaurarSucios(sucios);
   };
   const usaVT = usaViewTransition(borrador);
-  // ponytail: telemetría del render solo en dev (el callback VT corre async:
-  // este ms cubre el armado; el snapshot se ve en el Performance panel).
-  const tRender = import.meta.env.DEV ? performance.now() : 0;
   if (usaVT) {
     const t = document.startViewTransition(render);
     t.ready?.catch(() => {});
     t.finished?.catch(() => {});
   } else render();
-  if (import.meta.env.DEV)
-    console.info(
-      `renderHojas ms=${Math.round(performance.now() - tRender)} vt=${usaVT ? "sí" : "no"}`,
-    );
 }
 
 export function soltarRenderPendiente(): void {

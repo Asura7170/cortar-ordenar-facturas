@@ -202,33 +202,18 @@ async function intakeImagen(
   f: File,
   colocar: (items: Comprobante[]) => void,
   avisos: AvisoRechazo[],
-  msNorm: number[],
 ): Promise<boolean> {
   // Intake: jpg/png/webp sin nada que corregir pasa crudo (0 gens);
   // lo demás se empaqueta a WebP. Blanca/corrupta → aviso, sin tumbar el lote.
   // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
   try {
-    const tN = performance.now();
     const blob = await normalizarImagen(f);
-    if (import.meta.env.DEV) msNorm.push(performance.now() - tN);
     colocar([comprobanteDesdeBlob(blob, f.name)]);
     return true;
   } catch {
     avisos.push({ archivo: sanear(f.name), motivo: textoMotivo("ilegible") });
     return false;
   }
-}
-
-/** Telemetría del intake (solo DEV): pared vs costo de normalización por foto. */
-function telemetriaIntake(tIntake: number, msNorm: readonly number[]): void {
-  if (!import.meta.env.DEV || msNorm.length === 0) return;
-  const ordenadas = [...msNorm].sort((a, b) => a - b);
-  const cuantil = (q: number): number =>
-    Math.round(ordenadas[Math.min(ordenadas.length - 1, Math.ceil(q * ordenadas.length) - 1)] ?? 0);
-  console.info(
-    `intake ms pared=${Math.round(performance.now() - tIntake)} n=${msNorm.length} ` +
-      `normP50=${cuantil(0.5)} normMax=${cuantil(1)}`,
-  );
 }
 
 export async function agregarArchivos(
@@ -243,8 +228,6 @@ export async function agregarArchivos(
   const avisos = avisosDeFormato(lista);
   const colocar = crearColocacion(destino);
   let colocados = 0;
-  const tIntake = performance.now();
-  const msNorm: number[] = [];
   // Sin VT ni rebuilds por archivo durante el intake (ver sheets.renderHojas):
   // el flag cubre todo el loop y el finally lo suelta aunque un PDF falle.
   intakesActivos++;
@@ -253,7 +236,7 @@ export async function agregarArchivos(
     for (const f of lista) {
       await cederTurno();
       if (esImagen(f)) {
-        if (await intakeImagen(f, colocar, avisos, msNorm)) colocados += 1;
+        if (await intakeImagen(f, colocar, avisos)) colocados += 1;
         continue;
       }
       if (!esPdf(f)) continue;
@@ -267,7 +250,6 @@ export async function agregarArchivos(
     intakesActivos--;
     state.loteEnCurso = intakesActivos > 0;
   }
-  telemetriaIntake(tIntake, msNorm);
   avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
   if (colocados === 0) return;
 

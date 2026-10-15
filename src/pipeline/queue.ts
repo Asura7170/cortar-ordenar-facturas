@@ -15,7 +15,6 @@ import {
   limpiarTextoCompleto,
 } from "./extract";
 import type { Enderezado, Giro } from "./ocr";
-import { diagVacio } from "./ocr";
 /** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
 async function blobDeItem(sig: Comprobante): Promise<Blob> {
   if (sig.file) return sig.file;
@@ -53,16 +52,6 @@ export function precalentarModelos(): void {
 /** Tipo del módulo ocr que llega por el import dinámico (nulo si no resolvió). */
 type ModuloOcr = typeof import("./ocr");
 
-/** Tiempos por etapa del ítem (telemetría dev L0). */
-interface Tiempos {
-  recorte: number;
-  enderezar: number;
-  extraer: number;
-  diag: string;
-}
-
-const entero = (v: number): number => Math.round(v);
-
 /** Blob vigente para el OCR: file del commit (recorte/giro) o refetch en PDF. */
 async function blobActual(sig: Comprobante): Promise<Blob | null> {
   // ponytail: L1 — el blob ya está en memoria tras el recorte (file) o se refetchea (PDF, sin file guardado). Un solo decode por comprobante.
@@ -74,13 +63,11 @@ async function blobActual(sig: Comprobante): Promise<Blob | null> {
   }
 }
 
-/** Recorta con DocAligner y commitea la imagen si cambió; llena ms.recorte. */
-async function faseRecorte(sig: Comprobante, ms: Tiempos): Promise<void> {
+/** Recorta con DocAligner y commitea la imagen si cambió. */
+async function faseRecorte(sig: Comprobante): Promise<void> {
   try {
-    const t = performance.now();
     const original = await blobDeItem(sig);
     const recortada = await detectarYRecortar(original);
-    ms.recorte = performance.now() - t;
     if (recortada !== original) {
       // ponytail: commit tras el await — si se limpió durante la espera, se
       // revocan las nuevas y el guard de abajo evita resucitar.
@@ -118,14 +105,11 @@ async function faseEnderezar(
   sig: Comprobante,
   blob: Blob | null,
   ocr: ModuloOcr | null,
-  ms: Tiempos,
 ): Promise<Enderezado | null> {
   let end: Enderezado | null = null;
   try {
     if (ocr && blob) {
-      const t = performance.now();
       end = await ocr.enderezar(blob);
-      ms.enderezar = performance.now() - t;
       if (end.grados !== 0 && buscarSlot(sig.id)) {
         // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
         const imgNueva = URL.createObjectURL(end.blob);
@@ -154,32 +138,24 @@ async function faseEnderezar(
   return end;
 }
 
-/** OCR real (perezoso): texto saneado en el ítem + telemetría det/rec. */
+/** OCR real (perezoso): texto saneado en el ítem. */
 async function faseOcr(
   sig: Comprobante,
   blob: Blob | null,
   ocr: ModuloOcr | null,
   end: Enderezado | null,
-  ms: Tiempos,
 ): Promise<void> {
   try {
-    const t = performance.now();
     // L1: reuse evita repetir el det del giro ganador (end trae cajas/base).
-    const diag = diagVacio();
     sig.textoOcr =
-      ocr && blob ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined, diag)) : "";
-    ms.extraer = performance.now() - t;
-    // P1: cajas, forma del lote, fallback y nº de runs del rec.
-    ms.diag =
-      `cajas=${diag.cajas} batch=[${diag.lote},${diag.anchoMax}] ` +
-      `fallback=${diag.fallback ? "sí" : "no"} recRuns=${diag.recRuns}`;
+      ocr && blob ? sanear(await ocr.extraerTexto(blob, undefined, end ?? undefined)) : "";
   } catch {
     sig.textoOcr = "";
   }
 }
 
-/** Cierra el ítem: ok + monto fast-path offline + render + log dev. */
-function completarItem(sig: Comprobante, ms: Tiempos, t0: number): void {
+/** Cierra el ítem: ok + monto fast-path offline + render. */
+function completarItem(sig: Comprobante): void {
   // L1: sin miniatura (la celda pinta el full-res con lazy).
   sig.montoCents = null;
   sig.estado = "ok";
@@ -195,13 +171,6 @@ function completarItem(sig: Comprobante, ms: Tiempos, t0: number): void {
   } catch {
     /* el render nunca aborta la cola */
   }
-  // ponytail: telemetría local en dev (en prod es ruido + nombre de usuario en consola)
-  if (import.meta.env.DEV)
-    console.info(
-      `OCR ms ${sig.nombre}: recorte=${entero(ms.recorte)} ` +
-        `enderezar=${entero(ms.enderezar)} extraer=${entero(ms.extraer)} ` +
-        `${ms.diag} total=${entero(performance.now() - t0)}`,
-    );
 }
 
 /** Procesa un pendiente completo. False si lo limpiaron durante los awaits: no se cuenta tocada. */
@@ -212,20 +181,17 @@ async function procesarItem(sig: Comprobante): Promise<boolean> {
   } catch {
     /* el render nunca aborta la cola */
   }
-  // L0: tiempos por etapa (medir antes de optimizar).
-  const ms: Tiempos = { recorte: 0, enderezar: 0, extraer: 0, diag: "" };
-  const t0 = performance.now();
-  await faseRecorte(sig, ms);
+  await faseRecorte(sig);
   if (!buscarSlot(sig.id)) return false; // limpiado durante la espera: no resucita
   // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
   const ocr = await import("./ocr").catch((): null => null);
   const blob: Blob | null = await blobActual(sig);
   // Endereza por confianza del rec (det solo recorta líneas, no vota).
-  const end = await faseEnderezar(sig, blob, ocr, ms);
+  const end = await faseEnderezar(sig, blob, ocr);
   if (!buscarSlot(sig.id)) return false; // limpiado durante el enderezado: no resucita
-  await faseOcr(sig, sig.file ?? blob, ocr, end, ms);
+  await faseOcr(sig, sig.file ?? blob, ocr, end);
   if (!buscarSlot(sig.id)) return false; // limpiado durante el OCR: no resucita
-  completarItem(sig, ms, t0);
+  completarItem(sig);
   return true;
 }
 
