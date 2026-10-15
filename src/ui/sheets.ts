@@ -352,7 +352,9 @@ function setStats(hojas: number, comps: number): void {
 function renderCuerpo(borrador: BorradorMonto | null): void {
   rectsCache = null;
   const n = totalItems();
-  setStats(state.hojas.length, n);
+  // Stats = lo que está en pantalla: con n===0 (tarjeta vacía) no hay hojas
+  // pintadas — la semilla base (main.ts/limpiarHojas) no se cuenta.
+  setStats(n === 0 ? 0 : state.hojas.length, n);
   sheetsEl.innerHTML = "";
 
   if (n === 0) {

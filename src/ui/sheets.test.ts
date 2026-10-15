@@ -97,6 +97,26 @@ describe("cambiarLayoutHoja / aplicarATodas", () => {
   });
 });
 
+describe("stats del lote (flanco de marca)", () => {
+  it("hoja base sin comprobantes: cifra de hojas 0 (el fantasma no pinta)", () => {
+    state.hojas = [crearHoja()];
+    renderHojas();
+    expect(document.getElementById("statHojas")!.style.getPropertyValue("--n-hojas")).toBe("0");
+    expect(document.getElementById("statComp")!.style.getPropertyValue("--n-comp")).toBe("0");
+    expect(document.getElementById("metaHojas")!.hasAttribute("data-cero")).toBe(true);
+  });
+
+  it("con un comprobante: 1 hoja · 1 comp y sale del estado vacío", () => {
+    const h = crearHoja();
+    h.slots[0] = comprobante({ nombre: "x.png" });
+    state.hojas = [h];
+    renderHojas();
+    expect(document.getElementById("statHojas")!.style.getPropertyValue("--n-hojas")).toBe("1");
+    expect(document.getElementById("statComp")!.style.getPropertyValue("--n-comp")).toBe("1");
+    expect(document.getElementById("metaHojas")!.hasAttribute("data-cero")).toBe(false);
+  });
+});
+
 describe("quitarComprobante", () => {
   it("quita, revoca img y elimina la hoja vaciada", () => {
     const a = sembrar("u4x2", [null]);
