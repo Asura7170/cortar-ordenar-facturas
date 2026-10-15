@@ -36,16 +36,81 @@
     var(--sombra-boton);
 }
 
-.brand-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  text-wrap: balance;
+/* Stats del lote en el flanco de marca (suplantan el texto): número al vistazo.
+   Odómetro nativo de Chrome: @property <integer> interpola con transición y
+   counter() pinta — retargetea en pleno vuelo (transición, no keyframe). */
+@property --n-hojas {
+  syntax: "<integer>";
+  initial-value: 0;
+  inherits: true;
 }
-.brand-sub {
-  font-size: 12px;
+@property --n-comp {
+  syntax: "<integer>";
+  initial-value: 0;
+  inherits: true;
+}
+.lote-stats {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 12px;
+}
+.stat + .stat {
+  /* hairline estructural entre ejes (borders for structure) */
+  border-left: 1px solid var(--borde-panel);
+}
+.stat-ico {
+  width: 17px;
+  height: 17px;
   color: var(--texto-panel-suave);
-  letter-spacing: 0.04em;
+}
+.stat-cifra {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-panel);
+  counter-reset: cifra var(--n-hojas);
+  transition:
+    --n-hojas 0.35s cubic-bezier(0.2, 0, 0, 1),
+    --n-comp 0.35s cubic-bezier(0.2, 0, 0, 1);
+}
+#statComp {
+  counter-reset: cifra var(--n-comp);
+}
+.stat-cifra::after {
+  content: counter(cifra);
+}
+/* Lote vacío: ejes duermen, no la señal (estático, no solo-motion). */
+.lote-stats[data-cero] .stat-ico,
+.lote-stats[data-cero] .stat-cifra {
+  color: var(--texto-panel-suave);
+}
+/* Pop one-shot por cambio de lote (keyframe de secuencia única; el bloque
+   global de reduced-motion lo anula). */
+@keyframes stat-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.stat-cifra.bump {
+  animation: stat-pop 0.26s ease-out;
+}
+/* Arranque sin animación: primer render congelado, transición vuelve al frame
+   siguiente (better-ui: skip state animations on first render). */
+.lote-stats.stats-frozen .stat-cifra {
+  transition: none;
 }
 
 .monto-box {

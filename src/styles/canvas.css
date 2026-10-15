@@ -102,24 +102,6 @@
   pointer-events: none;
   z-index: 5;
 }
-.canvas-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  color: var(--texto-panel-suave);
-}
-.canvas-titulo {
-  font-size: 13px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-wrap: balance;
-}
-.canvas-meta {
-  font-family: var(--serif);
-  font-size: 12px;
-}
-
 .sheets {
   display: flex;
   flex-direction: column;

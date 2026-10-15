@@ -16,6 +16,8 @@ import { avisarError, getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
 const metaHojas: HTMLElement = getEl("metaHojas");
+const statHojas: HTMLElement = getEl("statHojas");
+const statComp: HTMLElement = getEl("statComp");
 const btnZoom: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoom");
 const btnZoomMas: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoomMas");
 const btnZoomMenos: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoomMenos");
@@ -320,11 +322,37 @@ function armarFilaFantasma(): HTMLElement {
   return fila;
 }
 
+/* Stats del flanco de marca: cifras que ruedan (--n transitioned) y pulsan al
+   cambiar de lote; sin fuga de palabra visible (labels en SR + title). */
+let statsPrimerRender = true;
+let statsPrevHojas = 0;
+let statsPrevComp = 0;
+function setStats(hojas: number, comps: number): void {
+  metaHojas.toggleAttribute("data-cero", hojas === 0 && comps === 0);
+  if (statsPrimerRender) {
+    // Better-ui: skip state animations on first render.
+    statsPrimerRender = false;
+    metaHojas.classList.add("stats-frozen");
+    requestAnimationFrame(() => metaHojas.classList.remove("stats-frozen"));
+  } else if (hojas !== statsPrevHojas || comps !== statsPrevComp) {
+    for (const el of [statHojas, statComp]) {
+      el.classList.remove("bump");
+    }
+    void statHojas.offsetWidth; // reinicia el pop one-shot si estaba en vuelo
+    statHojas.classList.add("bump");
+    statComp.classList.add("bump");
+  }
+  statsPrevHojas = hojas;
+  statsPrevComp = comps;
+  statHojas.style.setProperty("--n-hojas", String(hojas));
+  statComp.style.setProperty("--n-comp", String(comps));
+}
+
 /** Cuerpo del render (siempre bajo `mutandoHojas`: el swap destruye el foco). */
 function renderCuerpo(borrador: BorradorMonto | null): void {
   rectsCache = null;
   const n = totalItems();
-  metaHojas.textContent = `${state.hojas.length} hoja${state.hojas.length === 1 ? "" : "s"} · ${n} comprobante${n === 1 ? "" : "s"}`;
+  setStats(state.hojas.length, n);
   sheetsEl.innerHTML = "";
 
   if (n === 0) {

@@ -31,9 +31,48 @@
       <header class="topbar">
         <div class="brand">
           <img class="brand-mark" src="/logo.svg" alt="" width="42" height="42" />
-          <div class="brand-text">
-            <h1 class="brand-title">Cortar y Ordenar Facturas</h1>
-            <p class="brand-sub">Lote · Recorte &amp; OCR · Export Word</p>
+          <h1 class="sr-only">Cortar y Ordenar Facturas</h1>
+          <!-- Stats del lote reemplazan el texto de marca: cifra al vistazo. -->
+          <div
+            class="lote-stats"
+            id="metaHojas"
+            role="group"
+            aria-label="Hojas y comprobantes del lote"
+          >
+            <div class="stat" title="Hojas del lote">
+              <svg
+                class="stat-ico"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M8 3h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+                <path d="M4 7v12a2 2 0 0 0 2 2h10" />
+              </svg>
+              <span class="stat-cifra" id="statHojas"></span>
+              <span class="sr-only">hojas</span>
+            </div>
+            <div class="stat" title="Comprobantes del lote">
+              <svg
+                class="stat-ico"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21V3Z" />
+                <path d="M9.5 8h5M9.5 12h3.5" />
+              </svg>
+              <span class="stat-cifra" id="statComp"></span>
+              <span class="sr-only">comprobantes</span>
+            </div>
           </div>
         </div>
         <div class="zoom-grupo" role="group" aria-label="Zoom de hojas">
@@ -763,10 +802,6 @@
 
         <!-- Área principal: también zona de subida (drop en el canvas) -->
         <main class="canvas" id="canvas">
-          <div class="canvas-head">
-            <h2 class="canvas-titulo">Hojas</h2>
-            <span class="canvas-meta" id="metaHojas">0 hojas</span>
-          </div>
           <!-- #aviso: canal de avisos (los módulos lo exigen con getEl), invisible
                visualmente; sigue anunciando a lectores de pantalla (role=status). -->
           <p id="aviso" class="sr-only" role="status"></p>

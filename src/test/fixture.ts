@@ -10,7 +10,7 @@ export const FIXTURE_HTML = `
 </div>
 <span id="githubStars"></span>
 <main class="canvas" id="canvas">
-  <div class="canvas-head"><span id="metaHojas"></span></div>
+  <div class="lote-stats" id="metaHojas"><span class="stat-cifra" id="statHojas"></span><span class="stat-cifra" id="statComp"></span></div>
   <p id="aviso" role="status"></p>
   <span id="estadoCopiado" class="sr-only" role="status" aria-live="polite"></span>
   <div id="sheets"></div>

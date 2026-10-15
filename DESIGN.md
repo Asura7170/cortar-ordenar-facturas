@@ -64,7 +64,8 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
   Vendoreada en `public/fonts` (400/600/700 + latin-ext, OFL,
   `font-display: swap`; el peso 800 se podó del CSS y de los woff2 — commit
   Lote 3). Prohibida otra familia. `--mono` ya no existe: era el mismo stack.
-- Roles: brand 18px/700 (resuelto por el dueño — el doc decía 20px); monto total
+- Roles: stats del lote en el flanco de marca (cifra 16px/600 tabular, íconos 17px;
+  el h1 de brand vive solo en SR); monto total
   22px/600 tabular; títulos de sección 12-13px uppercase con tracking 0.1-0.14em;
   cuerpo 13-14px/1.5; datos (montos, códigos, badges) 11-14px `tabular-nums`,
   alineados a la derecha (la celda usa 14px — resuelto por el dueño); dropzone
@@ -107,6 +108,11 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 
 - `.monto-box/.monto-valor` (topbar.css, `#montoTotal`): cifra 22px/600 en
   `--monto-valor`; label 11px uppercase. Uso: solo lectura, un total por vista.
+- `.lote-stats` (topbar.css, `#metaHojas` en el flanco de marca): celdas
+  ícono 17px + cifra 16px/600 tabular, hairline entre ejes. Odómetro nativo
+  (`@property <integer>` + `counter()`) con retarget por transición; pop
+  one-shot por cambio (`.bump`); lote vacío duerme los ejes (`data-cero`).
+  El h1 de marca vive solo en SR; labels en sr-only + `title`.
 - `.panel` + `.switch` + `.codigo-row` (sidebar.css,
   `#chkCodigo/#chkOcr/#inputCodigo`): panel con head 12px uppercase; switch
   nativo con track; código con input numérico + rejilla de posición.

@@ -290,7 +290,7 @@ select {
 /* ponytail: tabulación compartida (monto/badges/contadores) — sede única en base, la usan topbar+canvas. */
 /* Números densos con la misma tabulación del monto (montos/badges/contadores). */
 .sheet-panel-count,
-.canvas-meta,
+.stat-cifra,
 .cell-monto,
 .calculo-txt,
 .dz-fmt {
