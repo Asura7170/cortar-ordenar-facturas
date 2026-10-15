@@ -42,7 +42,7 @@ describe("submit", () => {
     cfgMoneda.value = "ARS";
     enviar();
     expect(state.moneda).toBe("ARS");
-    expect(document.getElementById("montoTotal")?.textContent).toBe("AR$ 1.00");
+    expect(document.getElementById("montoTotal")?.getAttribute("aria-label")).toBe("AR$ 1.00");
     const raw = JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}") as Record<
       string,
       unknown
