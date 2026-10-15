@@ -97,6 +97,19 @@ describe("cambiarLayoutHoja / aplicarATodas", () => {
     expect(state.hojas.every((x) => x.layout === "u1")).toBe(true);
     expect(state.hojas.flatMap((x) => x.slots).filter(Boolean)).toHaveLength(2);
   });
+
+  it("aplicarATodas con desborde: las nuevas reciben la plantilla, no el default", () => {
+    const a = sembrar("u1", [10]);
+    const b = crearHoja("u4x2");
+    b.slots[0] = comprobante({ nombre: "x" });
+    b.slots[1] = comprobante({ nombre: "y" });
+    b.slots[2] = comprobante({ nombre: "z" });
+    state.hojas.push(b);
+    renderHojas();
+    aplicarATodas(a.id);
+    expect(state.hojas).toHaveLength(4);
+    expect(state.hojas.every((x) => x.layout === "u1")).toBe(true);
+  });
 });
 
 describe("stats del lote (flanco de marca)", () => {

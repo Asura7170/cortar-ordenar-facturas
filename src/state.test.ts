@@ -341,6 +341,17 @@ describe("redistribuir", () => {
     expect(state.hojas[2]?.slots).toEqual([items[3] ?? null, null, null, null]);
   });
 
+  it("layoutNuevas pisa el default para 'aplicar a todas'", () => {
+    const h = crearHoja("u4x2");
+    const items = [1, 2, 3, 4].map(() => comprobante());
+    h.slots = items;
+    state.hojas.push(h);
+    h.layout = "u1";
+    redistribuir("u1");
+    expect(state.hojas).toHaveLength(4);
+    expect(state.hojas.every((x) => x.layout === "u1")).toBe(true);
+  });
+
   it("descarta hojas que quedan vacías (recompacta en las primeras)", () => {
     state.hojas.push(crearHoja(), crearHoja());
     const c = comprobante();

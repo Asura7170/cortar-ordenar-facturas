@@ -440,7 +440,7 @@ export function aplicarATodas(hojaId: string | number): void {
   state.hojas.forEach((x) => {
     x.layout = layoutId;
   });
-  redistribuir();
+  redistribuir(layoutId); // las nuevas también reciben la plantilla propagada
   renderHojas();
 }
 

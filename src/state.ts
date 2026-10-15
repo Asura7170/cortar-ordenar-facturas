@@ -209,7 +209,8 @@ export function limpiarHojas(): void {
 
 // Reparte los comprobantes en orden visual respetando la capacidad de cada
 // hoja: rellena consecutivamente (recompacta, sin huecos) y crea hojas al final.
-export function redistribuir(): void {
+// `layoutNuevas` ("aplicar a todas") pisa el default de las hojas nuevas.
+export function redistribuir(layoutNuevas?: LayoutId): void {
   const items = Iterator.from(state.hojas)
     .flatMap((h) => Iterator.from(h.slots).filter((c) => c !== null))
     .toArray();
@@ -226,9 +227,9 @@ export function redistribuir(): void {
     for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();
   }
   while (pos < items.length) {
-    // Hojas nuevas con el default: el layout elegido es de la hoja, no del lote
-    // (el intake desborda igual con ?? crearHoja() — una sola regla).
-    const h = crearHoja();
+    // Las nuevas usan el default (el intake desborda igual): el layout elegido
+    // es de la hoja; "aplicar a todas" pisa vía layoutNuevas.
+    const h = crearHoja(layoutNuevas);
     const cap = layoutDe(h.layout).total;
     h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
     for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();
