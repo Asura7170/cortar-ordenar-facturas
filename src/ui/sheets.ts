@@ -480,6 +480,7 @@ interface BorradorMonto {
   readonly valor: string;
   readonly inicio: number | null;
   readonly fin: number | null;
+  readonly error: boolean;
 }
 
 /** Borrador en curso (input de monto con foco): sobrevive a los renders de fondo. */
@@ -490,27 +491,47 @@ function borradorEnEdicion(): BorradorMonto | null {
   const cell = a.closest(".cell");
   const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
   if (!Number.isInteger(id)) return null;
-  return { id, valor: a.value, inicio: a.selectionStart, fin: a.selectionEnd };
+  return {
+    id,
+    valor: a.value,
+    inicio: a.selectionStart,
+    fin: a.selectionEnd,
+    error: a.classList.contains("monto-error"),
+  };
 }
 
 /** Borradores visibles sin foco (inválidos tras blur): se capturan del DOM. */
-function borradoresVisibles(): Map<number, string> {
-  const sucios = new Map<number, string>();
+interface BorradorSucio {
+  readonly valor: string;
+  readonly error: boolean;
+}
+
+function borradoresVisibles(): Map<number, BorradorSucio> {
+  const sucios = new Map<number, BorradorSucio>();
   const a = document.activeElement;
   sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto").forEach((input) => {
     if (input === a || input.value === "") return;
     const cell = input.closest(".cell");
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
-    if (Number.isInteger(id)) sucios.set(id, input.value);
+    if (Number.isInteger(id)) {
+      sucios.set(id, {
+        valor: input.value,
+        error: input.classList.contains("monto-error"),
+      });
+    }
   });
   return sucios;
 }
 
-/** Restaura borradores sin foco tras el render (solo valor, nunca foco: B2). */
-function restaurarSucios(sucios: Map<number, string>): void {
-  sucios.forEach((valor, id) => {
+/** Restaura borradores sin foco tras el render (valor y error, nunca foco: B2). */
+function restaurarSucios(sucios: Map<number, BorradorSucio>): void {
+  sucios.forEach(({ valor, error }, id) => {
     const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
-    if (input && document.activeElement !== input) input.value = valor;
+    if (input && document.activeElement !== input) {
+      input.value = valor;
+      input.classList.toggle("monto-error", error);
+      if (error) input.setAttribute("aria-invalid", "true");
+    }
   });
 }
 
@@ -519,6 +540,8 @@ function restaurarBorrador(b: BorradorMonto): void {
   const input = cellById(b.id)?.querySelector<HTMLInputElement>("input.cell-monto");
   if (!input) return;
   input.value = b.valor;
+  input.classList.toggle("monto-error", b.error);
+  if (b.error) input.setAttribute("aria-invalid", "true");
   input.focus();
   if (b.inicio !== null && b.fin !== null) input.setSelectionRange(b.inicio, b.fin);
 }
@@ -550,19 +573,15 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
   // Inválido → se conserva el borrador para corregirlo (el title muestra el formato).
   // ponytail: el blur (change) no roba el foco: solo Enter reenfoca.
   if (cents === null) {
-    const typed = input.value;
     // Error visible solo con texto escrito (borrar = salir, no error).
-    const esError = typed.trim() !== "";
-    if (esError) avisarError("Formato no válido: usa 1234.56");
-    renderHojas();
-    const deNuevo = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
-    if (deNuevo) {
-      deNuevo.value = typed;
-      if (esError) {
-        deNuevo.classList.add("monto-error");
-        deNuevo.setAttribute("aria-invalid", "true");
-      }
+    if (input.value.trim() !== "") {
+      avisarError("Formato no válido: usa 1234.56");
+      // La marca viaja con el borrador (restaurarBorrador/restaurarSucios):
+      // el parche post-render se pierde cuando la VT difiere el swap.
+      input.classList.add("monto-error");
+      input.setAttribute("aria-invalid", "true");
     }
+    renderHojas();
     if (reenfocar) enfocarMonto(id);
     return null;
   }

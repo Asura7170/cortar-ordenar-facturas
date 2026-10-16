@@ -460,6 +460,33 @@ describe("monto manual", () => {
     expect(document.querySelector("#aviso > .toast-error")).not.toBeNull();
   });
 
+  it("change inválido sobrevive al swap diferido de la ViewTransition", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "12,3";
+    const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
+    const diferidos: Array<() => void> = [];
+    Object.defineProperty(document, "startViewTransition", {
+      value: (cb: () => void): object => {
+        diferidos.push(cb); // Chrome invoca el callback en la oportunidad de render
+        return {};
+      },
+      configurable: true,
+    });
+    try {
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(input.classList.contains("monto-error")).toBe(true);
+      diferidos.forEach((cb) => cb()); // el swap llega después
+      const deNuevo = inputMonto();
+      expect(deNuevo.classList.contains("monto-error")).toBe(true);
+      expect(deNuevo.getAttribute("aria-invalid")).toBe("true");
+      expect(deNuevo.value).toBe("12,3");
+    } finally {
+      if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
+      else Reflect.deleteProperty(document, "startViewTransition");
+    }
+  });
+
   it("change con campo vacío no marca error ni avisa", () => {
     sembrarOk();
     // Limpio el aviso del test anterior (el fixture es un DOM compartido).
