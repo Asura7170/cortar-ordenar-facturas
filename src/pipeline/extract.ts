@@ -192,7 +192,11 @@ export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: bo
     }
     return;
   }
-  const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
+  // Solo el título del toast vivo: la pila completa concatenaba títulos ajenos,
+  // detalles y toasts en despedida (el éxito total restauraba basura).
+  const avisoPrevio =
+    document.querySelector("#aviso .toast:not([data-grupo]):not(.saliendo) .toast-titulo")
+      ?.textContent ?? "";
   const ok = aplicarTotales(lote.items, lote.mapa);
   parchearCeldas(lote.items, lote.mapa);
   if (ok > 0) {

@@ -286,6 +286,19 @@ describe("extraerPendientes", () => {
     expect(aviso.textContent).toBe("«gordo.pdf»: pesa más de 5 MB");
   });
 
+  it("éxito total restaura solo el título del toast vivo (regresión)", () => {
+    const { c1 } = lote2();
+    mostrarToasts([{ tipo: "error", titulo: "mala.pdf", grupo: "intake" }]);
+    mostrarToasts([{ tipo: "error", titulo: "gordo.pdf: pesa más de 5 MB", detalle: "4.9 MB" }]);
+    extraerPendientes();
+    expect(c1.montoCents).toBe(1250);
+    // La pila trae el textContent completo (título de grupo + detalle);
+    // el título vivo es lo restaurable.
+    expect(
+      document.querySelector("#aviso .toast:not([data-grupo]) .toast-titulo")?.textContent,
+    ).toBe("gordo.pdf: pesa más de 5 MB");
+  });
+
   it("auto bloqueado durante OCR salvo desdeCola (regresión)", () => {
     const { c1 } = lote2();
     state.colaEnProceso = true;
