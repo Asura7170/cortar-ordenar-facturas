@@ -55,7 +55,7 @@ export function initSettings(): void {
         (e: unknown) => {
           console.warn("modelos:", e);
           estadoModelos.textContent =
-            "Modelos: no se pudo descargar (" + (e instanceof Error ? e.message : "error") + ")";
+            "Modelos: no se pudo descargar: falta espacio o conexión. Probá de nuevo";
         },
       )
       .finally(() => {
@@ -73,7 +73,7 @@ export function initSettings(): void {
       (e: unknown) => {
         console.warn("modelos:", e);
         estadoModelos.textContent =
-          "Modelos: no se pudo borrar (" + (e instanceof Error ? e.message : "error") + ")";
+          "Modelos: no se pudo borrar: hay algo bloqueando el almacenamiento. Probá de nuevo";
       },
     );
   });

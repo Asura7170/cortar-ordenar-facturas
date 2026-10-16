@@ -2,6 +2,8 @@
 /* ============ TOPBAR ============ */
 .topbar {
   display: flex;
+  flex-wrap: wrap; /* zoom 200%: las zonas apiladas, nunca controles solapados (verificado en captura). */
+  row-gap: 8px;
   align-items: center;
   gap: 20px;
   padding: 14px 22px;
@@ -16,6 +18,9 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
+  /* Flanco flexible: crece parejo con el derecho y dispara el wrap del
+     topbar antes de que comprimirse lo haga solapar. */
+  flex: 1 1 auto;
 }
 
 .brand-mark {
@@ -29,23 +34,87 @@
   border-radius: var(--radio-s);
   box-shadow:
     inset 0 0 0 1px var(--renglon),
-    0 3px 8px rgba(0, 0, 0, 0.3);
+    var(--sombra-boton);
 }
 
-.brand-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  text-wrap: balance;
+/* Stats del lote en el flanco de marca (suplantan el texto): número al vistazo.
+   Odómetro nativo de Chrome: @property <integer> interpola con transición y
+   counter() pinta — retargetea en pleno vuelo (transición, no keyframe). */
+@property --n-hojas {
+  syntax: "<integer>";
+  initial-value: 0;
+  inherits: true;
 }
-.brand-sub {
-  font-size: 12px;
+@property --n-comp {
+  syntax: "<integer>";
+  initial-value: 0;
+  inherits: true;
+}
+.lote-stats {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 12px;
+}
+.stat + .stat {
+  /* hairline estructural entre ejes (borders for structure) */
+  border-left: 1px solid var(--borde-panel);
+}
+.stat-ico {
+  width: 17px;
+  height: 17px;
   color: var(--texto-panel-suave);
-  letter-spacing: 0.04em;
+}
+.stat-cifra {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-panel);
+  counter-reset: cifra var(--n-hojas);
+  transition:
+    --n-hojas 0.35s cubic-bezier(0.2, 0, 0, 1),
+    --n-comp 0.35s cubic-bezier(0.2, 0, 0, 1);
+}
+#statComp {
+  counter-reset: cifra var(--n-comp);
+}
+.stat-cifra::after {
+  content: counter(cifra);
+}
+/* Lote vacío: ejes duermen, no la señal (estático, no solo-motion). */
+.lote-stats[data-cero] .stat-ico,
+.lote-stats[data-cero] .stat-cifra {
+  color: var(--texto-panel-suave);
+}
+/* Pop one-shot por cambio de lote (keyframe de secuencia única; el bloque
+   global de reduced-motion lo anula). */
+@keyframes stat-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.stat-cifra.bump {
+  animation: stat-pop 0.26s ease-out;
+}
+/* Arranque sin animación: primer render congelado, transición vuelve al frame
+   siguiente (better-ui: skip state animations on first render). */
+.lote-stats.stats-frozen .stat-cifra {
+  transition: none;
 }
 
 .monto-box {
-  margin-left: auto;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -62,69 +131,39 @@
   text-transform: uppercase;
 }
 .monto-valor {
-  font-family: var(--mono);
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--serif);
   font-size: 22px;
   font-weight: 600;
   color: var(--monto-valor);
   font-variant-numeric: tabular-nums;
 }
-/* Total odómetro: cada posición que cambia rueda a su ritmo (la de más a la
-   derecha rápido, las altas lento). ponytail: 1 keyframe + calc() por --p. */
-.monto-rodillo {
-  display: inline-block;
+/* Total ruleta (adaptado del prototipo p26): cada dígito es una tira vertical
+   0-9 recortada con desvanecido arriba/abajo; el blur SVG vertical lo escribe
+   monto.ts via defs; las tiras aterrizan izq→der con escalón (escalon inline). */
+.monto-col {
+  position: relative;
   height: 1lh;
   overflow: hidden;
-  vertical-align: top;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
 }
-/* ponytail: el carácter viejo vive en ::before/::after (attr): no cuenta en
-   textContent, así el total leído y la guardia anti-duplicada quedan exactos. */
-.monto-desplaza {
+.monto-tira {
   display: flex;
   flex-direction: column;
-  animation: monto-rueda calc(180ms + var(--p, 0) * 70ms) cubic-bezier(0.2, 0.7, 0.3, 1) both;
-  will-change: transform;
+  will-change: transform, filter;
 }
-.monto-desplaza::before {
-  content: attr(data-viejo);
-  display: block;
+.monto-digito {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: 1lh;
 }
-.monto-desplaza > span {
-  display: block;
-  height: 1lh;
-}
-.monto-valor[data-dir="1"] .monto-desplaza {
-  animation-direction: reverse;
-}
-.monto-valor[data-dir="1"] .monto-desplaza::before {
-  content: none;
-}
-.monto-valor[data-dir="1"] .monto-desplaza::after {
-  content: attr(data-viejo);
-  display: block;
-  height: 1lh;
-}
-/* Carácter totalmente nuevo (crece la cifra): pop con rebote. */
-.monto-nuevo {
-  display: inline-block;
-  animation: monto-cae 350ms cubic-bezier(0.34, 1.45, 0.64, 1) both;
-}
-@keyframes monto-rueda {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-1lh);
-  }
-}
-@keyframes monto-cae {
-  0% {
-    transform: translateY(-8px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
+/* Motion reducido: sin rueda ni blur; monto.ts clava cada dígito sin animar. */
+@media (prefers-reduced-motion: reduce) {
+  .monto-tira {
+    transition: none !important;
+    filter: none !important;
   }
 }
 .topbar-actions {
@@ -132,15 +171,27 @@
   gap: 10px;
 }
 
-/* Grupo de zoom: centrado absoluto (+/− siempre; reset solo con zoom).
-   ponytail: `translate`, no `transform`: así no choca con .btn:active. */
+/* Zona derecha (monto + acciones): flanco flexible como la marca; juntos
+   empujan el wrap del topbar antes del solape. */
+.topbar-derecha {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: flex-end;
+}
+
+/* Grupo de zoom al centro: con espacio sobrante los flancos crecen igual y lo
+   median; en ventanas angostas el wrap del topbar apila las zonas — nunca
+   controles solapados. */
 .zoom-grupo {
-  position: absolute;
-  left: 50%;
-  translate: -50% 0;
   display: flex;
   gap: 8px;
   align-items: center;
+  flex: 0 0 auto;
+  /* Empuje visual a la derecha del centro que dan los flancos (pedido). */
+  transform: translateX(64px);
 }
 .zoom-grupo .btn {
   min-height: 44px;
@@ -170,103 +221,117 @@
 }
 /* ponytail: un solo SVG + `d` interpolable (misma secuencia de comandos),
    sin SMIL — el loop lo maneja CSS y movimiento-reducido lo congela solo. */
-.lm-lente {
+/* ponytail: la única cinta permanente de la app ahora solo corre en
+   hover/foco (patrón engranaje del sidebar): en reposo la lente queda
+   congelada en su trazo de origen, sin loop 24/7. */
+#btnLupa:hover .lm-lente,
+#btnLupa:focus-visible .lm-lente {
   animation: lm-lente 4s ease-in-out infinite;
 }
-.lm-h {
+#btnLupa:hover .lm-h,
+#btnLupa:focus-visible .lm-h {
   animation: lm-h 4s ease-in-out infinite;
 }
-.lm-v {
+#btnLupa:hover .lm-v,
+#btnLupa:focus-visible .lm-v {
   animation: lm-v 4s ease-in-out infinite;
 }
-.lm-mango {
+#btnLupa:hover .lm-mango,
+#btnLupa:focus-visible .lm-mango {
   animation: lm-mango 4s ease-in-out infinite;
 }
 @keyframes lm-lente {
-  0%,
-  20% {
+  0% {
     d: path("M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0");
   }
-  50%,
-  70% {
+  20%,
+  50% {
     d: path("M10 15a5 5 0 1 0 10 0a5 5 0 1 0 -10 0");
   }
+  80%,
   100% {
     d: path("M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0");
   }
 }
 @keyframes lm-h {
-  0%,
-  20% {
+  0% {
     d: path("M7 10l6 0");
   }
-  50%,
-  70% {
+  20%,
+  50% {
     d: path("M13 15l4 0");
   }
+  80%,
   100% {
     d: path("M7 10l6 0");
   }
 }
 @keyframes lm-v {
-  0%,
-  20% {
+  0% {
     d: path("M10 7l0 6");
   }
-  50%,
-  70% {
+  20%,
+  50% {
     d: path("M15 13l0 4");
   }
+  80%,
   100% {
     d: path("M10 7l0 6");
   }
 }
 @keyframes lm-mango {
-  0%,
-  20% {
+  0% {
     d: path("M21 21l-6 -6");
   }
-  50%,
-  70% {
+  20%,
+  50% {
     d: path("M22 22l-3 -3");
   }
+  80%,
   100% {
     d: path("M21 21l-6 -6");
   }
 }
 /* Marco de foco: aparece y se dibuja con el mismo loop (pathLength=1
-   normaliza el largo de cada esquina). */
+   normaliza el largo de cada esquina). En reposo queda opacity:0 y la
+   animación vive solo en hover/foco, junto a las de la lente. */
+#btnLupa:hover .lm-marco,
+#btnLupa:focus-visible .lm-marco {
+  animation: lm-marco-op 4s ease-in-out infinite;
+}
 .lm-marco {
   opacity: 0;
-  animation: lm-marco-op 4s ease-in-out infinite;
+}
+#btnLupa:hover .lm-marco path,
+#btnLupa:focus-visible .lm-marco path {
+  animation: lm-dibuja 4s ease-in-out infinite;
 }
 .lm-marco path {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: lm-dibuja 4s ease-in-out infinite;
 }
 @keyframes lm-marco-op {
-  0%,
-  20% {
+  0% {
     opacity: 0;
   }
-  50%,
-  70% {
+  20%,
+  50% {
     opacity: 1;
   }
+  80%,
   100% {
     opacity: 0;
   }
 }
 @keyframes lm-dibuja {
-  0%,
-  20% {
+  0% {
     stroke-dashoffset: 1;
   }
-  50%,
-  70% {
+  20%,
+  50% {
     stroke-dashoffset: 0;
   }
+  80%,
   100% {
     stroke-dashoffset: 1;
   }
@@ -317,6 +382,14 @@
   justify-content: center;
   min-width: 42px;
   font-size: 16px;
+  position: relative;
+}
+/* Hit-area 44px: el gap vecino con #btnGithub es 10px, el ::after de -8px
+   no lo alcanza (quedan 2px). */
+#btnTema::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 .tema-ico {
   display: inline-flex;

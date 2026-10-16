@@ -18,54 +18,66 @@ import { extraerPendientes } from "../pipeline/extract";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
 import type { MotivoRechazo } from "../pipeline/pdf";
 import { normalizarImagen } from "../pipeline/imagen";
-import { getEl, sanear } from "../utils";
+import { despejarToasts, getEl, mostrarToasts, sanear } from "../utils";
+import type { ToastMensaje } from "../utils";
 
 const canvas: HTMLElement = getEl("canvas");
 const fileInput: HTMLInputElement = getEl<HTMLInputElement>("fileInput");
 const dropzone: HTMLElement = getEl("dropzone");
 const chkCodigo: HTMLInputElement = getEl<HTMLInputElement>("chkCodigo");
-const numCodigo: HTMLInputElement = getEl<HTMLInputElement>("numCodigo");
 const inputCodigo: HTMLInputElement = getEl<HTMLInputElement>("inputCodigo");
 // ponytail: por name (no getEl): si el fieldset falta, lista vacía sin reventar.
 function radiosPosicion(): NodeListOf<HTMLInputElement> {
   return document.querySelectorAll<HTMLInputElement>('input[name="posCodigo"]');
 }
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
-const aviso: HTMLElement = getEl("aviso");
 const btnCalcular: HTMLButtonElement = getEl<HTMLButtonElement>("btnCalcular");
 const btnPegar: HTMLButtonElement = getEl<HTMLButtonElement>("btnPegar");
 
-/** Rechazo de entrada: nombre en tono tenue + motivo en rojo sello. */
+/** Rechazo del intake: causa corta (título del toast), archivo y motivo. */
 interface AvisoRechazo {
+  readonly titulo: string;
   readonly archivo: string;
   readonly motivo: string;
 }
 
-/** Aviso de entrada (rechazos del filtro/gate). Sobrescribe el anterior.
-    Sin innerHTML: el nombre va como nodo de texto (a prueba de marcado). */
+/** Aviso de entrada (rechazos del filtro/gate): UN toast por archivo rechazado,
+    con la causa corta arriba y el nombre al final del detalle. */
 function avisar(rechazos: readonly AvisoRechazo[]): void {
-  const nodos: (Text | HTMLSpanElement)[] = [];
-  rechazos.forEach((r, i) => {
-    if (i > 0) nodos.push(document.createTextNode(" · "));
-    nodos.push(document.createTextNode(`«${r.archivo}»: `));
-    const m = document.createElement("span");
-    m.className = "motivo";
-    m.textContent = r.motivo;
-    nodos.push(m);
-  });
-  aviso.replaceChildren(...nodos);
+  const items: ToastMensaje[] = rechazos.map((r) => ({
+    tipo: "error",
+    titulo: r.titulo,
+    detalle: r.motivo,
+    archivo: r.archivo,
+    grupo: "intake",
+  }));
+  mostrarToasts(items);
 }
 
 function textoMotivo(m: MotivoRechazo): string {
   switch (m) {
     case "tamano":
-      return "pesa más de 5 MB";
+      return "pesa más de 5 MB, comprimila y probá de nuevo";
     case "paginas":
-      return "tiene más de 10 páginas";
+      return "tiene más de 10 páginas, partila en dos PDF";
     case "cifrado":
-      return "protegido con contraseña";
+      return "protegido con contraseña, quitásela y volvé a subir";
     case "ilegible":
-      return "no se pudo leer";
+      return "no se pudo leer: puede estar corrupta, probá con otra foto";
+  }
+}
+
+/** Título corto y escaneable del rechazo, pareja de textoMotivo. */
+function tituloDeMotivo(m: MotivoRechazo): string {
+  switch (m) {
+    case "tamano":
+      return "Archivo demasiado pesado";
+    case "paginas":
+      return "PDF demasiado largo";
+    case "cifrado":
+      return "PDF protegido con contraseña";
+    case "ilegible":
+      return "No se pudo leer";
   }
 }
 
@@ -110,7 +122,11 @@ function comprobanteDesdeBlob(blob: Blob, nombre: string): Comprobante {
 function avisosDeFormato(lista: readonly File[]): AvisoRechazo[] {
   return lista
     .filter((f) => !esImagen(f) && !esPdf(f))
-    .map((f) => ({ archivo: sanear(f.name), motivo: "formato no soportado" }));
+    .map((f) => ({
+      titulo: "Formato no soportado",
+      archivo: sanear(f.name),
+      motivo: MOTIVO_FORMATO,
+    }));
 }
 
 /** ¿Queda hueco en esta hoja? */
@@ -172,12 +188,20 @@ async function paginasUtiles(f: File, avisos: AvisoRechazo[]): Promise<Comproban
   const veredicto = await admitirPdf(f, contarPaginasPdf);
   // ponytail: admitirPdf no es nulable y el rechazo siempre trae motivo.
   if (veredicto.admite !== true) {
-    avisos.push({ archivo: sanear(f.name), motivo: textoMotivo(veredicto.motivo) });
+    avisos.push({
+      titulo: tituloDeMotivo(veredicto.motivo),
+      archivo: sanear(f.name),
+      motivo: textoMotivo(veredicto.motivo),
+    });
     return null;
   }
   const pags = await expandirPdf(f);
   if (pags.length === 0) {
-    avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+    avisos.push({
+      titulo: tituloDeMotivo("ilegible"),
+      archivo: sanear(f.name),
+      motivo: textoMotivo("ilegible"),
+    });
     return null;
   }
   const base = sanear(f.name).replace(/\.pdf$/i, "");
@@ -202,33 +226,22 @@ async function intakeImagen(
   f: File,
   colocar: (items: Comprobante[]) => void,
   avisos: AvisoRechazo[],
-  msNorm: number[],
 ): Promise<boolean> {
   // Intake: jpg/png/webp sin nada que corregir pasa crudo (0 gens);
   // lo demás se empaqueta a WebP. Blanca/corrupta → aviso, sin tumbar el lote.
   // ponytail: secuencial a propósito; N decodes en paralelo saturan memoria.
   try {
-    const tN = performance.now();
     const blob = await normalizarImagen(f);
-    if (import.meta.env.DEV) msNorm.push(performance.now() - tN);
     colocar([comprobanteDesdeBlob(blob, f.name)]);
     return true;
   } catch {
-    avisos.push({ archivo: sanear(f.name), motivo: "no se pudo leer" });
+    avisos.push({
+      titulo: tituloDeMotivo("ilegible"),
+      archivo: sanear(f.name),
+      motivo: textoMotivo("ilegible"),
+    });
     return false;
   }
-}
-
-/** Telemetría del intake (solo DEV): pared vs costo de normalización por foto. */
-function telemetriaIntake(tIntake: number, msNorm: readonly number[]): void {
-  if (!import.meta.env.DEV || msNorm.length === 0) return;
-  const ordenadas = [...msNorm].sort((a, b) => a - b);
-  const cuantil = (q: number): number =>
-    Math.round(ordenadas[Math.min(ordenadas.length - 1, Math.ceil(q * ordenadas.length) - 1)] ?? 0);
-  console.info(
-    `intake ms pared=${Math.round(performance.now() - tIntake)} n=${msNorm.length} ` +
-      `normP50=${cuantil(0.5)} normMax=${cuantil(1)}`,
-  );
 }
 
 export async function agregarArchivos(
@@ -243,8 +256,6 @@ export async function agregarArchivos(
   const avisos = avisosDeFormato(lista);
   const colocar = crearColocacion(destino);
   let colocados = 0;
-  const tIntake = performance.now();
-  const msNorm: number[] = [];
   // Sin VT ni rebuilds por archivo durante el intake (ver sheets.renderHojas):
   // el flag cubre todo el loop y el finally lo suelta aunque un PDF falle.
   intakesActivos++;
@@ -253,7 +264,7 @@ export async function agregarArchivos(
     for (const f of lista) {
       await cederTurno();
       if (esImagen(f)) {
-        if (await intakeImagen(f, colocar, avisos, msNorm)) colocados += 1;
+        if (await intakeImagen(f, colocar, avisos)) colocados += 1;
         continue;
       }
       if (!esPdf(f)) continue;
@@ -267,8 +278,8 @@ export async function agregarArchivos(
     intakesActivos--;
     state.loteEnCurso = intakesActivos > 0;
   }
-  telemetriaIntake(tIntake, msNorm);
-  avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
+  despejarToasts("intake"); // siempre: los rechazos viejos de otro lote salen con fade
+  avisar(avisos); // y los del lote actual, uno por archivo, entran abajo
   if (colocados === 0) return;
 
   renderHojas();
@@ -285,8 +296,9 @@ interface ItemConImagen {
 // Sin bytes de imagen el clic no puede pegar: el Ctrl+C al ARCHIVO en el
 // Explorador deja una referencia (no bytes) y el navegador no la entrega vía
 // read() — ese caso solo entra por Ctrl+V o la tarjeta. El mensaje cubre ambos.
+const MOTIVO_FORMATO: string = "formato no soportado: usá JPG, PNG, WEBP o PDF";
 const MOTIVO_SIN_IMAGEN: string =
-  "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pega con Ctrl+V";
+  "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pegá con Ctrl+V";
 
 /** Primer tipo image/* del item (null si no trae). */
 function tipoImagenDe(item: ItemConImagen): string | null {
@@ -301,7 +313,7 @@ function subtipoImagen(tipo: string): string {
 
 /** Motivo del aviso final: el formato raro encontrado o el genérico. */
 function motivoDePortapapeles(formatoNoSoportado: boolean): string {
-  return formatoNoSoportado ? "formato no soportado" : MOTIVO_SIN_IMAGEN;
+  return formatoNoSoportado ? MOTIVO_FORMATO : MOTIVO_SIN_IMAGEN;
 }
 
 // Lee los bytes de imagen del portapapeles del SO. Null = ya se avisó.
@@ -315,6 +327,7 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   if (typeof lector?.read !== "function") {
     avisar([
       {
+        titulo: "No se puede pegar aquí",
         archivo: "Portapapeles",
         motivo: "este navegador no permite pegar con clic: usa Ctrl+V",
       },
@@ -325,7 +338,9 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   try {
     items = await lector.read();
   } catch {
-    avisar([{ archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN }]);
+    avisar([
+      { titulo: "Portapapeles sin imagen", archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN },
+    ]);
     return null;
   }
   const archivos: File[] = [];
@@ -348,6 +363,7 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   if (archivos.length === 0) {
     avisar([
       {
+        titulo: formatoNoSoportado ? "Formato no soportado" : "Portapapeles sin imagen",
         archivo: "Portapapeles",
         motivo: motivoDePortapapeles(formatoNoSoportado),
       },
@@ -448,7 +464,13 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     try {
       comp = comprobanteDesdeBlob(await normalizarImagen(primero), primero.name);
     } catch {
-      avisar([{ archivo: sanear(primero.name), motivo: "no se pudo leer" }]);
+      avisar([
+        {
+          titulo: tituloDeMotivo("ilegible"),
+          archivo: sanear(primero.name),
+          motivo: textoMotivo("ilegible"),
+        },
+      ]);
       return;
     }
     const h = vigenteParaEscribir(destino, hojaId);
@@ -457,7 +479,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     // Resto (raro desde WhatsApp): sigue a la hoja donde cayó `primero`.
     const resto = archivos.slice(1);
     if (resto.length > 0) await agregarArchivos(resto, hojaFinal.id);
-    else avisar([]); // éxito: limpia un rechazo viejo de otro intento
+    else despejarToasts("intake"); // éxito: los rechazos viejos de otro intento salen con fade
     precalentarModelos();
     void procesarCola();
   } finally {
@@ -476,13 +498,9 @@ export async function pegarDelPortapapeles(): Promise<void> {
 
 export function renderCodigo(): void {
   chkCodigo.checked = state.codigoActivo;
-  numCodigo.value = String(state.codigoLongitud);
   inputCodigo.value = state.codigoValor;
-  inputCodigo.maxLength = state.codigoLongitud;
   inputCodigo.disabled = !state.codigoActivo;
-  inputCodigo.placeholder = state.codigoActivo
-    ? `Código (${state.codigoLongitud} dígitos)`
-    : "Código";
+  // ponytail: el placeholder "Código" del markup vale en ambos estados.
   // ponytail: el error visual vive hasta que el usuario corrige o se re-renderiza.
   inputCodigo.classList.remove("codigo-error", "sacudir");
   inputCodigo.removeAttribute("aria-invalid");
@@ -605,13 +623,8 @@ function cablearSwitchCodigo(): void {
     if (!chkCodigo.checked) borrarCodigo();
     renderCodigo();
   });
-  numCodigo.addEventListener("input", () => {
-    state.codigoLongitud = Math.max(1, Math.min(12, Math.floor(Number(numCodigo.value)) || 6));
-    if (chkCodigo.checked) guardarCodigo();
-    renderCodigo();
-  });
   inputCodigo.addEventListener("input", () => {
-    state.codigoValor = inputCodigo.value.replace(/\D/g, "").slice(0, state.codigoLongitud);
+    state.codigoValor = inputCodigo.value.replace(/\D/g, "");
     inputCodigo.value = state.codigoValor;
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
     inputCodigo.classList.remove("codigo-error", "sacudir");

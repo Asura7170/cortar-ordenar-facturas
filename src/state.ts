@@ -28,7 +28,6 @@ export const POSICION_DEFAULT: PosicionCodigo = "inf-der";
 export const state: EstadoApp = {
   hojas: [],
   codigoActivo: false,
-  codigoLongitud: 6,
   codigoValor: "",
   codigoPosicion: POSICION_DEFAULT,
   moneda: MONEDA_DEFAULT,
@@ -60,21 +59,20 @@ function leerBlob(): Record<string, unknown> {
   }
 }
 
-// Solo la ventana Código: el switch arma el guardado, editar longitud/valor lo dispara.
+// Solo la ventana Código: el switch arma el guardado, editar el valor lo dispara.
 export function guardarCodigo(): void {
   localStorage.setItem(
     LS_KEY,
     JSON.stringify({
       ...leerBlob(),
       codigoActivo: state.codigoActivo,
-      codigoLongitud: state.codigoLongitud,
       codigoValor: state.codigoValor,
       codigoPosicion: state.codigoPosicion,
     }),
   );
 }
 
-// Solo la ventana Ajustes (Guardar y Predeterminado): el código queda intacto.
+// Solo la ventana Ajustes (Guardar y Restablecer): el código queda intacto.
 export function guardarAjustes(): void {
   localStorage.setItem(
     LS_KEY,
@@ -89,7 +87,6 @@ export function guardarAjustes(): void {
 export function borrarCodigo(): void {
   const blob = leerBlob();
   delete blob["codigoActivo"];
-  delete blob["codigoLongitud"];
   delete blob["codigoValor"];
   delete blob["codigoPosicion"];
   if (Object.keys(blob).length === 0) localStorage.removeItem(LS_KEY);
@@ -118,7 +115,6 @@ function isPersistedState(v: unknown): v is PersistedState {
   if ("moneda" in p && !isMoneda(p["moneda"])) return false;
   return (
     typeof p["codigoActivo"] === "boolean" ||
-    typeof p["codigoLongitud"] === "number" ||
     typeof p["codigoValor"] === "string" ||
     typeof p["codigoPosicion"] === "string" ||
     isMoneda(p["moneda"])
@@ -135,10 +131,18 @@ function limpiarClavesIa(): void {
   }
 }
 
-/** Sobrante de la era IA: se retira del blob (el resto del estado se conserva). */
-function retirarConfigIa(r: Record<string, unknown>): void {
-  if (!("configIA" in r)) return;
-  delete r["configIA"];
+/** Sobrantes de eras anteriores: se retiran del blob (el resto se conserva). */
+function retirarSobrantes(r: Record<string, unknown>): void {
+  let cambio = false;
+  if ("configIA" in r) {
+    delete r["configIA"]; // era IA
+    cambio = true;
+  }
+  if ("codigoLongitud" in r) {
+    delete r["codigoLongitud"]; // era del switch de longitud (ya retirada)
+    cambio = true;
+  }
+  if (!cambio) return;
   if (Object.keys(r).length === 0) localStorage.removeItem(LS_KEY);
   else localStorage.setItem(LS_KEY, JSON.stringify(r));
 }
@@ -146,9 +150,6 @@ function retirarConfigIa(r: Record<string, unknown>): void {
 /** Ventana Código: booleans y números con clamps (blobs legacy caen al default). */
 function aplicarCodigo(r: Record<string, unknown>): void {
   state.codigoActivo = typeof r["codigoActivo"] === "boolean" ? r["codigoActivo"] : false;
-  const lon = r["codigoLongitud"];
-  state.codigoLongitud =
-    typeof lon === "number" ? Math.max(1, Math.min(12, Math.floor(lon) || 6)) : 6;
   state.codigoValor = typeof r["codigoValor"] === "string" ? r["codigoValor"] : "";
   // Blobs legacy o basura: la esquina cae al default (inferior derecha).
   state.codigoPosicion = isPosicionCodigo(r["codigoPosicion"])
@@ -164,7 +165,7 @@ export function cargar(): void {
     // el guard isPersistedState los ignora (sin escribir estado ni storage):
     // el re-parseo propio era un duplicado de leerBlob().
     const r = leerBlob();
-    retirarConfigIa(r);
+    retirarSobrantes(r);
     if (!isPersistedState(r)) return; // estado corrupto o de otra versión: ignorar
     aplicarCodigo(r);
     if (isMoneda(r["moneda"])) state.moneda = r["moneda"]; // ausente en blobs legacy: se conserva
@@ -209,7 +210,8 @@ export function limpiarHojas(): void {
 
 // Reparte los comprobantes en orden visual respetando la capacidad de cada
 // hoja: rellena consecutivamente (recompacta, sin huecos) y crea hojas al final.
-export function redistribuir(): void {
+// `layoutNuevas` ("aplicar a todas") pisa el default de las hojas nuevas.
+export function redistribuir(layoutNuevas?: LayoutId): void {
   const items = Iterator.from(state.hojas)
     .flatMap((h) => Iterator.from(h.slots).filter((c) => c !== null))
     .toArray();
@@ -226,9 +228,9 @@ export function redistribuir(): void {
     for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();
   }
   while (pos < items.length) {
-    // ponytail: el while implica hojas no vacías ⇒ hay última con layout.
-    const ultimo = state.hojas[state.hojas.length - 1] as Hoja;
-    const h = crearHoja(ultimo.layout);
+    // Las nuevas usan el default (el intake desborda igual): el layout elegido
+    // es de la hoja; "aplicar a todas" pisa vía layoutNuevas.
+    const h = crearHoja(layoutNuevas);
     const cap = layoutDe(h.layout).total;
     h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
     for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();

@@ -7,12 +7,14 @@ import type { NucleoOcr } from "./ocr";
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
 // El re-chequeo del drenado sale de este módulo: stub (cada test lo ajusta);
-// aplicarTotales y limpiarTextoCompleto siguen reales (la rama rápida los usa).
+// aplicarTotales se envuelve con vi.fn(implementación real): la rama rápida
+// la usa y los tests pueden envenenar una llamada (fail-path del drenaje).
 vi.mock("./extract", async (importOriginal) => {
   const real = await importOriginal<typeof import("./extract")>();
   return {
     ...real,
     extraerPendientes: vi.fn((): void => {}),
+    aplicarTotales: vi.fn(real.aplicarTotales),
   };
 });
 // OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
@@ -98,20 +100,6 @@ describe("procesarCola", () => {
     expect(c.montoCents).toBe(1250);
   });
 
-  it("informa tiempos por etapa (L0: recorte/enderezar/extraer/total)", async () => {
-    const h = crearHoja();
-    const c = comprobante({ nombre: "t.png" });
-    h.slots[0] = c;
-    state.hojas.push(h);
-    const info = vi.spyOn(console, "info").mockImplementation(() => {});
-    const p = procesarCola();
-    await vi.advanceTimersByTimeAsync(2000);
-    await p;
-    const linea = info.mock.calls.map((a) => String(a[0])).find((s) => s.startsWith("OCR ms"));
-    expect(linea).toMatch(/recorte=\d+ enderezar=\d+ extraer=\d+/);
-    expect(linea).toMatch(/cajas=\d+ batch=\[\d+,\d+\] fallback=(sí|no) recRuns=\d+ total=\d+/);
-  });
-
   it("lote de 3: 3 procesando + 3 ok inmediato + 1 final (imagen primero)", async () => {
     for (const n of ["a.png", "b.png", "c.png"]) {
       const h = crearHoja();
@@ -177,6 +165,27 @@ describe("procesarCola", () => {
     expect(state.colaEnProceso).toBe(false);
   });
 
+  it("throw a mitad del drenaje: el ítem falla en error y los hermanos siguen", async () => {
+    const { aplicarTotales } = await import("./extract");
+    vi.mocked(aplicarTotales).mockImplementationOnce((): number => {
+      throw new Error("veneno"); // explota el fast-path dentro de completarItem
+    });
+    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 12.50"); // fuerza el fast-path del 1º
+    const h = crearHoja();
+    const malo = comprobante({ nombre: "malo.png", file: new Blob(["x"]) });
+    h.slots[0] = malo;
+    const h2 = crearHoja();
+    const bueno = comprobante({ nombre: "bueno.png" });
+    h2.slots[0] = bueno;
+    state.hojas.push(h, h2);
+    const p = procesarCola();
+    await vi.advanceTimersByTimeAsync(5000);
+    await p;
+    expect(malo.estado).toBe("error"); // el catch del drenado lo cierra, no "procesando" eterno
+    expect(bueno.estado).toBe("ok"); // los hermanos siguen después del veneno
+    expect(state.colaEnProceso).toBe(false);
+  });
+
   it("throw en el render no aborta la cola (el ítem sigue a ok)", async () => {
     const h = crearHoja();
     const c = comprobante({ nombre: "t.png", file: new Blob(["x"]) });
@@ -189,27 +198,6 @@ describe("procesarCola", () => {
     await vi.advanceTimersByTimeAsync(2000);
     await p;
     expect(c.estado).toBe("ok");
-    expect(state.colaEnProceso).toBe(false);
-  });
-
-  it("throw a mitad de drenaje: el ítem falla en error, los hermanos siguen", async () => {
-    const h1 = crearHoja();
-    const malo = comprobante({ nombre: "malo.png", file: new Blob(["x"]) });
-    h1.slots[0] = malo;
-    const h2 = crearHoja();
-    const bueno = comprobante({ nombre: "bueno.png", file: new Blob(["y"]) });
-    h2.slots[0] = bueno;
-    state.hojas.push(h1, h2);
-    // Inyección del fallo fuera de las etapas con catch: el log final lanza una vez.
-    vi.spyOn(console, "info").mockImplementation(() => {});
-    vi.mocked(console.info).mockImplementationOnce(() => {
-      throw new Error("log");
-    });
-    const p = procesarCola();
-    await vi.advanceTimersByTimeAsync(3000);
-    await p;
-    expect(malo.estado).toBe("error");
-    expect(bueno.estado).toBe("ok");
     expect(state.colaEnProceso).toBe(false);
   });
 

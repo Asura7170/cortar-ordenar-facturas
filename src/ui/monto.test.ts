@@ -2,19 +2,21 @@
 import { describe, expect, it } from "vite-plus/test";
 
 document.body.innerHTML =
-  '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button>';
+  '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button><button id="btnWord" type="button"></button><button id="btnPdf" type="button"></button><button id="btnImprimir" type="button"></button><button id="btnLimpiar" type="button"></button>';
 const { state, crearHoja } = await import("../state");
 const {
   aplanar,
+  celdaDesdeMatriz,
   cuentaHoja,
+  desplazamiento,
   formatearMoneda,
   itemsDe,
   parsearMonto,
+  pasos,
+  pasoDesde,
   prefijoComun,
   alinearSufijos,
   spanFijo,
-  spanNuevo,
-  rodillo,
   renderMonto,
   sumaTotal,
   totalItems,
@@ -72,79 +74,192 @@ describe("colecciones", () => {
   });
 });
 
+describe("pasos", () => {
+  it("subir avanza hacia arriba con 1 barrido extra", () => {
+    expect(pasos(9, 0, true)).toBe(11); // 4→…→0 cruzando el 9: 1 paso + 1 barrido
+    expect(pasos(0, 1, true)).toBe(11);
+    expect(pasos(3, 7, true)).toBe(14);
+  });
+
+  it("bajar desplaza negativo (simétrico)", () => {
+    expect(pasos(0, 9, false)).toBe(-11);
+    expect(pasos(3, 1, false)).toBe(-12);
+  });
+
+  it("mismo dígito todavía marca el barrido completo (el llamador lo salta)", () => {
+    expect(pasos(4, 4, true)).toBe(20);
+  });
+});
+
+describe("pasoDesde", () => {
+  it("continuación: camina desde donde está la ruleta, con el signo del delta", () => {
+    expect(pasoDesde(14, 1, true)).toBe(7); // el arranque que antes bajaba (14→1) ya camina arriba
+    expect(pasoDesde(11, 1, true)).toBe(0); // ya está en el objetivo ⇒ estática
+    expect(pasoDesde(5, 1, false)).toBe(-4); // baja camina hacia abajo
+    expect(pasoDesde(6, 2, true)).toBe(6); // 6→…→12: aterriza en 2 (8 células arriba)
+  });
+});
+
+describe("desplazamiento y aterrizaje", () => {
+  it("desplazamiento rebasa por el origen de la tira (regresión del 8 inicial)", () => {
+    // plano "0": la tira arranca en k=-2 y la célula 0 queda en la 3ª posición
+    expect(desplazamiento(-2, 0, 24)).toBe(-48);
+    // aterrizaje del 9→0 sube (base 7, fin 20)
+    expect(desplazamiento(7, 20, 24)).toBe(-312);
+    // baja: célula -9 visible con base -11 (2ª posición)
+    expect(desplazamiento(-11, -9, 24)).toBe(-48);
+  });
+
+  it("celdaDesdeMatriz: matriz computada → célula; basura → null (fallback)", () => {
+    expect(celdaDesdeMatriz("matrix(1, 0, 0, 1, 0, -48)", -2, 24)).toBe(0);
+    expect(celdaDesdeMatriz("matrix(1, 0, 0, 1, 0, -96)", -2, 24)).toBe(2);
+    expect(celdaDesdeMatriz("none", -2, 24)).toBeNull();
+    expect(celdaDesdeMatriz("", 0, 24)).toBeNull();
+  });
+});
+
 describe("renderMonto", () => {
-  it("escribe el total formateado en #montoTotal", () => {
+  function cols(): HTMLElement[] {
+    return [...document.querySelectorAll<HTMLElement>("#montoTotal .monto-col")];
+  }
+  function tiraDe(c: HTMLElement): HTMLElement {
+    const t = c.querySelector<HTMLElement>(".monto-tira");
+    if (!t) throw new Error("sin tira");
+    return t;
+  }
+
+  it("total legible en aria-label; plano: cada dígito clavado en su número", () => {
+    state.moneda = "USD";
+    hojaCon([123456]);
+    renderMonto(); // primera vez: plano
+    const montoEl = document.getElementById("montoTotal");
+    if (!montoEl) throw new Error("sin #montoTotal");
+    expect(montoEl.getAttribute("aria-label")).toBe("US$ 1,234.56");
+    const colasPlano = cols();
+    expect(colasPlano.map((c) => c.dataset["muestra"])).toEqual(["1", "2", "3", "4", "5", "6"]);
+    // regresión del "8": la ventana cae sobre la célula del dígito, no de la base
+    expect(tiraDe(colasPlano[0] as HTMLElement).style.transform).toBe("translateY(-48px)");
+    // las estáticas del plano no portan filtro de blur
+    for (const c of colasPlano) expect(tiraDe(c).style.filter).toBe("");
+  });
+
+  it("aumento: lo que cambia rueda hacia arriba, incluidas las posiciones nuevas", () => {
+    state.moneda = "USD";
+    hojaCon([99999]);
+    // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
+    state.moneda = "BOB";
+    renderMonto();
+    state.moneda = "USD";
+    renderMonto();
+    state.hojas.pop();
+    hojaCon([100099]); // US$ 1,000.99 → crece una cifra
+    renderMonto();
+    // sufN "1,000.99" alineado con "  999.99": 1 nace y sube (fin 11 > 0),
+    // los 9→0 suben (fin 20 > 9); los 9 finales quedan fijos. El bug del
+    // pop-que-bajaba muere aquí: ninguna posición nueva desciende.
+    const colasAlto = cols();
+    expect(colasAlto.map((c) => c.dataset["muestra"])).toEqual(["11", "20", "20", "20", "9", "9"]);
+    // la ventana nunca sale de la tira (regresión del "desaparecen")
+    for (const c of colasAlto) {
+      const celulas = [...c.querySelectorAll<HTMLElement>(".monto-digito")];
+      const ultima = celulas[celulas.length - 1];
+      if (!ultima) throw new Error("sin células");
+      expect(Number(c.dataset["muestra"])).toBeLessThanOrEqual(Number(ultima.dataset["i"]));
+    }
+    // solo giratorias portan filtro (las estáticas sin blur fantasma; jsdom cita la url)
+    expect(tiraDe(colasAlto[0] as HTMLElement).style.filter).toContain("monto-blur-");
+    expect(tiraDe(colasAlto[4] as HTMLElement).style.filter).toBe("");
+  });
+
+  it("disminución: la rueda baja (fin negativo = descendió por el ciclo)", () => {
+    state.moneda = "USD";
+    hojaCon([35000]);
+    // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
+    state.moneda = "BOB";
+    renderMonto();
+    state.moneda = "USD";
+    renderMonto();
+    state.hojas.pop();
+    hojaCon([10000]); // US$ 100.00
+    renderMonto();
+    // sufV= sufN "350.00"→"100.00": 3→1 baja -12 (fin -9), 5→0 baja -15 (fin -10)
+    expect(cols().map((c) => c.dataset["muestra"])).toEqual(["-9", "-10", "0", "0", "0"]);
+  });
+
+  it("dígito sin cambio queda fijo: transition none y clavado en su dígito", () => {
+    state.moneda = "USD";
+    hojaCon([35000]);
+    // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
+    state.moneda = "BOB";
+    renderMonto();
+    state.moneda = "USD";
+    renderMonto();
+    state.hojas.pop();
+    hojaCon([35100]); // US$ 351.00: solo el 0→1 del sufijo rueda
+    renderMonto();
+    const colas = cols();
+    expect(colas.map((c) => c.dataset["muestra"])).toEqual(["11", "0", "0"]);
+    expect(tiraDe(colas[1] as HTMLElement).style.transition).toBe("none");
+    expect(tiraDe(colas[2] as HTMLElement).style.transition).toBe("none");
+  });
+
+  it("cambio de moneda reescribe plano, sin rueda", () => {
+    state.moneda = "USD";
+    hojaCon([35100]);
+    renderMonto(); // sincroniza
+    state.moneda = "ARS"; // mismos cents, otro texto
+    renderMonto();
+    expect(cols().map((c) => c.dataset["muestra"])).toEqual(["3", "5", "1", "0", "0"]);
+    for (const c of cols()) expect(tiraDe(c).style.transition).toBe("none");
+  });
+
+  it("llamada duplicada no toca el DOM", () => {
     state.moneda = "USD";
     hojaCon([123456]);
     renderMonto();
-    expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 1,234.56");
+    const antes = document.getElementById("montoTotal")?.innerHTML ?? "";
+    renderMonto();
+    expect(document.getElementById("montoTotal")?.innerHTML).toBe(antes);
   });
 
-  it("odómetro: solo rueda lo que cambia, rápido a la derecha", () => {
+  it("vuelo a mitad (retarget): la dirección sigue la del delta total", () => {
     state.moneda = "USD";
-    const montoEl = document.getElementById("montoTotal");
-    if (!montoEl) throw new Error("sin #montoTotal");
-    hojaCon([10000]);
-    renderMonto(); // sincroniza el previo
-    hojaCon([25000]); // +250.00 → sube
-    renderMonto();
-    expect(montoEl.textContent).toBe("US$ 350.00");
-    expect(montoEl.dataset["dir"]).toBe("-1");
-    const rodillos = montoEl.querySelectorAll(".monto-rodillo");
-    expect(rodillos).toHaveLength(2);
-    const tiraAlta = rodillos[0]?.querySelector<HTMLSpanElement>(".monto-desplaza");
-    const tiraBaja = rodillos[1]?.querySelector<HTMLSpanElement>(".monto-desplaza");
-    expect(tiraAlta?.style.getPropertyValue("--p")).toBe("5");
-    expect(tiraBaja?.style.getPropertyValue("--p")).toBe("4");
-    expect(tiraAlta?.dataset["viejo"]).toBe("1");
-    expect([...(tiraAlta?.children ?? [])].map((c) => c.textContent)).toEqual(["3"]);
-    expect(montoEl.querySelector(".monto-nuevo")).toBeNull();
-    state.hojas.pop(); // -250.00 → baja con tira invertida
-    renderMonto();
-    expect(montoEl.textContent).toBe("US$ 100.00");
-    expect(montoEl.dataset["dir"]).toBe("1");
-    const tiraBajada = montoEl
-      .querySelector(".monto-rodillo")
-      ?.querySelector<HTMLSpanElement>(".monto-desplaza");
-    expect(tiraBajada?.dataset["viejo"]).toBe("3");
-    expect([...(tiraBajada?.children ?? [])].map((c) => c.textContent)).toEqual(["1"]);
-    renderMonto(); // duplicada → no-op, preserva los rodillos
-    expect(montoEl.querySelectorAll(".monto-rodillo")).toHaveLength(2);
-    state.moneda = "ARS"; // mismo total, otro texto → plano sin rodillos
-    renderMonto();
-    expect(montoEl.textContent).toBe("AR$ 100.00");
-    expect(montoEl.querySelector(".monto-rodillo")).toBeNull();
-    expect(montoEl.dataset["dir"]).toBeUndefined();
-  });
-
-  it("al crecer la cifra lo nuevo entra con pop y lo común rueda", () => {
-    state.moneda = "USD";
-    const montoEl = document.getElementById("montoTotal");
-    if (!montoEl) throw new Error("sin #montoTotal");
     hojaCon([99999]);
-    renderMonto(); // sincroniza el previo (US$ 999.99)
-    hojaCon([100]); // +1.00 → US$ 1,000.99
+    renderMonto(); // agenda rAF ⇒ el siguiente render corre EN VUELO
+    state.hojas.pop();
+    hojaCon([100099]); // sube: US$ 1,000.99
     renderMonto();
-    expect(montoEl.textContent).toBe("US$ 1,000.99");
-    expect(montoEl.querySelectorAll(".monto-nuevo")).toHaveLength(2);
-    expect(montoEl.querySelectorAll(".monto-rodillo")).toHaveLength(3);
-  });
-
-  it("al encoger la cifra el punto decimal no rueda", () => {
-    state.moneda = "USD";
-    const montoEl = document.getElementById("montoTotal");
-    if (!montoEl) throw new Error("sin #montoTotal");
-    hojaCon([100099]);
-    renderMonto(); // US$ 1,000.99
-    state.hojas = [];
-    hojaCon([99999]);
-    renderMonto(); // US$ 999.99
-    expect(montoEl.textContent).toBe("US$ 999.99");
-    expect(montoEl.querySelectorAll(".monto-rodillo").length).toBeGreaterThan(0);
-    const viejos = [...montoEl.querySelectorAll<HTMLSpanElement>(".monto-desplaza")].map(
-      (t) => t.dataset["viejo"],
+    // aterriza en el dígito correcto (sea barrido limpio o continuación)
+    const normal = (nn: number): number => ((nn % 10) + 10) % 10;
+    const esperados = [1, 0, 0, 0, 9, 9];
+    cols().forEach((c, i) =>
+      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
     );
-    expect(viejos).not.toContain(".");
+    // y toda rueda avanza hacia arriba, nunca hacia abajo (delta +)
+    for (const c of cols()) {
+      const fin = Number(c.dataset["muestra"]);
+      const arranque = Number(c.dataset["arranque"]);
+      if (fin !== arranque) expect(fin - arranque).toBeGreaterThan(0);
+    }
+  });
+
+  it("vuelo a mitad condelta invertido: el cambio de sentido también respeta el delta", () => {
+    state.moneda = "USD";
+    hojaCon([100099]); // dejamos una rueda agendada del vuelo previo
+    renderMonto();
+    state.hojas.pop();
+    hojaCon([35000]); // baja: US$ 350.00
+    renderMonto();
+    const normal = (nn: number): number => ((nn % 10) + 10) % 10;
+    const esperados = [3, 5, 0, 0, 0];
+    cols().forEach((c, i) =>
+      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
+    );
+    for (const c of cols()) {
+      const fin = Number(c.dataset["muestra"]);
+      const arranque = Number(c.dataset["arranque"]);
+      if (fin !== arranque) expect(fin - arranque).toBeLessThan(0);
+    }
   });
 });
 
@@ -174,15 +289,19 @@ describe("barraBoton", () => {
     state.moneda = "USD";
     const btn = botonCalcular();
     btn.innerHTML =
-      '<span class="calculo-txt"></span><span class="calculo-capa" aria-hidden="true"><span class="calculo-txt" aria-hidden="true"></span></span>';
+      '<span class="calculo-txt"></span><span class="calculo-cuenta"></span><span class="calculo-capa" aria-hidden="true"><span class="calculo-txt" aria-hidden="true"></span><span class="calculo-cuenta" aria-hidden="true"></span></span>';
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoCents: 500 });
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     state.hojas.push(h);
     renderMonto();
     expect([...btn.querySelectorAll(".calculo-txt")].map((s) => s.textContent)).toEqual([
-      "Montos extraídos: 1/2",
-      "Montos extraídos: 1/2",
+      "Montos extraídos: ",
+      "Montos extraídos: ",
+    ]);
+    expect([...btn.querySelectorAll(".calculo-cuenta")].map((s) => s.textContent)).toEqual([
+      "1/2",
+      "1/2",
     ]);
     btn.innerHTML = "";
   });
@@ -197,9 +316,36 @@ describe("barraBoton", () => {
     expect(btn.textContent).toBe("Montos extraídos: 1/1");
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     renderMonto(); // mismo total: el odómetro no se toca…
-    expect(document.getElementById("montoTotal")?.textContent).toBe("US$ 5.00");
+    expect(document.getElementById("montoTotal")?.getAttribute("aria-label")).toBe("US$ 5.00");
     expect(btn.textContent).toBe("Montos extraídos: 1/2"); // …pero la barra sí se mueve
     expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
+  });
+
+  it("btnLimpiar deshabilitado con lote vacío, habilitado con items", () => {
+    const limpiar = document.getElementById("btnLimpiar");
+    if (!(limpiar instanceof HTMLButtonElement)) throw new Error("sin #btnLimpiar");
+    renderMonto(); // sin hojas
+    expect(limpiar.disabled).toBe(true);
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5" });
+    state.hojas.push(h);
+    renderMonto();
+    expect(limpiar.disabled).toBe(false);
+  });
+
+  it("lote vacío: TODOS los botones de acción de la sidebar deshabilitados", () => {
+    const botones = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLimpiar"].map((id) => {
+      const b = document.getElementById(id);
+      if (!(b instanceof HTMLButtonElement)) throw new Error(`sin #${id}`);
+      return b;
+    });
+    renderMonto(); // sin hojas
+    botones.forEach((b) => expect(b.disabled).toBe(true));
+    const h = crearHoja("u6x2");
+    h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5" });
+    state.hojas.push(h);
+    renderMonto();
+    botones.forEach((b) => expect(b.disabled).toBe(false));
   });
 });
 
@@ -241,20 +387,10 @@ describe("odómetro helpers", () => {
     expect(alinearSufijos("5", "5")).toBe("5");
   });
 
-  it("spans fijos/nuevos/rodillo con sus clases y atributos", () => {
+  it("spanFijo: span sin clase con el carácter", () => {
     const f = spanFijo("$");
     expect(f.tagName).toBe("SPAN");
     expect(f.className).toBe("");
     expect(f.textContent).toBe("$");
-    const n = spanNuevo("1");
-    expect(n.className).toBe("monto-nuevo");
-    expect(n.textContent).toBe("1");
-    const r = rodillo("7", "3", 3, 9);
-    expect(r.className).toBe("monto-rodillo");
-    expect(r.textContent).toBe("3");
-    const tira = r.querySelector(".monto-desplaza") as HTMLElement;
-    expect(tira.dataset["viejo"]).toBe("7");
-    expect(tira.style.getPropertyValue("--p")).toBe("5"); // min(9-1-3, 6)
-    expect([...tira.children].map((c) => c.textContent)).toEqual(["3"]);
   });
 });

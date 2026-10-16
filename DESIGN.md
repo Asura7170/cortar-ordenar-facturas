@@ -25,31 +25,33 @@ alinea a la derecha en tabular-nums.
 
 ## 3. Colors
 
-| Token                 | Light                | Dark      | Uso                                 |
-| --------------------- | -------------------- | --------- | ----------------------------------- |
-| `--papel`             | `#faf6ea`            | `#f4ecd8` | Fondo de hoja. No para fichas       |
-| `--papel-brillo`      | `#fffdf6`            | `#fbf6e9` | Superficie elevada sobre papel      |
-| `--papel-sombra`      | `#e6dcc0`            | `#e2d6b8` | Sombra/huella sobre papel           |
-| `--tinta`             | `#2c3a28`            | `#22311f` | Texto principal sobre papel         |
-| `--tinta-suave`       | `#55654f`            | `#4b5a47` | Texto secundario                    |
-| `--tinta-fina`        | `#7f8f7a`            | `#7b8577` | Texto tenue, nunca para datos       |
-| `--renglon`           | `#cfe3c6`            | `#b8cfae` | Renglón del libro contable          |
-| `--renglon-fuerte`    | `#9ecb96`            | `#8fbf8a` | Renglón alto, foco, bordes activos  |
-| `--sello`             | `#b23a2e`            | `#b23a2e` | Sello rojo: peligro, error, remover |
-| `--sello-suave`       | `#e7c4bd`            | `#d8a29a` | Teñido de sello                     |
-| `--verde-tinta`       | `#2f6b3a`            | `#2f6b3a` | Único acento de acción/ok           |
-| `--verde-claro`       | `#eef4ea`            | `#eef4ea` | Fondo suave de acento               |
-| `--mesa`              | `#eceadf`            | `#2e2b24` | Mesa bajo las hojas                 |
-| `--mesa-oscura`       | `#e3e1d4`            | `#221f19` | Sombra de mesa (fondo canvas)       |
-| `--panel`             | `#f6f2e5`            | `#3a352c` | Panel lateral                       |
-| `--panel-claro`       | `#fdfaf0`            | `#463f34` | Hover de panel                      |
-| `--texto-panel`       | `#2c3a28`            | `#f0ead9` | Texto sobre panel                   |
-| `--texto-panel-suave` | `#57644f`            | `#c9c0a8` | Secundario sobre panel (~4.8:1 AA)  |
-| `--monto-valor`       | `#2f6b3a`            | `#cfe6c2` | Cifra del total. Nunca otro verde   |
-| `--aviso-motivo`      | `#b23a2e`            | `#e59a8d` | Motivo de aviso (AA ambos temas)    |
-| `--input-bg`          | `#fffdf6`            | `#241f18` | Fondo de inputs                     |
-| `--input-placeholder` | `#9aa48f`            | `#8d8672` | Placeholder                         |
-| `--anillo`            | `renglon-fuerte 50%` | igual     | Anillo de `:focus-visible`          |
+| Token                 | Light         | Dark          | Uso                                           |
+| --------------------- | ------------- | ------------- | --------------------------------------------- |
+| `--papel`             | `#faf6ea`     | `#f4ecd8`     | Fondo de hoja. No para fichas                 |
+| `--papel-brillo`      | `#fffdf6`     | `#fbf6e9`     | Superficie elevada sobre papel                |
+| `--papel-sombra`      | `#e6dcc0`     | `#e2d6b8`     | Sombra/huella sobre papel                     |
+| `--tinta`             | `#2c3a28`     | `#22311f`     | Texto principal sobre papel                   |
+| `--tinta-suave`       | `#55654f`     | `#4b5a47`     | Texto secundario                              |
+| `--tinta-fina`        | `#7f8f7a`     | `#7b8577`     | Texto tenue, nunca para datos                 |
+| `--renglon`           | `#cfe3c6`     | `#b8cfae`     | Renglón del libro contable                    |
+| `--renglon-fuerte`    | `#9ecb96`     | `#8fbf8a`     | Renglón alto, foco, bordes activos            |
+| `--sello`             | `#b23a2e`     | `#b23a2e`     | Sello rojo: peligro, error, remover           |
+| `--sello-suave`       | `#e7c4bd`     | `#d8a29a`     | Teñido de sello                               |
+| `--sello-aviso`       | `#eab308`     | `#eab308`     | Sello amarillo: fondo del toast de aviso      |
+| `--texto-sello`       | `#fff`        | `#fff`        | Texto sobre sello sólido (5.8:1 AA)           |
+| `--verde-tinta`       | `#2f6b3a`     | `#2f6b3a`     | Único acento de acción/ok                     |
+| `--verde-claro`       | `#eef4ea`     | `#eef4ea`     | Fondo suave de acento                         |
+| `--mesa`              | `#eceadf`     | `#2e2b24`     | Mesa bajo las hojas                           |
+| `--mesa-oscura`       | `#e3e1d4`     | `#221f19`     | Sombra de mesa (fondo canvas)                 |
+| `--panel`             | `#f6f2e5`     | `#3a352c`     | Panel lateral                                 |
+| `--panel-claro`       | `#fdfaf0`     | `#463f34`     | Hover de panel                                |
+| `--texto-panel`       | `#2c3a28`     | `#f0ead9`     | Texto sobre panel                             |
+| `--texto-panel-suave` | `#57644f`     | `#c9c0a8`     | Secundario sobre panel (~4.8:1 AA)            |
+| `--monto-valor`       | `#2f6b3a`     | `#cfe6c2`     | Cifra del total. Nunca otro verde             |
+| `--aviso-motivo`      | `#b23a2e`     | `#e59a8d`     | Texto hover de `#btnLimpiar` (AA ambos temas) |
+| `--input-bg`          | `#fffdf6`     | `#241f18`     | Fondo de inputs                               |
+| `--input-placeholder` | `#9aa48f`     | `#8d8672`     | Placeholder                                   |
+| `--anillo`            | `verde-tinta` | `monto-valor` | Anillo de `:focus-visible` (AA: 5.8:1/11.3:1) |
 
 Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 `--borde-panel`, `--monto-bg`, `--dropzone-borde`, `--hover-claro`,
@@ -60,13 +62,18 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 
 ## 4. Typography
 
-- Familia única: `"Public Sans", "Segoe UI", Verdana, sans-serif` (`--serif` y
-  `--mono` son el mismo stack). Vendoreada en `public/fonts` (400/600/700/800 +
-  latin-ext, OFL, `font-display: swap`). Prohibida otra familia.
-- Roles: brand 20px/700; monto total 22px/600 tabular; títulos de sección
-  12-13px uppercase con tracking 0.1-0.14em; cuerpo 13-14px/1.5; datos
-  (montos, códigos, badges) 11-12px mono con `tabular-nums`; dropzone
+- Familia única: `"Public Sans", "Segoe UI", Verdana, sans-serif` (`--serif`).
+  Vendoreada en `public/fonts` (400/600/700 + latin-ext, OFL,
+  `font-display: swap`; el peso 800 se podó del CSS y de los woff2 — commit
+  Lote 3). Prohibida otra familia. `--mono` ya no existe: era el mismo stack.
+- Roles: stats del lote en el flanco de marca (cifra 16px/600 tabular, íconos 17px;
+  el h1 de brand vive solo en SR); monto total
+  22px/600 tabular; títulos de sección 12-13px uppercase con tracking 0.1-0.14em;
+  cuerpo 13-14px/1.5; datos (montos, códigos, badges) 11-14px `tabular-nums`,
+  alineados a la derecha (la celda usa 14px — resuelto por el dueño); dropzone
   24px/700 + icono 64px.
+- Las cifras se formatean **en-US** ("1,234.56"): deliberado, acoplado a
+  `parsearMonto` y al fast-path regex del extractor.
 - `line-height` unitless salvo contextos fijos. Sin all-caps fuera de títulos.
 
 ## 5. Layout & Spacing
@@ -79,38 +86,66 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 
 - Radios: `--radio: 10px`, `--radio-s: 6px`; pill 20px (`.dz-fmt`); círculo
   (×); 4px celdas/hojas; 8px paneles/opciones.
-- Sombras: `--sombra-hoja` (hoja y dropzone); `--anillo` solo en
-  `:focus-visible`; `0 3px 8px rgba(0,0,0,.3)` botones; `0 12px 28px`
-  fantasma de drag; modal `0 20px 60px`. Destino de drop: `inset 0 0 0 2px`
-  verde u `outline` discontinuo, nunca sombra nueva.
-- Hit-area 44px vía `::after` expandido (×, badge, girar); el visual queda chico.
+- Sombras: familia de 7 tokens teñidos en `:root` (`--sombra-celda`,
+  `--sombra-celda-hover`, `--sombra-boton`, `--sombra-barra`, `--sombra-flotante`,
+  `--sombra-hoja` 2 capas, `--sombra-modal`), jerarquía celda < botón <
+  flotante < hoja < modal, con par `light-dark()` propio: en oscuro la elevación
+  es visible (ΔL ≥ 0.03 sobre mesa). `--anillo` solo en `:focus-visible`.
+  Destino de drop: `inset 0 0 0 2px` verde u `outline` discontinuo, nunca
+  sombra nueva.
+- Hit-area 44px vía `::after` expandido (×, badge, girar, `.btn-icon`,
+  `#btnTema`); el visual queda chico.
 
 ## 7. Motion
 
 - Solo `transform` y `opacity` (el fantasma de drag se mueve solo con
   transform).
 - Todo respeta `prefers-reduced-motion`. Transiciones 0.15s en hover.
+- Los ciclos de iconos NUNCAN corren en reposo: gated a
+  `:hover/:focus-visible` (patrón casa — engranaje, escoba, impresora, lupa).
+- Reorden de celdas también por teclado (2.5.7): contraparte del drag — misma
+  semántica, sin re-toques del cursor.
 
 ## 8. Components
 
 - `.monto-box/.monto-valor` (topbar.css, `#montoTotal`): cifra 22px/600 en
   `--monto-valor`; label 11px uppercase. Uso: solo lectura, un total por vista.
+- `.lote-stats` (topbar.css, `#metaHojas` en el flanco de marca): celdas
+  ícono 17px + cifra 16px/600 tabular, hairline entre ejes. Odómetro nativo
+  (`@property <integer>` + `counter()`) con retarget por transición; pop
+  one-shot por cambio (`.bump`); lote vacío duerme los ejes (`data-cero`).
+  El h1 de marca vive solo en SR; labels en sr-only + `title`.
 - `.panel` + `.switch` + `.codigo-row` (sidebar.css,
   `#chkCodigo/#chkOcr/#inputCodigo`): panel con head 12px uppercase; switch
-  nativo con track; código con input numérico + rejilla de posición.
+  nativo con track; código con input + rejilla de posición.
   Estados: `:checked/:disabled/:focus-visible` siempre definidos; error
   `.codigo-error` (borde `--sello` + vibración `sacudir` solo `transform`) al
   bloquear una salida con código activo incompleto.
 - `.sheet/.sheet-grid/.cell` (canvas.css, `#sheets`): hoja papel con renglones
   cada 34px; celda `empty` (discontinua) / con foto (`object-fit: contain`) /
   `drop-target` (inset verde). Hover revela × y girar; sin hover siempre
-  visibles. Uso: renderiza `ui/sheets`, nunca construyas celdas a mano.
+  visibles. Reorden: drag O teclado (`Ctrl/Alt+←/→` slot previo/siguiente,
+  `Ctrl+↓/↑` hoja vecina conservando slot) sobre la celda enfocada — `moverSlot`. Uso: renderiza `ui/sheets`, nunca construyas celdas a mano.
 - `.grid-opt/.ficha/.layout-mini` (canvas.css, panel de hoja): ficha verde
   sobre grilla; `.active` marca borde + fondo. Uso: una distribución activa.
 - `.cell-ocr-text` (canvas.css): `pre-wrap`, 12px/1.5, scroll propio; único
   lugar con texto seleccionable (`user-select: text`, el resto `none`).
 - `.modal/.modal-card` (base.css, `#modalAjustes/#modalLimpiar`): `<dialog>`
   con `closedby`, backdrop, head/body/foot. Uso: `showModal()`, nunca divs.
+- `#aviso .toast` (base.css, canal único de avisos/errores): pila de toasts
+  fijos abajo-derecha que suben desde debajo del borde (`@keyframes
+  toast-subir`, solo transform; el bloque global de movimiento reducido
+  apaga entrada y salida). Cada toast se cierra con su X (hit 44px por
+  `::after`; el foco se tiñe `currentColor` porque `--anillo` no contrasta
+  sobre sello) o expira solo (aviso 5s, error 8s; el hover pausa el timer)
+  con fade (`.saliendo`). `toast-error` = sello rojo + `role=alert`;
+  `toast-aviso` = sello amarillo + `role=status` con texto `--tinta`.
+  Estructura: título (causa corta, 600) + detalle (acción · archivo con
+  ellipsis y `title` completo). Cap del stack: 4 (el más viejo hace lugar);
+  lote de >4 rechazos → 3 individuales + resumen «…y N más descartados».
+  Los del grupo `intake` se limpian al éxito del lote; los singleton (sin
+  grupo) reemplazan al general previo. Se escribe solo con `avisarError`/
+  `avisar`/`mostrarToasts`/`despejarToasts` (utils).
 - `.modal-recorte` (canvas.css, `#modalRecorte`): variante sin tarjeta — la
   foto flota sola sobre el velo con sombra de modal; la barra de acciones
   flota debajo en `modal-bg` con borde `borde-panel` (mismos botones
@@ -136,8 +171,9 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
 4. Todo interactivo con `:focus-visible` visible (anillo); sin excepciones.
 5. Hit-area mínima 44px aunque el visual sea menor.
 6. Un solo acento verde y un solo primario por vista.
-7. Sin degradados, sin emojis, sin sombras nuevas, sin uppercase fuera de títulos.
-8. Sin otra fuente que Public Sans; sin pesos fuera de 400/600/700/800.
+7. Sin degradados, sin emojis, sin sombras nuevas… — uppercase solo en títulos
+   y en `.btn` (13px con tracking 0.09em, declaración consciente del dueño).
+8. Sin otra fuente que Public Sans; sin pesos fuera de 400/600/700.
 9. Sin radios fuera de la escala (10/6/pill/círculo/4/8).
 10. Texto OCR seleccionable solo en `.cell-ocr-text`; el resto `user-select: none`.
 11. Print hereda el diseño; no rediseñes para imprimir.

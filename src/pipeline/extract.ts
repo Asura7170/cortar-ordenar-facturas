@@ -6,7 +6,7 @@ import { buscarSlot, state } from "../state";
 import type { Cents, Comprobante } from "../types";
 import { aplanar, parsearMonto } from "../ui/monto";
 import { actualizarMontoCelda, renderHojas } from "../ui/sheets";
-import { sanear } from "../utils";
+import { avisar, avisarError, sanear } from "../utils";
 
 const MONEY_RE = /(?:Bs\.?|BOB|\$)?\s*(\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)/g;
 
@@ -104,11 +104,6 @@ export function aplicarTotales(
   return aplicados;
 }
 
-function avisar(texto: string): void {
-  const el = document.getElementById("aviso");
-  if (el) el.textContent = texto;
-}
-
 /** Cómputo puro del lote (sin DOM ni estado): candidatos → items → mapa. */
 export type LoteListo =
   | { readonly tipo: "sin-candidatos" }
@@ -138,12 +133,20 @@ export function computarLote(lista: readonly Comprobante[]): LoteListo {
   return { tipo: "listo", items, mapa };
 }
 
-/** Aviso del lote vacío: null = silencio (sin-texto o no forzado). */
-function avisoVacio(tipo: LoteListo["tipo"], opciones?: { forzado?: boolean }): string | null {
+/** Aviso del lote vacío: null = silencio (sin-texto o no forzado). El
+    sin-totales es fallo (toast rojo); el sin-pendientes es información. */
+function avisoVacio(
+  tipo: LoteListo["tipo"],
+  opciones?: { forzado?: boolean },
+): { texto: string; esError: boolean } | null {
   if (!opciones?.forzado) return null;
-  if (tipo === "sin-candidatos") return "Sin pendientes (todo ya tiene total o es manual).";
+  if (tipo === "sin-candidatos")
+    return { texto: "Sin pendientes (todo ya tiene total o es manual).", esError: false };
   if (tipo === "sin-totales")
-    return "Sin totales para leer: revisá manualmente o recortá de nuevo.";
+    return {
+      texto: "Sin totales para leer: revisá manualmente o recortá de nuevo.",
+      esError: true,
+    };
   return null; // sin-texto: silencioso aunque sea forzado
 }
 
@@ -182,11 +185,18 @@ export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: bo
   if (bloqueadoPorCola(opciones)) return;
   const lote = computarLote(candidatos());
   if (lote.tipo !== "listo") {
-    const aviso = avisoVacio(lote.tipo, opciones);
-    if (aviso !== null) avisar(aviso);
+    const vacio = avisoVacio(lote.tipo, opciones);
+    if (vacio !== null) {
+      if (vacio.esError) avisarError(vacio.texto);
+      else avisar(vacio.texto);
+    }
     return;
   }
-  const avisoPrevio = document.getElementById("aviso")?.textContent ?? "";
+  // Solo el título del toast vivo: la pila completa concatenaba títulos ajenos,
+  // detalles y toasts en despedida (el éxito total restauraba basura).
+  const avisoPrevio =
+    document.querySelector("#aviso .toast:not([data-grupo]):not(.saliendo) .toast-titulo")
+      ?.textContent ?? "";
   const ok = aplicarTotales(lote.items, lote.mapa);
   parchearCeldas(lote.items, lote.mapa);
   if (ok > 0) {

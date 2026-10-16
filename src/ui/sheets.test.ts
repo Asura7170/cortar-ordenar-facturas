@@ -78,11 +78,13 @@ describe("cambiarLayoutHoja / aplicarATodas", () => {
     expect(state.hojas).toHaveLength(1);
   });
 
-  it("achica y refluye: 4 items u4x2 → u1 deja 4 hojas", () => {
+  it("achica y refluye: 4 items u4x2 → u1 deja la u1 + el resto en una u4x2 default", () => {
     const h = sembrar("u4x2", [1, 2, 3, 4]);
     cambiarLayoutHoja(h.id, "u1");
-    expect(state.hojas).toHaveLength(4);
-    expect(state.hojas.every((x) => x.slots.filter(Boolean).length <= 1)).toBe(true);
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[0]?.layout).toBe("u1");
+    expect(state.hojas[1]?.layout).toBe("u4x2");
+    expect(state.hojas[1]?.slots.filter(Boolean)).toHaveLength(3);
   });
 
   it("aplicarATodas propaga el layout origen", () => {
@@ -94,6 +96,39 @@ describe("cambiarLayoutHoja / aplicarATodas", () => {
     aplicarATodas(a.id);
     expect(state.hojas.every((x) => x.layout === "u1")).toBe(true);
     expect(state.hojas.flatMap((x) => x.slots).filter(Boolean)).toHaveLength(2);
+  });
+
+  it("aplicarATodas con desborde: las nuevas reciben la plantilla, no el default", () => {
+    const a = sembrar("u1", [10]);
+    const b = crearHoja("u4x2");
+    b.slots[0] = comprobante({ nombre: "x" });
+    b.slots[1] = comprobante({ nombre: "y" });
+    b.slots[2] = comprobante({ nombre: "z" });
+    state.hojas.push(b);
+    renderHojas();
+    aplicarATodas(a.id);
+    expect(state.hojas).toHaveLength(4);
+    expect(state.hojas.every((x) => x.layout === "u1")).toBe(true);
+  });
+});
+
+describe("stats del lote (flanco de marca)", () => {
+  it("hoja base sin comprobantes: cifra de hojas 0 (el fantasma no pinta)", () => {
+    state.hojas = [crearHoja()];
+    renderHojas();
+    expect(document.getElementById("statHojas")!.style.getPropertyValue("--n-hojas")).toBe("0");
+    expect(document.getElementById("statComp")!.style.getPropertyValue("--n-comp")).toBe("0");
+    expect(document.getElementById("metaHojas")!.hasAttribute("data-cero")).toBe(true);
+  });
+
+  it("con un comprobante: 1 hoja · 1 comp y sale del estado vacío", () => {
+    const h = crearHoja();
+    h.slots[0] = comprobante({ nombre: "x.png" });
+    state.hojas = [h];
+    renderHojas();
+    expect(document.getElementById("statHojas")!.style.getPropertyValue("--n-hojas")).toBe("1");
+    expect(document.getElementById("statComp")!.style.getPropertyValue("--n-comp")).toBe("1");
+    expect(document.getElementById("metaHojas")!.hasAttribute("data-cero")).toBe(false);
   });
 });
 
@@ -215,13 +250,13 @@ describe("clic delegado", () => {
     try {
       btn.click();
       await vi.advanceTimersByTimeAsync(0);
-      expect(btn.getAttribute("aria-label")).toBe("¡Copiado!");
+      expect(btn.getAttribute("aria-label")).toBe("Copiado");
       await vi.advanceTimersByTimeAsync(600);
       btn.click();
       await vi.advanceTimersByTimeAsync(0);
-      expect(btn.getAttribute("aria-label")).toBe("¡Copiado!");
+      expect(btn.getAttribute("aria-label")).toBe("Copiado");
       await vi.advanceTimersByTimeAsync(600); // cruza el deadline del 1.º → sigue ✓ si rearma
-      expect(btn.getAttribute("aria-label")).toBe("¡Copiado!");
+      expect(btn.getAttribute("aria-label")).toBe("Copiado");
       expect(btn.classList.contains("copiado")).toBe(true);
       await vi.advanceTimersByTimeAsync(600); // deadline del 2.º → revierte
       expect(btn.querySelector("svg")).not.toBeNull();
@@ -241,7 +276,7 @@ describe("clic delegado", () => {
     vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
     const btn = boton("copiar-ocr");
     btn.click();
-    await esperar(() => el("estadoCopiado").textContent === "¡Copiado!");
+    await esperar(() => el("estadoCopiado").textContent === "Copiado");
     await esperar(() => el("estadoCopiado").textContent === "", 3000);
     expect(btn.querySelector("svg")).not.toBeNull();
   });
@@ -411,6 +446,56 @@ describe("monto manual", () => {
     // ponytail: el blur no reenfoca (solo Enter); el foco sigue donde lo dejó el usuario.
     expect(document.activeElement).toBe(document.body);
     expect(document.activeElement).not.toBe(deNuevo);
+  });
+
+  it("change inválido marca la celda (monto-error) y avisa en #aviso", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "12,3"; // coma sin grupo de miles: parsearMonto la rechaza
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    const deNuevo = inputMonto();
+    expect(deNuevo.classList.contains("monto-error")).toBe(true);
+    expect(deNuevo.value).toBe("12,3"); // borrador intacto
+    expect(document.getElementById("aviso")?.textContent).toContain("Formato no válido");
+    expect(document.querySelector("#aviso > .toast-error")).not.toBeNull();
+  });
+
+  it("change inválido sobrevive al swap diferido de la ViewTransition", () => {
+    sembrarOk();
+    const input = inputMonto();
+    input.value = "12,3";
+    const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
+    const diferidos: Array<() => void> = [];
+    Object.defineProperty(document, "startViewTransition", {
+      value: (cb: () => void): object => {
+        diferidos.push(cb); // Chrome invoca el callback en la oportunidad de render
+        return {};
+      },
+      configurable: true,
+    });
+    try {
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(input.classList.contains("monto-error")).toBe(true);
+      diferidos.forEach((cb) => cb()); // el swap llega después
+      const deNuevo = inputMonto();
+      expect(deNuevo.classList.contains("monto-error")).toBe(true);
+      expect(deNuevo.getAttribute("aria-invalid")).toBe("true");
+      expect(deNuevo.value).toBe("12,3");
+    } finally {
+      if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
+      else Reflect.deleteProperty(document, "startViewTransition");
+    }
+  });
+
+  it("change con campo vacío no marca error ni avisa", () => {
+    sembrarOk();
+    // Limpio el aviso del test anterior (el fixture es un DOM compartido).
+    if (document.getElementById("aviso")) document.getElementById("aviso")!.textContent = "";
+    const input = inputMonto();
+    input.value = "";
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(inputMonto().classList.contains("monto-error")).toBe(false);
+    expect(document.getElementById("aviso")?.textContent).toBe("");
   });
 
   it("esEcoDeRemocion: desatachado es eco, atachado con foco no", () => {
@@ -686,7 +771,9 @@ describe("monto manual", () => {
       new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
     );
     expect(document.querySelector(".cell-badge")).toBeNull();
-    expect(document.activeElement?.className).toBe("cell-monto"); // el borrador queda corregible
+    // El foco queda en el input (con la marca de error; el borrador queda corregible).
+    expect(document.activeElement).toBe(inputMonto());
+    expect(inputMonto().classList.contains("monto-error")).toBe(true);
   });
 
   it("monto entero se muestra con 2 decimales (500 → US$ 500.00)", () => {
@@ -1714,5 +1801,137 @@ describe("hoja fantasma", () => {
     pegarEnCelda.mockClear();
     document.querySelector<HTMLButtonElement>('.sheet-fantasma [data-accion="pegar"]')?.click();
     expect(pegarEnCelda).toHaveBeenCalledWith(HOJA_FANTASMA, 0);
+  });
+});
+
+describe("reorden por teclado (2.5.7)", () => {
+  /** Celdas ocupadas en orden de render (slot, cruzando hojas). */
+  function ocupadas(): HTMLElement[] {
+    return [...document.querySelectorAll<HTMLElement>(".cell[data-id]")];
+  }
+
+  /** Montos de los slots (null = vacía: el solo ?. de monto pisaba null→undefined). */
+  function montos(h: Hoja): (number | null)[] {
+    return h.slots.map((c) => (c ? c.montoCents : null));
+  }
+
+  /** Ctrl/Alt+flecha desde la celda enfocada (foco previo como el uso real). */
+  function tecla(idx: number, key: string, alt = false): void {
+    const cell = ocupadas()[idx];
+    if (!cell) throw new Error(`sin celda ocupada ${idx}`);
+    /* jsdom no trae matchMedia (animarFlipDesde lo lee pelado): stub
+       reduced-motion para apagar el FLIP, restaurado al salir. */
+    const previo = window.matchMedia;
+    window.matchMedia = vi.fn(() => ({ matches: true })) as unknown as typeof window.matchMedia;
+    try {
+      cell.focus();
+      cell.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          cancelable: true,
+          key,
+          ctrlKey: !alt,
+          altKey: alt,
+        }),
+      );
+    } finally {
+      window.matchMedia = previo;
+    }
+  }
+
+  it("Ctrl+→ intercambia con el vecino", () => {
+    const h = sembrar("u4x2", [100, 200]);
+    tecla(0, "ArrowRight");
+    expect(montos(h)).toEqual([200, 100]);
+  });
+
+  it("Ctrl+← intercambia con el vecino anterior", () => {
+    const h = sembrar("u4x2", [100, 200]);
+    tecla(1, "ArrowLeft");
+    expect(montos(h)).toEqual([200, 100]);
+  });
+
+  it("Ctrl+→ cruza al borde de la siguiente hoja y enfoca la celda destino", () => {
+    sembrar("u1", [100]);
+    const b = sembrar("u4x2", [200, null]);
+    tecla(0, "ArrowRight");
+    expect(state.hojas.map(montos)).toEqual([[200], [100, null]]); // swap 200↔100, nada se pierde
+    const foco = document.activeElement;
+    expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
+    expect(foco?.getAttribute("data-slot")).toBe("0");
+  });
+
+  it("Ctrl+→ en el último slot del lote no mueve", () => {
+    sembrar("u1", [100]);
+    tecla(0, "ArrowRight");
+    expect(state.hojas.map(montos)).toEqual([[100]]);
+  });
+
+  it("Ctrl+↓ conserva el slot; fila corta cae al primer hueco y enfoca", () => {
+    const a = sembrar("u4x2", [100, null, null, 300]);
+    const b = sembrar("u2h", [200, null]);
+    tecla(1, "ArrowDown"); // slot 3 no existe en u2h: cae al hueco 1
+    expect(montos(b)).toEqual([200, 300]);
+    expect(montos(a)).toEqual([100, null, null, null]);
+    const foco = document.activeElement;
+    expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
+    expect(foco?.getAttribute("data-slot")).toBe("1");
+  });
+
+  it("hoja destino llena sin hueco: silencio", () => {
+    sembrar("u4x2", [null, null, null, 300]);
+    sembrar("u1", [200]);
+    tecla(0, "ArrowDown"); // u1 no tiene slot 3 ni hueco
+    expect(state.hojas.map(montos)).toEqual([[null, null, null, 300], [200]]);
+  });
+
+  it("Ctrl+→ a un hueco vacía la hoja original (render estructural) y enfoca", () => {
+    sembrar("u1", [100]);
+    const b = sembrar("u1", [null]);
+    tecla(0, "ArrowRight");
+    expect(state.hojas).toHaveLength(1); // la primera quedó vacía: limpiarHojas
+    expect(state.hojas[0]?.slots.map((c) => (c ? c.montoCents : null))).toEqual([100]);
+    const foco = document.activeElement;
+    expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
+    expect(foco?.getAttribute("data-slot")).toBe("0");
+  });
+
+  it("Alt+→ es alias del Ctrl horizontal", () => {
+    const h = sembrar("u4x2", [100, 200]);
+    tecla(0, "ArrowRight", true);
+    expect(montos(h)).toEqual([200, 100]);
+  });
+
+  it("input de monto no mueve (las flechas editan texto)", () => {
+    const h = crearHoja("u2h");
+    h.slots[0] = comprobante({ estado: "ok", montoCents: null });
+    h.slots[1] = comprobante({ montoCents: 200 });
+    state.hojas.push(h);
+    renderHojas();
+    const input = document.querySelector<HTMLInputElement>("input.cell-monto");
+    if (!input) throw new Error("sin input de monto");
+    input.focus();
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "ArrowRight",
+        ctrlKey: true,
+      }),
+    );
+    // Sin swap: el 200 sigue en el slot 1 y el foco sigue en el input.
+    expect(montos(h)).toEqual([null, 200]);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("en modo OCR el teclado no mueve (como el drag)", () => {
+    const h = sembrar("u4x2", [100, 200]);
+    state.modoOcr = true;
+    try {
+      tecla(0, "ArrowRight");
+      expect(montos(h)).toEqual([100, 200]);
+    } finally {
+      state.modoOcr = false;
+    }
   });
 });

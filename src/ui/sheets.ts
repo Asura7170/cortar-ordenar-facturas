@@ -12,10 +12,12 @@ import type { Cents, Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
 import { cuentaHoja, formatearMoneda, parsearMonto, renderMonto, totalItems } from "./monto";
 import { girarYReleer } from "../pipeline/rotar";
-import { getEl, sanear } from "../utils";
+import { avisarError, getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
 const metaHojas: HTMLElement = getEl("metaHojas");
+const statHojas: HTMLElement = getEl("statHojas");
+const statComp: HTMLElement = getEl("statComp");
 const btnZoom: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoom");
 const btnZoomMas: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoomMas");
 const btnZoomMenos: HTMLButtonElement = getEl<HTMLButtonElement>("btnZoomMenos");
@@ -131,7 +133,7 @@ function pintarCeldaVacia(div: HTMLElement, slotIdx: number, hojaId: number): vo
   const mas = document.createElement("span");
   mas.className = "cell-pegar-mas";
   mas.setAttribute("aria-hidden", "true");
-  mas.textContent = "＋";
+  mas.textContent = "+";
   const txt = document.createElement("span");
   txt.className = "cell-pegar-txt";
   txt.textContent = "Clic para pegar";
@@ -149,8 +151,8 @@ function pintarCeldaOcr(div: HTMLElement, item: Comprobante): void {
       (item.estado === "procesando"
         ? "Procesando…"
         : item.estado === "pendiente"
-          ? "(pendiente)"
-          : "(sin texto OCR)"),
+          ? "Pendiente"
+          : "Sin texto OCR"),
   );
   const btn = document.createElement("button");
   btn.className = "cell-remove";
@@ -206,7 +208,7 @@ function pintarBadgeOMonto(div: HTMLElement, item: Comprobante): void {
     entrada.className = "cell-monto";
     entrada.type = "text";
     entrada.inputMode = "decimal";
-    entrada.placeholder = "Total…";
+    entrada.placeholder = "1234.56";
     entrada.title = "Total del comprobante (ej. 1234.56)";
     entrada.setAttribute("aria-label", `Total de ${item.nombre}`);
     entrada.dataset["accion"] = "monto";
@@ -229,7 +231,8 @@ function panelHoja(hoja: Hoja, idx: number): string {
       .toArray()
       .join("");
     const activa = id === hoja.layout ? " active" : "";
-    return `<button class="grid-opt${activa}" data-accion="layout" data-hoja="${hoja.id}" data-layout="${id}" title="${NOMBRES_LAYOUT[id]}">
+    const presionado = id === hoja.layout ? "true" : "false";
+    return `<button class="grid-opt${activa}" data-accion="layout" data-hoja="${hoja.id}" data-layout="${id}" title="${NOMBRES_LAYOUT[id]}" aria-pressed="${presionado}">
       <span class="layout-mini" style="grid-template-columns:repeat(${l.cols},1fr);grid-template-rows:repeat(${l.filas},1fr);" aria-hidden="true">${fichas}</span>
       <span class="layout-name">${NOMBRES_LAYOUT[id]}</span>
     </button>`;
@@ -287,8 +290,8 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
   const ico = document.createElement("span");
   ico.className = "btn-sumar-mas";
   ico.setAttribute("aria-hidden", "true");
-  ico.textContent = "＋";
-  mas.append(ico, " Agregar factura");
+  ico.textContent = "+";
+  mas.append(ico, " Agregar comprobantes");
   lado.append(mas);
   row.append(lado);
   return row;
@@ -319,11 +322,39 @@ function armarFilaFantasma(): HTMLElement {
   return fila;
 }
 
+/* Stats del flanco de marca: cifras que ruedan (--n transitioned) y pulsan al
+   cambiar de lote; sin fuga de palabra visible (labels en SR + title). */
+let statsPrimerRender = true;
+let statsPrevHojas = 0;
+let statsPrevComp = 0;
+function setStats(hojas: number, comps: number): void {
+  metaHojas.toggleAttribute("data-cero", hojas === 0 && comps === 0);
+  if (statsPrimerRender) {
+    // Better-ui: skip state animations on first render.
+    statsPrimerRender = false;
+    metaHojas.classList.add("stats-frozen");
+    requestAnimationFrame(() => metaHojas.classList.remove("stats-frozen"));
+  } else if (hojas !== statsPrevHojas || comps !== statsPrevComp) {
+    for (const el of [statHojas, statComp]) {
+      el.classList.remove("bump");
+    }
+    void statHojas.offsetWidth; // reinicia el pop one-shot si estaba en vuelo
+    statHojas.classList.add("bump");
+    statComp.classList.add("bump");
+  }
+  statsPrevHojas = hojas;
+  statsPrevComp = comps;
+  statHojas.style.setProperty("--n-hojas", String(hojas));
+  statComp.style.setProperty("--n-comp", String(comps));
+}
+
 /** Cuerpo del render (siempre bajo `mutandoHojas`: el swap destruye el foco). */
 function renderCuerpo(borrador: BorradorMonto | null): void {
   rectsCache = null;
   const n = totalItems();
-  metaHojas.textContent = `${state.hojas.length} hoja${state.hojas.length === 1 ? "" : "s"} · ${n} comprobante${n === 1 ? "" : "s"}`;
+  // Stats = lo que está en pantalla: con n===0 (tarjeta vacía) no hay hojas
+  // pintadas — la semilla base (main.ts/limpiarHojas) no se cuenta.
+  setStats(n === 0 ? 0 : state.hojas.length, n);
   sheetsEl.innerHTML = "";
 
   if (n === 0) {
@@ -379,18 +410,11 @@ export function renderHojas(): void {
     restaurarSucios(sucios);
   };
   const usaVT = usaViewTransition(borrador);
-  // ponytail: telemetría del render solo en dev (el callback VT corre async:
-  // este ms cubre el armado; el snapshot se ve en el Performance panel).
-  const tRender = import.meta.env.DEV ? performance.now() : 0;
   if (usaVT) {
     const t = document.startViewTransition(render);
     t.ready?.catch(() => {});
     t.finished?.catch(() => {});
   } else render();
-  if (import.meta.env.DEV)
-    console.info(
-      `renderHojas ms=${Math.round(performance.now() - tRender)} vt=${usaVT ? "sí" : "no"}`,
-    );
 }
 
 export function soltarRenderPendiente(): void {
@@ -416,7 +440,7 @@ export function aplicarATodas(hojaId: string | number): void {
   state.hojas.forEach((x) => {
     x.layout = layoutId;
   });
-  redistribuir();
+  redistribuir(layoutId); // las nuevas también reciben la plantilla propagada
   renderHojas();
 }
 
@@ -456,6 +480,7 @@ interface BorradorMonto {
   readonly valor: string;
   readonly inicio: number | null;
   readonly fin: number | null;
+  readonly error: boolean;
 }
 
 /** Borrador en curso (input de monto con foco): sobrevive a los renders de fondo. */
@@ -466,27 +491,47 @@ function borradorEnEdicion(): BorradorMonto | null {
   const cell = a.closest(".cell");
   const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
   if (!Number.isInteger(id)) return null;
-  return { id, valor: a.value, inicio: a.selectionStart, fin: a.selectionEnd };
+  return {
+    id,
+    valor: a.value,
+    inicio: a.selectionStart,
+    fin: a.selectionEnd,
+    error: a.classList.contains("monto-error"),
+  };
 }
 
 /** Borradores visibles sin foco (inválidos tras blur): se capturan del DOM. */
-function borradoresVisibles(): Map<number, string> {
-  const sucios = new Map<number, string>();
+interface BorradorSucio {
+  readonly valor: string;
+  readonly error: boolean;
+}
+
+function borradoresVisibles(): Map<number, BorradorSucio> {
+  const sucios = new Map<number, BorradorSucio>();
   const a = document.activeElement;
   sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto").forEach((input) => {
     if (input === a || input.value === "") return;
     const cell = input.closest(".cell");
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
-    if (Number.isInteger(id)) sucios.set(id, input.value);
+    if (Number.isInteger(id)) {
+      sucios.set(id, {
+        valor: input.value,
+        error: input.classList.contains("monto-error"),
+      });
+    }
   });
   return sucios;
 }
 
-/** Restaura borradores sin foco tras el render (solo valor, nunca foco: B2). */
-function restaurarSucios(sucios: Map<number, string>): void {
-  sucios.forEach((valor, id) => {
+/** Restaura borradores sin foco tras el render (valor y error, nunca foco: B2). */
+function restaurarSucios(sucios: Map<number, BorradorSucio>): void {
+  sucios.forEach(({ valor, error }, id) => {
     const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
-    if (input && document.activeElement !== input) input.value = valor;
+    if (input && document.activeElement !== input) {
+      input.value = valor;
+      input.classList.toggle("monto-error", error);
+      if (error) input.setAttribute("aria-invalid", "true");
+    }
   });
 }
 
@@ -495,6 +540,8 @@ function restaurarBorrador(b: BorradorMonto): void {
   const input = cellById(b.id)?.querySelector<HTMLInputElement>("input.cell-monto");
   if (!input) return;
   input.value = b.valor;
+  input.classList.toggle("monto-error", b.error);
+  if (b.error) input.setAttribute("aria-invalid", "true");
   input.focus();
   if (b.inicio !== null && b.fin !== null) input.setSelectionRange(b.inicio, b.fin);
 }
@@ -526,10 +573,15 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
   // Inválido → se conserva el borrador para corregirlo (el title muestra el formato).
   // ponytail: el blur (change) no roba el foco: solo Enter reenfoca.
   if (cents === null) {
-    const typed = input.value;
+    // Error visible solo con texto escrito (borrar = salir, no error).
+    if (input.value.trim() !== "") {
+      avisarError("Formato no válido: usa 1234.56");
+      // La marca viaja con el borrador (restaurarBorrador/restaurarSucios):
+      // el parche post-render se pierde cuando la VT difiere el swap.
+      input.classList.add("monto-error");
+      input.setAttribute("aria-invalid", "true");
+    }
     renderHojas();
-    const deNuevo = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
-    if (deNuevo) deNuevo.value = typed;
     if (reenfocar) enfocarMonto(id);
     return null;
   }
@@ -965,6 +1017,72 @@ function moverSlot(
   renderMonto();
 }
 
+/** Centro de una celda (la "soltura" del FLIP cuando mueve el teclado). */
+function centroDeCelda(cell: HTMLElement): { x: number; y: number } {
+  const r = cell.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+/** Si un hueco existe en la hoja: índice; si está llena, null. */
+function primerHueco(h: Hoja): number | null {
+  const hueco = h.slots.indexOf(null);
+  return hueco < 0 ? null : hueco;
+}
+
+/** Vecino lineal del lote (hoja + slot), cruzando el borde de la hoja si toca;
+    null en el borde del lote (no hay vecino). */
+function vecinoLineal(
+  hoja: Hoja,
+  slot: number,
+  avanza: boolean,
+): { hoja: Hoja; slot: number } | null {
+  const destino = slot + (avanza ? 1 : -1);
+  if (destino >= 0 && destino < hoja.slots.length) return { hoja, slot: destino };
+  const otra = state.hojas[state.hojas.indexOf(hoja) + (avanza ? 1 : -1)];
+  return otra ? { hoja: otra, slot: avanza ? 0 : otra.slots.length - 1 } : null;
+}
+
+/** Reorden por teclado (2.5.7): Ctrl/Alt+flecha mueve la celda (convive con el
+    drag: ambos entran por moverSlot). ←/→ son el vecino lineal del lote;
+    ↑/↓ cambian de hoja conservando el slot, con caída al primer hueco si la
+    fila destino es más corta. El re-enfoque sigue el patrón escaparMonto. */
+function cablearReordenTeclado(): void {
+  sheetsEl.addEventListener("keydown", (e) => {
+    if (state.modoOcr || pointerDrag) return; // mismo bloqueo que el drag manual
+    if (esCampoTexto(e.target)) return; // las flechas editan texto (no mover)
+    const cell = e.target instanceof Element ? e.target.closest(".cell") : null;
+    if (!(cell instanceof HTMLElement) || !cell.dataset["id"]) return;
+    // El alias del Ctrl solo es horizontal (lo aprobado): Alt+vertical no actúa.
+    const conMod =
+      (e.ctrlKey || (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight"))) &&
+      !e.metaKey &&
+      !e.shiftKey;
+    if (!conMod || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault();
+    const id = Number(cell.dataset["id"]);
+    const actual = buscarSlot(id);
+    if (!actual) return;
+
+    let destino: { hoja: Hoja; slot: number };
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const vecino = vecinoLineal(actual.hoja, actual.idx, e.key === "ArrowRight");
+      if (!vecino) return; // borde del lote: no hay vecino
+      destino = vecino;
+    } else {
+      const otra = state.hojas[state.hojas.indexOf(actual.hoja) + (e.key === "ArrowDown" ? 1 : -1)];
+      // ponytail: hoja inexistente (borde del lote) u hoja llena sin hueco:
+      // silencio — la flecha se repite rápido y un #aviso sería ruido.
+      if (!otra) return;
+      const slot = actual.idx < otra.slots.length ? actual.idx : primerHueco(otra);
+      if (slot === null) return;
+      destino = { hoja: otra, slot };
+    }
+    moverSlot({ id }, destino.hoja, destino.slot, centroDeCelda(cell));
+    // El render pudo reconstruir la grilla (hoja vaciada): nodo fresco.
+    (nodoCeldaHoja(destino.hoja.id, destino.slot) as HTMLElement | null)?.focus();
+  });
+}
+
 // Único camino de cierre del drag (pointerup + red de lostpointercapture).
 function finalizarDrag(x: number, y: number): void {
   if (!pointerDrag) return;
@@ -1164,9 +1282,9 @@ function anunciarCopiado(btn: HTMLElement): void {
   if (previo !== undefined) window.clearTimeout(previo);
   btn.classList.add("copiado");
   btn.title = "Copiar OCR";
-  btn.setAttribute("aria-label", "¡Copiado!");
+  btn.setAttribute("aria-label", "Copiado");
   const anuncio = document.getElementById("estadoCopiado");
-  if (anuncio) anuncio.textContent = "¡Copiado!";
+  if (anuncio) anuncio.textContent = "Copiado";
   copiadoTimers.set(
     btn,
     window.setTimeout(() => {
@@ -1197,17 +1315,21 @@ function copiarOcrAlPortapapeles(id: number, btn: HTMLElement): void {
   if (!item || !item.textoOcr) return;
   // Sin Promise.try (ausente en Node 22 del CI): writeText ya devuelve promesa.
   // clipboard no existe fuera de contexto seguro (http): TypeError antes de la promesa.
-  // ponytail: en fallo solo el title (el check es solo éxito, sin error visual nuevo).
+  // El fallo avisa en el toast rojo de #aviso y también queda en el title del botón.
   const fallo = "Copiar falló (sin permiso del portapapeles)";
   const portapapeles = navigator.clipboard;
   if (typeof portapapeles?.writeText !== "function") {
+    avisarError("No se pudo copiar el texto: dale permiso al portapapeles e intentá de nuevo.");
     btn.title = fallo;
     return;
   }
   void portapapeles
     .writeText(item.textoOcr)
     .then(() => anunciarCopiado(btn))
-    .catch(() => deshacerCopiado(btn, fallo));
+    .catch(() => {
+      avisarError("No se pudo copiar el texto: dale permiso al portapapeles e intentá de nuevo.");
+      deshacerCopiado(btn, fallo);
+    });
 }
 
 /** Acción `corregir-monto`: abre la edición no destructiva del total. */
@@ -1514,6 +1636,7 @@ export function initSheets(cb: SheetsCallbacks): void {
   cablearAcciones();
   cablearMontoCambio();
   cablearMontoTeclado();
+  cablearReordenTeclado();
   cablearArchivosEntrada();
   cablearArchivosFuera();
   cablearArchivosSoltar();

@@ -30,6 +30,7 @@
   margin-top: 12px;
   font-size: 24px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--tinta);
   text-wrap: balance;
 }
@@ -58,7 +59,7 @@
 .dz-fmt {
   display: inline-block;
   margin-top: 10px;
-  font-family: var(--mono);
+  font-family: var(--serif);
   font-size: 11px;
   color: var(--texto-panel-suave);
   border: 1px solid var(--borde-panel);
@@ -93,43 +94,19 @@
   padding: 24px;
   font-size: 28px;
   font-weight: 700;
-  color: light-dark(var(--texto-panel), var(--verde-tinta));
+  letter-spacing: -0.01em;
+  color: var(--texto-panel);
   background: color-mix(in srgb, var(--renglon-fuerte) 18%, transparent);
   border: 4px dashed var(--renglon-fuerte);
   border-radius: var(--radio);
   pointer-events: none;
   z-index: 5;
 }
-.canvas-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  color: var(--texto-panel-suave);
-}
-.canvas-titulo {
-  font-size: 13px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  text-wrap: balance;
-}
-.canvas-meta {
-  font-family: var(--mono);
-  font-size: 12px;
-}
-
 .sheets {
   display: flex;
   flex-direction: column;
   align-items: safe center;
   gap: 30px;
-}
-/* Avisos de entrada bajo el head del canvas; vacío no ocupa lugar. */
-.hint-canvas {
-  margin: 0 0 12px;
-}
-.hint-canvas:empty {
-  display: none;
 }
 
 .sheet {
@@ -152,9 +129,9 @@
   position: absolute;
   top: 10px;
   left: 10px;
-  font-family: var(--mono);
+  font-family: var(--serif);
   font-size: 12px;
-  color: var(--tinta-fina);
+  color: var(--tinta-suave);
   background: var(--fondo-sheet-tag);
   border: 1px solid var(--borde-sheet-tag);
   border-radius: 4px;
@@ -222,7 +199,7 @@
   background: var(--papel);
   border: 2px solid var(--verde-tinta);
   border-radius: var(--radio);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--sombra-boton);
   cursor: pointer;
   transition:
     background 0.15s,
@@ -253,7 +230,7 @@
   text-wrap: balance;
 }
 .sheet-panel-count {
-  font-family: var(--mono);
+  font-family: var(--serif);
   font-size: 12px;
   color: var(--texto-panel);
 }
@@ -282,7 +259,8 @@
   cursor: pointer;
   transition:
     background 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    transform 0.12s;
 }
 .grid-opt:hover {
   border-color: var(--renglon-fuerte);
@@ -330,9 +308,43 @@
   background: var(--gridopt-activo);
   color: var(--texto-panel);
   cursor: pointer;
+  transition: transform 0.12s;
 }
 .apply-all:hover {
   border-color: var(--verde-tinta);
+}
+/* Foco del panel: anillo del sistema (var(--anillo)), no el ring UA. */
+.grid-opt:focus-visible,
+.apply-all:focus-visible {
+  box-shadow: var(--anillo);
+}
+/* Presión en controles de casilla: transición corta al estilo .btn. */
+.cell-pegar,
+.cell-remove,
+.cell-girar,
+.cell-recortar {
+  transition: transform 0.12s;
+}
+/* Pulsado: presión mínima, solo transform (nunca top/left). */
+.cell-pegar:active,
+.cell-remove:active,
+.cell-girar:active,
+.cell-recortar:active,
+.cell-badge:active,
+.grid-opt:active,
+.apply-all:active {
+  transform: scale(0.98);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cell-pegar:active,
+  .cell-remove:active,
+  .cell-girar:active,
+  .cell-recortar:active,
+  .cell-badge:active,
+  .grid-opt:active,
+  .apply-all:active {
+    transform: none;
+  }
 }
 .sheet-grid {
   position: absolute;
@@ -361,10 +373,14 @@
 .cell:not(.empty):not(.cell-ocr) {
   cursor: grab;
 } /* en OCR no hay drag: flecha normal */
+.cell:focus-visible {
+  outline: 2px solid var(--verde-tinta);
+  outline-offset: -2px;
+}
 .cell.empty {
   border: 1px dashed var(--renglon-fuerte);
   border-radius: 4px;
-  color: var(--tinta-fina);
+  color: var(--tinta-suave);
   font-size: 12px;
 }
 /* Botón de pegado en la celda vacía (llena la casilla: un clic grande para mayores). */
@@ -430,13 +446,13 @@
   height: 100%;
   object-fit: contain; /* entera y lo más grande posible; bandas solo si difiere el ratio */
   border-radius: 2px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--sombra-celda);
   pointer-events: none; /* el pointerdown cae en la celda, no en la imagen */
   -webkit-user-drag: none;
   transition: box-shadow 0.15s;
 }
 .cell:hover img {
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--sombra-celda-hover);
 }
 
 /* Fantasma del comprobante mientras se arrastra (Pointer Events).
@@ -446,10 +462,10 @@
   left: 0;
   top: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 70;
   object-fit: contain;
   opacity: 0.9;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--sombra-flotante);
   border-radius: 4px;
   will-change: transform;
   transform-origin: center;
@@ -501,7 +517,7 @@ body.is-dragging .cell:not(.empty) {
   position: absolute;
   bottom: 6px;
   right: 6px;
-  font-family: var(--mono);
+  font-family: var(--serif);
   font-size: 14px;
   background: var(--papel-brillo);
   color: var(--verde-tinta);
@@ -514,6 +530,16 @@ body.is-dragging .cell:not(.empty) {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s,
+    transform 0.12s;
+}
+/* Hover del total: misma affordance que pegar (tinte verde + anillo interno),
+   sin outline (ese es el foco). Es el control más clicado de la app. */
+.cell-badge:hover {
+  background: var(--verde-claro);
+  box-shadow: inset 0 0 0 2px var(--verde-tinta);
 }
 /* Hit-area 44px como el × (el badge visual es bajo). */
 .cell-badge::after {
@@ -527,10 +553,22 @@ body.is-dragging .cell:not(.empty) {
 }
 .cell-monto {
   width: 11ch;
+  text-align: right;
 }
 .cell-monto:focus-visible {
   outline: 2px solid var(--verde-tinta);
   outline-offset: 2px;
+}
+/* Monto manual inválido: anillo sello + vibración (patrón codigo-error: estado
+   no solo por color — el tembleque es la señal motriz). */
+.cell-monto.monto-error {
+  border-color: var(--sello);
+  background: color-mix(in srgb, var(--sello) 10%, var(--papel-brillo));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sello) 25%, transparent);
+  animation: sacudir 0.3s;
+}
+.cell-monto.monto-error:focus-visible {
+  outline-color: var(--sello);
 }
 .cell-remove {
   position: absolute;
@@ -570,7 +608,7 @@ body.is-dragging .cell:not(.empty) {
   }
 }
 .cell-remove:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--verde-tinta);
   outline-offset: 2px;
 }
 .cell-remove:hover {
@@ -641,7 +679,7 @@ body.is-dragging .cell:not(.empty) {
   }
 }
 .cell-girar:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--verde-tinta);
   outline-offset: 2px;
 }
 .cell-girar:hover {
@@ -815,7 +853,7 @@ body.is-dragging .cell:not(.empty) {
   }
 }
 .cell-recortar:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--verde-tinta);
   outline-offset: 2px;
 }
 .cell-recortar:hover {
@@ -995,7 +1033,7 @@ body.is-dragging .cell:not(.empty) {
     drop-shadow(0 0 8px rgba(255, 255, 255, 0.5));
 }
 .recorte-cerrar:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--verde-tinta);
   outline-offset: 2px;
 }
 .recorte-escena {
@@ -1004,7 +1042,7 @@ body.is-dragging .cell:not(.empty) {
   place-items: center;
   background: transparent;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--sombra-modal);
 }
 .recorte-escena canvas {
   grid-area: 1 / 1;
@@ -1024,7 +1062,7 @@ body.is-dragging .cell:not(.empty) {
   background: var(--modal-bg);
   border: 1px solid var(--borde-panel);
   border-radius: var(--radio);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--sombra-modal);
 }
 /* Confirmar recorte: fondo sólido intacto en hover; el realce es bloom blanco
    en texto e icono (con ID para no tocar otros primarios). Borde reservado
@@ -1330,7 +1368,7 @@ body.is-dragging .cell:not(.empty) {
   overflow-y: auto;
   margin: 0;
   padding: 8px 8px 34px;
-  font-family: var(--mono);
+  font-family: var(--serif);
   font-size: 12px;
   line-height: 1.5;
   color: var(--tinta);
@@ -1354,7 +1392,7 @@ body.is-dragging .cell:not(.empty) {
   background: var(--verde-claro);
   color: var(--verde-tinta);
   font-size: 12px;
-  font-family: var(--mono);
+  font-family: var(--serif);
   line-height: 1.2;
   z-index: 2;
   transition:
@@ -1522,9 +1560,9 @@ body.is-dragging .cell:not(.empty) {
   position: absolute;
   bottom: 6px;
   left: 6px;
-  font-family: var(--mono);
+  font-family: var(--serif);
   font-size: 12px;
-  color: var(--tinta-fina);
+  color: var(--tinta-suave);
   background: var(--procesando-bg);
   border: 1px solid var(--renglon);
   border-radius: 4px;
@@ -1541,7 +1579,7 @@ body.is-dragging .cell:not(.empty) {
   position: absolute;
   bottom: 6px;
   left: 6px;
-  font-family: var(--mono);
+  font-family: var(--serif);
   font-size: 12px;
   color: var(--sello);
   background: var(--error-bg);

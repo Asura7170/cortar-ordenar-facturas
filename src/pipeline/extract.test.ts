@@ -19,6 +19,7 @@ const {
   mensajeLote,
 } = await import("./extract");
 import type { ItemLote } from "./extract";
+const { mostrarToasts } = await import("../utils");
 
 const aviso = el("aviso");
 
@@ -278,10 +279,24 @@ describe("extraerPendientes", () => {
 
   it("éxito total conserva el aviso previo (N1)", () => {
     const { c1 } = lote2();
-    aviso.textContent = "«gordo.pdf»: pesa más de 5 MB";
+    // El aviso previo llega como toast (no como texto suelto): estado real del canal.
+    mostrarToasts([{ tipo: "error", titulo: "«gordo.pdf»: pesa más de 5 MB" }]);
     extraerPendientes();
     expect(c1.montoCents).toBe(1250);
     expect(aviso.textContent).toBe("«gordo.pdf»: pesa más de 5 MB");
+  });
+
+  it("éxito total restaura solo el título del toast vivo (regresión)", () => {
+    const { c1 } = lote2();
+    mostrarToasts([{ tipo: "error", titulo: "mala.pdf", grupo: "intake" }]);
+    mostrarToasts([{ tipo: "error", titulo: "gordo.pdf: pesa más de 5 MB", detalle: "4.9 MB" }]);
+    extraerPendientes();
+    expect(c1.montoCents).toBe(1250);
+    // La pila trae el textContent completo (título de grupo + detalle);
+    // el título vivo es lo restaurable.
+    expect(
+      document.querySelector("#aviso .toast:not([data-grupo]) .toast-titulo")?.textContent,
+    ).toBe("gordo.pdf: pesa más de 5 MB");
   });
 
   it("auto bloqueado durante OCR salvo desdeCola (regresión)", () => {

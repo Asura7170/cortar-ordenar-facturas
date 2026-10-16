@@ -22,7 +22,7 @@ import type { Comprobante, Hoja, LayoutId, PosicionCodigo } from "../types";
 import { CALIDAD_JPEG } from "../pipeline/imagen";
 import { layoutDe } from "../ui/layout";
 import { totalItems } from "../ui/monto";
-import { getEl } from "../utils";
+import { avisarError, getEl } from "../utils";
 
 const btnWord: HTMLButtonElement = getEl<HTMLButtonElement>("btnWord");
 const btnPdf: HTMLButtonElement = getEl<HTMLButtonElement>("btnPdf");
@@ -44,7 +44,7 @@ const EMU_POR_PX = 9525;
 
 export function codigoValido(): boolean {
   if (!state.codigoActivo) return true;
-  return state.codigoValor.length === state.codigoLongitud && /^\d+$/.test(state.codigoValor);
+  return /^\d+$/.test(state.codigoValor);
 }
 
 export function nombreArchivo(ext: string = "docx"): string {
@@ -389,9 +389,10 @@ export async function imprimir(): Promise<void> {
   await imprimirZona(false);
 }
 
+// ponytail: delega en el helper compartido — misma firma, así los 8 llamados
+// quedan intactos y el error sale en el toast rojo de #aviso.
 function avisar(texto: string): void {
-  const el = document.getElementById("aviso");
-  if (el) el.textContent = texto;
+  avisarError(texto);
 }
 
 // ponytail: marca local nullable (sin importar sidebar: ese módulo exige todo

@@ -73,7 +73,6 @@ export type PosicionCodigo = "sup-izq" | "sup-der" | "inf-izq" | "inf-der";
 export interface EstadoApp {
   hojas: Hoja[];
   codigoActivo: boolean;
-  codigoLongitud: number;
   codigoValor: string;
   codigoPosicion: PosicionCodigo;
   moneda: Moneda;
@@ -87,7 +86,7 @@ export interface EstadoApp {
 
 /** Subset persistido en localStorage (clave `libro-mayor-state`); cada ventana guarda solo lo suyo. */
 export type PersistedState = Partial<
-  Pick<EstadoApp, "codigoActivo" | "codigoLongitud" | "codigoValor" | "codigoPosicion" | "moneda">
+  Pick<EstadoApp, "codigoActivo" | "codigoValor" | "codigoPosicion" | "moneda">
 >;
 
 // ponytail: OcrResult/ExtractResult borrados (0 usos); vuelven con el pipeline real.

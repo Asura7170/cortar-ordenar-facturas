@@ -51,7 +51,6 @@ describe("crearHoja", () => {
 describe("guardar/cargar por ventana", () => {
   it("round-trip: cada ventana persiste lo suyo y lo restaura", () => {
     state.codigoActivo = true;
-    state.codigoLongitud = 8;
     state.codigoValor = "12345678";
     state.codigoPosicion = "sup-izq";
     guardarCodigo();
@@ -59,14 +58,12 @@ describe("guardar/cargar por ventana", () => {
     guardarAjustes();
 
     state.codigoActivo = false;
-    state.codigoLongitud = 6;
     state.codigoValor = "";
     state.codigoPosicion = "inf-der";
     state.moneda = "USD";
     cargar();
 
     expect(state.codigoActivo).toBe(true);
-    expect(state.codigoLongitud).toBe(8);
     expect(state.codigoValor).toBe("12345678");
     expect(state.codigoPosicion).toBe("sup-izq");
     expect(state.moneda).toBe("BOB");
@@ -76,7 +73,6 @@ describe("guardar/cargar por ventana", () => {
     state.moneda = "ARS";
     guardarAjustes();
     state.codigoActivo = true;
-    state.codigoLongitud = 8;
     state.codigoValor = "87654321";
     guardarCodigo();
 
@@ -96,7 +92,6 @@ describe("guardar/cargar por ventana", () => {
     const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "{}") as Record<string, unknown>;
     expect(Object.keys(raw).sort()).toEqual([
       "codigoActivo",
-      "codigoLongitud",
       "codigoPosicion",
       "codigoValor",
       "moneda",
@@ -124,20 +119,15 @@ describe("guardar/cargar por ventana", () => {
     localStorage.setItem(LS_KEY, JSON.stringify({ moneda: "ARS" }));
     cargar();
     expect(state.codigoActivo).toBe(false);
-    expect(state.codigoLongitud).toBe(6);
     expect(state.codigoValor).toBe("");
     expect(state.moneda).toBe("ARS");
   });
 
   it("blob legacy solo-código (sin moneda ni posición): restaura el código y usa defaults", () => {
     state.moneda = "EUR";
-    localStorage.setItem(
-      LS_KEY,
-      JSON.stringify({ codigoActivo: true, codigoLongitud: 8, codigoValor: "12345678" }),
-    );
+    localStorage.setItem(LS_KEY, JSON.stringify({ codigoActivo: true, codigoValor: "12345678" }));
     cargar();
     expect(state.codigoActivo).toBe(true);
-    expect(state.codigoLongitud).toBe(8);
     expect(state.codigoValor).toBe("12345678");
     expect(state.codigoPosicion).toBe("inf-der");
     expect(state.moneda).toBe("EUR");
@@ -163,19 +153,6 @@ describe("guardar/cargar por ventana", () => {
     expect(state.moneda).toBe("EUR");
   });
 
-  it("clamp de longitud: 99→12, 2.7→2, 0→6", () => {
-    const base = { codigoActivo: false, codigoValor: "", moneda: "USD" };
-    for (const [entrada, esperado] of [
-      [99, 12],
-      [2.7, 2],
-      [0, 6],
-    ] as const) {
-      localStorage.setItem(LS_KEY, JSON.stringify({ ...base, codigoLongitud: entrada }));
-      cargar();
-      expect(state.codigoLongitud).toBe(esperado);
-    }
-  });
-
   it("sobrante de la era IA: configIA se retira del blob y las claves se borran", () => {
     localStorage.setItem("jev-api-key", "apik-vieja");
     sessionStorage.setItem("jev-api-key", "apik-sesion");
@@ -183,7 +160,6 @@ describe("guardar/cargar por ventana", () => {
       LS_KEY,
       JSON.stringify({
         codigoActivo: false,
-        codigoLongitud: 6,
         codigoValor: "",
         moneda: "USD",
         configIA: { baseUrl: "http://solo" },
@@ -195,9 +171,20 @@ describe("guardar/cargar por ventana", () => {
     expect(sessionStorage.getItem("jev-api-key")).toBeNull();
     expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toEqual({
       codigoActivo: false,
-      codigoLongitud: 6,
       codigoValor: "",
       moneda: "USD",
+    });
+  });
+
+  it("sobrante de la era del switch: codigoLongitud se retira del blob al cargar", () => {
+    localStorage.setItem(
+      LS_KEY,
+      JSON.stringify({ codigoActivo: true, codigoValor: "12345678", codigoLongitud: 8 }),
+    );
+    cargar();
+    expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toEqual({
+      codigoActivo: true,
+      codigoValor: "12345678",
     });
   });
 
@@ -293,7 +280,7 @@ describe("redistribuir", () => {
     expect(state.hojas[0]?.slots).toEqual([a, b, null, null]);
   });
 
-  it("desborda a hojas nuevas heredando el layout", () => {
+  it("recompacta en hojas existentes preservando su layout", () => {
     const h = crearHoja("u2h");
     const items = [1, 2, 3, 4, 5].map(() => comprobante());
     h.slots = [items[0] ?? null, items[1] ?? null];
@@ -312,15 +299,44 @@ describe("redistribuir", () => {
     expect(ids).toEqual([...items.map((c) => c.id), null]);
   });
 
-  it("cambio de plantilla con hojas ocupadas: refluye sin perder items", () => {
+  it("cambio de plantilla: el resto refluye a hojas nuevas con el default", () => {
     const h = crearHoja();
-    h.slots = [1, 2, 3, 4].map(() => comprobante());
+    const items = [1, 2, 3, 4].map(() => comprobante());
+    h.slots = items;
     state.hojas.push(h);
     h.layout = "u1";
     redistribuir();
+    expect(state.hojas).toHaveLength(2);
+    expect(state.hojas[0]?.layout).toBe("u1");
+    expect(state.hojas[1]?.layout).toBe("u4x2");
+    // orden preservado: 1 en la u1, 3 en la nueva
+    expect(state.hojas[0]?.slots).toEqual([items[0] ?? null]);
+    expect(state.hojas[1]?.slots).toEqual([...items.slice(1), null]);
+  });
+
+  it("el resto no hereda el layout de la última hoja aunque sea no-default", () => {
+    const a = crearHoja("u2h");
+    const b = crearHoja("u2h");
+    const items = [1, 2, 3, 4].map(() => comprobante());
+    a.slots = [items[0] ?? null, items[1] ?? null];
+    b.slots = [items[2] ?? null, items[3] ?? null];
+    state.hojas.push(a, b);
+    a.layout = "u1";
+    redistribuir();
+    // u1(1) + u2h(2) + la sobrante a una u4x2 (no u2h heredado)
+    expect(state.hojas.map((x) => x.layout)).toEqual(["u1", "u2h", "u4x2"]);
+    expect(state.hojas[2]?.slots).toEqual([items[3] ?? null, null, null, null]);
+  });
+
+  it("layoutNuevas pisa el default para 'aplicar a todas'", () => {
+    const h = crearHoja("u4x2");
+    const items = [1, 2, 3, 4].map(() => comprobante());
+    h.slots = items;
+    state.hojas.push(h);
+    h.layout = "u1";
+    redistribuir("u1");
     expect(state.hojas).toHaveLength(4);
-    expect(state.hojas.flatMap((x) => x.slots)).toHaveLength(4);
-    expect(state.hojas.every((x) => x.slots[0] !== null)).toBe(true);
+    expect(state.hojas.every((x) => x.layout === "u1")).toBe(true);
   });
 
   it("descarta hojas que quedan vacías (recompacta en las primeras)", () => {

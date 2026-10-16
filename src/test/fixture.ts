@@ -10,8 +10,8 @@ export const FIXTURE_HTML = `
 </div>
 <span id="githubStars"></span>
 <main class="canvas" id="canvas">
-  <div class="canvas-head"><span id="metaHojas"></span></div>
-  <p id="aviso" role="status"></p>
+  <div class="lote-stats" id="metaHojas"><span class="stat-cifra" id="statHojas"></span><span class="stat-cifra" id="statComp"></span></div>
+  <div id="aviso" role="region" aria-label="Avisos"></div>
   <span id="estadoCopiado" class="sr-only" role="status" aria-live="polite"></span>
   <div id="sheets"></div>
   <label id="dropzone" for="fileInput" tabindex="0"></label>
@@ -20,7 +20,6 @@ export const FIXTURE_HTML = `
 </main>
 <div id="lupa" aria-hidden="true"><canvas id="lupaCanvas"></canvas></div>
 <input id="chkCodigo" type="checkbox">
-<input id="numCodigo" type="number" value="6">
 <input id="inputCodigo" type="text">
 <fieldset>
   <input type="radio" name="posCodigo" value="sup-izq">

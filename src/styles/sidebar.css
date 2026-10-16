@@ -28,7 +28,7 @@
   margin-bottom: 10px;
 }
 .panel-title {
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--texto-panel-suave);
@@ -47,10 +47,13 @@
     border-color 0.15s,
     background 0.15s;
 }
+/* La chica copia la semántica verde de la grande (canvas .dropzone-grande):
+   borde renglon-fuerte + tinte sutil de verde; --sello queda solo para
+   peligro real (limpiar, errores). */
 .dropzone:hover,
 .dropzone:focus-visible {
-  border-color: var(--sello);
-  background: color-mix(in srgb, var(--sello) 8%, transparent);
+  border-color: var(--renglon-fuerte);
+  background: color-mix(in srgb, var(--verde-tinta) 8%, transparent);
   box-shadow: var(--anillo);
 }
 /* Switch */
@@ -96,6 +99,18 @@
 #cfgMoneda {
   cursor: pointer;
 }
+/* Hover: la pista varía apenas (apagado tinte verde; checked oscurece como
+   .btn-primary:hover). El track ya transiciona background 0.2s. */
+.switch:hover .switch-track {
+  background: color-mix(in srgb, var(--switch-bg) 85%, var(--verde-tinta) 15%);
+}
+.switch:hover input:checked + .switch-track {
+  background: color-mix(in srgb, var(--verde-tinta), #000 12%);
+}
+/* Pulsado: presión mínima en la pista (transform, como los controles de casilla). */
+.switch:active .switch-track {
+  transform: scale(0.98);
+}
 
 .codigo-row {
   display: flex;
@@ -107,12 +122,16 @@
   color: var(--texto-panel-suave);
   white-space: nowrap;
 }
-.codigo-row input[type="number"] {
-  width: 56px;
+/* Solo la leyenda de posición lleva el tracking de los títulos y va más gruesa. */
+legend.field-mini {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
 }
 .codigo-row input[type="text"] {
   flex: 1;
   min-width: 0;
+  text-align: right;
 }
 /* El código solo pide atención cuando su switch está activo (el JS lo
    refleja en disabled); apagado conserva el fondo neutro. */
@@ -156,10 +175,55 @@
   padding: 0;
 }
 .pos-grid {
+  --pos-ancho: 76px;
+  --pos-alto: calc(var(--pos-ancho) * 4 / 3);
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  /* plegado por defecto: la 2ª pista en 0px; las ocultas viven ahí (sin
+     display:none: Chrome no anima entrando/saliendo de display) */
+  grid-template-columns: var(--pos-ancho) 0px;
+  grid-template-rows: var(--pos-alto) 0px;
+  gap: 0;
+  margin: auto;
   margin-top: 8px;
+  width: max-content;
+  /* el pliegue recorta a las hojas que aún se desvanecen (sus bordes sobresalen
+     del border-box que se cierra) */
+  overflow: clip;
+  transition:
+    grid-template-columns 220ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    grid-template-rows 220ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    gap 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+/* plegado: solo la elegida visible; visibility interpola (nace al expandir,
+   se desvanece al plegar) y quita el radio del tab-order/SR */
+.pos-opt:not(:has(:checked)) {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  /* sin el piso de 44px: la celda (y la hoja con height:100%) colapsan con la pista */
+  min-height: 0;
+}
+/* la elegida ancla arriba-izquierda en plegado (válido también con el OFF,
+   donde el hover no despliega y su celda nativa quedaría fuera de la caja) */
+.pos-grid:not(:has(input:not(:disabled))) .pos-opt:has(:checked),
+.codigo-pos:not(:hover):not(:has(input:focus-visible)) .pos-opt:has(:checked) {
+  order: -1;
+}
+/* despliegan hover sobre TODO el fieldset (leyenda incluida = zona grande y
+   con pista visible) o foco visible de teclado — y SOLO con el switch encendido.
+   El foco por clic no es :focus-visible: al salir del área colapsa a la elegida. */
+.codigo-pos:hover:has(input:not(:disabled)),
+.codigo-pos:has(input:focus-visible) {
+  .pos-grid {
+    grid-template-columns: repeat(2, var(--pos-ancho));
+    grid-template-rows: repeat(2, var(--pos-alto));
+    gap: 8px;
+  }
+  .pos-opt {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .pos-opt {
   display: flex;
@@ -168,6 +232,9 @@
   min-height: 44px;
   cursor: pointer;
   position: relative;
+  transition:
+    opacity 220ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    visibility 220ms;
 }
 .pos-opt input {
   position: absolute;
@@ -175,9 +242,8 @@
   pointer-events: none;
 }
 .pos-hoja {
-  flex-shrink: 0;
-  width: 30px;
-  height: 40px;
+  width: 100%;
+  height: 100%;
   background: var(--papel);
   border: 1px solid var(--renglon-fuerte);
   border-radius: 3px;
@@ -186,30 +252,26 @@
 .pos-hoja::after {
   content: "";
   position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 55%;
+  height: 9%;
+  border-radius: 1px;
   border: 1.5px solid var(--texto-panel-suave);
 }
 .pos-sup-izq::after {
-  top: 3px;
-  left: 3px;
+  top: 5%;
+  left: 5%;
 }
 .pos-sup-der::after {
-  top: 3px;
-  right: 3px;
+  top: 5%;
+  right: 5%;
 }
 .pos-inf-izq::after {
-  bottom: 3px;
-  left: 3px;
+  bottom: 5%;
+  left: 5%;
 }
 .pos-inf-der::after {
-  bottom: 3px;
-  right: 3px;
-}
-.pos-nom {
-  font-size: 12px;
-  color: var(--texto-panel);
+  bottom: 5%;
+  right: 5%;
 }
 .pos-opt:has(:checked) .pos-hoja {
   border-color: var(--verde-tinta);
@@ -219,15 +281,20 @@
   background: var(--verde-tinta);
   border-color: var(--verde-tinta);
 }
-.pos-opt:has(:checked) .pos-nom {
-  font-weight: 700;
-}
 .pos-opt:has(:focus-visible) .pos-hoja {
   box-shadow: var(--anillo);
 }
 .pos-opt:has(:disabled) {
   opacity: 0.45;
   cursor: default;
+}
+/* movimiento reducido: pliegue/despliegue instantáneo (la elegida siempre
+   visible = el cambio no viaja solo por la animación) */
+@media (prefers-reduced-motion: reduce) {
+  .pos-grid,
+  .pos-opt {
+    transition: none;
+  }
 }
 .panel-ocr .panel-head {
   margin-bottom: 0;
@@ -291,7 +358,7 @@
   color: light-dark(#7a5c2e, tan);
   border: 1px solid currentColor;
 }
-.btn-calculo:hover {
+.btn-calculo:hover:not(:disabled) {
   background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
 /* Realce botones: halo en ::before estático fundido por opacidad (animar
@@ -326,27 +393,27 @@
   transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
 }
-#btnCalcular:hover,
+#btnCalcular:hover:not(:disabled),
 #btnCalcular:focus-visible,
-.btn-word:hover,
+.btn-word:hover:not(:disabled),
 .btn-word:focus-visible,
-.btn-pdf:hover,
+.btn-pdf:hover:not(:disabled),
 .btn-pdf:focus-visible,
-.btn-imprimir:hover,
+.btn-imprimir:hover:not(:disabled),
 .btn-imprimir:focus-visible {
   /* ponytail: scale en vez de translateY — trasladar la caja bajo un cursor
      quieto en el borde oscila el hover (tembleque flecha/puntero). */
   transform: scale(1.03);
 }
-#btnCalcular:hover::before,
+#btnCalcular:hover:not(:disabled)::before,
 #btnCalcular:focus-visible::before,
-.btn-word:hover::before,
+.btn-word:hover:not(:disabled)::before,
 .btn-word:focus-visible::before,
-.btn-pdf:hover::before,
+.btn-pdf:hover:not(:disabled)::before,
 .btn-pdf:focus-visible::before,
-.btn-imprimir:hover::before,
+.btn-imprimir:hover:not(:disabled)::before,
 .btn-imprimir:focus-visible::before,
-#btnLimpiar:hover::before,
+#btnLimpiar:hover:not(:disabled)::before,
 #btnLimpiar:focus-visible::before {
   opacity: 1;
 }
@@ -404,22 +471,40 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   clip-path: inset(0 calc((1 - var(--progreso, 0)) * 100%) 0 0);
   pointer-events: none;
 }
 .btn-calculo .calculo-capa .calculo-ico {
   color: var(--calculo-lleno);
 }
-/* Texto fantasma invisible: solo reserva el ancho para que el icono
-   fantasma calce sobre el base (visible duplicaría el texto). */
-.btn-calculo .calculo-capa .calculo-txt {
+/* Texto fantasma invisible: SOLO reserva el ancho para que el icono
+   fantasma calce sobre el base (visible duplicaría el texto/cuenta; la
+   inversión de ambos la pinta el gradiente del texto base). */
+.btn-calculo .calculo-capa .calculo-txt,
+.btn-calculo .calculo-capa .calculo-cuenta {
   visibility: hidden;
 }
+/* Cuenta separada: caja fija (el icono no baila cuando cambian los dígitos)
+   y oculta en reposo; centrada en el eje vertical del botón. */
+.btn-calculo .calculo-cuenta {
+  display: none;
+  width: 6ch;
+  font-variant-numeric: tabular-nums;
+}
+.btn-calculo.con-monto .calculo-cuenta {
+  display: block;
+}
+/* Etiqueta partida en 2 líneas: min-content (su palabra más ancha) deja la
+   fila casi tan ancha como "Calcular totales", y el icono no se corre. */
+.btn-calculo.con-monto .calculo-txt {
+  width: min-content;
+  padding-left: 16px;
+}
 
-/* Exportar: Word y PDF a la par, Imprimir grande debajo. Word y PDF son
+/* Exportar: Word y PDF a la par, Imprimir grande debajo. Los tres son
    fantasma con color de marca solo en texto y borde (fondo transparente
-   para no romper el estilo del sitio); Imprimir va sólido en verde. */
+   para no romper el estilo del sitio). */
 .export-doble {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -432,7 +517,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
 }
 .export-ico {
   width: 20px;
@@ -451,21 +536,21 @@
   opacity: 0;
   transform-origin: 50% 50%;
 }
-#btnWord:hover .flecha-caida,
+#btnWord:hover:not(:disabled) .flecha-caida,
 #btnWord:focus-visible .flecha-caida,
-#btnPdf:hover .flecha-caida,
+#btnPdf:hover:not(:disabled) .flecha-caida,
 #btnPdf:focus-visible .flecha-caida {
   animation: caida-flecha 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-#btnWord:hover .bandeja,
+#btnWord:hover:not(:disabled) .bandeja,
 #btnWord:focus-visible .bandeja,
-#btnPdf:hover .bandeja,
+#btnPdf:hover:not(:disabled) .bandeja,
 #btnPdf:focus-visible .bandeja {
   animation: bandeja-elastica 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-#btnWord:hover .destello-base,
+#btnWord:hover:not(:disabled) .destello-base,
 #btnWord:focus-visible .destello-base,
-#btnPdf:hover .destello-base,
+#btnPdf:hover:not(:disabled) .destello-base,
 #btnPdf:focus-visible .destello-base {
   animation: destello-base 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
@@ -584,7 +669,7 @@
 #btnImprimir .prn-stream {
   opacity: 0;
 }
-#btnImprimir:hover,
+#btnImprimir:hover:not(:disabled),
 #btnImprimir:focus-visible {
   .prn-ambient-rig {
     animation: prn-amb-float 6.8s ease-in-out infinite;
@@ -984,15 +1069,15 @@
   color: light-dark(#0e4ae2, #8fb0ff);
   border: 1px solid currentColor;
 }
-.btn-word:hover {
+.btn-word:hover:not(:disabled) {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 .btn-pdf {
   background: transparent;
-  color: #fe5721;
+  color: var(--pdf-marca);
   border: 1px solid currentColor;
 }
-.btn-pdf:hover {
+.btn-pdf:hover:not(:disabled) {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 .btn-imprimir {
@@ -1003,7 +1088,7 @@
   color: light-dark(var(--verde-tinta), var(--monto-valor));
   border: 1px solid currentColor;
 }
-.btn-imprimir:hover {
+.btn-imprimir:hover:not(:disabled) {
   background: color-mix(in srgb, currentColor 12%, transparent);
 }
 /* Realce orgánico de exportar: elevación en el botón y halo/sombra en
@@ -1014,16 +1099,17 @@
   position: relative;
 }
 @media (prefers-reduced-motion: reduce) {
-  .btn-word:hover,
+  .btn-word:hover:not(:disabled),
   .btn-word:focus-visible,
-  .btn-pdf:hover,
+  .btn-pdf:hover:not(:disabled),
   .btn-pdf:focus-visible,
-  .btn-imprimir:hover,
+  .btn-imprimir:hover:not(:disabled),
   .btn-imprimir:focus-visible,
-  #btnCalcular:hover,
+  #btnCalcular:hover:not(:disabled),
   #btnCalcular:focus-visible,
-  #btnLimpiar:hover,
-  #btnLimpiar:focus-visible {
+  #btnLimpiar:hover:not(:disabled),
+  #btnLimpiar:focus-visible,
+  .switch:active .switch-track {
     transform: none;
   }
 }
@@ -1038,6 +1124,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 40px de aire: el texto "Limpiar" vive entre las dos escobas y el hueco
+     central evita que el label lo asfixie (o que las escobas lo invadan). */
   gap: 40px;
   position: relative;
   /* Borde reservado transparente: el rojo de hover no recoloca nada. */
@@ -1045,10 +1133,10 @@
 }
 /* Inversión fantasma + realce en hover/foco (las escobas heredan el rojo
    por currentColor; el halo común vive arriba y usa currentColor). */
-#btnLimpiar:hover,
+#btnLimpiar:hover:not(:disabled),
 #btnLimpiar:focus-visible {
   background-color: color-mix(in srgb, var(--sello) 12%, transparent);
-  color: #f04438;
+  color: var(--aviso-motivo);
   border-color: var(--sello);
   /* ponytail: scale en vez de translateY — ver #btnCalcular (tembleque de hover). */
   transform: scale(1.03);
@@ -1107,7 +1195,7 @@
   transform-origin: 50% 50%;
   opacity: 0;
 }
-#btnLimpiar:hover,
+#btnLimpiar:hover:not(:disabled),
 #btnLimpiar:focus-visible {
   .esc-ambient {
     animation: esc-kf-ambient 7.3s ease-in-out infinite alternate;

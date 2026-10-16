@@ -5,7 +5,7 @@
    intacto; no-manual se reabre y el lote lo relee. Nunca lanza. */
 import { buscarSlot, obtenerComprobante, state } from "../state";
 import type { Comprobante } from "../types";
-import { sanear } from "../utils";
+import { avisarError, sanear } from "../utils";
 import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
 import type { DepsOcr } from "./ocr";
 import { girarBlob, lienzoGirado } from "./ocr";
@@ -20,9 +20,10 @@ const relecturas = new Map<number, ReturnType<typeof setTimeout>>();
 /** Cadena de giros por item: cada pulsación parte del blob ya commiteado. */
 const girosEnCurso = new Map<number, Promise<void>>();
 
+// ponytail: delega en el helper compartido — misma firma, así los 2 llamados
+// quedan intactos y el error sale en el toast rojo de #aviso.
 function avisar(texto: string): void {
-  const el = document.getElementById("aviso");
-  if (el) el.textContent = texto;
+  avisarError(texto);
 }
 
 /** Cargador/factory para el giro o el real (mejoras de deps fuera del cuerpo). */

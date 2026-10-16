@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2e2b24" />
+    <meta name="theme-color" content="#eceadf" media="(prefers-color-scheme: light)" />
     <meta
       name="description"
       content="Recorta, ordena y extrae totales de facturas en lotes para exportar a Word."
@@ -23,14 +25,58 @@
     <link rel="stylesheet" href="./src/styles/canvas.css" />
   </head>
   <body>
+    <a class="skip-link sr-only" href="#canvas">Saltar al canvas</a>
     <div class="app">
       <!-- Barra superior -->
       <header class="topbar">
         <div class="brand">
           <img class="brand-mark" src="/logo.svg" alt="" width="42" height="42" />
-          <div class="brand-text">
-            <h1 class="brand-title">Cortar y Ordenar Facturas</h1>
-            <p class="brand-sub">Lote · Recorte &amp; OCR · Export Word</p>
+          <h1 class="sr-only">Cortar y Ordenar Facturas</h1>
+          <!-- Stats del lote reemplazan el texto de marca: cifra al vistazo. -->
+          <div
+            class="lote-stats"
+            id="metaHojas"
+            role="group"
+            aria-label="Hojas y comprobantes del lote"
+          >
+            <div class="stat" title="Hojas del lote">
+              <svg
+                class="stat-ico"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2 2 0 0 1 1.7.7l3.6 3.6A2 2 0 0 1 20 8v12a2 2 0 0 1-2 2z"
+                />
+                <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+              </svg>
+              <span class="stat-cifra" id="statHojas"></span>
+              <span class="sr-only">hojas</span>
+            </div>
+            <div class="stat" title="Comprobantes del lote">
+              <svg
+                class="stat-ico"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M4 21 V3 Q4 2 5 2 L6.98 3.1 Q7.33 3.3 7.68 3.1 L9.32 2.2 Q9.67 2 10.02 2.2 L11.65 3.1 Q12 3.3 12.35 3.1 L13.98 2.2 Q14.33 2 14.68 2.2 L16.32 3.1 Q16.67 3.3 17.02 3.1 L19 2 Q20 2 20 3 V21 Q20 22 19 22 L17.02 20.9 Q16.67 20.7 16.32 20.9 L14.68 21.8 Q14.33 22 13.98 21.8 L12.35 20.9 Q12 20.7 11.65 20.9 L10.02 21.8 Q9.67 22 9.32 21.8 L7.68 20.9 Q7.33 20.7 6.98 20.9 L5 22 Q4 22 4 21 Z"
+                />
+                <path d="M8 8 H14 M8 12 H16 M8 16 H13" />
+              </svg>
+              <span class="stat-cifra" id="statComp"></span>
+              <span class="sr-only">comprobantes</span>
+            </div>
           </div>
         </div>
         <div class="zoom-grupo" role="group" aria-label="Zoom de hojas">
@@ -96,117 +142,119 @@
             </span>
           </button>
         </div>
-        <div class="monto-box">
-          <span class="monto-label">MONTO TOTAL</span>
-          <span class="monto-valor" id="montoTotal">Bs 0.00</span>
-        </div>
-        <div class="topbar-actions">
-          <a
-            class="btn btn-ghost btn-github"
-            id="btnGithub"
-            href="https://github.com/Asura7170/cortar-ordenar-facturas"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Ver en GitHub"
-            aria-label="Star en GitHub"
-          >
-            <svg
-              class="github-ico"
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              width="16"
-              height="16"
-              fill="currentColor"
+        <div class="topbar-derecha">
+          <div class="monto-box">
+            <span class="monto-label">TOTAL</span>
+            <span class="monto-valor" id="montoTotal">Bs 0.00</span>
+          </div>
+          <div class="topbar-actions">
+            <a
+              class="btn btn-ghost btn-github"
+              id="btnGithub"
+              href="https://github.com/Asura7170/cortar-ordenar-facturas"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Ver en GitHub"
+              aria-label="Star en GitHub"
             >
-              <path
-                d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-              />
-            </svg>
-            <span>Star</span>
-            <span class="github-stars" id="githubStars" aria-hidden="true"></span>
-          </a>
-          <button
-            class="btn btn-ghost"
-            id="btnTema"
-            title="Cambiar tema claro/oscuro"
-            aria-label="Cambiar tema"
-          >
-            <span class="tema-ico" aria-hidden="true">
-              <svg class="ico-sol" viewBox="0 0 180 180">
-                <g transform="translate(90, 90)">
-                  <circle class="sol-halo" r="42" fill="currentColor" />
-                  <g class="sol-corona">
-                    <g class="sol-rayos">
-                      <polygon
-                        points="0.00,-80.00 23.73,-57.28 56.57,-56.57 57.28,-23.73 80.00,0.00 57.28,23.73 56.57,56.57 23.73,57.28 0.00,80.00 -23.73,57.28 -56.57,56.57 -57.28,23.73 -80.00,0.00 -57.28,-23.73 -56.57,-56.57 -23.73,-57.28"
-                        fill="none"
-                        stroke="#fbbf24"
-                        stroke-width="6"
-                        stroke-linejoin="round"
-                      />
+              <svg
+                class="github-ico"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                fill="currentColor"
+              >
+                <path
+                  d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
+                />
+              </svg>
+              <span>Star</span>
+              <span class="github-stars" id="githubStars" aria-hidden="true"></span>
+            </a>
+            <button
+              class="btn btn-ghost"
+              id="btnTema"
+              title="Cambiar a oscuro"
+              aria-label="Cambiar a oscuro"
+            >
+              <span class="tema-ico" aria-hidden="true">
+                <svg class="ico-sol" viewBox="0 0 180 180">
+                  <g transform="translate(90, 90)">
+                    <circle class="sol-halo" r="42" fill="currentColor" />
+                    <g class="sol-corona">
+                      <g class="sol-rayos">
+                        <polygon
+                          points="0.00,-80.00 23.73,-57.28 56.57,-56.57 57.28,-23.73 80.00,0.00 57.28,23.73 56.57,56.57 23.73,57.28 0.00,80.00 -23.73,57.28 -56.57,56.57 -57.28,23.73 -80.00,0.00 -57.28,-23.73 -56.57,-56.57 -23.73,-57.28"
+                          fill="none"
+                          stroke="#fbbf24"
+                          stroke-width="6"
+                          stroke-linejoin="round"
+                        />
+                      </g>
+                    </g>
+                    <g class="sol-nucleo">
+                      <circle r="40" fill="#fbbf24" />
                     </g>
                   </g>
-                  <g class="sol-nucleo">
-                    <circle r="40" fill="#fbbf24" />
+                </svg>
+                <svg class="ico-luna" viewBox="0 0 186 169">
+                  <defs>
+                    <mask id="corte-nube">
+                      <rect width="186" height="169" fill="#ffffff" />
+                      <g class="nube-flota">
+                        <path
+                          d="M 26 152 A 20 20 0 0 1 30 112.4 A 24 24 0 0 1 78 112.4 A 20 20 0 0 1 82 152 Z"
+                          fill="#000000"
+                          stroke="#000000"
+                          stroke-width="6"
+                          stroke-linejoin="round"
+                        />
+                      </g>
+                    </mask>
+                  </defs>
+                  <g class="luna-estrellas" fill="#3d629e">
+                    <path
+                      class="estrella-1"
+                      d="M 36 31 Q 36 42 47 42 Q 36 42 36 53 Q 36 42 25 42 Q 36 42 36 31 Z"
+                    />
+                    <path
+                      class="estrella-2"
+                      d="M 165 65 Q 165 76 176 76 Q 165 76 165 87 Q 165 76 154 76 Q 165 76 165 65 Z"
+                    />
+                    <path
+                      class="estrella-3"
+                      d="M 95 14 Q 95 22 103 22 Q 95 22 95 30 Q 95 22 87 22 Q 95 22 95 14 Z"
+                    />
+                    <path
+                      class="estrella-4"
+                      d="M 140 144 Q 140 152 148 152 Q 140 152 140 160 Q 140 152 132 152 Q 140 152 140 144 Z"
+                    />
                   </g>
-                </g>
-              </svg>
-              <svg class="ico-luna" viewBox="0 0 186 169">
-                <defs>
-                  <mask id="corte-nube">
-                    <rect width="186" height="169" fill="#ffffff" />
-                    <g class="nube-flota">
-                      <path
-                        d="M 26 152 A 20 20 0 0 1 30 112.4 A 24 24 0 0 1 78 112.4 A 20 20 0 0 1 82 152 Z"
-                        fill="#000000"
-                        stroke="#000000"
-                        stroke-width="6"
-                        stroke-linejoin="round"
-                      />
-                    </g>
-                  </mask>
-                </defs>
-                <g class="luna-estrellas" fill="#3d629e">
-                  <path
-                    class="estrella-1"
-                    d="M 36 31 Q 36 42 47 42 Q 36 42 36 53 Q 36 42 25 42 Q 36 42 36 31 Z"
-                  />
-                  <path
-                    class="estrella-2"
-                    d="M 165 65 Q 165 76 176 76 Q 165 76 165 87 Q 165 76 154 76 Q 165 76 165 65 Z"
-                  />
-                  <path
-                    class="estrella-3"
-                    d="M 95 14 Q 95 22 103 22 Q 95 22 95 30 Q 95 22 87 22 Q 95 22 95 14 Z"
-                  />
-                  <path
-                    class="estrella-4"
-                    d="M 140 144 Q 140 152 148 152 Q 140 152 140 160 Q 140 152 132 152 Q 140 152 140 144 Z"
-                  />
-                </g>
-                <g class="luna-deriva">
-                  <path
-                    d="M 146 15 A 76 76 0 1 0 178 136 A 64 64 0 0 1 146 15 Z"
-                    mask="url(#corte-nube)"
-                    fill="#8ab6ff"
-                    stroke="#203251"
-                    stroke-width="6"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </g>
-                <g class="nube-flota">
-                  <path
-                    d="M 26 152 A 20 20 0 0 1 30 112.4 A 24 24 0 0 1 78 112.4 A 20 20 0 0 1 82 152 Z"
-                    fill="#e9edf4"
-                    stroke="#203251"
-                    stroke-width="6"
-                    stroke-linejoin="round"
-                  />
-                </g>
-              </svg>
-            </span>
-          </button>
+                  <g class="luna-deriva">
+                    <path
+                      d="M 146 15 A 76 76 0 1 0 178 136 A 64 64 0 0 1 146 15 Z"
+                      mask="url(#corte-nube)"
+                      fill="#8ab6ff"
+                      stroke="#203251"
+                      stroke-width="6"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </g>
+                  <g class="nube-flota">
+                    <path
+                      d="M 26 152 A 20 20 0 0 1 30 112.4 A 24 24 0 0 1 78 112.4 A 20 20 0 0 1 82 152 Z"
+                      fill="#e9edf4"
+                      stroke="#203251"
+                      stroke-width="6"
+                      stroke-linejoin="round"
+                    />
+                  </g>
+                </svg>
+              </span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -217,47 +265,61 @@
             <header class="panel-head">
               <h2 class="panel-title" id="tituloCodigo">Código de pedido</h2>
               <label class="switch">
-                <input type="checkbox" id="chkCodigo" aria-label="Activar código de pedido" />
+                <input type="checkbox" id="chkCodigo" aria-label="Código de pedido" />
                 <span class="switch-track"></span>
               </label>
             </header>
             <div class="codigo-row">
-              <label class="field-mini" for="numCodigo">N° dígitos</label>
-              <input type="number" id="numCodigo" min="1" max="12" value="6" />
               <input
                 type="text"
                 id="inputCodigo"
                 aria-label="Código de pedido"
                 inputmode="numeric"
                 placeholder="Código"
-                maxlength="12"
+                maxlength="24"
                 spellcheck="false"
                 autocorrect="off"
                 autocomplete="off"
               />
             </div>
             <fieldset class="codigo-pos">
-              <legend class="field-mini">Posición en hoja</legend>
+              <legend class="field-mini">Posición del código</legend>
               <div class="pos-grid">
                 <label class="pos-opt" title="Superior izquierda">
-                  <input type="radio" name="posCodigo" value="sup-izq" />
+                  <input
+                    type="radio"
+                    name="posCodigo"
+                    value="sup-izq"
+                    aria-label="Superior izquierda"
+                  />
                   <span class="pos-hoja pos-sup-izq" aria-hidden="true"></span>
-                  <span class="pos-nom">Sup. izq.</span>
                 </label>
                 <label class="pos-opt" title="Superior derecha">
-                  <input type="radio" name="posCodigo" value="sup-der" />
+                  <input
+                    type="radio"
+                    name="posCodigo"
+                    value="sup-der"
+                    aria-label="Superior derecha"
+                  />
                   <span class="pos-hoja pos-sup-der" aria-hidden="true"></span>
-                  <span class="pos-nom">Sup. der.</span>
                 </label>
                 <label class="pos-opt" title="Inferior izquierda">
-                  <input type="radio" name="posCodigo" value="inf-izq" />
+                  <input
+                    type="radio"
+                    name="posCodigo"
+                    value="inf-izq"
+                    aria-label="Inferior izquierda"
+                  />
                   <span class="pos-hoja pos-inf-izq" aria-hidden="true"></span>
-                  <span class="pos-nom">Inf. izq.</span>
                 </label>
                 <label class="pos-opt" title="Inferior derecha">
-                  <input type="radio" name="posCodigo" value="inf-der" />
+                  <input
+                    type="radio"
+                    name="posCodigo"
+                    value="inf-der"
+                    aria-label="Inferior derecha"
+                  />
                   <span class="pos-hoja pos-inf-der" aria-hidden="true"></span>
-                  <span class="pos-nom">Inf. der.</span>
                 </label>
               </div>
             </fieldset>
@@ -299,7 +361,7 @@
                 </span>
               </h2>
               <label class="switch">
-                <input type="checkbox" id="chkOcr" aria-label="Activar modo OCR" />
+                <input type="checkbox" id="chkOcr" aria-label="Modo OCR" />
                 <span class="switch-track"></span>
               </label>
             </header>
@@ -325,6 +387,7 @@
                 <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01" />
               </svg>
               <span class="calculo-txt">Calcular totales</span>
+              <span class="calculo-cuenta"></span>
               <span class="calculo-capa" aria-hidden="true">
                 <svg
                   class="calculo-ico"
@@ -342,6 +405,7 @@
                   <path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01" />
                 </svg>
                 <span class="calculo-txt" aria-hidden="true">Calcular totales</span>
+                <span class="calculo-cuenta"></span>
               </span>
             </button>
           </section>
@@ -614,6 +678,7 @@
               id="btnLimpiar"
               command="show-modal"
               commandfor="modalLimpiar"
+              title="Vaciar el lote completo"
             >
               <svg
                 class="export-ico escoba-der"
@@ -670,7 +735,9 @@
                   </g>
                 </g>
               </svg>
-              <span>Limpiar</span>
+              <span>Vaciar lote</span>
+              <!-- ponytail: copia completa (no symbol/use): las ~60 reglas .esc-* animan
+                   elementos internos del SVG y un shadow tree de <use> no las ve. -->
               <svg class="export-ico" viewBox="0 0 192 192" fill="currentColor" aria-hidden="true">
                 <g class="esc-ambient">
                   <g transform="translate(97.77, 94.23) rotate(45)">
@@ -755,20 +822,21 @@
 
         <!-- Área principal: también zona de subida (drop en el canvas) -->
         <main class="canvas" id="canvas">
-          <div class="canvas-head">
-            <h2 class="canvas-titulo">Hojas</h2>
-            <span class="canvas-meta" id="metaHojas">0 hojas</span>
-          </div>
-          <p class="hint hint-canvas" id="aviso" role="status"></p>
+          <!-- #aviso: canal único de avisos/errores (los módulos escriben con
+               mostrarToasts/avisarError): pila de toasts fijos abajo-derecha
+               (error = rojo, aviso = amarillo) que suben desde debajo del
+               borde; se cierran con X o expiran solos. role=region: cada toast
+               anuncia por sí mismo, sin relatar la historia completa. -->
+          <div id="aviso" role="region" aria-label="Avisos"></div>
           <span id="estadoCopiado" class="sr-only" role="status" aria-live="polite"></span>
           <div class="sheets" id="sheets">
             <!-- <article class="sheet">... generado por JS ...</article> -->
           </div>
           <label class="dropzone dropzone-grande" id="dropzone" for="fileInput" tabindex="0">
-            <span class="dz-ico" aria-hidden="true">＋</span>
+            <span class="dz-ico" aria-hidden="true">+</span>
             <span class="dz-titulo">Subí tus comprobantes</span>
             <span class="dz-txt"
-              >Arrastrá archivos a esta área, pegalos con <strong>Ctrl+V</strong>, hacé clic para
+              >Arrastrá archivos a esta área, pegálos con <strong>Ctrl+V</strong>, hacé clic para
               buscarlos o clic en una celda vacía para pegar</span
             >
             <span class="dz-fmt">JPG · PNG · WEBP · PDF</span>
@@ -777,7 +845,7 @@
             class="btn btn-ghost btn-block btn-pegar"
             id="btnPegar"
             type="button"
-            title="Pega la imagen que copiaste en WhatsApp"
+            title="Pegá la imagen que copiaste en WhatsApp"
           >
             <svg
               class="pegar-ico"
@@ -823,14 +891,13 @@
           <div class="modal-body">
             <fieldset class="grupo-modelos">
               <legend>Moneda</legend>
-              <label aria-label="Moneda">
-                <select id="cfgMoneda" name="cfgMoneda">
-                  <option value="USD">USD · US$</option>
-                  <option value="ARS">ARS · AR$</option>
-                  <option value="EUR">EUR · €</option>
-                  <option value="BOB">BOB · Bs</option>
-                </select>
-              </label>
+              <label class="field-mini" for="cfgMoneda">Moneda</label>
+              <select id="cfgMoneda" name="cfgMoneda">
+                <option value="USD">USD · US$</option>
+                <option value="ARS">ARS · AR$</option>
+                <option value="EUR">EUR · €</option>
+                <option value="BOB">BOB · Bs</option>
+              </select>
             </fieldset>
             <fieldset class="grupo-modelos">
               <legend>Modelos en este equipo</legend>
@@ -844,7 +911,7 @@
             </fieldset>
           </div>
           <div class="modal-foot">
-            <button class="btn btn-ghost" type="button" id="btnResetAjustes">Predeterminado</button>
+            <button class="btn btn-ghost" type="button" id="btnResetAjustes">Restablecer</button>
             <button class="btn btn-primary" type="submit" id="btnGuardarAjustes">Guardar</button>
           </div>
         </form>
@@ -881,7 +948,7 @@
         </div>
         <form method="dialog" class="modal-foot">
           <button class="btn btn-ghost" type="submit" value="cancel" autofocus>Cancelar</button>
-          <button class="btn btn-danger" type="submit" value="ok">Sí, vaciar</button>
+          <button class="btn btn-danger" type="submit" value="ok">Vaciar lote</button>
         </form>
       </div>
     </dialog>

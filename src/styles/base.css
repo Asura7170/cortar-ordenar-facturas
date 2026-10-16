@@ -15,10 +15,20 @@
   --tinta-fina: light-dark(#7f8f7a, #7b8577); /* tinta tenue */
   --renglon: light-dark(#cfe3c6, #b8cfae); /* renglón verde del libro contable */
   --renglon-fuerte: light-dark(#9ecb96, #8fbf8a); /* renglón verde alto */
+  /* Acentos deliberados: NO unificar. La columna de salidas del sidebar mezcla
+     a propósito verde-tinta (identidad de la app), sello rojo y tan #7a5c2e
+     (papel contable) y los colores de marca de Word (azul) y PDF (naranja):
+     su color identifica el formato a un vistazo, no es un descuido de paleta. */
   --sello: #b23a2e; /* sello de goma rojo */
   --sello-suave: light-dark(#e7c4bd, #d8a29a); /* sello teñido */
+  --sello-aviso: #eab308; /* sello amarillo (fondo del toast de aviso); con --tinta: 4.9:1 claro / 7.2:1 oscuro (AA) */
+  --texto-sello: #fff; /* texto sobre sello sólido: 5.8:1 sobre --sello (AA) */
   --verde-tinta: #2f6b3a; /* verde tienda */
   --verde-claro: #eef4ea; /* verde suave */
+  --pdf-marca: light-dark(
+    #c2410c,
+    #ff8a5c
+  ); /* marca PDF con par por tema: el label del botón exige AA (antes #fe5721 único, 3.05:1) */
 
   /* Superficies de la app */
   --mesa: light-dark(#eceadf, #2e2b24); /* mesa ejecutiva */
@@ -46,9 +56,11 @@
   );
   --monto-valor: light-dark(#2f6b3a, #cfe6c2);
   --celda-alto-intrinseco: 240px; /* alto estimado para content-visibility */
+  /* 60% ≈ 3.3:1 de contraste de componente no texto (AA) en ambos temas;
+     la mezcla 30% medía 1.77/2.18:1 (W3). Solo sube el mix, no el token. */
   --dropzone-borde: light-dark(
-    color-mix(in srgb, #2c3a28 30%, transparent),
-    color-mix(in srgb, #f0ead9 30%, transparent)
+    color-mix(in srgb, #2c3a28 60%, transparent),
+    color-mix(in srgb, #f0ead9 60%, transparent)
   );
   --hover-claro: light-dark(
     color-mix(in srgb, #2c3a28 7%, transparent),
@@ -104,13 +116,66 @@
 
   /* Tipografía (vendoreada en public/fonts: sin CDN por COEP require-corp) */
   --serif: "Public Sans", "Segoe UI", Verdana, sans-serif;
-  --mono: "Public Sans", "Segoe UI", Verdana, sans-serif;
 
   /* Medidas */
   --radio: 10px;
   --radio-s: 6px;
-  --sombra-hoja: 0 6px 14px rgba(0, 0, 0, 0.4), 0 18px 50px rgba(0, 0, 0, 0.25);
-  --anillo: 0 0 0 3px color-mix(in srgb, var(--renglon-fuerte) 50%, transparent);
+  /* Familia de sombras teñidas con la tinta (antes rgba(0,0,0)): el negro puro
+     chanclaba contra la paleta verde-tinta. Jerarquía por elevación:
+     celda < botón < barra/flotante < hoja < modal; en oklch conserva el matiz. */
+  /* En oscuro la tinta (dark) ya es casi negra: ΔL vs --mesa ≈0 y la elevación
+     desaparece. Cada token pasa a par light-dark: el claro queda byte-igual, el
+     oscuro mezcla negro puro (ΔL compuesto sobre #2e2b24 ≥ 0.036, calculado en
+     scratch). La jerarquía clara se respeta en oscuro. */
+  /* dark ΔL 0.036 */
+  --sombra-celda: 0 2px 6px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 18%, transparent),
+      color-mix(in oklch, #000 20%, transparent)
+    );
+  /* dark ΔL 0.054 */
+  --sombra-celda-hover: 0 4px 10px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 25%, transparent),
+      color-mix(in oklch, #000 30%, transparent)
+    );
+  /* dark ΔL 0.063 */
+  --sombra-boton: 0 3px 8px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 30%, transparent),
+      color-mix(in oklch, #000 35%, transparent)
+    );
+  /* dark ΔL 0.082 */
+  --sombra-barra: 0 8px 24px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 40%, transparent),
+      color-mix(in oklch, #000 45%, transparent)
+    );
+  /* dark ΔL 0.082 */
+  --sombra-flotante: 0 12px 28px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 40%, transparent),
+      color-mix(in oklch, #000 45%, transparent)
+    );
+  /* dark ΔL 0.082/0.054 */
+  --sombra-hoja:
+    0 6px 14px
+      light-dark(
+        color-mix(in oklch, var(--tinta) 40%, transparent),
+        color-mix(in oklch, #000 45%, transparent)
+      ),
+    0 18px 50px
+      light-dark(
+        color-mix(in oklch, var(--tinta) 25%, transparent),
+        color-mix(in oklch, #000 30%, transparent)
+      );
+  /* dark ΔL 0.100 */
+  --sombra-modal: 0 20px 60px
+    light-dark(
+      color-mix(in oklch, var(--tinta) 50%, transparent),
+      color-mix(in oklch, #000 55%, transparent)
+    );
+  --anillo: 0 0 0 3px light-dark(var(--verde-tinta), var(--monto-valor));
 
   color-scheme: dark;
 }
@@ -179,28 +244,6 @@
     U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
     U+A720-A7FF;
 }
-@font-face {
-  font-family: "Public Sans";
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url("../../fonts/public-sans-latin-800.woff2") format("woff2");
-  unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
-    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "Public Sans";
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url("../../fonts/public-sans-latin-ext-800.woff2") format("woff2");
-  unicode-range:
-    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
-    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
-    U+A720-A7FF;
-}
-
 /* ============ TEMA CLARO (Libro Mayor en papel) ============ */
 [data-tema="claro"] {
   color-scheme: light;
@@ -248,8 +291,9 @@ select {
 /* ponytail: tabulación compartida (monto/badges/contadores) — sede única en base, la usan topbar+canvas. */
 /* Números densos con la misma tabulación del monto (montos/badges/contadores). */
 .sheet-panel-count,
-.canvas-meta,
+.stat-cifra,
 .cell-monto,
+.calculo-txt,
 .dz-fmt {
   font-variant-numeric: tabular-nums;
 }
@@ -266,7 +310,7 @@ select {
   color: var(--texto-panel);
   border-radius: var(--radio-s);
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: 14px;
 }
 input:focus-visible,
 select:focus-visible {
@@ -278,27 +322,14 @@ input::placeholder {
   color: var(--input-placeholder);
 }
 
-.hint {
-  font-size: 12px;
-  color: var(--texto-panel-suave);
-  margin-top: 10px;
-  line-height: 1.5;
-  text-wrap: pretty;
-}
-/* Motivo del rechazo: rojo sello semibold (el nombre queda tenue). */
-.hint .motivo {
-  color: var(--aviso-motivo);
-  font-weight: 600;
-  font-size: 13px;
-}
 /* Botones */
 .btn {
   border: none;
   border-radius: var(--radio-s);
-  padding: 9px 14px;
+  padding: 8px 12px;
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   transition:
     transform 0.12s,
@@ -308,6 +339,12 @@ input::placeholder {
 .btn:active {
   transform: translateY(1px);
 }
+/* Deshabilitado: apagado y sin cursor de mano (el velo del opacity ya apaga
+   el hover). El wiring de btnLimpiar lo conecta el coordinador post-merge. */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .btn:focus-visible {
   box-shadow: var(--anillo);
 }
@@ -315,9 +352,11 @@ input::placeholder {
 .btn-primary {
   background: var(--verde-tinta);
   color: #fff;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--sombra-boton);
 }
-.btn-primary:hover {
+/* Hover solo cuando habilitado: el deshabilitado queda tenue e inerte
+   (regla genérica aplicada por variante; también cubre modales). */
+.btn-primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--verde-tinta), #000 12%);
 }
 
@@ -326,7 +365,7 @@ input::placeholder {
   color: var(--texto-panel);
   border: 1px solid var(--borde-panel);
 }
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled) {
   background: var(--hover-ghost);
 }
 
@@ -334,7 +373,7 @@ input::placeholder {
   background: var(--sello);
   color: #fff;
 }
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sello), #000 12%);
 }
 
@@ -348,6 +387,14 @@ input::placeholder {
   color: var(--texto-panel);
   line-height: 1;
   padding: 4px;
+  position: relative;
+}
+/* Hit-area 44px como el × (el ::after transparente recibe el tap; los vecinos
+   en modal-head son el título, sin interacción propia: no hay solape real). */
+.btn-icon::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 
 /* ============ BOTONES DE PIE (accesibles 1 clic) ============ */
@@ -362,13 +409,128 @@ input::placeholder {
   background: var(--footer-barra);
   border: 1px solid var(--borde-panel);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--sombra-barra);
   z-index: 50;
   backdrop-filter: blur(6px);
 }
 .sheet-footer-bar .btn {
   white-space: nowrap;
 }
+
+/* ============ TOAST #aviso ============ */
+/* Canal único de avisos/errores: PILA de toasts fijos abajo-derecha (los
+   módulos escriben con mostrarToasts/avisar/avisarError). Cada toast entra
+   subiendo desde debajo del borde, se cierra con su X o expira solo (aviso
+   5s, error 8s; el hover pausa el timer — utils) y sale desvaneciéndose
+   (clase .saliendo). El cap de 4 y el resumen de lotes grandes viven en utils. */
+#aviso {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  /* Sobre footer-bar (50), topbar (60) y drag-ghost (70); los <dialog>
+     viven en top layer: el toast no compite con ellos. */
+  z-index: 80;
+  display: flex; /* columna: el nuevo queda pegado a la esquina (abajo) */
+  flex-direction: column;
+  align-items: flex-end; /* ancho por contenido */
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 40px));
+  pointer-events: none; /* solo la burbuja es objetivo (ver .toast) */
+}
+#aviso > .toast {
+  pointer-events: auto; /* la burbuja sí atrapa el cursor (hover pausa / X) */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 2px 10px;
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-barra);
+  font-size: 13px;
+  line-height: 1.5;
+  text-wrap: pretty;
+  animation: toast-subir 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition:
+    opacity 0.3s,
+    translate 0.3s;
+}
+#aviso > .toast.saliendo {
+  opacity: 0;
+  translate: 0 10px;
+}
+.toast-cuerpo {
+  grid-column: 1;
+  min-width: 0; /* el archivo en ellipsis puede encoger */
+}
+/* La causa escaneable primero (peso), la acción y el archivo después. */
+.toast-titulo {
+  font-weight: 600;
+}
+.toast-detalle {
+  font-size: 12.5px;
+  line-height: 1.45;
+  min-width: 0;
+}
+/* El nombre truncado nunca deja de ser accesible: title lleva el valor entero. */
+.toast-archivo {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.toast-cerrar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%; /* círculo (×), paleta §6 */
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.toast-cerrar::after {
+  content: ""; /* hit 44px: 26 + 18 */
+  position: absolute;
+  inset: -9px;
+}
+.toast-cerrar:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+/* La cruz vive en ::before (el botón queda vacío en el DOM). */
+.toast-cerrar::before {
+  content: "×";
+}
+/* El anillo del sistema no contrasta sobre sello rojo/amarillo: el foco se
+   tiñe con el propio color del toast. */
+.toast-cerrar:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+#aviso > .toast-error {
+  background: var(--sello);
+  color: var(--texto-sello);
+}
+#aviso > .toast-aviso {
+  background: var(--sello-aviso);
+  color: var(--tinta);
+}
+/* Entra desde debajo del suelo: translateY propio (100% + holgura del offset
+   de origen) esconde el nodo completo por debajo del borde del viewport. */
+@keyframes toast-subir {
+  from {
+    transform: translateY(calc(100% + 40px));
+  }
+}
+/* El bloque global de movimiento reducido (fin del archivo) apaga entrada y salida. */
 
 /* ============ MODALES ============ */
 /* Solo lectores de pantalla (títulos de diálogos sin cromo). */
@@ -379,6 +541,22 @@ input::placeholder {
   clip-path: inset(50%);
   overflow: hidden;
   white-space: nowrap;
+}
+/* Skip-link (primer focuable del body): sr-only que se vuelve visible al foco. */
+.skip-link:focus {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  width: auto;
+  height: auto;
+  clip-path: none;
+  overflow: auto;
+  background: var(--papel);
+  color: var(--tinta);
+  border: 1px solid var(--borde-panel);
+  border-radius: var(--radio-s);
+  padding: 10px 14px;
+  z-index: 100;
 }
 .modal {
   border: none;
@@ -422,7 +600,7 @@ input::placeholder {
   max-height: 82vh;
   background: var(--modal-bg);
   border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--sombra-modal);
   display: flex;
   flex-direction: column;
   overflow: hidden;
