@@ -7,7 +7,7 @@ import type { Comprobante } from "../types";
 import { aplanar } from "../ui/monto";
 import { renderHojas } from "../ui/sheets";
 import { sanear } from "../utils";
-import { detectarYRecortar, obtenerSesion } from "./docaligner";
+import { detectarYRecortar, falloIa, obtenerSesion } from "./docaligner";
 import {
   aplicarTotales,
   extraerPendientes,
@@ -44,7 +44,7 @@ export function precalentarModelos(): void {
       const ocr = await import("./ocr").catch((): null => null);
       await ocr?.obtenerNucleo();
     } catch {
-      // el uso real reintenta; el warm-up es best-effort
+      // el uso real reintenta; el warm-up es best-effort (el intake real avisa)
     }
   })();
 }
@@ -184,7 +184,10 @@ async function procesarItem(sig: Comprobante): Promise<boolean> {
   await faseRecorte(sig);
   if (!buscarSlot(sig.id)) return false; // limpiado durante la espera: no resucita
   // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
-  const ocr = await import("./ocr").catch((): null => null);
+  const ocr = await import("./ocr").catch((e: unknown): null => {
+    falloIa(e, "OCR");
+    return null;
+  });
   const blob: Blob | null = await blobActual(sig);
   // Endereza por confianza del rec (det solo recorta líneas, no vota).
   const end = await faseEnderezar(sig, blob, ocr);

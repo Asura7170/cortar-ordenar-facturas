@@ -5,6 +5,7 @@
 import { CALIDAD_WEBP, cargarReal, crearReal, recortarMargenesBlancos } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 import { rutaWasmOrt } from "./ortWasm";
+import { esImportDinamicoMuerto, mostrarToasts } from "../utils";
 
 /** Punto en píxeles de la imagen original. */
 export interface Punto {
@@ -34,6 +35,17 @@ export const UMBRAL_HEATMAP: number = 0.3;
 /** Pesos en prod: Pages rechaza archivos >25MB; la URL /resolve/ es estable (el 302 firmado caduca). */
 export const URL_MODELO_HF: string =
   "https://huggingface.co/7rplus/pagescan-weights/resolve/main/fastvit_sa24_h_e_bifpn_256_fp32.onnx";
+
+/** Versión de los pesos cacheados. Al cambiar det/rec.onnx vendoreados o re-subir
+    los pesos de HF, subirla +1 en el mismo PR: la clave de caché la embede y el
+    bump expulsa las copias viejas de TODOS los navegadores (hoy vivían para
+    siempre: era el "borrar modelos" manual que los usuarios hacían de emergencia). */
+export const MODELOS_VERSION = 2;
+
+/** Clave de caché de un modelo: URL del peso + versión de pesos. */
+export function claveCache(url: string): string {
+  return `${url}#v${MODELOS_VERSION}`;
+}
 
 /** Modelo local en dev/test, remoto en prod (mismo peso; CORS de HF pasa COEP require-corp). */
 const RUTA_MODELO: string = import.meta.env.PROD
@@ -605,6 +617,65 @@ export function reintentarEps(): void {
   epCaidos.clear();
 }
 
+/** Strikes de sesión fallida por clave de pesos: al 2º consecutivo expulsa la
+    copia cacheada (el "Borrar modelos" de Ajustes, automático y por clave — los
+    bytes muertos sobrevivían al fallo con cualquier mensaje de error). */
+const STRIKES_EXPULSION = 2;
+const fallosSesion = new Map<string, number>();
+
+let avisoIaActivo = false;
+
+/** Aviso de IA caída: un solo toast (los fallos por foto no lo repiten);
+    si el motivo exige recarga (chunk perdedor tras un deploy) sale como aviso,
+    no como error. */
+export function falloIa(e: unknown, contexto: string): void {
+  const msj = e instanceof Error && e.message !== "" ? e.message : contexto;
+  console.error(`${contexto}: IA no disponible (${msj})`);
+  if (avisoIaActivo) return;
+  avisoIaActivo = true;
+  mostrarToasts(
+    esImportDinamicoMuerto(msj)
+      ? [{ tipo: "aviso", titulo: "Hay una versión nueva: recargá el navegador" }]
+      : [{ tipo: "error", titulo: "IA no disponible: seguís en modo manual", detalle: msj }],
+  );
+}
+
+/** El próximo fallo de IA vuelve a avisar (el éxito reenciende el límite). */
+export function iaOk(): void {
+  avisoIaActivo = false;
+}
+
+/** Anota una sesión fallida sobre la clave: el 1er strike suelta el latch de
+    EPs (una caída transitoria reintenta en la próxima foto); el 2º consecutivo
+    además expulsa el peso cacheado de esa clave. Nunca envenena el singleton. */
+export async function olvidarSesionFallida(clave: string = RUTA_MODELO): Promise<void> {
+  const n = (fallosSesion.get(clave) ?? 0) + 1;
+  fallosSesion.set(clave, n);
+  if (n >= STRIKES_EXPULSION) {
+    fallosSesion.delete(clave);
+    await expulsarPeso(clave);
+  }
+  reintentarEps();
+}
+
+/** Limpia el historial de fallos de una clave (la expulsión cuenta seguidos). */
+export function notarSesionOk(clave: string = RUTA_MODELO): void {
+  fallosSesion.delete(clave);
+}
+
+/** Saca del caché "modelos" la entrada (versionada) de una clave. */
+async function expulsarPeso(clave: string): Promise<void> {
+  const cache = await abrirModelos();
+  await cache?.delete(claveCache(clave)).catch(() => false);
+}
+
+/** Suelta enfriamientos y latch (botón "Probar IA" de Ajustes): el siguiente
+    intento nace fresco; los strikes siguen contando hasta el 2º para expulsar. */
+export function reactivarIa(): void {
+  frioHasta.clear();
+  reintentarEps();
+}
+
 /** Race con rechazo por timeout; un solo handle, siempre limpiado (sin rechazos sin manejar). */
 export function conTimeout<T>(promesa: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resuelve, rechaza) => {
@@ -653,10 +724,40 @@ export const TIMEOUT_MODELO_MS: number = 300_000;
 /** Descargas en curso por clave (dos miss concurrentes = un solo fetch). */
 const enVuelo = new Map<string, Promise<ArrayBuffer>>();
 
+/** Enfriamiento tras una baja de red (el lote reintenta por foto: sin él, un
+    HF/CDN caído cuesta TIMEOUT_MODELO_MS por comprobante). */
+const ENFRIAMIENTO_MS = 60_000;
+const frioHasta = new Map<string, number>();
+
+/** Cache "modelos" o undefined si el almacenamiento está bloqueado (modo
+    privado, quota, políticas): degrada a red directa en vez de tumbar la IA. */
+async function abrirModelos(): Promise<Cache | undefined> {
+  if (typeof caches === "undefined") return undefined;
+  try {
+    return await caches.open("modelos");
+  } catch {
+    return undefined;
+  }
+}
+
+/** Baja las claves de la era sin versión (y de versiones de modelos pasadas):
+    ocupan quota y ya no matcherían ninguna clave nueva. */
+async function limpiarLegacy(cache: Cache | undefined): Promise<void> {
+  if (!cache) return;
+  try {
+    for (const peticion of await cache.keys()) {
+      if (!peticion.url.includes(`#v${MODELOS_VERSION}`)) await cache.delete(peticion.url);
+    }
+  } catch {
+    /* best-effort: sin limpieza sigue funcionando */
+  }
+}
+
 /**
- * Descarga con caché Cache Storage (una sola descarga por navegador y clave).
- * Sin `caches` (jsdom) → red directa. `minBytes` expulsa errores con 200
- * (páginas HTML de HF) antes de cachear.
+ * Descarga con caché Cache Storage (una sola descarga por navegador y clave;
+ * la clave en caché es la URL + `#v${MODELOS_VERSION}`). Sin `caches` o con
+ * storage bloqueado → red directa. `minBytes` expulsa respuestas 200 que no
+ * son el peso (páginas HTML de HF) antes de cachear.
  */
 export async function descargarConCache(
   clave: string,
@@ -689,24 +790,37 @@ async function pesoGuardado(
   return null;
 }
 
-/** Un intento físico: caché-miss → red → persistir. Lanza (el dedup lo extiende). */
+/** Un intento físico: caché-miss (con enfriamiento) → red → persistir. Lanza
+    (el dedup lo extiende); cualquier baja de red arma la enfriamiento por clave. */
 async function intentoDeDescarga(
   clave: string,
   timeoutMs: number,
   minBytes: number,
 ): Promise<ArrayBuffer> {
-  const cache = typeof caches !== "undefined" ? await caches.open("modelos") : undefined;
-  const local = await pesoGuardado(cache, clave, minBytes);
+  const llave = claveCache(clave);
+  const cache = await abrirModelos();
+  const local = await pesoGuardado(cache, llave, minBytes);
   if (local) return local;
-  // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
-  const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
-  if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
-  const pesos = await res.arrayBuffer();
-  if (pesos.byteLength < minBytes) {
-    throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
+  const frio = frioHasta.get(clave) ?? 0;
+  if (Date.now() < frio) {
+    throw new Error(`la descarga de ${clave} recién falló: esperá ~1 minuto y reintentá`);
   }
-  await guardarEnCache(cache, clave, pesos);
-  return pesos;
+  await limpiarLegacy(cache);
+  // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
+  try {
+    const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
+    const pesos = await res.arrayBuffer();
+    if (pesos.byteLength < minBytes) {
+      throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
+    }
+    await guardarEnCache(cache, llave, pesos);
+    frioHasta.delete(clave); // el éxito reseca el enfriamiento
+    return pesos;
+  } catch (e: unknown) {
+    frioHasta.set(clave, Date.now() + ENFRIAMIENTO_MS);
+    throw e;
+  }
 }
 
 /** Best-effort: un put con await (perderlo cuesta una re-descarga) + warn si falla. */
@@ -733,71 +847,63 @@ export function descargarPesos(): Promise<ArrayBuffer> {
   return descargarConCache(RUTA_MODELO, TIMEOUT_MODELO_MS, 50_000_000);
 }
 
-/** Bytes ocupados por los modelos en este navegador (0 sin caché). */
+/** Bytes ocupados por los modelos en este navegador (0 sin caché o bloqueada). */
 export async function tamanoModelos(): Promise<number> {
-  if (typeof caches === "undefined") return 0;
-  const cache = await caches.open("modelos");
+  const cache = await abrirModelos();
   let total = 0;
-  for (const peticion of await cache.keys()) {
-    const res = await cache.match(peticion.url);
+  for (const peticion of (await cache?.keys()) ?? []) {
+    const res = await cache?.match(peticion.url);
     total += Number(res?.headers.get("Content-Length") ?? 0);
   }
   return total;
 }
 
-/** Borra los modelos descargados (recorte + OCR); true si había algo. */
+/** Borra los modelos descargados (recorte + OCR); true si había algo. Propaga
+    el fallo: "no se pudo borrar" es mentible en Ajustes, nunca tragado. */
 export async function borrarModelos(): Promise<boolean> {
   if (typeof caches === "undefined") return false;
   return caches.delete("modelos");
 }
 
-/** Expulsa el peso cacheado y suelta el latch (create fallido = bytes corruptos, no EP caído). */
-export async function olvidarSesionFallida(): Promise<void> {
-  if (typeof caches !== "undefined") {
-    await caches
-      .open("modelos")
-      .then((c) => c.delete(RUTA_MODELO))
-      .catch(() => false);
-  }
-  reintentarEps();
-}
-
 async function crearSesion(): Promise<SesionDetectora> {
-  // ponytail: build solo-webgpu (sin jsep deprecado ni webgl): el dist pasa de ~30MB a <1MB.
-  const ort = await import("onnxruntime-web/webgpu");
-  // ponytail: nombres cambian por minor (ort-bump mueve VERSION_ORT junta).
-  ort.env.wasm.wasmPaths = rutaWasmOrt(import.meta.env.PROD, import.meta.env.BASE_URL);
-  // ponytail: single-thread a propósito — los workers pthread del build threaded los bloquea
-  // Chrome bajo COEP require-corp (y en headless cuelgan sin rechazar); ~250ms/foto bastan.
-  ort.env.wasm.numThreads = 1;
-  // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
-  const pesos = await descargarPesos();
-  const intentar = async (ep: string): Promise<SesionDetectora> => {
-    const s = await ort.InferenceSession.create(pesos, {
-      executionProviders: [ep],
-      graphOptimizationLevel: "all",
-    });
-    const entrada = s.inputNames[0] ?? "img";
-    const salida = s.outputNames[0] ?? "heatmap";
-    return {
-      inferir: async (
-        tensor: Float32Array,
-      ): Promise<{ datos: Float32Array; dims: readonly number[] }> => {
-        const t = new ort.Tensor("float32", tensor, [1, 3, LADO_MODELO, LADO_MODELO]);
-        const sal = await s.run({ [entrada]: t });
-        const o = sal[salida];
-        if (!o) throw new Error("modelo sin salida heatmap");
-        return { datos: o.data as Float32Array, dims: [...o.dims] };
-      },
-    };
-  };
   try {
-    return await iniciarSesion(intentar);
+    // ponytail: build solo-webgpu (sin jsep deprecado ni webgl): el dist pasa de ~30MB a <1MB.
+    const ort = await import("onnxruntime-web/webgpu");
+    // ponytail: nombres cambian por minor (ort-bump mueve VERSION_ORT junta).
+    ort.env.wasm.wasmPaths = rutaWasmOrt(import.meta.env.PROD, import.meta.env.BASE_URL);
+    // ponytail: single-thread a propósito — los workers pthread del build threaded los bloquea
+    // Chrome bajo COEP require-corp (y en headless cuelgan sin rechazar); ~250ms/foto bastan.
+    ort.env.wasm.numThreads = 1;
+    // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
+    const pesos = await descargarPesos();
+    const intentar = async (ep: string): Promise<SesionDetectora> => {
+      const s = await ort.InferenceSession.create(pesos, {
+        executionProviders: [ep],
+        graphOptimizationLevel: "all",
+      });
+      const entrada = s.inputNames[0] ?? "img";
+      const salida = s.outputNames[0] ?? "heatmap";
+      return {
+        inferir: async (
+          tensor: Float32Array,
+        ): Promise<{ datos: Float32Array; dims: readonly number[] }> => {
+          const t = new ort.Tensor("float32", tensor, [1, 3, LADO_MODELO, LADO_MODELO]);
+          const sal = await s.run({ [entrada]: t });
+          const o = sal[salida];
+          if (!o) throw new Error("modelo sin salida heatmap");
+          return { datos: o.data as Float32Array, dims: [...o.dims] };
+        },
+      };
+    };
+    const sesion = await iniciarSesion(intentar);
+    notarSesionOk(RUTA_MODELO);
+    iaOk();
+    return sesion;
   } catch (e: unknown) {
-    // ponytail: solo el fallo de integridad expulsa el peso (un timeout de EP no borra 79MB buenos).
-    if (e instanceof Error && /corrupto|incompleto|heatmap|sin salida/i.test(e.message)) {
-      await olvidarSesionFallida();
-    }
+    // Strikes: 2 fallos seguidos expulsan el peso cacheado (cualquier motivo,
+    // no solo integridad); el 1º ya soltó el latch de EPs. Sin regex de mensajes.
+    await olvidarSesionFallida(RUTA_MODELO);
+    falloIa(e, "recorte");
     throw e;
   }
 }
@@ -851,7 +957,7 @@ export async function detectarYRecortar(blob: Blob, deps?: DepsRecorte): Promise
     if (!quad) return blob;
     return await rectificar(bmp, quitarBorde(quad), crear);
   } catch (e: unknown) {
-    console.warn(`DocAligner: recorte omitido (${e instanceof Error ? e.message : String(e)})`);
+    console.error(`DocAligner: recorte omitido (${e instanceof Error ? e.message : String(e)})`);
     return blob;
   } finally {
     bmp?.close();

@@ -7,6 +7,7 @@ import {
   avisar,
   avisarError,
   despejarToasts,
+  esImportDinamicoMuerto,
   mostrarToasts,
   planificarToasts,
   sanear,
@@ -21,6 +22,24 @@ describe("sanear", () => {
     expect(sanear(42)).toBe("42");
     expect(sanear(null)).toBe("");
     expect(sanear(undefined)).toBe("");
+  });
+});
+
+describe("esImportDinamicoMuerto (pestaña que cruza un deploy)", () => {
+  it("detecta lo que Chrome grita por un chunk 404", () => {
+    expect(
+      esImportDinamicoMuerto(
+        "Failed to fetch dynamically imported module: https://x/assets/ocr-abc.js",
+      ),
+    ).toBe(true);
+    expect(esImportDinamicoMuerto("Importing a module script failed.")).toBe(true);
+    expect(esImportDinamicoMuerto("Failed to load dynamic import /ort/ort-wasm...mjs")).toBe(true);
+  });
+
+  it("confunde otros fallos: fetch de red, 404 de modelo, timeout EP", () => {
+    expect(esImportDinamicoMuerto("modelo: HTTP 429 en https://hf...")).toBe(false);
+    expect(esImportDinamicoMuerto("timeout tras 30000ms")).toBe(false);
+    expect(esImportDinamicoMuerto("ORTH sin proveedor válido")).toBe(false);
   });
 });
 

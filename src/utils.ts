@@ -185,3 +185,11 @@ export function avisarError(texto: string): void {
 export function avisar(texto: string): void {
   mostrarToasts([{ tipo: "aviso", titulo: texto }]);
 }
+
+/** Detecta el fallo de un import dinámico de chunk muerto (pestaña viva que
+    cruza un deploy: el asset hashado viejo ya no existe → 404). Chrome:
+    "Failed to fetch dynamically imported module: <url>" y viejo
+    "Importing a module script failed". */
+export function esImportDinamicoMuerto(mensaje: string): boolean {
+  return /dynamically imported|importing a module|dynamic import/i.test(mensaje);
+}

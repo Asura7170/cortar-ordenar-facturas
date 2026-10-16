@@ -11,18 +11,21 @@ vi.mock("onnxruntime-web/webgpu", () => ({
   InferenceSession: { create: crearFalso },
 }));
 
-const { obtenerSesion, reintentarEps } = await import("./docaligner");
+const { obtenerSesion, reintentarEps, notarSesionOk, iaOk } = await import("./docaligner");
 
 // Umbral de descargarPesos (50MB): un solo buffer reutilizado por escenario.
 const PESOS = new ArrayBuffer(50_000_000);
 
 beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
+  vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(globalThis, "fetch").mockResolvedValue({
     ok: true,
     arrayBuffer: async () => PESOS,
   } as Response);
   reintentarEps();
+  notarSesionOk(); // el historial de strikes no cruza tests
+  iaOk(); // ni el estado del uno-solo-toast
   crearFalso.mockReset();
 });
 
@@ -35,13 +38,14 @@ function sesionFalsa(run: () => Promise<unknown>): unknown {
 }
 
 describe("crearSesion (ORT falso, resto real)", () => {
-  it("EPs caídos hacen latch y sin EPs lanza sin reintentar", async () => {
+  it("strike suelta el latch: el siguiente comprobante reintenta los EPs", async () => {
     crearFalso.mockRejectedValue(new Error("GPU muerta"));
     await expect(obtenerSesion()).rejects.toThrow("GPU muerta");
-    // Latch: el siguiente intento no llama a create (los dos EPs ya cayeron).
+    // El 1er strike resetea el latch (antes quedaba muerto hasta un F5): el
+    // intento siguiente repite create; si el hardware sigue muerto, falla igual.
     crearFalso.mockClear();
-    await expect(obtenerSesion()).rejects.toThrow("ORT sin proveedor");
-    expect(crearFalso).not.toHaveBeenCalled();
+    await expect(obtenerSesion()).rejects.toThrow("GPU muerta");
+    expect(crearFalso).toHaveBeenCalledTimes(2); // webgpu + wasm otra vez
   });
 
   it("peso corrupto expulsa el peso y reintenta", async () => {

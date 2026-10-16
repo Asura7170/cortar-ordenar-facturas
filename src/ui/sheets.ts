@@ -11,6 +11,7 @@ import {
 import type { Cents, Comprobante, Hoja, Plantilla } from "../types";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
 import { cuentaHoja, formatearMoneda, parsearMonto, renderMonto, totalItems } from "./monto";
+import { falloIa } from "../pipeline/docaligner";
 import { girarYReleer } from "../pipeline/rotar";
 import { avisarError, getEl, sanear } from "../utils";
 
@@ -1349,8 +1350,13 @@ function abrirRecorteSiHaceFalta(id: number): void {
   // ponytail: solo recortar se suprime tras el descarte (carrera
   // descarte→clic en la celda de abajo); el resto acciona siempre.
   if (Date.now() - state.cierreRecorte < VENTANA_CIERRE_RECORTE_MS) return;
-  // ponytail: dinámico (recorte importa la cola: estático sería ciclo).
-  void import("./recorte").then((m) => m.abrirRecorte(id)).catch(() => {});
+  // ponytail: dinámico (recorte importa la cola: estático sería ciclo). Único
+  // chunk lazy real: tras un deploy el asset hashado viejo 404ea y el click
+  // moriría callado; avisa por el canal del pipeline (si es chunk muerto,
+  // sale el "recargá el navegador").
+  void import("./recorte")
+    .then((m) => m.abrirRecorte(id))
+    .catch((e: unknown) => falloIa(e, "recorte"));
 }
 
 /** Acción `agregar`: pedir archivos para la hoja del botón. */

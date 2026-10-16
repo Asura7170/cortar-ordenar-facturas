@@ -2,9 +2,15 @@
 import { MONEDA_DEFAULT, guardarAjustes, isMoneda, restablecerAjustes, state } from "../state";
 import { renderMonto } from "./monto";
 import { renderHojas } from "./sheets";
-import { getEl } from "../utils";
-import { borrarModelos, descargarPesos, tamanoModelos } from "../pipeline/docaligner";
-import { descargarPesosOcr } from "../pipeline/ocr";
+import { getEl, esImportDinamicoMuerto } from "../utils";
+import {
+  borrarModelos,
+  descargarPesos,
+  obtenerSesion,
+  reactivarIa,
+  tamanoModelos,
+} from "../pipeline/docaligner";
+import { descargarPesosOcr, obtenerNucleo } from "../pipeline/ocr";
 
 const modalAjustes: HTMLDialogElement = getEl<HTMLDialogElement>("modalAjustes");
 const btnAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnAjustes");
@@ -13,6 +19,7 @@ const cfgMoneda: HTMLSelectElement = getEl<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnResetAjustes");
 const estadoModelos: HTMLElement = getEl("estadoModelos");
 const btnDescargarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnDescargarModelos");
+const btnProbarIa: HTMLButtonElement = getEl<HTMLButtonElement>("btnProbarIa");
 const btnBorrarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarModelos");
 
 function textoModelos(bytes: number): string {
@@ -44,6 +51,27 @@ export function initSettings(): void {
     pintarAjustes();
     renderMonto();
     renderHojas();
+  });
+  btnProbarIa.addEventListener("click", () => {
+    reactivarIa(); // sin enfriamiento ni latch de EPs: la prueba nace fresca
+    btnProbarIa.disabled = true;
+    btnDescargarModelos.disabled = true;
+    estadoModelos.textContent = "IA: probando (descarga y sesiones GPU)…";
+    void (async (): Promise<void> => {
+      try {
+        await obtenerSesion(); // recorte: fastvit
+        await obtenerNucleo(); // OCR: det+rec (en serie: la GPU no compite)
+        estadoModelos.textContent = "IA: sesiones listas — recorte y OCR van bien";
+      } catch (e: unknown) {
+        const msj = e instanceof Error ? e.message : String(e);
+        estadoModelos.textContent = esImportDinamicoMuerto(msj)
+          ? "IA: sin archivos de la app (recargá el navegador — hay versión nueva)"
+          : `IA: no disponible (${msj}). Probá de nuevo o borrá los modelos`;
+      } finally {
+        btnProbarIa.disabled = false;
+        btnDescargarModelos.disabled = false;
+      }
+    })();
   });
   btnDescargarModelos.addEventListener("click", () => {
     btnDescargarModelos.disabled = true;
