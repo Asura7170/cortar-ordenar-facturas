@@ -190,6 +190,8 @@
   gap: 8px;
   align-items: center;
   flex: 0 0 auto;
+  /* Empuje visual a la derecha del centro que dan los flancos (pedido). */
+  transform: translateX(64px);
 }
 .zoom-grupo .btn {
   min-height: 44px;
