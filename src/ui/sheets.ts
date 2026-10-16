@@ -1296,7 +1296,7 @@ function copiarOcrAlPortapapeles(id: number, btn: HTMLElement): void {
   if (!item || !item.textoOcr) return;
   // Sin Promise.try (ausente en Node 22 del CI): writeText ya devuelve promesa.
   // clipboard no existe fuera de contexto seguro (http): TypeError antes de la promesa.
-  // El fallo avisa en #aviso (visible) y también queda en el title del botón.
+  // El fallo avisa en el toast rojo de #aviso y también queda en el title del botón.
   const fallo = "Copiar falló (sin permiso del portapapeles)";
   const portapapeles = navigator.clipboard;
   if (typeof portapapeles?.writeText !== "function") {

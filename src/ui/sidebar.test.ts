@@ -58,6 +58,7 @@ const {
 } = await import("./sidebar");
 const { archivo, comprobante } = await import("../test/factoria");
 const { HOJA_FANTASMA } = await import("./sheets");
+const { mostrarToasts } = await import("../utils");
 const { extraerPendientes } = await import("../pipeline/extract");
 
 const canvas = el("canvas");
@@ -433,18 +434,39 @@ describe("gate PDF (tamaño + páginas)", () => {
     expect(aviso.textContent).toContain("formato no soportado");
   });
 
-  it("el motivo va en .motivo (rojo sello) y el nombre en texto plano", async () => {
+  it("cada rechazo va en su propio toast: causa corta arriba, archivo al final", async () => {
     aviso.textContent = "";
     await agregarArchivos([pdfTamano("gordo.pdf", 6 * 1024 * 1024)]);
-    const m = aviso.querySelector(".motivo");
-    expect(m?.textContent).toBe("pesa más de 5 MB, comprimila y probá de nuevo");
-    expect(m?.innerHTML).toBe("pesa más de 5 MB, comprimila y probá de nuevo"); // sin marcado inyectado
+    const toasts = aviso.querySelectorAll(".toast-error");
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.querySelector(".toast-titulo")?.textContent).toBe("Archivo demasiado pesado");
+    expect(toasts[0]?.querySelector(".toast-detalle")?.textContent).toBe(
+      "pesa más de 5 MB, comprimila y probá de nuevo · gordo.pdf",
+    );
+    expect(toasts[0]?.querySelector(".toast-archivo")?.innerHTML).toBe("gordo.pdf"); // sin marcado inyectado
   });
 
-  it("lote válido limpia el aviso viejo de otro lote", async () => {
-    aviso.textContent = "«gordo.pdf»: pesa más de 5 MB";
+  it("mezcla de válidos e inválidos: un toast por rechazo y el válido entra igual", async () => {
+    aviso.textContent = "";
+    await agregarArchivos([
+      archivo("a.png", "image/png"),
+      archivo("nota.txt", "text/plain"),
+      archivo("b.har", "application/octet-stream"),
+      pdfTamano("gordo.pdf", 6 * 1024 * 1024),
+    ]);
+    const toasts = aviso.querySelectorAll(".toast-error");
+    expect(toasts).toHaveLength(3);
+    const archivos = Array.from(toasts).map((t) => t.querySelector(".toast-archivo")?.textContent);
+    expect(archivos).toEqual(["nota.txt", "b.har", "gordo.pdf"]);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
+  });
+
+  it("lote válido limpia el rechazo viejo de otro lote (con fade)", async () => {
+    mostrarToasts([
+      { tipo: "error", titulo: "Archivo demasiado pesado", archivo: "gordo.pdf", grupo: "intake" },
+    ]);
     await agregarArchivos([archivo("ok.png", "image/png")]);
-    expect(aviso.textContent).toBe("");
+    expect(aviso.querySelectorAll(".toast:not(.saliendo)")).toHaveLength(0);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
   });
 
@@ -655,6 +677,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
   });
 
   it("coloca exacto en el slot clicado", async () => {
+    aviso.textContent = "";
     mockRead(async () => [itemPng()]);
     const h = crearHoja("u4x2");
     h.slots[0] = comprobante();
@@ -662,7 +685,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
     await pegarEnCelda(h.id, 2);
     expect(h.slots[2]?.nombre).toBe("pegado.png");
     expect(h.slots[1]).toBeNull();
-    expect(aviso.textContent).toBe("");
+    expect(aviso.textContent).toBe(""); // éxito limpio: sin avisos nuevos
   });
 
   it("slot ocupado → primer hueco de la misma hoja", async () => {
@@ -902,11 +925,12 @@ describe("pegarDelPortapapeles (lote vacío)", () => {
   });
 
   it("pega sin destino: crea la hoja desde el vacío", async () => {
+    aviso.textContent = "";
     mockRead(async () => [itemPng()]);
     await pegarDelPortapapeles();
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
-    expect(aviso.textContent).toBe("");
+    expect(aviso.textContent).toBe(""); // éxito limpio: sin avisos nuevos
   });
 
   it("sin imagen avisa sin crear hojas", async () => {

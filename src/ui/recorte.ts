@@ -68,7 +68,7 @@ let raf: number | null = null;
 let depsVigentes: DepsOcr | undefined;
 
 // ponytail: delega en el helper compartido (F3) — misma firma, así los 4
-// llamados quedan intactos y el error ahora sale en span.motivo (rojo sello).
+// llamados quedan intactos y el error sale en el toast rojo de #aviso.
 function avisar(texto: string): void {
   avisarError(texto);
 }

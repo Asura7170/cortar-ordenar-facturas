@@ -128,10 +128,6 @@ legend.field-mini {
   font-weight: 700;
   letter-spacing: 0.12em;
 }
-.codigo-row input[type="number"] {
-  width: 56px;
-  text-align: right;
-}
 .codigo-row input[type="text"] {
   flex: 1;
   min-width: 0;

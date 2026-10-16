@@ -658,7 +658,7 @@ describe("abrirRecorte", () => {
       ctx.mockRestore();
       document
         .getElementById("sheets")
-        ?.insertAdjacentHTML("beforebegin", '<p id="aviso" role="status"></p>');
+        ?.insertAdjacentHTML("beforebegin", '<div id="aviso" role="region"></div>');
     }
   });
 });

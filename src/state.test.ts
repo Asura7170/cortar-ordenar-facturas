@@ -176,6 +176,18 @@ describe("guardar/cargar por ventana", () => {
     });
   });
 
+  it("sobrante de la era del switch: codigoLongitud se retira del blob al cargar", () => {
+    localStorage.setItem(
+      LS_KEY,
+      JSON.stringify({ codigoActivo: true, codigoValor: "12345678", codigoLongitud: 8 }),
+    );
+    cargar();
+    expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toEqual({
+      codigoActivo: true,
+      codigoValor: "12345678",
+    });
+  });
+
   it("blob no-objeto: no lanza y deja el storage intacto", () => {
     for (const raw of ['"null"', "5", "[]"]) {
       localStorage.setItem(LS_KEY, raw);

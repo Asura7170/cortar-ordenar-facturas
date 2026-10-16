@@ -131,10 +131,18 @@ function limpiarClavesIa(): void {
   }
 }
 
-/** Sobrante de la era IA: se retira del blob (el resto del estado se conserva). */
-function retirarConfigIa(r: Record<string, unknown>): void {
-  if (!("configIA" in r)) return;
-  delete r["configIA"];
+/** Sobrantes de eras anteriores: se retiran del blob (el resto se conserva). */
+function retirarSobrantes(r: Record<string, unknown>): void {
+  let cambio = false;
+  if ("configIA" in r) {
+    delete r["configIA"]; // era IA
+    cambio = true;
+  }
+  if ("codigoLongitud" in r) {
+    delete r["codigoLongitud"]; // era del switch de longitud (ya retirada)
+    cambio = true;
+  }
+  if (!cambio) return;
   if (Object.keys(r).length === 0) localStorage.removeItem(LS_KEY);
   else localStorage.setItem(LS_KEY, JSON.stringify(r));
 }
@@ -157,7 +165,7 @@ export function cargar(): void {
     // el guard isPersistedState los ignora (sin escribir estado ni storage):
     // el re-parseo propio era un duplicado de leerBlob().
     const r = leerBlob();
-    retirarConfigIa(r);
+    retirarSobrantes(r);
     if (!isPersistedState(r)) return; // estado corrupto o de otra versión: ignorar
     aplicarCodigo(r);
     if (isMoneda(r["moneda"])) state.moneda = r["moneda"]; // ausente en blobs legacy: se conserva

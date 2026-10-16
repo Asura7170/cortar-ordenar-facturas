@@ -11,7 +11,7 @@ export const FIXTURE_HTML = `
 <span id="githubStars"></span>
 <main class="canvas" id="canvas">
   <div class="lote-stats" id="metaHojas"><span class="stat-cifra" id="statHojas"></span><span class="stat-cifra" id="statComp"></span></div>
-  <p id="aviso" role="status"></p>
+  <div id="aviso" role="region" aria-label="Avisos"></div>
   <span id="estadoCopiado" class="sr-only" role="status" aria-live="polite"></span>
   <div id="sheets"></div>
   <label id="dropzone" for="fileInput" tabindex="0"></label>

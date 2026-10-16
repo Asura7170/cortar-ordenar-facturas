@@ -18,7 +18,8 @@ import { extraerPendientes } from "../pipeline/extract";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
 import type { MotivoRechazo } from "../pipeline/pdf";
 import { normalizarImagen } from "../pipeline/imagen";
-import { getEl, sanear } from "../utils";
+import { despejarToasts, getEl, mostrarToasts, sanear } from "../utils";
+import type { ToastMensaje } from "../utils";
 
 const canvas: HTMLElement = getEl("canvas");
 const fileInput: HTMLInputElement = getEl<HTMLInputElement>("fileInput");
@@ -30,29 +31,27 @@ function radiosPosicion(): NodeListOf<HTMLInputElement> {
   return document.querySelectorAll<HTMLInputElement>('input[name="posCodigo"]');
 }
 const modalLimpiar: HTMLDialogElement = getEl<HTMLDialogElement>("modalLimpiar");
-const aviso: HTMLElement = getEl("aviso");
 const btnCalcular: HTMLButtonElement = getEl<HTMLButtonElement>("btnCalcular");
 const btnPegar: HTMLButtonElement = getEl<HTMLButtonElement>("btnPegar");
 
-/** Rechazo de entrada: nombre en tono tenue + motivo en rojo sello. */
+/** Rechazo del intake: causa corta (título del toast), archivo y motivo. */
 interface AvisoRechazo {
+  readonly titulo: string;
   readonly archivo: string;
   readonly motivo: string;
 }
 
-/** Aviso de entrada (rechazos del filtro/gate). Sobrescribe el anterior.
-    Sin innerHTML: el nombre va como nodo de texto (a prueba de marcado). */
+/** Aviso de entrada (rechazos del filtro/gate): UN toast por archivo rechazado,
+    con la causa corta arriba y el nombre al final del detalle. */
 function avisar(rechazos: readonly AvisoRechazo[]): void {
-  const nodos: (Text | HTMLSpanElement)[] = [];
-  rechazos.forEach((r, i) => {
-    if (i > 0) nodos.push(document.createTextNode(" · "));
-    nodos.push(document.createTextNode(`«${r.archivo}»: `));
-    const m = document.createElement("span");
-    m.className = "motivo";
-    m.textContent = r.motivo;
-    nodos.push(m);
-  });
-  aviso.replaceChildren(...nodos);
+  const items: ToastMensaje[] = rechazos.map((r) => ({
+    tipo: "error",
+    titulo: r.titulo,
+    detalle: r.motivo,
+    archivo: r.archivo,
+    grupo: "intake",
+  }));
+  mostrarToasts(items);
 }
 
 function textoMotivo(m: MotivoRechazo): string {
@@ -65,6 +64,20 @@ function textoMotivo(m: MotivoRechazo): string {
       return "protegido con contraseña, quitásela y volvé a subir";
     case "ilegible":
       return "no se pudo leer: puede estar corrupta, probá con otra foto";
+  }
+}
+
+/** Título corto y escaneable del rechazo, pareja de textoMotivo. */
+function tituloDeMotivo(m: MotivoRechazo): string {
+  switch (m) {
+    case "tamano":
+      return "Archivo demasiado pesado";
+    case "paginas":
+      return "PDF demasiado largo";
+    case "cifrado":
+      return "PDF protegido con contraseña";
+    case "ilegible":
+      return "No se pudo leer";
   }
 }
 
@@ -109,7 +122,11 @@ function comprobanteDesdeBlob(blob: Blob, nombre: string): Comprobante {
 function avisosDeFormato(lista: readonly File[]): AvisoRechazo[] {
   return lista
     .filter((f) => !esImagen(f) && !esPdf(f))
-    .map((f) => ({ archivo: sanear(f.name), motivo: MOTIVO_FORMATO }));
+    .map((f) => ({
+      titulo: "Formato no soportado",
+      archivo: sanear(f.name),
+      motivo: MOTIVO_FORMATO,
+    }));
 }
 
 /** ¿Queda hueco en esta hoja? */
@@ -171,12 +188,20 @@ async function paginasUtiles(f: File, avisos: AvisoRechazo[]): Promise<Comproban
   const veredicto = await admitirPdf(f, contarPaginasPdf);
   // ponytail: admitirPdf no es nulable y el rechazo siempre trae motivo.
   if (veredicto.admite !== true) {
-    avisos.push({ archivo: sanear(f.name), motivo: textoMotivo(veredicto.motivo) });
+    avisos.push({
+      titulo: tituloDeMotivo(veredicto.motivo),
+      archivo: sanear(f.name),
+      motivo: textoMotivo(veredicto.motivo),
+    });
     return null;
   }
   const pags = await expandirPdf(f);
   if (pags.length === 0) {
-    avisos.push({ archivo: sanear(f.name), motivo: textoMotivo("ilegible") });
+    avisos.push({
+      titulo: tituloDeMotivo("ilegible"),
+      archivo: sanear(f.name),
+      motivo: textoMotivo("ilegible"),
+    });
     return null;
   }
   const base = sanear(f.name).replace(/\.pdf$/i, "");
@@ -210,7 +235,11 @@ async function intakeImagen(
     colocar([comprobanteDesdeBlob(blob, f.name)]);
     return true;
   } catch {
-    avisos.push({ archivo: sanear(f.name), motivo: textoMotivo("ilegible") });
+    avisos.push({
+      titulo: tituloDeMotivo("ilegible"),
+      archivo: sanear(f.name),
+      motivo: textoMotivo("ilegible"),
+    });
     return false;
   }
 }
@@ -249,7 +278,8 @@ export async function agregarArchivos(
     intakesActivos--;
     state.loteEnCurso = intakesActivos > 0;
   }
-  avisar(avisos); // siempre: con [] limpia un rechazo viejo de otro lote.
+  despejarToasts("intake"); // siempre: los rechazos viejos de otro lote salen con fade
+  avisar(avisos); // y los del lote actual, uno por archivo, entran abajo
   if (colocados === 0) return;
 
   renderHojas();
@@ -297,6 +327,7 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   if (typeof lector?.read !== "function") {
     avisar([
       {
+        titulo: "No se puede pegar aquí",
         archivo: "Portapapeles",
         motivo: "este navegador no permite pegar con clic: usa Ctrl+V",
       },
@@ -307,7 +338,9 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   try {
     items = await lector.read();
   } catch {
-    avisar([{ archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN }]);
+    avisar([
+      { titulo: "Portapapeles sin imagen", archivo: "Portapapeles", motivo: MOTIVO_SIN_IMAGEN },
+    ]);
     return null;
   }
   const archivos: File[] = [];
@@ -330,6 +363,7 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   if (archivos.length === 0) {
     avisar([
       {
+        titulo: formatoNoSoportado ? "Formato no soportado" : "Portapapeles sin imagen",
         archivo: "Portapapeles",
         motivo: motivoDePortapapeles(formatoNoSoportado),
       },
@@ -430,7 +464,13 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     try {
       comp = comprobanteDesdeBlob(await normalizarImagen(primero), primero.name);
     } catch {
-      avisar([{ archivo: sanear(primero.name), motivo: textoMotivo("ilegible") }]);
+      avisar([
+        {
+          titulo: tituloDeMotivo("ilegible"),
+          archivo: sanear(primero.name),
+          motivo: textoMotivo("ilegible"),
+        },
+      ]);
       return;
     }
     const h = vigenteParaEscribir(destino, hojaId);
@@ -439,7 +479,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     // Resto (raro desde WhatsApp): sigue a la hoja donde cayó `primero`.
     const resto = archivos.slice(1);
     if (resto.length > 0) await agregarArchivos(resto, hojaFinal.id);
-    else avisar([]); // éxito: limpia un rechazo viejo de otro intento
+    else despejarToasts("intake"); // éxito: los rechazos viejos de otro intento salen con fade
     precalentarModelos();
     void procesarCola();
   } finally {

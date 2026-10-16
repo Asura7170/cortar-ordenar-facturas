@@ -822,9 +822,12 @@
 
         <!-- Área principal: también zona de subida (drop en el canvas) -->
         <main class="canvas" id="canvas">
-          <!-- #aviso: canal de avisos (los módulos lo exigen con getEl), invisible
-               visualmente; sigue anunciando a lectores de pantalla (role=status). -->
-          <p id="aviso" class="sr-only" role="status"></p>
+          <!-- #aviso: canal único de avisos/errores (los módulos escriben con
+               mostrarToasts/avisarError): pila de toasts fijos abajo-derecha
+               (error = rojo, aviso = amarillo) que suben desde debajo del
+               borde; se cierran con X o expiran solos. role=region: cada toast
+               anuncia por sí mismo, sin relatar la historia completa. -->
+          <div id="aviso" role="region" aria-label="Avisos"></div>
           <span id="estadoCopiado" class="sr-only" role="status" aria-live="polite"></span>
           <div class="sheets" id="sheets">
             <!-- <article class="sheet">... generado por JS ...</article> -->
@@ -834,7 +837,7 @@
             <span class="dz-titulo">Subí tus comprobantes</span>
             <span class="dz-txt"
               >Arrastrá archivos a esta área, pegálos con <strong>Ctrl+V</strong>, hacé clic para
-              buscarlos o clic en una celda vacía para pegá</span
+              buscarlos o clic en una celda vacía para pegar</span
             >
             <span class="dz-fmt">JPG · PNG · WEBP · PDF</span>
           </label>

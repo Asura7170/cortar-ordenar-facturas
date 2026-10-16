@@ -21,6 +21,8 @@
      su color identifica el formato a un vistazo, no es un descuido de paleta. */
   --sello: #b23a2e; /* sello de goma rojo */
   --sello-suave: light-dark(#e7c4bd, #d8a29a); /* sello teñido */
+  --sello-aviso: #eab308; /* sello amarillo (fondo del toast de aviso); con --tinta: 4.9:1 claro / 7.2:1 oscuro (AA) */
+  --texto-sello: #fff; /* texto sobre sello sólido: 5.8:1 sobre --sello (AA) */
   --verde-tinta: #2f6b3a; /* verde tienda */
   --verde-claro: #eef4ea; /* verde suave */
   --pdf-marca: light-dark(
@@ -118,7 +120,6 @@
   /* Medidas */
   --radio: 10px;
   --radio-s: 6px;
-  --topbar-alto: 72px; /* alto real del topbar: 14px de padding × 2 + 44px de controles; si cambia el padding, se cambia aquí */
   /* Familia de sombras teñidas con la tinta (antes rgba(0,0,0)): el negro puro
      chanclaba contra la paleta verde-tinta. Jerarquía por elevación:
      celda < botón < barra/flotante < hoja < modal; en oklch conserva el matiz. */
@@ -415,6 +416,121 @@ input::placeholder {
 .sheet-footer-bar .btn {
   white-space: nowrap;
 }
+
+/* ============ TOAST #aviso ============ */
+/* Canal único de avisos/errores: PILA de toasts fijos abajo-derecha (los
+   módulos escriben con mostrarToasts/avisar/avisarError). Cada toast entra
+   subiendo desde debajo del borde, se cierra con su X o expira solo (aviso
+   5s, error 8s; el hover pausa el timer — utils) y sale desvaneciéndose
+   (clase .saliendo). El cap de 4 y el resumen de lotes grandes viven en utils. */
+#aviso {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  /* Sobre footer-bar (50), topbar (60) y drag-ghost (70); los <dialog>
+     viven en top layer: el toast no compite con ellos. */
+  z-index: 80;
+  display: flex; /* columna: el nuevo queda pegado a la esquina (abajo) */
+  flex-direction: column;
+  align-items: flex-end; /* ancho por contenido */
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 40px));
+  pointer-events: none; /* solo la burbuja es objetivo (ver .toast) */
+}
+#aviso > .toast {
+  pointer-events: auto; /* la burbuja sí atrapa el cursor (hover pausa / X) */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 2px 10px;
+  padding: 10px 10px 10px 14px;
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-barra);
+  font-size: 13px;
+  line-height: 1.5;
+  text-wrap: pretty;
+  animation: toast-subir 0.25s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition:
+    opacity 0.3s,
+    translate 0.3s;
+}
+#aviso > .toast.saliendo {
+  opacity: 0;
+  translate: 0 10px;
+}
+.toast-cuerpo {
+  grid-column: 1;
+  min-width: 0; /* el archivo en ellipsis puede encoger */
+}
+/* La causa escaneable primero (peso), la acción y el archivo después. */
+.toast-titulo {
+  font-weight: 600;
+}
+.toast-detalle {
+  font-size: 12.5px;
+  line-height: 1.45;
+  min-width: 0;
+}
+/* El nombre truncado nunca deja de ser accesible: title lleva el valor entero. */
+.toast-archivo {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.toast-cerrar {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%; /* círculo (×), paleta §6 */
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.toast-cerrar::after {
+  content: ""; /* hit 44px: 26 + 18 */
+  position: absolute;
+  inset: -9px;
+}
+.toast-cerrar:hover {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+/* La cruz vive en ::before (el botón queda vacío en el DOM). */
+.toast-cerrar::before {
+  content: "×";
+}
+/* El anillo del sistema no contrasta sobre sello rojo/amarillo: el foco se
+   tiñe con el propio color del toast. */
+.toast-cerrar:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+#aviso > .toast-error {
+  background: var(--sello);
+  color: var(--texto-sello);
+}
+#aviso > .toast-aviso {
+  background: var(--sello-aviso);
+  color: var(--tinta);
+}
+/* Entra desde debajo del suelo: translateY propio (100% + holgura del offset
+   de origen) esconde el nodo completo por debajo del borde del viewport. */
+@keyframes toast-subir {
+  from {
+    transform: translateY(calc(100% + 40px));
+  }
+}
+/* El bloque global de movimiento reducido (fin del archivo) apaga entrada y salida. */
 
 /* ============ MODALES ============ */
 /* Solo lectores de pantalla (títulos de diálogos sin cromo). */

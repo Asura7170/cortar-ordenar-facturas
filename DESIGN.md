@@ -37,6 +37,8 @@ alinea a la derecha en tabular-nums.
 | `--renglon-fuerte`    | `#9ecb96`     | `#8fbf8a`     | Renglón alto, foco, bordes activos            |
 | `--sello`             | `#b23a2e`     | `#b23a2e`     | Sello rojo: peligro, error, remover           |
 | `--sello-suave`       | `#e7c4bd`     | `#d8a29a`     | Teñido de sello                               |
+| `--sello-aviso`       | `#eab308`     | `#eab308`     | Sello amarillo: fondo del toast de aviso      |
+| `--texto-sello`       | `#fff`        | `#fff`        | Texto sobre sello sólido (5.8:1 AA)           |
 | `--verde-tinta`       | `#2f6b3a`     | `#2f6b3a`     | Único acento de acción/ok                     |
 | `--verde-claro`       | `#eef4ea`     | `#eef4ea`     | Fondo suave de acento                         |
 | `--mesa`              | `#eceadf`     | `#2e2b24`     | Mesa bajo las hojas                           |
@@ -46,7 +48,7 @@ alinea a la derecha en tabular-nums.
 | `--texto-panel`       | `#2c3a28`     | `#f0ead9`     | Texto sobre panel                             |
 | `--texto-panel-suave` | `#57644f`     | `#c9c0a8`     | Secundario sobre panel (~4.8:1 AA)            |
 | `--monto-valor`       | `#2f6b3a`     | `#cfe6c2`     | Cifra del total. Nunca otro verde             |
-| `--aviso-motivo`      | `#b23a2e`     | `#e59a8d`     | Motivo de aviso (AA ambos temas)              |
+| `--aviso-motivo`      | `#b23a2e`     | `#e59a8d`     | Texto hover de `#btnLimpiar` (AA ambos temas) |
 | `--input-bg`          | `#fffdf6`     | `#241f18`     | Fondo de inputs                               |
 | `--input-placeholder` | `#9aa48f`     | `#8d8672`     | Placeholder                                   |
 | `--anillo`            | `verde-tinta` | `monto-valor` | Anillo de `:focus-visible` (AA: 5.8:1/11.3:1) |
@@ -115,7 +117,7 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
   El h1 de marca vive solo en SR; labels en sr-only + `title`.
 - `.panel` + `.switch` + `.codigo-row` (sidebar.css,
   `#chkCodigo/#chkOcr/#inputCodigo`): panel con head 12px uppercase; switch
-  nativo con track; código con input numérico + rejilla de posición.
+  nativo con track; código con input + rejilla de posición.
   Estados: `:checked/:disabled/:focus-visible` siempre definidos; error
   `.codigo-error` (borde `--sello` + vibración `sacudir` solo `transform`) al
   bloquear una salida con código activo incompleto.
@@ -130,6 +132,20 @@ Resto por nombre (derivan de los de arriba vía `color-mix`/`var`):
   lugar con texto seleccionable (`user-select: text`, el resto `none`).
 - `.modal/.modal-card` (base.css, `#modalAjustes/#modalLimpiar`): `<dialog>`
   con `closedby`, backdrop, head/body/foot. Uso: `showModal()`, nunca divs.
+- `#aviso .toast` (base.css, canal único de avisos/errores): pila de toasts
+  fijos abajo-derecha que suben desde debajo del borde (`@keyframes
+  toast-subir`, solo transform; el bloque global de movimiento reducido
+  apaga entrada y salida). Cada toast se cierra con su X (hit 44px por
+  `::after`; el foco se tiñe `currentColor` porque `--anillo` no contrasta
+  sobre sello) o expira solo (aviso 5s, error 8s; el hover pausa el timer)
+  con fade (`.saliendo`). `toast-error` = sello rojo + `role=alert`;
+  `toast-aviso` = sello amarillo + `role=status` con texto `--tinta`.
+  Estructura: título (causa corta, 600) + detalle (acción · archivo con
+  ellipsis y `title` completo). Cap del stack: 4 (el más viejo hace lugar);
+  lote de >4 rechazos → 3 individuales + resumen «…y N más descartados».
+  Los del grupo `intake` se limpian al éxito del lote; los singleton (sin
+  grupo) reemplazan al general previo. Se escribe solo con `avisarError`/
+  `avisar`/`mostrarToasts`/`despejarToasts` (utils).
 - `.modal-recorte` (canvas.css, `#modalRecorte`): variante sin tarjeta — la
   foto flota sola sobre el velo con sombra de modal; la barra de acciones
   flota debajo en `modal-bg` con borde `borde-panel` (mismos botones

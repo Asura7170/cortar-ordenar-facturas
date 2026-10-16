@@ -18,8 +18,9 @@
   align-items: center;
   gap: 12px;
   min-width: 0;
-  /* Flanco izquierdo igual al derecho (flex-basis 0 + grow): centera el zoom */
-  flex: 1 1 0;
+  /* Flanco flexible: crece parejo con el derecho y dispara el wrap del
+     topbar antes de que comprimirse lo haga solapar. */
+  flex: 1 1 auto;
 }
 
 .brand-mark {
@@ -170,10 +171,10 @@
   gap: 10px;
 }
 
-/* Zona derecha (monto + acciones): flanco derecho de la misma medida que el
-   brand — juntos centeran el grupo de zoom en el topbar. */
+/* Zona derecha (monto + acciones): flanco flexible como la marca; juntos
+   empujan el wrap del topbar antes del solape. */
 .topbar-derecha {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -181,9 +182,9 @@
   justify-content: flex-end;
 }
 
-/* Grupo de zoom muerto al centro: .brand y .topbar-derecha son flancos iguales
-   (flex-basis 0 + grow). En ventanas angostas se comprimen los flancos; nunca
-   se solapan con el centro (antes: centrado absoluto, sin garantía alguna). */
+/* Grupo de zoom al centro: con espacio sobrante los flancos crecen igual y lo
+   median; en ventanas angostas el wrap del topbar apila las zonas — nunca
+   controles solapados. */
 .zoom-grupo {
   display: flex;
   gap: 8px;

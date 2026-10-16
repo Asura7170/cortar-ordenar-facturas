@@ -457,7 +457,7 @@ describe("monto manual", () => {
     expect(deNuevo.classList.contains("monto-error")).toBe(true);
     expect(deNuevo.value).toBe("12,3"); // borrador intacto
     expect(document.getElementById("aviso")?.textContent).toContain("Formato no válido");
-    expect(document.querySelector("#aviso > span.motivo")).not.toBeNull();
+    expect(document.querySelector("#aviso > .toast-error")).not.toBeNull();
   });
 
   it("change con campo vacío no marca error ni avisa", () => {

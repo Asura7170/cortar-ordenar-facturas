@@ -19,6 +19,7 @@ const {
   mensajeLote,
 } = await import("./extract");
 import type { ItemLote } from "./extract";
+const { mostrarToasts } = await import("../utils");
 
 const aviso = el("aviso");
 
@@ -278,7 +279,8 @@ describe("extraerPendientes", () => {
 
   it("éxito total conserva el aviso previo (N1)", () => {
     const { c1 } = lote2();
-    aviso.textContent = "«gordo.pdf»: pesa más de 5 MB";
+    // El aviso previo llega como toast (no como texto suelto): estado real del canal.
+    mostrarToasts([{ tipo: "error", titulo: "«gordo.pdf»: pesa más de 5 MB" }]);
     extraerPendientes();
     expect(c1.montoCents).toBe(1250);
     expect(aviso.textContent).toBe("«gordo.pdf»: pesa más de 5 MB");
