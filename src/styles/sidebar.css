@@ -179,12 +179,55 @@ legend.field-mini {
   padding: 0;
 }
 .pos-grid {
+  --pos-ancho: 76px;
+  --pos-alto: calc(var(--pos-ancho) * 4 / 3);
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  /* plegado por defecto: la 2ª pista en 0px; las ocultas viven ahí (sin
+     display:none: Chrome no anima entrando/saliendo de display) */
+  grid-template-columns: var(--pos-ancho) 0px;
+  grid-template-rows: var(--pos-alto) 0px;
+  gap: 0;
   margin: auto;
   margin-top: 8px;
-  max-width: 160px;
+  width: max-content;
+  /* el pliegue recorta a las hojas que aún se desvanecen (sus bordes sobresalen
+     del border-box que se cierra) */
+  overflow: clip;
+  transition:
+    grid-template-columns 220ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    grid-template-rows 220ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    gap 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+/* plegado: solo la elegida visible; visibility interpola (nace al expandir,
+   se desvanece al plegar) y quita el radio del tab-order/SR */
+.pos-opt:not(:has(:checked)) {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  /* sin el piso de 44px: la celda (y la hoja con height:100%) colapsan con la pista */
+  min-height: 0;
+}
+/* la elegida ancla arriba-izquierda en plegado (válido también con el OFF,
+   donde el hover no despliega y su celda nativa quedaría fuera de la caja) */
+.pos-grid:not(:has(input:not(:disabled))) .pos-opt:has(:checked),
+.codigo-pos:not(:hover):not(:has(input:focus-visible)) .pos-opt:has(:checked) {
+  order: -1;
+}
+/* despliegan hover sobre TODO el fieldset (leyenda incluida = zona grande y
+   con pista visible) o foco visible de teclado — y SOLO con el switch encendido.
+   El foco por clic no es :focus-visible: al salir del área colapsa a la elegida. */
+.codigo-pos:hover:has(input:not(:disabled)),
+.codigo-pos:has(input:focus-visible) {
+  .pos-grid {
+    grid-template-columns: repeat(2, var(--pos-ancho));
+    grid-template-rows: repeat(2, var(--pos-alto));
+    gap: 8px;
+  }
+  .pos-opt {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .pos-opt {
   display: flex;
@@ -193,6 +236,9 @@ legend.field-mini {
   min-height: 44px;
   cursor: pointer;
   position: relative;
+  transition:
+    opacity 220ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    visibility 220ms;
 }
 .pos-opt input {
   position: absolute;
@@ -201,7 +247,7 @@ legend.field-mini {
 }
 .pos-hoja {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  height: 100%;
   background: var(--papel);
   border: 1px solid var(--renglon-fuerte);
   border-radius: 3px;
@@ -245,6 +291,14 @@ legend.field-mini {
 .pos-opt:has(:disabled) {
   opacity: 0.45;
   cursor: default;
+}
+/* movimiento reducido: pliegue/despliegue instantáneo (la elegida siempre
+   visible = el cambio no viaja solo por la animación) */
+@media (prefers-reduced-motion: reduce) {
+  .pos-grid,
+  .pos-opt {
+    transition: none;
+  }
 }
 .panel-ocr .panel-head {
   margin-bottom: 0;
