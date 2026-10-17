@@ -37,14 +37,20 @@ export const URL_MODELO_HF: string =
   "https://huggingface.co/7rplus/pagescan-weights/resolve/main/fastvit_sa24_h_e_bifpn_256_fp32.onnx";
 
 /** Versión de los pesos cacheados. Al cambiar det/rec.onnx vendoreados o re-subir
-    los pesos de HF, subirla +1 en el mismo PR: la clave de caché la embede y el
-    bump expulsa las copias viejas de TODOS los navegadores (hoy vivían para
-    siempre: era el "borrar modelos" manual que los usuarios hacían de emergencia). */
+    los pesos de HF, subirla +1 en el mismo PR: la clave de caché la embede (en la
+    query, `?modelos_v=N`) y el bump expulsa las copias viejas de TODOS los
+    navegadores (hoy vivían para siempre: era el "borrar modelos" manual que los
+    usuarios hacían de emergencia). */
 export const MODELOS_VERSION = 2;
 
-/** Clave de caché de un modelo: URL del peso + versión de pesos. */
+/** Clave de caché de un modelo: URL del peso + versión en la QUERY. No en
+    fragmento: la igualdad de Cache Storage excluye el `#` al matchear y al
+    borrar (Chrome real: put("x#v1") y put("x#v2") colapsan y match("#v1")
+    devuelve los bytes de #v2). */
 export function claveCache(url: string): string {
-  return `${url}#v${MODELOS_VERSION}`;
+  return url.includes("?")
+    ? `${url}&modelos_v=${MODELOS_VERSION}`
+    : `${url}?modelos_v=${MODELOS_VERSION}`;
 }
 
 /** Modelo local en dev/test, remoto en prod (mismo peso; CORS de HF pasa COEP require-corp). */
@@ -746,7 +752,7 @@ async function limpiarLegacy(cache: Cache | undefined): Promise<void> {
   if (!cache) return;
   try {
     for (const peticion of await cache.keys()) {
-      if (!peticion.url.includes(`#v${MODELOS_VERSION}`)) await cache.delete(peticion.url);
+      if (!peticion.url.includes(`modelos_v=${MODELOS_VERSION}`)) await cache.delete(peticion.url);
     }
   } catch {
     /* best-effort: sin limpieza sigue funcionando */
@@ -755,7 +761,7 @@ async function limpiarLegacy(cache: Cache | undefined): Promise<void> {
 
 /**
  * Descarga con caché Cache Storage (una sola descarga por navegador y clave;
- * la clave en caché es la URL + `#v${MODELOS_VERSION}`). Sin `caches` o con
+ * la clave en caché es la URL + `?modelos_v=${MODELOS_VERSION}`). Sin `caches` o con
  * storage bloqueado → red directa. `minBytes` expulsa respuestas 200 que no
  * son el peso (páginas HTML de HF) antes de cachear.
  */

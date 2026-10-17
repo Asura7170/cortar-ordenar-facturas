@@ -982,20 +982,28 @@ describe("descargarPesos", () => {
     }
   });
 
-  it("limpia claves legacy de la era sin versión en la 1ª descarga", async () => {
+  it("limpia claves legacy (era sin versión, fragmentos #v y queries pasadas) en la 1ª descarga", async () => {
     const tienda: Tienda = new Map([
       ["sin-version", { arrayBuffer: async () => BYTES }],
-      [`k#v${MODELOS_VERSION - 1}`, { arrayBuffer: async () => BYTES }],
+      // el formato #vN de este PR era muerto: el matching de Cache Storage
+      // excluye el fragmento (verificado en Chrome real) y nunca invalidaba.
+      [`k#v${MODELOS_VERSION}`, { arrayBuffer: async () => BYTES }],
+      [`k?modelos_v=${MODELOS_VERSION - 1}`, { arrayBuffer: async () => BYTES }],
     ]);
     const restaurar = conRed(tienda, redOk());
     try {
       await descargarConCache("k", 30_000, 2);
       expect(tienda.has("sin-version")).toBe(false);
-      expect(tienda.has(`k#v${MODELOS_VERSION - 1}`)).toBe(false);
-      expect(tienda.has(`k#v${MODELOS_VERSION}`)).toBe(true);
+      expect(tienda.has(`k#v${MODELOS_VERSION}`)).toBe(false);
+      expect(tienda.has(`k?modelos_v=${MODELOS_VERSION - 1}`)).toBe(false);
+      expect(tienda.has(claveCache("k"))).toBe(true);
     } finally {
       restaurar();
     }
+  });
+
+  it("la versión vive en la query, no en fragmento (el matching de Cache Storage excluye #)", () => {
+    expect(claveCache("/m.onnx")).toBe(`/m.onnx?modelos_v=${MODELOS_VERSION}`);
   });
 
   it("caches.open rechazando (storage bloqueado) va a red igual", async () => {
