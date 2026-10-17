@@ -261,6 +261,32 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
     expect(btnProbarIa.disabled).toBe(false);
     expect(btnDescargarModelos.disabled).toBe(false);
   });
+
+  it("fieldset ocupado: Borrar/Descargar/2º Probar quedan excluidos hasta que vuela", async () => {
+    let suelta: (v: unknown) => void = () => {};
+    iaFalsa.sesion.mockResolvedValue({});
+    iaFalsa.nucleo.mockReturnValue(new Promise((r) => (suelta = r)));
+    btnAjustes.click();
+    await pausa();
+    btnProbarIa.click();
+    await pausa();
+    // Pulsaciones ajenas mientras la prueba vuela: la ocupación única las traga.
+    btnProbarIa.click();
+    btnDescargarModelos.click();
+    btnBorrarModelos.click();
+    await pausa();
+    expect(estadoModelos.textContent).toContain("IA: probando");
+    expect(btnProbarIa.disabled).toBe(true);
+    expect(btnDescargarModelos.disabled).toBe(true);
+    expect(btnBorrarModelos.disabled).toBe(true);
+    expect(iaFalsa.reactiva).toHaveBeenCalledTimes(1); // el 2º Probar no repite
+    suelta({});
+    await pausa();
+    expect(estadoModelos.textContent).toContain("IA: sesiones listas");
+    expect(btnProbarIa.disabled).toBe(false);
+    expect(btnDescargarModelos.disabled).toBe(false);
+    expect(btnBorrarModelos.disabled).toBe(false);
+  });
 });
 
 describe("secciones del modal", () => {

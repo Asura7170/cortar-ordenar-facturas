@@ -94,4 +94,22 @@ describe("nucleoReal (ORT falso, det/rec reales en la red falsa)", () => {
     expect(tienda.size).toBe(2);
     expect(subida).toHaveBeenCalledTimes(4);
   });
+
+  it("la baja de red de rec no expulsa a det sano (strike por clave, no en bloque)", async () => {
+    subida.mockImplementation(async (url: unknown) => {
+      if (String(url).endsWith("rec.onnx")) throw new Error("la bajada de rec murió");
+      return { ok: true, status: 200, arrayBuffer: async () => BUF_DET };
+    });
+    // Bajada 1: det baja y cachea; rec falla → strike 1 SOLO de rec.
+    await expect(obtenerNucleo()).rejects.toThrow("la bajada de rec murió");
+    expect(tienda.size).toBe(1);
+    // Bajada 2 (en enfriamiento de rec): det sirve de caché, rec fast-faila →
+    // strike 2 de rec. Con el catch en bloque det otra vez golpeado habría
+    // llegado a 2 strikes y su copia sana habría sido expulsada (tienda en 0).
+    await expect(obtenerNucleo()).rejects.toThrow("recién falló");
+    expect(tienda.size).toBe(1);
+    expect([...tienda.keys()].some((k) => k.includes("det.onnx"))).toBe(true);
+    // 0 fetches en el 2º intento: det de caché y rec en enfriamiento ±1min.
+    expect(subida).toHaveBeenCalledTimes(2);
+  });
 });

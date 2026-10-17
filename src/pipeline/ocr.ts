@@ -105,6 +105,10 @@ export function envolver(
 
 /** Núcleo real: importa ort (dinámico: onnx solo baja con el primer uso), EPs webgpu→wasm. */
 async function nucleoReal(): Promise<NucleoOcr> {
+  // Claves cuya descarga falló en este intento; el catch del núcleo golpea con
+  // strikes solo a esas (los pesos sanos de la otra sobreviven al enfriamiento)
+  // o a ambas si el fallo fue de sesión (create/EP), que no delata la clave.
+  const clavesFallidas: string[] = [];
   try {
     // ponytail: mismos valores que docaligner (single-thread: COEP bloquea pthreads).
     const ort: OrtModulo = await import("onnxruntime-web/webgpu");
@@ -122,9 +126,15 @@ async function nucleoReal(): Promise<NucleoOcr> {
     // serie (compiten por el mismo contexto GPU). El latch de EPs caídos sigue
     // compartido con docaligner: si webgpu murió ahí, aquí ni se intenta.
     // ponytail: los run() tampoco se solapan (la relectura espera a la cola en rotar).
+    // bajar() etiqueta la clave caída: el catch escupe strikes solo a las de bajada.
+    const bajar = (clave: string, minBytes: number): Promise<ArrayBuffer> =>
+      descargarConCache(clave, TIMEOUT_OCR_MS, minBytes).catch((e: unknown) => {
+        clavesFallidas.push(clave);
+        throw e;
+      });
     const [detBuf, recBuf] = await Promise.all([
-      descargarConCache(RUTA_DET, TIMEOUT_OCR_MS, 5_000_000),
-      descargarConCache(RUTA_REC, TIMEOUT_OCR_MS, 10_000_000),
+      bajar(RUTA_DET, 5_000_000),
+      bajar(RUTA_REC, 10_000_000),
     ]);
     const det = envolver(ort, await iniciarSesion(crearSesion(detBuf)), "det");
     const rec = envolver(ort, await iniciarSesion(crearSesion(recBuf)), "rec");
@@ -133,10 +143,12 @@ async function nucleoReal(): Promise<NucleoOcr> {
     iaOk();
     return { det, rec };
   } catch (e: unknown) {
-    // Strikes: 2 fallos seguidos expulsan det/rec cacheados (pesos muertos);
-    // el fallo avisa una vez (toast) y el siguiente comprobante reintenta.
-    await olvidarSesionFallida(RUTA_DET);
-    await olvidarSesionFallida(RUTA_REC);
+    // Strikes: 2 fallos seguidos expulsan la copia cacheada de la clave (pesos
+    // muertos); el fallo avisa una vez (toast) y el siguiente comprobante reintenta.
+    // Si la baja fue de descarga, solo esa clave recibe el golpe; si fue de
+    // sesión (create/EP), no se sabe cuál corrompe → ambas, como siempre.
+    if (clavesFallidas.length === 0) clavesFallidas.push(RUTA_DET, RUTA_REC);
+    for (const clave of clavesFallidas) await olvidarSesionFallida(clave);
     falloIa(e, "OCR");
     throw e;
   }
