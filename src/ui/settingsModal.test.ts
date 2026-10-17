@@ -1,6 +1,21 @@
 /* Tests P1: modal de ajustes — moneda, submit y Restablecer (DOM aislado). */
-import { describe, expect, it, vi } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import { montarFixture, el } from "../test/fixture";
+
+// Sesiones IA falsas: el toque real necesita GPU/wasm; el modal solo reporta.
+const iaFalsa = vi.hoisted(() => ({
+  sesion: vi.fn(),
+  nucleo: vi.fn(),
+  reactiva: vi.fn(),
+}));
+vi.mock("../pipeline/docaligner", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../pipeline/docaligner")>();
+  return { ...real, obtenerSesion: iaFalsa.sesion, reactivarIa: iaFalsa.reactiva };
+});
+vi.mock("../pipeline/ocr", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../pipeline/ocr")>();
+  return { ...real, obtenerNucleo: iaFalsa.nucleo };
+});
 
 montarFixture();
 const { state, crearHoja, guardarCodigo } = await import("../state");
@@ -14,6 +29,7 @@ const cfgMoneda = el<HTMLSelectElement>("cfgMoneda");
 const btnResetAjustes = el<HTMLButtonElement>("btnResetAjustes");
 const estadoModelos = el("estadoModelos");
 const btnDescargarModelos = el<HTMLButtonElement>("btnDescargarModelos");
+const btnProbarIa = el<HTMLButtonElement>("btnProbarIa");
 const btnBorrarModelos = el<HTMLButtonElement>("btnBorrarModelos");
 
 initSettings();
@@ -170,7 +186,7 @@ describe("Modelos", () => {
     }
   });
 
-  it("caché que lanza pinta error de consulta", async () => {
+  it("caché que lanza degrada a 0 (no tumba la consulta ni el modal)", async () => {
     const g = globalThis as Record<string, unknown>;
     const realCaches = g["caches"];
     g["caches"] = {
@@ -181,7 +197,8 @@ describe("Modelos", () => {
     try {
       btnAjustes.click();
       await pausa();
-      expect(estadoModelos.textContent).toContain("no se pudo consultar");
+      // La IA degrada a red directa sin caché; aquí solo se ve "no hay nada".
+      expect(estadoModelos.textContent).toContain("Modelos: no descargados");
     } finally {
       if (realCaches === undefined) delete g["caches"];
       else g["caches"] = realCaches;
@@ -207,6 +224,68 @@ describe("Modelos", () => {
       if (realCaches === undefined) delete g["caches"];
       else g["caches"] = realCaches;
     }
+  });
+});
+
+describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
+  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+
+  beforeEach(() => {
+    iaFalsa.sesion.mockReset();
+    iaFalsa.nucleo.mockReset();
+    iaFalsa.reactiva.mockReset();
+  });
+
+  it("sesiones listas: repone el botón y limpia enfriamiento+latch una vez", async () => {
+    iaFalsa.sesion.mockResolvedValue({});
+    iaFalsa.nucleo.mockResolvedValue({});
+    btnAjustes.click();
+    await pausa(); // deja asentar el estado de modelos antes de la prueba
+    btnProbarIa.click();
+    await pausa();
+    expect(estadoModelos.textContent).toContain("IA: sesiones listas");
+    expect(btnProbarIa.disabled).toBe(false);
+    expect(btnDescargarModelos.disabled).toBe(false);
+    expect(iaFalsa.reactiva).toHaveBeenCalledTimes(1);
+  });
+
+  it("sesiones caídas: motivo visible y botón repuesto (no queda bloqueado)", async () => {
+    iaFalsa.sesion.mockResolvedValue({});
+    iaFalsa.nucleo.mockRejectedValue(new Error("GPU muerta"));
+    btnAjustes.click();
+    await pausa();
+    btnProbarIa.click();
+    await pausa();
+    expect(estadoModelos.textContent).toContain("IA: no disponible");
+    expect(estadoModelos.textContent).toContain("GPU muerta");
+    expect(btnProbarIa.disabled).toBe(false);
+    expect(btnDescargarModelos.disabled).toBe(false);
+  });
+
+  it("fieldset ocupado: Borrar/Descargar/2º Probar quedan excluidos hasta que vuela", async () => {
+    let suelta: (v: unknown) => void = () => {};
+    iaFalsa.sesion.mockResolvedValue({});
+    iaFalsa.nucleo.mockReturnValue(new Promise((r) => (suelta = r)));
+    btnAjustes.click();
+    await pausa();
+    btnProbarIa.click();
+    await pausa();
+    // Pulsaciones ajenas mientras la prueba vuela: la ocupación única las traga.
+    btnProbarIa.click();
+    btnDescargarModelos.click();
+    btnBorrarModelos.click();
+    await pausa();
+    expect(estadoModelos.textContent).toContain("IA: probando");
+    expect(btnProbarIa.disabled).toBe(true);
+    expect(btnDescargarModelos.disabled).toBe(true);
+    expect(btnBorrarModelos.disabled).toBe(true);
+    expect(iaFalsa.reactiva).toHaveBeenCalledTimes(1); // el 2º Probar no repite
+    suelta({});
+    await pausa();
+    expect(estadoModelos.textContent).toContain("IA: sesiones listas");
+    expect(btnProbarIa.disabled).toBe(false);
+    expect(btnDescargarModelos.disabled).toBe(false);
+    expect(btnBorrarModelos.disabled).toBe(false);
   });
 });
 

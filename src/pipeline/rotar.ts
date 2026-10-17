@@ -7,6 +7,7 @@ import { buscarSlot, obtenerComprobante, state } from "../state";
 import type { Comprobante } from "../types";
 import { avisarError, sanear } from "../utils";
 import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
+import { falloIa } from "./docaligner";
 import type { DepsOcr } from "./ocr";
 import { girarBlob, lienzoGirado } from "./ocr";
 
@@ -171,7 +172,10 @@ async function drenarSiLaColaTrabaja(): Promise<void> {
 
 /** OCR del blob girado; "" si el módulo cargó roto (mejor vacío que rancio). */
 async function textoDeOcr(blob: Blob, deps?: DepsOcr): Promise<string> {
-  const ocr = await import("./ocr").catch((): null => null);
+  const ocr = await import("./ocr").catch((e: unknown): null => {
+    falloIa(e, "OCR");
+    return null;
+  });
   return ocr ? await ocr.extraerTexto(blob, deps) : "";
 }
 

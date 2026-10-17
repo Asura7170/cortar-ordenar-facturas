@@ -1,6 +1,6 @@
 /* Tests: ocr — orquestación con sesiones y lienzos falsos (sin onnx ni DOM).
    El modelo real se valida en Chrome con image-test/. */
-import { describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   bgrDesdeRgba,
   chunkValido,
@@ -19,8 +19,13 @@ import {
   TIMEOUT_OCR_MS,
 } from "./ocr";
 import type { NucleoOcr, SalidaOcr, SubsesionOcr } from "./ocr";
+import { reactivarIa } from "./docaligner";
 import { DICT_OCR } from "./ocrDict";
 import { matrizInversa } from "./ocrRec";
+
+// El enfriamiento/latch de docaligner queda armado por los fallos de descarga
+// intencionales de abajo: no cruza a ningún test siguiente del archivo.
+afterEach(() => reactivarIa());
 
 /** Lienzo falso: tamaño asignable, píxeles fijos, captura draws/transforms. */
 function lienzoFalso(pixeles: Uint8ClampedArray): {
@@ -358,7 +363,7 @@ describe("extraerTexto", () => {
 
   it("rechazo no-Error → avisa y sin texto", async () => {
     const { lienzo } = lienzoFalso(BLANCO32);
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const texto = await extraerTexto(new Blob(["x"]), {
         cargar: () => Promise.resolve(bitmapFalso(64, 32)),
@@ -366,9 +371,9 @@ describe("extraerTexto", () => {
         nucleo: () => Promise.reject("corte de luz"),
       });
       expect(texto).toBe("");
-      expect(warn).toHaveBeenCalledWith("OCR: texto omitido (corte de luz)");
+      expect(error).toHaveBeenCalledWith("OCR: texto omitido (corte de luz)");
     } finally {
-      warn.mockRestore();
+      error.mockRestore();
     }
   });
 

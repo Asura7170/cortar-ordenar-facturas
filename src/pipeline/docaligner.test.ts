@@ -4,6 +4,7 @@ import {
   areaQuad,
   bitmapATensor,
   calcularHomografia,
+  claveCache,
   conBorde,
   conTimeout,
   decodificarHeatmap,
@@ -19,19 +20,22 @@ import {
   LADO_MODELO,
   masaComponente,
   mejorComponente,
+  MODELOS_VERSION,
   muestrearBilinear,
+  notarSesionOk,
   olvidarSesionFallida,
   ordenarQuad,
   PAD_BORDE,
   pivotar,
   quitarBorde,
+  reactivarIa,
   rectificar,
   reintentarEps,
   sistemaDLT,
   tamanoModelos,
   tamanoSalida,
-  UMBRAL_HEATMAP,
   URL_MODELO_HF,
+  UMBRAL_HEATMAP,
   vecinoAceptable,
   warpear,
 } from "./docaligner";
@@ -717,6 +721,11 @@ describe("conBorde/quitarBorde", () => {
 });
 
 describe("descargarPesos", () => {
+  // Estado de módulo que cruza tests: cooldown, strikes y latch nacen frescos.
+  beforeEach(() => {
+    reactivarIa();
+    notarSesionOk();
+  });
   const BYTES = new Uint8Array([1, 2, 3]).buffer;
   type Tienda = Map<
     unknown,
@@ -854,7 +863,7 @@ describe("descargarPesos", () => {
     }
   });
 
-  it("peso bajo el mínimo no se cachea (reintento refetchea)", async () => {
+  it("peso bajo el mínimo no se cachea y la re-descarga entra en enfriamiento", async () => {
     const tienda: Tienda = new Map();
     const fetchFn = vi.fn(async () => ({
       ok: true,
@@ -865,6 +874,11 @@ describe("descargarPesos", () => {
     try {
       await expect(descargarPesos()).rejects.toThrow("corrupto");
       expect(tienda.size).toBe(0);
+      // Enfriamiento: el reintento inmediato no va a red (la cola de fotos no
+      // se estaca 300s por foto sin el backoff).
+      await expect(descargarPesos()).rejects.toThrow("recién falló");
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      reactivarIa(); // como el botón "Probar IA": suelta el enfriamiento
       await expect(descargarPesos()).rejects.toThrow("corrupto");
       expect(fetchFn).toHaveBeenCalledTimes(2);
     } finally {
@@ -915,7 +929,7 @@ describe("descargarPesos", () => {
     }
   });
 
-  it("olvidarSesionFallida expulsa el peso y suelta el latch", async () => {
+  it("olvidarSesionFallida: strike 1 suelta el latch, strike 2 expulsa el peso", async () => {
     const tienda: Tienda = new Map();
     const grande = new ArrayBuffer(60_000_000);
     const restaurar = conRed(
@@ -932,18 +946,94 @@ describe("descargarPesos", () => {
       };
       await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
       expect(intentos).toBe(1);
+      // El 1er strike suelta el latch sin borrar 79MB buenos.
       await olvidarSesionFallida();
-      expect(tienda.size).toBe(0);
+      expect(tienda.size).toBe(1);
       await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
       expect(intentos).toBe(2); // latch suelto: webgpu se reintenta
+      // El 2º consecutivo es el "Borrar modelos" automático: los bytes muertos salen.
+      await olvidarSesionFallida();
+      expect(tienda.size).toBe(0);
     } finally {
       restaurar();
     }
   });
 
+  it("notarSesionOk limpia los strikes: una 2ª falla aislada no expulsa", async () => {
+    const tienda: Tienda = new Map();
+    const grande = new ArrayBuffer(60_000_000);
+    const restaurar = conRed(
+      tienda,
+      vi.fn(async () => ({ ok: true, status: 200, arrayBuffer: async () => grande })),
+    );
+    try {
+      await descargarPesos();
+      const caido: IntentarEp = async (): Promise<never> => {
+        throw new Error("GPU busy");
+      };
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      await olvidarSesionFallida(); // strike 1
+      notarSesionOk(); // la sesión resolvió: el historial muere
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      await olvidarSesionFallida(); // strike 1 otra vez
+      expect(tienda.size).toBe(1); // nunca llegó al 2º consecutivo real
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("limpia claves legacy (era sin versión, fragmentos #v y queries pasadas) en la 1ª descarga", async () => {
+    const tienda: Tienda = new Map([
+      ["sin-version", { arrayBuffer: async () => BYTES }],
+      // el formato #vN de este PR era muerto: el matching de Cache Storage
+      // excluye el fragmento (verificado en Chrome real) y nunca invalidaba.
+      [`k#v${MODELOS_VERSION}`, { arrayBuffer: async () => BYTES }],
+      [`k?modelos_v=${MODELOS_VERSION - 1}`, { arrayBuffer: async () => BYTES }],
+    ]);
+    const restaurar = conRed(tienda, redOk());
+    try {
+      await descargarConCache("k", 30_000, 2);
+      expect(tienda.has("sin-version")).toBe(false);
+      expect(tienda.has(`k#v${MODELOS_VERSION}`)).toBe(false);
+      expect(tienda.has(`k?modelos_v=${MODELOS_VERSION - 1}`)).toBe(false);
+      expect(tienda.has(claveCache("k"))).toBe(true);
+    } finally {
+      restaurar();
+    }
+  });
+
+  it("la versión vive en la query, no en fragmento (el matching de Cache Storage excluye #)", () => {
+    expect(claveCache("/m.onnx")).toBe(`/m.onnx?modelos_v=${MODELOS_VERSION}`);
+  });
+
+  it("caches.open rechazando (storage bloqueado) va a red igual", async () => {
+    const g = globalThis as Record<string, unknown>;
+    const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
+    g["Response"] = RespuestaFalsa;
+    const fetchFn = redOk();
+    g["fetch"] = fetchFn;
+    g["caches"] = {
+      open: async (): Promise<never> => {
+        throw new Error("storage bloqueado");
+      },
+      delete: async (): Promise<boolean> => false,
+    };
+    try {
+      await expect(descargarConCache("k", 30_000, 2)).resolves.toBe(BYTES);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      await expect(tamanoModelos()).resolves.toBe(0);
+      await expect(borrarModelos()).resolves.toBe(false);
+    } finally {
+      g["fetch"] = real.fetch;
+      g["Response"] = real.Response;
+      if (real.caches === undefined) delete g["caches"];
+      else g["caches"] = real.caches;
+    }
+  });
+
   it("hit infradimensionado se expulsa y refetchea", async () => {
     const tienda: Tienda = new Map([
-      ["k", { arrayBuffer: async () => BYTES, headers: { get: () => "3" } }],
+      [claveCache("k"), { arrayBuffer: async () => BYTES, headers: { get: () => "3" } }],
     ]);
     const grande = new ArrayBuffer(60_000_000);
     const fetchFn = vi.fn(async () => ({
@@ -957,7 +1047,10 @@ describe("descargarPesos", () => {
       expect(r).toBe(grande);
       expect(fetchFn).toHaveBeenCalledTimes(1);
       // el put falso guarda 3B: se siembra la buena a mano y el hit ya no refetchea.
-      tienda.set("k", { arrayBuffer: async () => grande, headers: { get: () => "60000000" } });
+      tienda.set(claveCache("k"), {
+        arrayBuffer: async () => grande,
+        headers: { get: () => "60000000" },
+      });
       await expect(descargarConCache("k", 30_000, 50_000_000)).resolves.toBe(grande);
       expect(fetchFn).toHaveBeenCalledTimes(1);
     } finally {

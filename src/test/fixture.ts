@@ -49,6 +49,7 @@ export const FIXTURE_HTML = `
   <button id="btnResetAjustes" type="button"></button>
   <output id="estadoModelos"></output>
   <button id="btnDescargarModelos" type="button"></button>
+  <button id="btnProbarIa" type="button"></button>
   <button id="btnBorrarModelos" type="button"></button>
   </fieldset>
 </form>
