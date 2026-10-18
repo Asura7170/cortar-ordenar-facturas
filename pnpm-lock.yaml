@@ -184,8 +184,8 @@ importers:
   .:
     dependencies:
       docx:
-        specifier: 9.9.0
-        version: 9.9.0
+        specifier: 9.11.0
+        version: 9.11.0
       onnxruntime-web:
         specifier: 1.30.0
         version: 1.30.0
@@ -1398,8 +1398,8 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  docx@9.9.0:
-    resolution: {integrity: sha512-qefptMMO31ZCfVnFANQWSLtnvUrYkqd7cLr+Bi4e+kl4LvYOmdk314iwp8XHHyQs3TPtPcQwqgZgN/MJxT7Ttw==}
+  docx@9.11.0:
+    resolution: {integrity: sha512-vQLEYi45vlN/auiMHgx4oC95wbP5qPaD7Vanfixcd3wtTl5gLUPWqUpwbw6yVN0/U6o3p3EX4P5puAeYPXvcSQ==}
     engines: {node: '>=10'}
 
   dom-accessibility-api@0.5.16:
@@ -2618,7 +2618,7 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  docx@9.9.0:
+  docx@9.11.0:
     dependencies:
       '@types/node': 26.6.3
       hash.js: 1.1.7
