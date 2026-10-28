@@ -93,7 +93,7 @@ Una fuente (`state.hojas` + layout + `codigoPosicion`): la vista carta es lo que
 | `pnpm build`     | `vp build` → `dist/`, `target esnext`, solo-webgpu <1MB                                                                                 |
 | `pnpm preview`   | previsualizar build                                                                                                                     |
 
-`catalog: vite/vite-plus/@vitest/coverage-v8 + overrides vitest@* lockstep al embuteado`, `allowBuilds esbuild,protobufjs` (`onnxruntime-web 1.30.0` lo trae). `pdfjs-dist ^6.4.299` flotante deliberado (decisión: dejar `^`). `servir-ort-crudo` solo mapea `/ort/*.mjs` en dev; `COOP same-origin + COEP require-corp` en `server+preview` (no servir con `python -m http.server`). Tests `vp test run` con `jsdom + setup.ts` (config `test` en `vite.config.ts`). `ponytail:` marca simplificaciones deliberadas, no deuda.
+`catalog: vite/vite-plus/@vitest/coverage-v8 + overrides vitest@* lockstep al embuteado`, `allowBuilds esbuild,protobufjs` (`onnxruntime-web 1.31.1` lo trae). `pdfjs-dist ^6.4.299` flotante deliberado (decisión: dejar `^`). `servir-ort-crudo` solo mapea `/ort/*.mjs` en dev; `COOP same-origin + COEP require-corp` en `server+preview` (no servir con `python -m http.server`). Tests `vp test run` con `jsdom + setup.ts` (config `test` en `vite.config.ts`). `ponytail:` marca simplificaciones deliberadas, no deuda.
 
 ## 7. Diagrama de flujo (mermaid)
 
