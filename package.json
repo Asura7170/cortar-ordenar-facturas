@@ -14,7 +14,7 @@
     "prepare": "vp config"
   },
   "dependencies": {
-    "docx": "9.15.0",
+    "docx": "9.15.2",
     "onnxruntime-web": "1.31.1",
     "pdfjs-dist": "^6.4.299"
   },
