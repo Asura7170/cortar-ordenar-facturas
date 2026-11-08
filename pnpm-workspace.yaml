@@ -7,7 +7,7 @@ catalog:
   # falla duro si no ("Expected @voidzero-dev/vite-plus-core@X, but found Y").
   # dependabot solo bumpea la segunda, así que este bump es manual.
   vite: npm:@voidzero-dev/vite-plus-core@1.1.0
-  vite-plus: 1.1.0
+  vite-plus: 1.3.0
   vitest: 5.1.0
   "@vitest/coverage-v8": 5.0.3
 overrides:
