@@ -16,7 +16,7 @@
   "dependencies": {
     "docx": "9.15.0",
     "onnxruntime-web": "1.31.1",
-    "pdfjs-dist": "^6.4.299"
+    "pdfjs-dist": "^6.5.438"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",
