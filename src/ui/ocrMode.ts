@@ -1,7 +1,7 @@
 /* Modo OCR: las casillas muestran el texto OCR en vez de la imagen. */
 import { state } from "../state";
-import { renderHojas } from "./sheets";
 import { getEl } from "../utils";
+import { renderHojas } from "./sheets";
 
 const chkOcr: HTMLInputElement = getEl<HTMLInputElement>("chkOcr");
 const ocrEstado: HTMLElement = getEl("ocrEstado");

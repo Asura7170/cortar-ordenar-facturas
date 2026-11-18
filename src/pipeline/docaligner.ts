@@ -2,10 +2,11 @@
    Geometría y decode portados de andor83/ml-web-scanner (MIT — ver public/models/NOTICE.txt);
    pesos DocAligner de DocsaidLab (Apache-2.0 — ver public/models/NOTICE.txt).
    Entrada: blob JPEG ya normalizado (imagen.ts: EXIF + tope + recorte + vacías). Fallo → blob original. */
+
+import { esImportDinamicoMuerto, mostrarToasts } from "../utils";
 import { CALIDAD_WEBP, cargarReal, crearReal, recortarMargenesBlancos } from "./imagen";
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 import { rutaWasmOrt } from "./ortWasm";
-import { esImportDinamicoMuerto, mostrarToasts } from "../utils";
 
 /** Punto en píxeles de la imagen original. */
 export interface Punto {

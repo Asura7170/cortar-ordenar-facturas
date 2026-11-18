@@ -1,3 +1,5 @@
+import { falloIa } from "../pipeline/docaligner";
+import { girarYReleer } from "../pipeline/rotar";
 /* Hojas carta: render de casillas + drag & drop de comprobantes. */
 import {
   buscarSlot,
@@ -9,11 +11,9 @@ import {
   VENTANA_CIERRE_RECORTE_MS,
 } from "../state";
 import type { Cents, Comprobante, Hoja, Plantilla } from "../types";
+import { avisarError, getEl, sanear } from "../utils";
 import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
 import { cuentaHoja, formatearMoneda, parsearMonto, renderMonto, totalItems } from "./monto";
-import { falloIa } from "../pipeline/docaligner";
-import { girarYReleer } from "../pipeline/rotar";
-import { avisarError, getEl, sanear } from "../utils";
 
 const sheetsEl: HTMLElement = getEl("sheets");
 const metaHojas: HTMLElement = getEl("metaHojas");

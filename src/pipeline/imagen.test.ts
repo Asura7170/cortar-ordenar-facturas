@@ -1,5 +1,6 @@
 /* Tests: imagen — normalización WebP/passthrough, tope 2000px, filtro blancas/corruptas. */
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
 import {
   CALIDAD_WEBP,
   LADO_MAX_IMAGEN,

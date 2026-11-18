@@ -1,5 +1,6 @@
 /* Stubs que jsdom no trae + reset del estado global antes de cada test. */
 import { beforeEach } from "vite-plus/test";
+
 import { MONEDA_DEFAULT, POSICION_DEFAULT, state } from "../state";
 
 // jsdom sin origen expone localStorage como undefined: fallback en memoria.

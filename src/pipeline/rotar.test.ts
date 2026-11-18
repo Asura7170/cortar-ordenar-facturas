@@ -1,5 +1,6 @@
 /* Tests P1: rotar.ts — giro manual ±90° + OCR único, sin enderezar. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+
 import { montarFixture } from "../test/fixture";
 
 // El render real necesita grilla; los tests asertan estado, no DOM.

@@ -1,5 +1,6 @@
 /* Tests P1: cola — drena pendientes aunque se limpie durante el proceso. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
 import { montarFixture } from "../test/fixture";
 import type { SesionDetectora } from "./docaligner";
 import type { NucleoOcr } from "./ocr";

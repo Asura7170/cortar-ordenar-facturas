@@ -1,5 +1,7 @@
 /* Tests P1: sidebar — entrada de archivos, código de pedido y limpiar (DOM aislado). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
+import type { PaginaPdf } from "../pipeline/pdf";
 import {
   montarFixture,
   el,
@@ -9,7 +11,6 @@ import {
   eventoDragover,
   eventoPaste,
 } from "../test/fixture";
-import type { PaginaPdf } from "../pipeline/pdf";
 import type { Comprobante } from "../types";
 
 // El conteo real abre el PDF con pdf.js: stub fijo (cada test lo ajusta).

@@ -1,6 +1,7 @@
 /* Tests: dibujarLupa con ctx 2d mockeado (jsdom no trae canvas).
    El módulo captura lupaCtx al importarse: el mock va antes del import dinámico. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+
 import { montarFixture, el, puntoPorDefecto } from "../test/fixture";
 
 montarFixture();

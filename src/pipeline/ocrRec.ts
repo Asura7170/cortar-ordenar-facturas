@@ -4,8 +4,8 @@
    h→48 con aspecto, ancho útil sin truncar a 320, (x/255−0.5)/0.5, pad a
    derecha; argmax por paso, colapsar repetidos, quitar blank=0. */
 
-import { DICT_OCR } from "./ocrDict";
 import type { CajaDb } from "./ocrDb";
+import { DICT_OCR } from "./ocrDict";
 
 /** Alto fijo de entrada del rec (image_shape [3,48,320]). */
 export const REC_ALTO: number = 48;

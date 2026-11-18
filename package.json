@@ -11,7 +11,9 @@
     "test": "vp test run",
     "test:coverage": "vp test run --coverage",
     "test:watch": "vp test watch",
-    "prepare": "vp config"
+    "prepare": "vp config",
+    "check": "ultracite check",
+    "fix": "ultracite fix"
   },
   "dependencies": {
     "docx": "9.15.3",
@@ -21,7 +23,10 @@
   "devDependencies": {
     "@vitest/coverage-v8": "catalog:",
     "jsdom": "^31.0.1",
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
     "typescript": "7.0.2",
+    "ultracite": "8.2.1",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

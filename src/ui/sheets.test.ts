@@ -1,5 +1,6 @@
 /* Tests P1: hojas — layouts, quitar, clic delegado, drop y celdas (DOM aislado). */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+
 import {
   montarFixture,
   el,

@@ -1,5 +1,6 @@
 /* Tests P1: switch del modo OCR (DOM aislado). */
 import { describe, expect, it } from "vite-plus/test";
+
 import { montarFixture, el } from "../test/fixture";
 
 montarFixture();

@@ -6,8 +6,8 @@
 import { buscarSlot, obtenerComprobante, state } from "../state";
 import type { Comprobante } from "../types";
 import { avisarError, sanear } from "../utils";
-import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
 import { falloIa } from "./docaligner";
+import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
 import type { DepsOcr } from "./ocr";
 import { girarBlob, lienzoGirado } from "./ocr";
 

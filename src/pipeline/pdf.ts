@@ -3,6 +3,7 @@
    (pdf.js vía import dinámico: solo se descarga cuando llega un PDF).
    Todo rechazo se avisa y se descarta sin crear comprobante ni blob URL. */
 import workerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
+
 import {
   CALIDAD_WEBP,
   crearReal,

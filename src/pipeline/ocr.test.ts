@@ -1,6 +1,8 @@
 /* Tests: ocr — orquestación con sesiones y lienzos falsos (sin onnx ni DOM).
    El modelo real se valida en Chrome con image-test/. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+
+import { reactivarIa } from "./docaligner";
 import {
   bgrDesdeRgba,
   chunkValido,
@@ -19,7 +21,6 @@ import {
   TIMEOUT_OCR_MS,
 } from "./ocr";
 import type { NucleoOcr, SalidaOcr, SubsesionOcr } from "./ocr";
-import { reactivarIa } from "./docaligner";
 import { DICT_OCR } from "./ocrDict";
 import { matrizInversa } from "./ocrRec";
 

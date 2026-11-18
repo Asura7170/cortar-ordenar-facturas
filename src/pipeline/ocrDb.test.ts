@@ -1,6 +1,7 @@
 /* Tests: ocrDb — post-proceso DB puro (binarizar, contornos, casco,
    rectángulo mínimo, puntaje, unclip) sin onnx ni DOM. */
 import { describe, expect, it } from "vite-plus/test";
+
 import {
   binarizarMapa,
   cajasDesdeMapa,

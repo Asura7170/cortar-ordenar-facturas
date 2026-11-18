@@ -1,8 +1,9 @@
 /* Tests salida Word (salidas.ts necesita #montoTotal, #btnWord, #btnPdf y
    #btnImprimir al importar; docx va mockeado: se aserta la estructura armada). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { ORDEN_PLANTILLAS } from "../ui/layout";
+
 import type { LayoutId, PosicionCodigo } from "../types";
+import { ORDEN_PLANTILLAS } from "../ui/layout";
 
 interface Registro {
   readonly tipo: string;
