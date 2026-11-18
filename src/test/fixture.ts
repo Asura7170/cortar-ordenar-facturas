@@ -60,9 +60,20 @@ export const FIXTURE_HTML = `
 <div id="zonaPrint" hidden></div>
 `;
 
+/** jsdom no implementa elementFromPoint: la lupa lo llama desde rAF y el throw
+    (jsdom >=31) marca el run como unhandled. Stub por defecto, no borrar. */
+export function puntoPorDefecto(): void {
+  Object.defineProperty(document, "elementFromPoint", {
+    value: () => null,
+    configurable: true,
+    writable: true,
+  });
+}
+
 /** Monta el fixture (llamar antes del import dinámico del módulo bajo test). */
 export function montarFixture(): void {
   document.body.innerHTML = FIXTURE_HTML;
+  puntoPorDefecto();
 }
 
 /** Atajo getEl para tests (falla fuerte como el de la app). */
