@@ -1,10 +1,11 @@
+/* Sidebar: código de pedido, limpiar y recálculo de totales. La entrada vive en el
+   canvas (tarjeta grande + drop en el área): acá solo se cablea. */
+
 import { extraerPendientes } from "../pipeline/extract";
 import { normalizarImagen } from "../pipeline/imagen";
 import { admitirPdf, contarPaginasPdf, esPdf, expandirPdf } from "../pipeline/pdf";
 import type { MotivoRechazo } from "../pipeline/pdf";
 import { precalentarModelos, procesarCola } from "../pipeline/queue";
-/* Sidebar: código de pedido, limpiar y recálculo de totales. La entrada vive en el
-   canvas (tarjeta grande + drop en el área): acá solo se cablea. */
 import {
   borrarCodigo,
   crearHoja,

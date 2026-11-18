@@ -1,6 +1,7 @@
+/* Hojas carta: render de casillas + drag & drop de comprobantes. */
+
 import { falloIa } from "../pipeline/docaligner";
 import { girarYReleer } from "../pipeline/rotar";
-/* Hojas carta: render de casillas + drag & drop de comprobantes. */
 import {
   buscarSlot,
   hojaPorId,

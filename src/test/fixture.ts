@@ -60,8 +60,8 @@ export const FIXTURE_HTML = `
 <div id="zonaPrint" hidden></div>
 `;
 
-/** jsdom no implementa elementFromPoint: la lupa lo llama desde rAF y el throw
-    (jsdom >=31) marca el run como unhandled. Stub por defecto, no borrar. */
+/** jsdom no implementa elementFromPoint en ninguna versión: la lupa lo llama
+    desde rAF y el throw marca el run como unhandled. Stub por defecto, no borrar. */
 export function puntoPorDefecto(): void {
   Object.defineProperty(document, "elementFromPoint", {
     value: () => null,

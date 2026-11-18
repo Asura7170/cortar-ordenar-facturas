@@ -1,5 +1,6 @@
-import { initExport } from "./export/salidas";
 /* Bootstrap: carga estado, cablea módulos y pinta el primer frame. */
+
+import { initExport } from "./export/salidas";
 import { cargar, crearHoja, state } from "./state";
 import { initGithub } from "./ui/github";
 import { initOcrMode, renderOcrToggle } from "./ui/ocrMode";

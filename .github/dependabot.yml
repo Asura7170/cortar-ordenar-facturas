@@ -23,6 +23,11 @@ updates:
       # provider rompe el guard de coverage de vp, así que solo va manual junto
       # al bump de vite-plus.
       - dependency-name: "@vitest/coverage-v8"
+      # ponytail: oxlint/oxfmt deben ser EXACTOS a los que embutea vite-plus;
+      # `vp check` usa la copia embebida y `pnpm fix` la del paquete. Un bump
+      # suelto separa el formato del gate del de ultracite (ping-pong).
+      - dependency-name: oxlint
+      - dependency-name: oxfmt
   - package-ecosystem: github-actions
     directory: /
     schedule:
