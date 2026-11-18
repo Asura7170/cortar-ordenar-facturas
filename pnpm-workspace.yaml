@@ -6,10 +6,13 @@ catalog:
   # valida en runtime que el alias de vite coincida con su core, y `vp build`
   # falla duro si no ("Expected @voidzero-dev/vite-plus-core@X, but found Y").
   # dependabot solo bumpea la segunda, así que este bump es manual.
-  vite: npm:@voidzero-dev/vite-plus-core@1.1.0
-  vite-plus: 1.1.0
+  vite: npm:@voidzero-dev/vite-plus-core@1.6.0
+  vite-plus: 1.6.0
+  # ponytail: ambas atadas al vitest que EMBUTEA vite-plus 1.6.0 (5.1.0); el
+  # guard de `vp test --coverage` aborta con otra versión. Al subir vite-plus,
+  # mover las cuatro entradas de este bloque en el mismo commit.
   vitest: 5.1.0
-  "@vitest/coverage-v8": 5.0.3
+  "@vitest/coverage-v8": 5.1.0
 overrides:
   vite@*: "catalog:"
   # ponytail: parche de CVE (GHSA-68fv-2mgg-jv7q, event-loop DoS). Llega

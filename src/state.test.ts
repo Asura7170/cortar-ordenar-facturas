@@ -1,5 +1,6 @@
 /* Tests P0: estado, persistencia y operaciones puras (sin DOM). */
 import { describe, expect, it, vi } from "vite-plus/test";
+
 import {
   LS_KEY,
   borrarCodigo,
@@ -18,8 +19,8 @@ import {
   restablecerAjustes,
   state,
 } from "./state";
-import type { LayoutId } from "./types";
 import { comprobante } from "./test/factoria";
+import type { LayoutId } from "./types";
 
 describe("ids monótonos", () => {
   it("nextComprobanteId y nextHojaId crecen de a 1", () => {

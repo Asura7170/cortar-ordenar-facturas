@@ -1,5 +1,6 @@
 /* Tests P1: modal de ajustes — moneda, submit y Restablecer (DOM aislado). */
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
 import { montarFixture, el } from "../test/fixture";
 
 // Sesiones IA falsas: el toque real necesita GPU/wasm; el modal solo reporta.

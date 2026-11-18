@@ -1,6 +1,13 @@
 /* Bootstrap: carga estado, cablea módulos y pinta el primer frame. */
+
+import { initExport } from "./export/salidas";
 import { cargar, crearHoja, state } from "./state";
+import { initGithub } from "./ui/github";
+import { initOcrMode, renderOcrToggle } from "./ui/ocrMode";
+import { initRecorte } from "./ui/recorte";
+import { initSettings } from "./ui/settingsModal";
 import { initSheets } from "./ui/sheets";
+import { renderHojas } from "./ui/sheets";
 import {
   agregarArchivos,
   elegirArchivos,
@@ -8,12 +15,6 @@ import {
   pegarEnCelda,
   renderCodigo,
 } from "./ui/sidebar";
-import { initOcrMode, renderOcrToggle } from "./ui/ocrMode";
-import { initSettings } from "./ui/settingsModal";
-import { initGithub } from "./ui/github";
-import { initRecorte } from "./ui/recorte";
-import { initExport } from "./export/salidas";
-import { renderHojas } from "./ui/sheets";
 import { getEl } from "./utils";
 
 const TEMA_KEY = "libro-mayor-tema";

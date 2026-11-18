@@ -1,5 +1,6 @@
 /* Tests P0: gate de admisión PDF (puro; el conteo real con pdf.js se valida manual). */
 import { describe, expect, it, vi } from "vite-plus/test";
+
 import {
   PDF_MAX_BYTES,
   PDF_MAX_PAGINAS,

@@ -1,5 +1,6 @@
 /* Tests: docaligner — geometría pura, decode de heatmap sintético y paso completo con stubs (sin onnx). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
 import {
   areaQuad,
   bitmapATensor,

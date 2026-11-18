@@ -1,5 +1,6 @@
 /* Tests: extract.ts — regex offline, lo manual siempre gana. */
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
 import { montarFixture, el } from "../test/fixture";
 
 vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn(), actualizarMontoCelda: vi.fn() }));

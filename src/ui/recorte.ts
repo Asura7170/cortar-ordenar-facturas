@@ -1,10 +1,11 @@
 /* Recorte manual por comprobante: modal con la imagen fija en el canvas base
    y 8 tiradores (4 lados + 4 esquinas) sobre el overlay. Confirmar commitea
    el recorte como WebP y relee el OCR (igual que el giro). Estado efímero. */
-import { buscarSlot, obtenerComprobante, state } from "../state";
-import { releerTrasEdicion, cancelarRelecturaProgramada } from "../pipeline/rotar";
+
 import { CALIDAD_WEBP, cargarReal, crearReal } from "../pipeline/imagen";
 import type { DepsOcr } from "../pipeline/ocr";
+import { releerTrasEdicion, cancelarRelecturaProgramada } from "../pipeline/rotar";
+import { buscarSlot, obtenerComprobante, state } from "../state";
 import type { Comprobante } from "../types";
 import { avisarError, getEl } from "../utils";
 

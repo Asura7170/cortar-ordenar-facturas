@@ -1,7 +1,8 @@
 /* Tests P0: plantillas de distribución (sin DOM). */
 import { describe, expect, it } from "vite-plus/test";
-import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
+
 import type { LayoutId } from "../types";
+import { NOMBRES_LAYOUT, ORDEN_PLANTILLAS, PLANTILLAS, isLayoutId, layoutDe } from "./layout";
 
 const TOTALES: Record<LayoutId, number> = {
   u1: 1,

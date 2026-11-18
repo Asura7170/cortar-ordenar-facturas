@@ -10,10 +10,11 @@ import {
   notarSesionOk,
   olvidarSesionFallida,
 } from "./docaligner";
-import { rutaWasmOrt } from "./ortWasm";
-import { DICT_OCR } from "./ocrDict";
+import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
+import type { CargarBitmap, CrearLienzo } from "./imagen";
 import { cajasDesdeMapa } from "./ocrDb";
 import type { CajaDb } from "./ocrDb";
+import { DICT_OCR } from "./ocrDict";
 import {
   apilarLineas,
   decodificarCtc,
@@ -23,8 +24,7 @@ import {
   REC_ALTO,
 } from "./ocrRec";
 import type { LineaNorm, LoteNorm, TextoRec } from "./ocrRec";
-import { CALIDAD_WEBP, cargarReal, crearReal } from "./imagen";
-import type { CargarBitmap, CrearLienzo } from "./imagen";
+import { rutaWasmOrt } from "./ortWasm";
 
 const RUTA_DET = `${import.meta.env.BASE_URL}models/ocr/det.onnx`;
 const RUTA_REC = `${import.meta.env.BASE_URL}models/ocr/rec.onnx`;

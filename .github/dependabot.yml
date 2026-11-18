@@ -14,11 +14,20 @@ updates:
       # acoplamiento, así que solo los minor/major quedan manuales.
       - dependency-name: vite-plus
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # ponytail: el vitest del catálogo debe ser EXACTO el que embutea
+      # vite-plus; un bump suelto corre un runner distinto sin que el guard
+      # de coverage lo vea (compara contra la versión declarada por vp).
+      - dependency-name: vitest
       # ponytail: lockstep con el vitest que embutea vite-plus ("Keep coverage
       # providers at the bundled runner's exact version"). Un bump suelto del
       # provider rompe el guard de coverage de vp, así que solo va manual junto
       # al bump de vite-plus.
       - dependency-name: "@vitest/coverage-v8"
+      # ponytail: oxlint/oxfmt deben ser EXACTOS a los que embutea vite-plus;
+      # `vp check` usa la copia embebida y `pnpm fix` la del paquete. Un bump
+      # suelto separa el formato del gate del de ultracite (ping-pong).
+      - dependency-name: oxlint
+      - dependency-name: oxfmt
   - package-ecosystem: github-actions
     directory: /
     schedule:

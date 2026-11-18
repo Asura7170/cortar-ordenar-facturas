@@ -1,7 +1,8 @@
 /* Tests: dibujarLupa con ctx 2d mockeado (jsdom no trae canvas).
    El módulo captura lupaCtx al importarse: el mock va antes del import dinámico. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { montarFixture, el } from "../test/fixture";
+
+import { montarFixture, el, puntoPorDefecto } from "../test/fixture";
 
 montarFixture();
 
@@ -72,7 +73,7 @@ describe("dibujarLupa", () => {
       expect(ctx.fillRect).toHaveBeenCalledWith(0, 0, 200, 200);
       expect(ctx.drawImage).not.toHaveBeenCalled();
     } finally {
-      delete (document as unknown as Record<string, unknown>)["elementFromPoint"];
+      puntoPorDefecto();
       panel.remove();
     }
   });
@@ -110,7 +111,7 @@ describe("dibujarLupa", () => {
       expect(ctx.drawImage).toHaveBeenCalled();
     } finally {
       rect.mockRestore();
-      delete (document as unknown as Record<string, unknown>)["elementFromPoint"];
+      puntoPorDefecto();
     }
   });
 });

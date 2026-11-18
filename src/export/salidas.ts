@@ -17,9 +17,10 @@ import {
   VerticalPositionRelativeFrom,
   convertInchesToTwip,
 } from "docx";
+
+import { CALIDAD_JPEG } from "../pipeline/imagen";
 import { state } from "../state";
 import type { Comprobante, Hoja, LayoutId, PosicionCodigo } from "../types";
-import { CALIDAD_JPEG } from "../pipeline/imagen";
 import { layoutDe } from "../ui/layout";
 import { totalItems } from "../ui/monto";
 import { avisarError, getEl } from "../utils";

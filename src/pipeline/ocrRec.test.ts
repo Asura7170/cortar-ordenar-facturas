@@ -1,6 +1,8 @@
 /* Tests: ocrRec — normalización de línea, matriz afín y CTC greedy
    (puros; el lienzo solo lo toca ocr.ts). */
 import { describe, expect, it } from "vite-plus/test";
+
+import { DICT_OCR } from "./ocrDict";
 import {
   decodificarCtc,
   matrizAfin,
@@ -9,7 +11,6 @@ import {
   REC_ALTO,
   REC_RATIO_MAXIMA,
 } from "./ocrRec";
-import { DICT_OCR } from "./ocrDict";
 
 describe("normalizarLinea", () => {
   it("blanco 4x2 → unos en lo útil y ceros en el pad", () => {

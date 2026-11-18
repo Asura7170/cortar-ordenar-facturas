@@ -2,6 +2,7 @@
    apila toasts (error=alert/rojo, aviso=status/amarillo) con X, auto-cierre y
    despeje por grupo; tolera la ausencia del nodo. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+
 import {
   MAX_TOASTS,
   avisar,

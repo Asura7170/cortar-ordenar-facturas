@@ -1,5 +1,6 @@
 /* Tests P0: forma de wasmPaths (la sincronía con package.json la amarra el grep de ort-bump). */
 import { describe, expect, test } from "vite-plus/test";
+
 import { VERSION_ORT, rutaWasmOrt } from "./ortWasm";
 
 describe("rutaWasmOrt", () => {

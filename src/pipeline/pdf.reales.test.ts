@@ -3,6 +3,7 @@
    solo a nivel gate aquí; el conteo real de blancas es manual en Chrome
    (jsdom no tiene canvas 2d). Nunca asserts de bytes exactos. */
 import { describe, expect, it, vi } from "vite-plus/test";
+
 import { PDF_MAX_BYTES, admitirPdf, admiteTamanoPdf, contarPaginasPdf, expandirPdf } from "./pdf";
 
 /** Mínimo de node:fs usado (tipos vía @types/node, transitivo de docx). */

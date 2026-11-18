@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+
 import { defineConfig } from "vite-plus";
+
+import oxfmt from "./oxfmt.config.mts";
 
 // COOP/COEP: necesarios para onnxruntime-web WASM con threads (y futuro PaddleOCR).
 // server.open: abre el navegador en `pnpm dev`. build → dist/.
@@ -37,7 +40,7 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {},
+  fmt: { ...oxfmt },
   lint: {
     // ponytail: glue asyncify vendoreado (upstream) — fuera del lint, como del formato.
     ignorePatterns: ["public/ort/**"],

@@ -1,8 +1,5 @@
 /* Modal de ajustes: moneda (persiste) + gestión de modelos locales (OCR). */
-import { MONEDA_DEFAULT, guardarAjustes, isMoneda, restablecerAjustes, state } from "../state";
-import { renderMonto } from "./monto";
-import { renderHojas } from "./sheets";
-import { getEl, esImportDinamicoMuerto } from "../utils";
+
 import {
   borrarModelos,
   descargarPesos,
@@ -11,6 +8,10 @@ import {
   tamanoModelos,
 } from "../pipeline/docaligner";
 import { descargarPesosOcr, obtenerNucleo } from "../pipeline/ocr";
+import { MONEDA_DEFAULT, guardarAjustes, isMoneda, restablecerAjustes, state } from "../state";
+import { getEl, esImportDinamicoMuerto } from "../utils";
+import { renderMonto } from "./monto";
+import { renderHojas } from "./sheets";
 
 const modalAjustes: HTMLDialogElement = getEl<HTMLDialogElement>("modalAjustes");
 const btnAjustes: HTMLButtonElement = getEl<HTMLButtonElement>("btnAjustes");

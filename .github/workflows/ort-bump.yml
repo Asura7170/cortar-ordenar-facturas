@@ -23,6 +23,11 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      # El camino no-op no instala y no crea el store: setup-node falla en el
+      # post-step al guardar una ruta inexistente. Crearla conserva la caché
+      # para el camino que sí instala.
+      - name: Asegurar store de pnpm
+        run: mkdir -p "$(pnpm store path)"
       - name: Resolver versión candidata
         id: version
         run: |

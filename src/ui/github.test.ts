@@ -1,5 +1,6 @@
 /* Tests: botón GitHub — conteo vivo y fallback offline (DOM aislado). */
 import { describe, expect, it } from "vite-plus/test";
+
 import { montarFixture, el } from "../test/fixture";
 
 montarFixture();

@@ -1,6 +1,14 @@
 /* Tests P1: hojas — layouts, quitar, clic delegado, drop y celdas (DOM aislado). */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { montarFixture, el, eventoDrop, eventoDragover, eventoDragleave } from "../test/fixture";
+
+import {
+  montarFixture,
+  el,
+  eventoDrop,
+  eventoDragover,
+  eventoDragleave,
+  puntoPorDefecto,
+} from "../test/fixture";
 
 // El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
 vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
@@ -1537,14 +1545,14 @@ describe("drag entre celdas (swap)", () => {
     );
   }
 
-  /** jsdom no trae elementFromPoint: se define por test y se borra al salir. */
+  /** jsdom no trae elementFromPoint: se define por test y se restaura al salir. */
   function stubPunto(valor: Element | null): () => void {
     Object.defineProperty(document, "elementFromPoint", {
       value: vi.fn(() => valor),
       configurable: true,
     });
     return () => {
-      delete (document as unknown as Record<string, unknown>)["elementFromPoint"];
+      puntoPorDefecto();
     };
   }
 

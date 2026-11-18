@@ -1,5 +1,6 @@
 /* Tests: recorte.ts — editor manual con tiradores, commit + relectura. */
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+
 import { el, montarFixture } from "../test/fixture";
 
 // El render real necesita grilla; los tests asertan estado, no DOM.
