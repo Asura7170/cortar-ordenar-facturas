@@ -82,7 +82,7 @@ describe("normalizarImagen", () => {
     expect(falso.tipo()).toBe("image/webp");
     expect(falso.calidad()).toBe(CALIDAD_WEBP);
     // Guard de regresión: sin from-image el EXIF no se endereza.
-    expect(ultimaOpc).toEqual({ imageOrientation: "from-image" });
+    expect(ultimaOpc).toStrictEqual({ imageOrientation: "from-image" });
   });
 
   it("jpg chico sin nada que corregir pasa el original intacto (0 gens)", async () => {
@@ -277,7 +277,7 @@ describe("recortarMargenesBlancos", () => {
     // bbox x5-34/y5-24 sin margen → sx5 sy5 w30 h20
     expect(src.width).toBe(30);
     expect(src.height).toBe(20);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
   it("marco negro → recorta al contenido", () => {
@@ -288,7 +288,7 @@ describe("recortarMargenesBlancos", () => {
     );
     expect(src.width).toBe(30);
     expect(src.height).toBe(20);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
   it("marco negro con ruido JPEG ±8 → recorta (tolerancia)", () => {
@@ -299,7 +299,7 @@ describe("recortarMargenesBlancos", () => {
     );
     expect(src.width).toBe(30);
     expect(src.height).toBe(20);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
   it("marco morado digital uniforme → recorta (cualquier color)", () => {
@@ -309,7 +309,7 @@ describe("recortarMargenesBlancos", () => {
     );
     expect(src.width).toBe(30);
     expect(src.height).toBe(20);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
   it("lados de distinto color no puro → recorta (cada lado con el suyo)", () => {
@@ -321,7 +321,7 @@ describe("recortarMargenesBlancos", () => {
     );
     expect(src.width).toBe(30);
     expect(src.height).toBe(20);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 
   it("barra uniforme interior ≠ borde → se conserva", () => {
@@ -362,7 +362,7 @@ describe("recortarMargenesBlancos", () => {
     const out = recortarMargenesBlancos(src, () => salida);
     expect(out.width).toBe(40);
     expect(out.height).toBe(15);
-    expect(dibujos[0]?.slice(1)).toEqual([0, 10, 40, 15, 0, 0, 40, 15]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([0, 10, 40, 15, 0, 0, 40, 15]);
   });
 
   it("frontera TOL: diff 15 cede, diff 16 frena", () => {
@@ -409,7 +409,7 @@ describe("recortarMargenesBlancos", () => {
     const out = recortarMargenesBlancos(src, () => salida);
     expect(out.width).toBe(40);
     expect(out.height).toBe(5);
-    expect(dibujos[0]?.slice(1)).toEqual([0, 20, 40, 5, 0, 0, 40, 5]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([0, 20, 40, 5, 0, 0, 40, 5]);
   });
 
   it("1px distinto en el marco → esa fila frena", () => {
@@ -449,7 +449,7 @@ describe("recortarMargenesBlancos", () => {
     const out = recortarMargenesBlancos(src, () => salida);
     expect(out.width).toBe(30);
     expect(out.height).toBe(23);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 2, 30, 23, 0, 0, 30, 23]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([5, 2, 30, 23, 0, 0, 30, 23]);
   });
 
   it("todo blanco → devuelve el mismo lienzo", () => {
@@ -535,7 +535,7 @@ describe("recortarMargenesBlancos", () => {
     // bbox x5-34/y5-24 sin margen → sx5 sy5 w30 h20
     expect(out.width).toBe(30);
     expect(out.height).toBe(20);
-    expect(dibujos[0]?.slice(1)).toEqual([5, 5, 30, 20, 0, 0, 30, 20]);
+    expect(dibujos[0]?.slice(1)).toStrictEqual([5, 5, 30, 20, 0, 0, 30, 20]);
   });
 });
 
@@ -570,8 +570,8 @@ describe("medianaCanal/medianaBorde", () => {
 
   it("medianaBorde salta transparentes y usa los índices de toma", () => {
     const datos = new Uint8ClampedArray([0, 0, 0, 0, 1, 2, 3, 255]);
-    expect(medianaBorde(datos, (k) => k * 4, 2)).toEqual([1, 2, 3]);
-    expect(medianaBorde(datos, () => 0, 4)).toEqual([0, 0, 0]); // todo transparente
+    expect(medianaBorde(datos, (k) => k * 4, 2)).toStrictEqual([1, 2, 3]);
+    expect(medianaBorde(datos, () => 0, 4)).toStrictEqual([0, 0, 0]); // todo transparente
   });
 });
 
@@ -596,7 +596,7 @@ describe("tramoFondo", () => {
     const blanco: readonly [number, number, number] = [255, 255, 255];
     // Fila toda-fondo: el scan izquierdo termina en `largo` y el derecho queda corto
     // ([largo, largo-1] degenerado, como el original con rango interior vacío).
-    expect(tramoFondo(datos, 3, toma, blanco, blanco, blanco)).toEqual([3, 2]);
+    expect(tramoFondo(datos, 3, toma, blanco, blanco, blanco)).toStrictEqual([3, 2]);
     datos[2 * 4] = 128; // gris en la posición central
     expect(tramoFondo(datos, 3, toma, blanco, blanco, blanco)).toBeNull();
   });
@@ -621,7 +621,7 @@ describe("bboxRecorte/recorteViable", () => {
     datos[i] = 128;
     datos[i + 1] = 128;
     datos[i + 2] = 128;
-    expect(bboxRecorte(datos, w, h, blanco, blanco, blanco, blanco)).toEqual({
+    expect(bboxRecorte(datos, w, h, blanco, blanco, blanco, blanco)).toStrictEqual({
       x0: 2,
       y0: 1,
       x1: 2,

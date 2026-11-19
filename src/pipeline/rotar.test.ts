@@ -127,7 +127,7 @@ describe("girarYReleer", () => {
     const blobB = new Blob(["b"]);
     try {
       await Promise.all([releerTrasEdicion(c.id, blobA), releerTrasEdicion(c.id, blobB)]);
-      expect(eventos).toEqual(["A-ini", "A-fin", "B-ini", "B-fin"]);
+      expect(eventos).toStrictEqual(["A-ini", "A-fin", "B-ini", "B-fin"]);
       expect(c.textoOcr).toBe("LEÍDO");
     } finally {
       vi.mocked(extraerTexto).mockResolvedValue("TOTAL LEÍDO");

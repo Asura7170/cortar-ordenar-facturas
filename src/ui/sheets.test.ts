@@ -306,7 +306,7 @@ describe("celdas", () => {
   it("ocupada tabindex 0, vacía -1", () => {
     sembrar("u4x2", [100, null, null, null]);
     const tabs = [...document.querySelectorAll(".cell")].map((c) => (c as HTMLElement).tabIndex);
-    expect(tabs).toEqual([0, -1, -1, -1]);
+    expect(tabs).toStrictEqual([0, -1, -1, -1]);
   });
 
   it("badge con el monto formateado", () => {
@@ -1416,7 +1416,7 @@ describe("drag: render pendiente y cancelaciones", () => {
   it("pointerup sin drag previo no hace nada", () => {
     const h = sembrar("u4x2", [100, 200]);
     expect(() => soltarDoc(10, 10)).not.toThrow();
-    expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+    expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
   });
 
   it("render durante el drag se pospone hasta soltar", () => {
@@ -1442,7 +1442,7 @@ describe("drag: render pendiente y cancelaciones", () => {
     pressImg();
     moverDoc(11, 11);
     soltarDoc(11, 11);
-    expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+    expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
   });
 
   it("lostpointercapture cierra el drag", () => {
@@ -1576,7 +1576,7 @@ describe("drag entre celdas (swap)", () => {
       await esperarRaf(); // moveRaf: resalta destino + autoscroll en vuelo
       moverDoc(171, 51);
       soltarDoc(170, 50);
-      expect(h.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([200, 100]);
       expect(document.querySelector(".drag-ghost")).toBeNull();
     } finally {
       punto();
@@ -1596,7 +1596,7 @@ describe("drag entre celdas (swap)", () => {
         moverDoc(170, 50);
         await esperarRaf(); // moveRaf: el destino propio se anula
         soltarDoc(170, 50);
-        expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+        expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
       } finally {
         punto();
       }
@@ -1614,7 +1614,7 @@ describe("drag entre celdas (swap)", () => {
       pressCelda(0, 10, 10);
       moverDoc(170, 50);
       soltarDoc(9999, 9999);
-      expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+      expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
     } finally {
       punto();
       restaurar();
@@ -1632,7 +1632,7 @@ describe("drag entre celdas (swap)", () => {
       moverDoc(170, 50);
       state.hojas = [b];
       soltarDoc(170, 50);
-      expect(b.slots.map((c) => c?.montoCents)).toEqual([200]);
+      expect(b.slots.map((c) => c?.montoCents)).toStrictEqual([200]);
       expect(
         state.hojas.flatMap((h) => h.slots).find((c) => c?.id === a.slots[0]?.id),
       ).toBeUndefined();
@@ -1653,7 +1653,7 @@ describe("drag entre celdas (swap)", () => {
       moverDoc(290, 50);
       soltarDoc(290, 50);
       expect(state.hojas).toHaveLength(1);
-      expect(b.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      expect(b.slots.map((c) => c?.montoCents)).toStrictEqual([200, 100]);
     } finally {
       punto();
       restaurar();
@@ -1671,7 +1671,7 @@ describe("drag entre celdas (swap)", () => {
       pressCelda(0, 10, 10);
       moverDoc(170, 50);
       soltarDoc(170, 50); // centro exacto de la celda destino: dx=dy=0
-      expect(h.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([200, 100]);
       // imgA salta por hypot<2 y solo imgB vuela: sin el guard serían 2.
       expect(vuelos).toHaveLength(1);
     } finally {
@@ -1862,20 +1862,20 @@ describe("reorden por teclado (2.5.7)", () => {
   it("Ctrl+→ intercambia con el vecino", () => {
     const h = sembrar("u4x2", [100, 200]);
     tecla(0, "ArrowRight");
-    expect(montos(h)).toEqual([200, 100]);
+    expect(montos(h)).toStrictEqual([200, 100]);
   });
 
   it("Ctrl+← intercambia con el vecino anterior", () => {
     const h = sembrar("u4x2", [100, 200]);
     tecla(1, "ArrowLeft");
-    expect(montos(h)).toEqual([200, 100]);
+    expect(montos(h)).toStrictEqual([200, 100]);
   });
 
   it("Ctrl+→ cruza al borde de la siguiente hoja y enfoca la celda destino", () => {
     sembrar("u1", [100]);
     const b = sembrar("u4x2", [200, null]);
     tecla(0, "ArrowRight");
-    expect(state.hojas.map(montos)).toEqual([[200], [100, null]]); // swap 200↔100, nada se pierde
+    expect(state.hojas.map(montos)).toStrictEqual([[200], [100, null]]); // swap 200↔100, nada se pierde
     const foco = document.activeElement;
     expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
     expect(foco?.getAttribute("data-slot")).toBe("0");
@@ -1884,15 +1884,15 @@ describe("reorden por teclado (2.5.7)", () => {
   it("Ctrl+→ en el último slot del lote no mueve", () => {
     sembrar("u1", [100]);
     tecla(0, "ArrowRight");
-    expect(state.hojas.map(montos)).toEqual([[100]]);
+    expect(state.hojas.map(montos)).toStrictEqual([[100]]);
   });
 
   it("Ctrl+↓ conserva el slot; fila corta cae al primer hueco y enfoca", () => {
     const a = sembrar("u4x2", [100, null, null, 300]);
     const b = sembrar("u2h", [200, null]);
     tecla(1, "ArrowDown"); // slot 3 no existe en u2h: cae al hueco 1
-    expect(montos(b)).toEqual([200, 300]);
-    expect(montos(a)).toEqual([100, null, null, null]);
+    expect(montos(b)).toStrictEqual([200, 300]);
+    expect(montos(a)).toStrictEqual([100, null, null, null]);
     const foco = document.activeElement;
     expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
     expect(foco?.getAttribute("data-slot")).toBe("1");
@@ -1902,7 +1902,7 @@ describe("reorden por teclado (2.5.7)", () => {
     sembrar("u4x2", [null, null, null, 300]);
     sembrar("u1", [200]);
     tecla(0, "ArrowDown"); // u1 no tiene slot 3 ni hueco
-    expect(state.hojas.map(montos)).toEqual([[null, null, null, 300], [200]]);
+    expect(state.hojas.map(montos)).toStrictEqual([[null, null, null, 300], [200]]);
   });
 
   it("Ctrl+→ a un hueco vacía la hoja original (render estructural) y enfoca", () => {
@@ -1910,7 +1910,7 @@ describe("reorden por teclado (2.5.7)", () => {
     const b = sembrar("u1", [null]);
     tecla(0, "ArrowRight");
     expect(state.hojas).toHaveLength(1); // la primera quedó vacía: limpiarHojas
-    expect(state.hojas[0]?.slots.map((c) => (c ? c.montoCents : null))).toEqual([100]);
+    expect(state.hojas[0]?.slots.map((c) => (c ? c.montoCents : null))).toStrictEqual([100]);
     const foco = document.activeElement;
     expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
     expect(foco?.getAttribute("data-slot")).toBe("0");
@@ -1919,7 +1919,7 @@ describe("reorden por teclado (2.5.7)", () => {
   it("Alt+→ es alias del Ctrl horizontal", () => {
     const h = sembrar("u4x2", [100, 200]);
     tecla(0, "ArrowRight", true);
-    expect(montos(h)).toEqual([200, 100]);
+    expect(montos(h)).toStrictEqual([200, 100]);
   });
 
   it("input de monto no mueve (las flechas editan texto)", () => {
@@ -1940,7 +1940,7 @@ describe("reorden por teclado (2.5.7)", () => {
       }),
     );
     // Sin swap: el 200 sigue en el slot 1 y el foco sigue en el input.
-    expect(montos(h)).toEqual([null, 200]);
+    expect(montos(h)).toStrictEqual([null, 200]);
     expect(document.activeElement).toBe(input);
   });
 
@@ -1949,7 +1949,7 @@ describe("reorden por teclado (2.5.7)", () => {
     state.modoOcr = true;
     try {
       tecla(0, "ArrowRight");
-      expect(montos(h)).toEqual([100, 200]);
+      expect(montos(h)).toStrictEqual([100, 200]);
     } finally {
       state.modoOcr = false;
     }

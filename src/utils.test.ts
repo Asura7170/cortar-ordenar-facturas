@@ -202,7 +202,7 @@ describe("planificarToasts (cap del lote, puro)", () => {
 
   it("≤4 no colapsa y lote singleton no hereda grupo", () => {
     const tres: ToastMensaje[] = [{ tipo: "aviso", titulo: "conteo" }];
-    expect(planificarToasts(tres)).toEqual(tres);
+    expect(planificarToasts(tres)).toStrictEqual(tres);
     const cinco: ToastMensaje[] = Array.from({ length: 5 }, (_v, i): ToastMensaje => {
       const n = String(i);
       return { tipo: "error", titulo: `t${n}` };

@@ -121,25 +121,25 @@ const BLANCO32 = new Uint8ClampedArray(32 * 32 * 4).fill(255);
 
 describe("tamanoDet", () => {
   it("2000x1000 → 960x480 (solo reduce, múltiplo de 32)", () => {
-    expect(tamanoDet(2000, 1000)).toEqual({ w: 960, h: 480 });
+    expect(tamanoDet(2000, 1000)).toStrictEqual({ w: 960, h: 480 });
   });
 
   it("100x50 → 96x64", () => {
-    expect(tamanoDet(100, 50)).toEqual({ w: 96, h: 64 });
+    expect(tamanoDet(100, 50)).toStrictEqual({ w: 96, h: 64 });
   });
 
   it("10x10 → mínimo 32", () => {
-    expect(tamanoDet(10, 10)).toEqual({ w: 32, h: 32 });
+    expect(tamanoDet(10, 10)).toStrictEqual({ w: 32, h: 32 });
   });
 
   it("cero → cero", () => {
-    expect(tamanoDet(0, 5)).toEqual({ w: 0, h: 0 });
+    expect(tamanoDet(0, 5)).toStrictEqual({ w: 0, h: 0 });
   });
 });
 
 describe("bgrDesdeRgba", () => {
   it("rota canales e ignora alfa", () => {
-    expect(bgrDesdeRgba(new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 128]))).toEqual(
+    expect(bgrDesdeRgba(new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 128]))).toStrictEqual(
       new Uint8Array([0, 0, 255, 0, 255, 0]),
     );
   });
@@ -155,7 +155,7 @@ describe("tensorDet", () => {
 
   it("desde RGBA equivale bit a bit a la vía en 2 pasos", () => {
     const rgba = new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 128, 10, 20, 30, 255]);
-    expect(tensorDetDesdeRgba(rgba, 3, 1)).toEqual(tensorDet(bgrDesdeRgba(rgba), 3, 1));
+    expect(tensorDetDesdeRgba(rgba, 3, 1)).toStrictEqual(tensorDet(bgrDesdeRgba(rgba), 3, 1));
   });
 
   it("BGR corto usa 0 en los canales ausentes (guarda ??)", () => {
@@ -182,7 +182,9 @@ describe("envolver", () => {
 describe("matrizInversa", () => {
   it("traslación → traslación opuesta", () => {
     // +0 normaliza el −0 del álgebra (idéntico para canvas).
-    expect(matrizInversa([1, 0, 0, 1, 10, 10])?.map((v) => v + 0)).toEqual([1, 0, 0, 1, -10, -10]);
+    expect(matrizInversa([1, 0, 0, 1, 10, 10])?.map((v) => v + 0)).toStrictEqual([
+      1, 0, 0, 1, -10, -10,
+    ]);
   });
 
   it("compuesta con la original → identidad sobre p0 y p1", () => {
@@ -245,11 +247,11 @@ describe("extraerTexto", () => {
     const diag = diagVacio();
     const texto = await extraerTexto(new Blob(["x"]), deps, undefined, diag);
     expect(texto).toBe("AA");
-    expect(espia.det).toEqual([[[1, 3, 32, 64]]]);
+    expect(espia.det).toStrictEqual([[[1, 3, 32, 64]]]);
     expect(espia.rec).toHaveLength(1);
-    expect((espia.rec[0] as number[][])?.[0]?.slice(0, 3)).toEqual([1, 3, 48]);
+    expect((espia.rec[0] as number[][])?.[0]?.slice(0, 3)).toStrictEqual([1, 3, 48]);
     expect(transforms).toHaveLength(1); // warp afín aplicado
-    expect(diag).toEqual({ cajas: 1, lote: 1, anchoMax: 320, fallback: false, recRuns: 1 });
+    expect(diag).toStrictEqual({ cajas: 1, lote: 1, anchoMax: 320, fallback: false, recRuns: 1 });
   });
 
   it("mapa vacío → sin texto y sin rec", async () => {
@@ -446,7 +448,7 @@ describe("girarBlob", () => {
     expect(fuera).toBeInstanceOf(Blob);
     expect(lienzo.width).toBe(20);
     expect(lienzo.height).toBe(10);
-    expect(pedidos).toEqual([{ tipo: "image/webp", calidad: 0.85 }]);
+    expect(pedidos).toStrictEqual([{ tipo: "image/webp", calidad: 0.85 }]);
   });
 
   it("sin contexto o sin blob → null sin lanzar", async () => {
@@ -498,7 +500,7 @@ describe("reconocerCaja", () => {
       },
       () => sinCtx,
     );
-    expect(r).toEqual({ texto: "", puntaje: 0 });
+    expect(r).toStrictEqual({ texto: "", puntaje: 0 });
     expect(espia.rec).toHaveLength(0);
   });
 
@@ -546,7 +548,7 @@ describe("reconocerCaja", () => {
       crear,
     );
     // aristas 200.8×20 → 201×20 (el bbox daría 200×38 y estiraría los glifos).
-    expect([w, h]).toEqual([201, 20]);
+    expect([w, h]).toStrictEqual([201, 20]);
   });
 });
 
@@ -601,10 +603,10 @@ describe("reconocerLote", () => {
       () => lienzo,
       diag,
     );
-    expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
+    expect(rs.map((r) => r.texto)).toStrictEqual(["AA", "AA"]);
     expect(espia.rec).toHaveLength(1);
-    expect((espia.rec[0] as number[][])?.[0]).toEqual([2, 3, 48, 320]);
-    expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: false, recRuns: 1 });
+    expect((espia.rec[0] as number[][])?.[0]).toStrictEqual([2, 3, 48, 320]);
+    expect(diag).toStrictEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: false, recRuns: 1 });
   });
 
   it("lote rechazado → fallback individual sin lanzar (L2)", async () => {
@@ -624,11 +626,11 @@ describe("reconocerLote", () => {
     const { lienzo } = lienzoFalso(BLANCO32);
     const diag = diagVacio();
     const rs = await reconocerLote(rec, lienzo, [caja10(0.9), caja10(0.8)], () => lienzo, diag);
-    expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
+    expect(rs.map((r) => r.texto)).toStrictEqual(["AA", "AA"]);
     expect(llamadas).toHaveLength(3); // 1 lote + 2 individuales
     expect(llamadas[0]?.[0]).toBe(2);
     // Hilo #3: el lote fallido también es un run (antes se omitía).
-    expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 3 });
+    expect(diag).toStrictEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 3 });
   });
 
   it("fallback conserva chunks exitosos y cuenta el chunk fallido (hilo #3)", async () => {
@@ -662,7 +664,7 @@ describe("reconocerLote", () => {
     expect(rs).toHaveLength(20);
     expect(rs.every((r) => r.texto === "AA")).toBe(true);
     // 1 chunk ok [16] + 1 chunk fallido [4] + 4 individuales (solo el caído)
-    expect(llamadas).toEqual([
+    expect(llamadas).toStrictEqual([
       [16, 3, 48, 320],
       [4, 3, 48, 320],
       [1, 3, 48, 320],
@@ -670,7 +672,7 @@ describe("reconocerLote", () => {
       [1, 3, 48, 320],
       [1, 3, 48, 320],
     ]);
-    expect(diag).toEqual({ cajas: 0, lote: 20, anchoMax: 320, fallback: true, recRuns: 6 });
+    expect(diag).toStrictEqual({ cajas: 0, lote: 20, anchoMax: 320, fallback: true, recRuns: 6 });
   });
 
   /** rec stub que deletrea "AA" por lote con la forma que le pidan. */
@@ -704,7 +706,7 @@ describe("reconocerLote", () => {
     const rs = await reconocerLote(recLotes(formasRun), lienzo, cajas, () => lienzo, diag);
     expect(rs).toHaveLength(20);
     expect(rs.every((r) => r.texto === "AA")).toBe(true);
-    expect(formasRun).toEqual([
+    expect(formasRun).toStrictEqual([
       [16, 3, 48, 320],
       [4, 3, 48, 320],
     ]);
@@ -729,7 +731,7 @@ describe("reconocerLote", () => {
     const rs = await reconocerLote(recLotes(formasRun), lienzo, cajas, () => lienzo);
     expect(rs).toHaveLength(18);
     // 16 angostas con W=320; la ancha (W=1536) queda aislada en el 2º chunk.
-    expect(formasRun).toEqual([
+    expect(formasRun).toStrictEqual([
       [16, 3, 48, 320],
       [2, 3, 48, 1536],
     ]);
@@ -739,7 +741,7 @@ describe("reconocerLote", () => {
     const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
     const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
     const { lienzo } = lienzoFalso(BLANCO32);
-    expect(await reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).toEqual([]);
+    expect(await reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).toStrictEqual([]);
     expect(espia.rec).toHaveLength(0);
   });
 
@@ -756,7 +758,7 @@ describe("reconocerLote", () => {
       ] as const,
       puntaje: 0.9,
     };
-    expect(await reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).toEqual([
+    expect(await reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).toStrictEqual([
       { texto: "", puntaje: 0 },
     ]);
     expect(espia.rec).toHaveLength(0);
@@ -901,8 +903,8 @@ describe("enderezar (decisión rec)", () => {
     expect(r.grados).toBe(0);
     expect(r.cajas).toHaveLength(1);
     expect(r.base).not.toBeNull();
-    expect(detLlamadas).toEqual([0]);
-    expect(recLlamadas).toEqual([0]);
+    expect(detLlamadas).toStrictEqual([0]);
+    expect(recLlamadas).toStrictEqual([0]);
   });
 
   it("0° baja + 270° alta → gira con 2 det (early-exit, sin 90/180)", async () => {
@@ -913,9 +915,9 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).not.toBe(blob);
     expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1]);
+    expect(detLlamadas).toStrictEqual([0, 1]);
     // rot270 del bitmap 64x32: 4º lienzo (rot0, base0, rec0, rot270).
-    expect([lienzos[3]?.width, lienzos[3]?.height]).toEqual([32, 64]);
+    expect([lienzos[3]?.width, lienzos[3]?.height]).toStrictEqual([32, 64]);
   });
 
   it("sin OK → gana el más alto (270) con loop completo", async () => {
@@ -925,7 +927,7 @@ describe("enderezar (decisión rec)", () => {
     );
     const r = await enderezar(new Blob(["foto"]), deps);
     expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+    expect(detLlamadas).toStrictEqual([0, 1, 2, 3]);
   });
 
   it("todo bajo sin OK → gana el más alto aunque sea bajo (270)", async () => {
@@ -936,7 +938,7 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).not.toBe(blob);
     expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+    expect(detLlamadas).toStrictEqual([0, 1, 2, 3]);
   });
 
   it("fondo tenue sin cajas → loop completo y quieta", async () => {
@@ -947,8 +949,8 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(detLlamadas).toEqual([0, 1, 2, 3]);
-    expect(recLlamadas).toEqual([]);
+    expect(detLlamadas).toStrictEqual([0, 1, 2, 3]);
+    expect(recLlamadas).toStrictEqual([]);
   });
 
   it("mapa cero → quieta con 1 det (sin texto: ni giros)", async () => {
@@ -956,8 +958,8 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(detLlamadas).toEqual([0]);
-    expect(recLlamadas).toEqual([]);
+    expect(detLlamadas).toStrictEqual([0]);
+    expect(recLlamadas).toStrictEqual([]);
   });
 
   it("lote rec falla en 270 → reintenta individual y gana 270 (L2)", async () => {
@@ -968,8 +970,8 @@ describe("enderezar (decisión rec)", () => {
     );
     const r = await enderezar(new Blob(["foto"]), deps);
     expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1]);
-    expect(recLlamadas).toEqual([0, 1, 2]);
+    expect(detLlamadas).toStrictEqual([0, 1]);
+    expect(recLlamadas).toStrictEqual([0, 1, 2]);
   });
 
   it("núcleo caído → quieto sin lanzar", async () => {
@@ -997,8 +999,8 @@ describe("enderezar (decisión rec)", () => {
     });
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(detLlamadas).toEqual([]);
-    expect(recLlamadas).toEqual([]);
+    expect(detLlamadas).toStrictEqual([]);
+    expect(recLlamadas).toStrictEqual([]);
   });
 
   it("sin contexto 2d → quieta (rot nulo)", async () => {
@@ -1010,7 +1012,7 @@ describe("enderezar (decisión rec)", () => {
     });
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(r.cajas).toEqual([]);
+    expect(r.cajas).toStrictEqual([]);
   });
 
   it("det sin dims → giros vacíos y quieta", async () => {
@@ -1019,9 +1021,9 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(r.cajas).toEqual([]);
-    expect(detLlamadas).toEqual([0]);
-    expect(recLlamadas).toEqual([]);
+    expect(r.cajas).toStrictEqual([]);
+    expect(detLlamadas).toStrictEqual([0]);
+    expect(recLlamadas).toStrictEqual([]);
   });
 
   it("det caído → quieta sin lanzar", async () => {
@@ -1074,14 +1076,14 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+    expect(detLlamadas).toStrictEqual([0, 1, 2, 3]);
     expect(recLlamadas).toHaveLength(4);
   });
 
   it("sin deps → quieta sin lanzar (reales no disponibles en jsdom)", async () => {
     const r = await enderezar(new Blob(["x"]));
     expect(r.grados).toBe(0);
-    expect(r.cajas).toEqual([]);
+    expect(r.cajas).toStrictEqual([]);
   });
 });
 

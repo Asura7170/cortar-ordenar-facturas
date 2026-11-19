@@ -54,23 +54,23 @@ describe("candidatos", () => {
     h.slots[2] = comprobante({ estado: "ok", textoOcr: "   " });
     h.slots[3] = comprobante({ estado: "pendiente", textoOcr: "TOTAL 5" });
     state.hojas.push(h);
-    expect(candidatos()).toEqual([ok]);
+    expect(candidatos()).toStrictEqual([ok]);
   });
 
   it("marca manual: fuera aunque esté en null", () => {
     const h = crearHoja();
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5", montoManual: true });
     state.hojas.push(h);
-    expect(candidatos()).toEqual([]);
+    expect(candidatos()).toStrictEqual([]);
   });
 });
 
 describe("regex", () => {
   it("filtra cuentas sin decimal e ignora precios ×4 decimales", () => {
-    expect(extractCandidates("Bs 18,490.34 Cuenta 40005189200").map((c) => c.valor)).toEqual([
+    expect(extractCandidates("Bs 18,490.34 Cuenta 40005189200").map((c) => c.valor)).toStrictEqual([
       "18,490.34",
     ]);
-    expect(extractCandidates("x Bs 8.2500 = Bs 1,650.00").map((c) => c.valor)).toEqual([
+    expect(extractCandidates("x Bs 8.2500 = Bs 1,650.00").map((c) => c.valor)).toStrictEqual([
       "1,650.00",
     ]);
   });
@@ -201,22 +201,22 @@ describe("aplicarTotales", () => {
 
 describe("computarLote", () => {
   it("sin candidatos → sin-candidatos", () => {
-    expect(computarLote([])).toEqual({ tipo: "sin-candidatos" });
+    expect(computarLote([])).toStrictEqual({ tipo: "sin-candidatos" });
   });
 
   it("candidatos sin texto → sin-texto", () => {
-    expect(computarLote([comprobante({ textoOcr: "   " })])).toEqual({ tipo: "sin-texto" });
+    expect(computarLote([comprobante({ textoOcr: "   " })])).toStrictEqual({ tipo: "sin-texto" });
   });
 
   it("sin montos → sin-totales", () => {
     const c = comprobante({ textoOcr: "recorte malo sin números" });
-    expect(computarLote([c])).toEqual({ tipo: "sin-totales" });
+    expect(computarLote([c])).toStrictEqual({ tipo: "sin-totales" });
   });
 
   it("listo mapea idx/id/texto y el mapa de totales", () => {
     const c1 = comprobante({ textoOcr: "TOTAL 12.50" });
     const c2 = comprobante({ textoOcr: "TOTAL 7.00" });
-    expect(computarLote([c1, c2])).toEqual({
+    expect(computarLote([c1, c2])).toStrictEqual({
       tipo: "listo",
       items: [
         { idx: 1, id: c1.id, texto: "TOTAL 12.50" },
