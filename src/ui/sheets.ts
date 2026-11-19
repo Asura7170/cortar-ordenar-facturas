@@ -152,13 +152,13 @@ function pintarCeldaOcr(div: HTMLElement, item: Comprobante): void {
   div.classList.add("cell-ocr");
   const pre = document.createElement("pre");
   pre.className = "cell-ocr-text";
-  let sinTexto = "Sin texto OCR";
+  let marcador = "Sin texto OCR";
   if (item.estado === "procesando") {
-    sinTexto = "Procesando…";
+    marcador = "Procesando…";
   } else if (item.estado === "pendiente") {
-    sinTexto = "Pendiente";
+    marcador = "Pendiente";
   }
-  pre.textContent = sanear(item.textoOcr || sinTexto);
+  pre.textContent = sanear(item.textoOcr || marcador);
   const btn = document.createElement("button");
   btn.className = "cell-remove";
   btn.dataset["accion"] = "copiar-ocr";
