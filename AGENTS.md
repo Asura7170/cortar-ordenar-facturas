@@ -68,9 +68,23 @@ Solo Chrome/Chromium desktop. Se vale usar lo más moderno disponible en Chrome 
 
 - `type="module"`, `const` por defecto. Código en español (ids, comentarios, UI).
 - Comentarios `ponytail:` marcan simplificaciones deliberadas — no "arreglarlos" sin motivo.
-- `docs/` e `image-test/` están en `.gitignore` (referencia/scratch local): no commitear ni importar desde ahí.
+- `docs/` e `image-test/` están en `.gitignore` (referencia/scratch local): no commitear ni importar desde ahí, salvo `docs/agents/` y `docs/adr/`, que se versionan.
 - **NUNCA tocar el zoom de la GUI/TUI de Orca** (el programa en el que se trabaja): ni `Ctrl±/0`, ni rueda+tecla, ni menús del host — al hacer zoom sobre la pestaña activa de Orca se escapa el zoom del programa completo y arruina la sesión del usuario. El "zoom" de test solo va a la PÁGINA abierta: zoom nativo del chromium del browser embebido actuando sobre el documento (CSS `zoom` en la página) o viewport; jamás la superficie host. Si el atajo no está garantizado para la página, NO se envía: se cambia de método.
 - Prohibido `git commit`, `push`, `merge`, crear PRs o reescribir historial (`--force`, `reset --hard`) sin petición explícita del usuario en el prompt. Sin esa orden, los cambios quedan sin commitear.
+
+## Agent skills
+
+### Issue tracker
+
+Issues y specs viven como markdown local en `docs/<feature>/` (gitignored). Ver `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Los cinco roles canónicos usan sus nombres por defecto (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). Ver `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` en la raíz y `docs/adr/` para decisiones. Ver `docs/agents/domain.md`.
 
 # Ultracite Code Standards
 
