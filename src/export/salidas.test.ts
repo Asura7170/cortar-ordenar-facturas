@@ -320,7 +320,9 @@ describe("construirDocumento (docx mockeado)", () => {
       await construirDocumento(state.hojas, "", "inf-der");
       const imgs = deTipo("ImageRun");
       expect(imgs).toHaveLength(1);
-      const data = (imgs[0]?.opc as { data: ArrayBuffer }).data;
+      const img = imgs[0];
+      if (!img) throw new Error("imagen ausente");
+      const data = (img.opc as { data: ArrayBuffer }).data;
       const bytes = new Uint8Array(data).slice(0, 3);
       expect(bytes).toEqual(new Uint8Array([0xff, 0xd8, 0xff]));
       expect(toBlob).toHaveBeenCalledWith(expect.any(Function), "image/jpeg", expect.any(Number));

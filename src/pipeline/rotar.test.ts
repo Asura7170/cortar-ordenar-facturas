@@ -269,6 +269,7 @@ describe("girarYReleer", () => {
           soltar = res;
         }),
     });
+    // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- soltar lo muta el executor; cota 100
     for (let i = 0; i < 100 && !soltar; i++) await Promise.resolve();
     soltar?.(bmp as unknown as ImageBitmap);
     const urlAntes = c.imgUrl;
@@ -299,6 +300,7 @@ describe("girarYReleer", () => {
             toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
           }) as unknown as HTMLCanvasElement,
       });
+      // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- soltar lo muta el executor; cota 100
       for (let i = 0; i < 100 && !soltar; i++) await Promise.resolve();
       soltar?.(bmp as unknown as ImageBitmap);
       state.hojas = [crearHoja()]; // Limpiar durante el await.
@@ -372,7 +374,7 @@ describe("girarYReleer", () => {
       const previoBlob = new Blob(["previo"]);
       let soltarGiro: ((b: ImageBitmap) => void) | undefined;
       let soltarPrevio: ((b: ImageBitmap) => void) | undefined;
-      const depsGiro = {
+      const depsGiroEnVuelo = {
         // Puertas por fuente: el giro se suspende en el previo, a mitad del commit.
         cargar: (f: Blob) => {
           if (f === previoBlob) {
@@ -403,12 +405,14 @@ describe("girarYReleer", () => {
       };
       const c = sembrar();
       c.previoDocAligner = previoBlob;
-      const pg = girarYReleer(c.id, 90, depsGiro as never);
+      const pg = girarYReleer(c.id, 90, depsGiroEnVuelo as never);
       await abrirRecorte(c.id, depsCrop as never);
+      // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- lo muta el executor; cota 100
       for (let i = 0; i < 100 && !soltarGiro; i++) await Promise.resolve();
       soltarGiro?.(bmpGiro as unknown as ImageBitmap);
       // El giro queda suspendido entre imgUrl= y file= (código viejo): ahí
       // commitea el recorte entero y recién después termina el giro.
+      // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- lo muta el executor; cota 200
       for (let i = 0; i < 200 && !soltarPrevio; i++) await Promise.resolve();
       document.getElementById("btnRecorteOk")?.click();
       await new Promise((r) => setTimeout(r, 200)); // confirmar entero (C gana píxeles)
