@@ -287,7 +287,8 @@ describe("pivotar/eliminar", () => {
       [0, 1],
     ]);
     expect(b).toStrictEqual([2, 1]);
-    pivotar(a, b, 1, 2); // ya pivoteado: sin swap
+    // ya pivoteado: sin swap
+    pivotar(a, b, 1, 2);
     expect(a).toStrictEqual([
       [1, 0],
       [0, 1],
@@ -300,7 +301,8 @@ describe("pivotar/eliminar", () => {
       [0, 1],
     ];
     const b = [5, 7];
-    eliminar(a, b, 0, 2); // factores 0: sin cambios
+    // factores 0: sin cambios
+    eliminar(a, b, 0, 2);
     expect(a).toStrictEqual([
       [1, 0],
       [0, 1],
@@ -311,7 +313,8 @@ describe("pivotar/eliminar", () => {
       [3, 4],
     ];
     const d = [5, 11];
-    eliminar(c, d, 0, 2); // fil 1 con factor 3
+    // fil 1 con factor 3
+    eliminar(c, d, 0, 2);
     expect(c[1]).toStrictEqual([0, -2]);
     expect(d).toStrictEqual([5, -4]);
   });
@@ -339,9 +342,11 @@ describe("masaComponente/mejorComponente", () => {
     const visitados = new Uint8Array(4);
     const heat = new Float32Array([0.1, 0.9, 0, 0]);
     expect(vecinoAceptable(visitados, heat, 0, 1, 0.3)).toBe(true);
-    expect(vecinoAceptable(visitados, heat, 0, 0, 0.3)).toBe(false); // frío
+    // frío
+    expect(vecinoAceptable(visitados, heat, 0, 0, 0.3)).toBe(false);
     visitados[1] = 1;
-    expect(vecinoAceptable(visitados, heat, 0, 1, 0.3)).toBe(false); // visitado
+    // visitado
+    expect(vecinoAceptable(visitados, heat, 0, 1, 0.3)).toBe(false);
   });
 
   it("bloque 2×2 suma masa y centroide", () => {
@@ -351,7 +356,8 @@ describe("masaComponente/mejorComponente", () => {
     heat[5] = 1;
     heat[6] = 1;
     heat[9] = 1;
-    heat[10] = 1; // bloque (1,1)-(2,2)
+    // bloque (1,1)-(2,2)
+    heat[10] = 1;
     const visitados = new Uint8Array(w * h);
     const pila = new Int32Array(w * h);
     const { masa, sumaX, sumaY } = masaComponente(heat, 0, w, h, 0.3, 5, visitados, pila);
@@ -364,9 +370,11 @@ describe("masaComponente/mejorComponente", () => {
     const w = 4;
     const h = 4;
     const heat = new Float32Array(w * h).fill(0);
-    heat[0] = 0.5; // componente chica en (0,0)
+    // componente chica en (0,0)
+    heat[0] = 0.5;
     heat[10] = 1;
-    heat[11] = 1; // componente grande en (2,2)-(3,2)
+    // componente grande en (2,2)-(3,2)
+    heat[11] = 1;
     const visitados = new Uint8Array(w * h);
     const pila = new Int32Array(w * h);
     const { punto, pico } = mejorComponente(heat, 0, w, h, 0.3, 40, 40, visitados, pila);
@@ -900,7 +908,8 @@ describe("descargarPesos", () => {
       // se estaca 300s por foto sin el backoff).
       await expect(descargarPesos()).rejects.toThrow("recién falló");
       expect(fetchFn).toHaveBeenCalledOnce();
-      reactivarIa(); // como el botón "Probar IA": suelta el enfriamiento
+      // como el botón "Probar IA": suelta el enfriamiento
+      reactivarIa();
       await expect(descargarPesos()).rejects.toThrow("corrupto");
       expect(fetchFn).toHaveBeenCalledTimes(2);
     } finally {
@@ -975,7 +984,8 @@ describe("descargarPesos", () => {
       await olvidarSesionFallida();
       expect(tienda.size).toBe(1);
       await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("create corrupto");
-      expect(intentos).toBe(2); // latch suelto: webgpu se reintenta
+      // latch suelto: webgpu se reintenta
+      expect(intentos).toBe(2);
       // El 2º consecutivo es el "Borrar modelos" automático: los bytes muertos salen.
       await olvidarSesionFallida();
       expect(tienda.size).toBe(0);
@@ -997,11 +1007,15 @@ describe("descargarPesos", () => {
         throw new Error("GPU busy");
       };
       await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("GPU busy");
-      await olvidarSesionFallida(); // strike 1
-      notarSesionOk(); // la sesión resolvió: el historial muere
+      // strike 1
+      await olvidarSesionFallida();
+      // la sesión resolvió: el historial muere
+      notarSesionOk();
       await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("GPU busy");
-      await olvidarSesionFallida(); // strike 1 otra vez
-      expect(tienda.size).toBe(1); // nunca llegó al 2º consecutivo real
+      // strike 1 otra vez
+      await olvidarSesionFallida();
+      // nunca llegó al 2º consecutivo real
+      expect(tienda.size).toBe(1);
     } finally {
       restaurar();
     }
@@ -1108,7 +1122,8 @@ describe("descargarPesos", () => {
     try {
       const p = descargarConCache("k", 30_000, 2);
       await new Promise((res) => setTimeout(res, 10));
-      expect(tienda.size).toBe(0); // fetch listo, put atascado
+      // fetch listo, put atascado
+      expect(tienda.size).toBe(0);
       abrir();
       await expect(p).resolves.toBe(BYTES);
       expect(tienda.size).toBe(1);

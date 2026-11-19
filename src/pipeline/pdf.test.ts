@@ -333,7 +333,8 @@ describe("abrirPdfReal (default de expandirPdf, pdfjs falso)", () => {
 
   it("MediaBox extremo: vista insegura → null y cierra", async () => {
     destruida = false;
-    pdfjsFalso.GlobalWorkerOptions.workerSrc = "fijado"; // cubre ||= ya configurado
+    // cubre ||= ya configurado
+    pdfjsFalso.GlobalWorkerOptions.workerSrc = "fijado";
     getDocumentFalso.mockReturnValue(tareaFalsa({ width: 1, height: 4000 }) as never);
     const pags = await expandirPdf(pdfReal());
     expect(pags).toStrictEqual([]);
@@ -351,8 +352,10 @@ describe("abrirPdfReal (default de expandirPdf, pdfjs falso)", () => {
 describe("vistaSegura", () => {
   it("normal sí; MediaBox extremo (1pt ancho, NaN, área gigante) no", () => {
     expect(vistaSegura(720, 1000)).toBe(true);
-    expect(vistaSegura(1, 1000)).toBe(true); // base angosta pero real; el escalado la filtra
-    expect(vistaSegura(720, 720_000)).toBe(false); // 518M px colgaría la pestaña
+    // base angosta pero real; el escalado la filtra
+    expect(vistaSegura(1, 1000)).toBe(true);
+    // 518M px colgaría la pestaña
+    expect(vistaSegura(720, 720_000)).toBe(false);
     expect(vistaSegura(Number.NaN, 100)).toBe(false);
     expect(vistaSegura(0, 100)).toBe(false);
   });

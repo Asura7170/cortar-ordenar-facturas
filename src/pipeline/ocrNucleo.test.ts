@@ -19,8 +19,10 @@ const { iaOk, notarSesionOk, reactivarIa } = await import("./docaligner");
 // Mismas plantillas que las consts privadas de ocr.ts (no exportadas a propósito).
 const DET = `${import.meta.env.BASE_URL}models/ocr/det.onnx`;
 const REC = `${import.meta.env.BASE_URL}models/ocr/rec.onnx`;
-const BUF_DET = new ArrayBuffer(5_000_000); // minBytes det (ocr.ts)
-const BUF_REC = new ArrayBuffer(10_000_000); // minBytes rec
+// minBytes det (ocr.ts)
+const BUF_DET = new ArrayBuffer(5_000_000);
+// minBytes rec
+const BUF_REC = new ArrayBuffer(10_000_000);
 
 // jsdom no trae Response: dummy con arrayBuffer (el put falso ignora el init).
 class RespuestaFalsa {

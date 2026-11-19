@@ -217,11 +217,14 @@ describe("abrirRecorte", () => {
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(true);
       guia.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      expect(modal.open).toBe(true); // dentro: sigue abierto
+      // dentro: sigue abierto
+      expect(modal.open).toBe(true);
       modal.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      expect(modal.open).toBe(false); // velo (target = dialog): cierra
+      // velo (target = dialog): cierra
+      expect(modal.open).toBe(false);
       expect(state.cierreRecorte).toBeGreaterThan(0);
-      expect(c.file).toBeDefined(); // cerrar no commitea
+      // cerrar no commitea
+      expect(c.file).toBeDefined();
     } finally {
       ctx.mockRestore();
       state.cierreRecorte = 0;
@@ -366,7 +369,8 @@ describe("abrirRecorte", () => {
       const { deps } = depsRecorte();
       await abrirRecorte(c.id, deps as never);
       btnOk.click();
-      await vi.advanceTimersByTimeAsync(2000); // vence el debounce del giro
+      // vence el debounce del giro
+      await vi.advanceTimersByTimeAsync(2000);
       // Solo la relectura inmediata del recorte (sin fix serían 2).
       expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
       expect(c.textoOcr).toBe("TOTAL LEÍDO");
@@ -421,7 +425,8 @@ describe("abrirRecorte", () => {
       const fileAntes = c.file;
       const urlAntes = c.imgUrl;
       await abrirRecorte(c.id, deps as never);
-      state.hojas.length = 0; // Limpiar tras abrir, antes de confirmar.
+      // Limpiar tras abrir, antes de confirmar.
+      state.hojas.length = 0;
       btnOk.click();
       await vaciar();
       expect(c.file).toBe(fileAntes);
@@ -450,8 +455,10 @@ describe("abrirRecorte", () => {
       const urlVieja = c.imgUrl;
       await abrirRecorte(c.id, deps as never);
       btnOk.click();
-      await vaciar(); // confirmar quedó esperando el toBlob
-      modal.close(); // cancelar en vuelo
+      // confirmar quedó esperando el toBlob
+      await vaciar();
+      // cancelar en vuelo
+      modal.close();
       resolve(new Blob(["recorte"]));
       await vaciar();
       // Sin el guard idAbierto, el commit sobrevivía al descarte.
@@ -483,9 +490,12 @@ describe("abrirRecorte", () => {
       const antes = c.file;
       await abrirRecorte(c.id, deps as never);
       btnOk.click();
-      await vaciar(); // confirmar quedó esperando el toBlob
-      modal.close(); // descartar...
-      await abrirRecorte(c.id, deps as never); // ...y reabrir el mismo comprobante
+      // confirmar quedó esperando el toBlob
+      await vaciar();
+      // descartar...
+      modal.close();
+      // ...y reabrir el mismo comprobante
+      await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(true);
       resolve(new Blob(["recorte"]));
       await vaciar();
@@ -550,7 +560,8 @@ describe("abrirRecorte", () => {
       };
       const c = sembrar();
       const apertura = abrirRecorte(c.id, deps as never);
-      state.hojas.length = 0; // Limpiar durante el decode.
+      // Limpiar durante el decode.
+      state.hojas.length = 0;
       resolve();
       await apertura;
       expect(modal.open).toBe(false);
@@ -589,11 +600,13 @@ describe("abrirRecorte", () => {
       const antes = c.file;
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(true);
-      modal.close(); // Escape/native: el evento close limpia
+      // Escape/native: el evento close limpia
+      modal.close();
       expect(c.file).toBe(antes);
       expect(c.textoOcr).toBe("VIEJO");
       expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
-      expect(bmp.close).toHaveBeenCalled(); // bitmap liberado
+      // bitmap liberado
+      expect(bmp.close).toHaveBeenCalled();
     } finally {
       ctx.mockRestore();
     }
@@ -645,7 +658,8 @@ describe("abrirRecorte", () => {
       const antes = c.file;
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(true);
-      btnOk.click(); // rect completo 5x5 < MIN_NATURAL 8
+      // rect completo 5x5 < MIN_NATURAL 8
+      btnOk.click();
       await vaciar();
       expect(c.file).toBe(antes);
       expect(document.getElementById("aviso")?.textContent).toBe(
@@ -989,13 +1003,17 @@ describe("editor: filas de borde, teclado y extremos del commit", () => {
       const captura = guia as unknown as { setPointerCapture?: unknown };
       const cap = vi.fn<Element["setPointerCapture"]>();
       captura.setPointerCapture = cap;
-      guia.dispatchEvent(puntero("pointermove", 6, 6)); // esquina "no"
+      // esquina "no"
+      guia.dispatchEvent(puntero("pointermove", 6, 6));
       expect(guia.style.cursor).toBe("nwse-resize");
-      guia.dispatchEvent(puntero("pointermove", 300, 200)); // interior
+      // interior
+      guia.dispatchEvent(puntero("pointermove", 300, 200));
       expect(guia.style.cursor).toBe("move");
-      guia.dispatchEvent(puntero("pointermove", 3, 500)); // fuera (y de banda)
+      // fuera (y de banda)
+      guia.dispatchEvent(puntero("pointermove", 3, 500));
       expect(guia.style.cursor).toBe("default");
-      guia.dispatchEvent(puntero("pointermove", 60, 6)); // plena línea norte
+      // plena línea norte
+      guia.dispatchEvent(puntero("pointermove", 60, 6));
       expect(guia.style.cursor).toBe("ns-resize");
       guia.dispatchEvent(puntero("pointerdown", 60, 6));
       expect(cap).toHaveBeenCalledWith(1);

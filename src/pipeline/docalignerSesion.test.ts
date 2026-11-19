@@ -26,8 +26,10 @@ beforeEach(() => {
     arrayBuffer: async () => PESOS,
   } as Response);
   reintentarEps();
-  notarSesionOk(); // el historial de strikes no cruza tests
-  iaOk(); // ni el estado del uno-solo-toast
+  // el historial de strikes no cruza tests
+  notarSesionOk();
+  // ni el estado del uno-solo-toast
+  iaOk();
   crearFalso.mockReset();
 });
 
@@ -47,7 +49,8 @@ describe("crearSesion (ORT falso, resto real)", () => {
     // intento siguiente repite create; si el hardware sigue muerto, falla igual.
     crearFalso.mockClear();
     await expect(obtenerSesion()).rejects.toThrow("GPU muerta");
-    expect(crearFalso).toHaveBeenCalledTimes(2); // webgpu + wasm otra vez
+    // webgpu + wasm otra vez
+    expect(crearFalso).toHaveBeenCalledTimes(2);
   });
 
   it("peso corrupto expulsa el peso y reintenta", async () => {

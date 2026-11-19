@@ -276,10 +276,12 @@ describe("clic delegado", () => {
       btn.click();
       await vi.advanceTimersByTimeAsync(0);
       expect(btn.getAttribute("aria-label")).toBe("Copiado");
-      await vi.advanceTimersByTimeAsync(600); // cruza el deadline del 1.º → sigue ✓ si rearma
+      // cruza el deadline del 1.º → sigue ✓ si rearma
+      await vi.advanceTimersByTimeAsync(600);
       expect(btn.getAttribute("aria-label")).toBe("Copiado");
       expect(btn.classList.contains("copiado")).toBe(true);
-      await vi.advanceTimersByTimeAsync(600); // deadline del 2.º → revierte
+      // deadline del 2.º → revierte
+      await vi.advanceTimersByTimeAsync(600);
       expect(btn.querySelector("svg")).not.toBeNull();
       expect(btn.classList.contains("copiado")).toBe(false);
       expect(btn.getAttribute("aria-label")).toBe("Copiar OCR");
@@ -338,7 +340,8 @@ describe("celdas", () => {
     const cell = document.querySelector(".cell");
     const imgAntes = cell?.querySelector("img");
     expect(imgAntes).not.toBeNull();
-    c.montoCents = 1250; // como lo deja aplicarTotales
+    // como lo deja aplicarTotales
+    c.montoCents = 1250;
     expect(actualizarMontoCelda(c.id)).toBe(true);
     expect(document.querySelector(".cell-badge")?.textContent).toContain("12.50");
     expect(document.querySelector("input.cell-monto")).toBeNull();
@@ -374,8 +377,10 @@ describe("celdas", () => {
     if (!(input instanceof HTMLInputElement)) {
       throw new Error("sin input de monto");
     }
-    input.value = "abc"; // borrador inválido tras blur, sin foco
-    c.montoCents = 1250; // como lo deja aplicarTotales
+    // borrador inválido tras blur, sin foco
+    input.value = "abc";
+    // como lo deja aplicarTotales
+    c.montoCents = 1250;
     expect(actualizarMontoCelda(c.id)).toBe(false);
     expect(cell.querySelector("input.cell-monto")).not.toBeNull();
     expect(cell.querySelector(".cell-badge")).toBeNull();
@@ -481,11 +486,13 @@ describe("monto manual", () => {
   it("change inválido marca la celda (monto-error) y avisa en #aviso", () => {
     sembrarOk();
     const input = inputMonto();
-    input.value = "12,3"; // coma sin grupo de miles: parsearMonto la rechaza
+    // coma sin grupo de miles: parsearMonto la rechaza
+    input.value = "12,3";
     input.dispatchEvent(new Event("change", { bubbles: true }));
     const deNuevo = inputMonto();
     expect(deNuevo.classList.contains("monto-error")).toBe(true);
-    expect(deNuevo.value).toBe("12,3"); // borrador intacto
+    // borrador intacto
+    expect(deNuevo.value).toBe("12,3");
     expect(document.getElementById("aviso")?.textContent).toContain("Formato no válido");
     expect(document.querySelector("#aviso > .toast-error")).not.toBeNull();
   });
@@ -498,7 +505,8 @@ describe("monto manual", () => {
     const diferidos: (() => void)[] = [];
     Object.defineProperty(document, "startViewTransition", {
       value: (cb: () => void): object => {
-        diferidos.push(cb); // Chrome invoca el callback en la oportunidad de render
+        // Chrome invoca el callback en la oportunidad de render
+        diferidos.push(cb);
         return {};
       },
       configurable: true,
@@ -506,7 +514,8 @@ describe("monto manual", () => {
     try {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       expect(input.classList.contains("monto-error")).toBe(true);
-      diferidos.forEach((cb) => cb()); // el swap llega después
+      // el swap llega después
+      diferidos.forEach((cb) => cb());
       const deNuevo = inputMonto();
       expect(deNuevo.classList.contains("monto-error")).toBe(true);
       expect(deNuevo.getAttribute("aria-invalid")).toBe("true");
@@ -608,7 +617,8 @@ describe("monto manual", () => {
     input.value = "abc";
     input.blur();
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    renderHojas(); // cola/mini pintando de fondo sin foco en el input
+    // cola/mini pintando de fondo sin foco en el input
+    renderHojas();
     expect(inputMonto().value).toBe("abc");
     expect(c.montoCents).toBeNull();
     expect(document.activeElement).not.toBe(inputMonto());
@@ -649,7 +659,8 @@ describe("monto manual", () => {
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     const editando = inputMonto();
     editando.value = "abc";
-    editando.blur(); // el foco ya salió (clic fuera): el change no lo trae de vuelta
+    // el foco ya salió (clic fuera): el change no lo trae de vuelta
+    editando.blur();
     editando.dispatchEvent(new Event("change", { bubbles: true }));
     expect(c.montoCents).toBe(50_000);
     const deNuevo = inputMonto();
@@ -663,7 +674,8 @@ describe("monto manual", () => {
     input.value = "12.5";
     input.focus();
     input.setSelectionRange(2, 2);
-    renderHojas(); // p. ej. la cola pintando otro ítem
+    // p. ej. la cola pintando otro ítem
+    renderHojas();
     const deNuevo = inputMonto();
     expect(deNuevo.value).toBe("12.5");
     expect(document.activeElement).toBe(deNuevo);
@@ -845,7 +857,8 @@ describe("drop de archivos sobre hojas", () => {
   });
 
   it("drop sobre el fantasma va por el flujo normal (null)", () => {
-    sembrar("u1", [100]); // llena → fantasma
+    // llena → fantasma
+    sembrar("u1", [100]);
     const files = [new File(["x"], "d.png", { type: "image/png" })];
     agregarArchivos.mockClear();
     document.querySelector(".sheet-fantasma")?.dispatchEvent(eventoDrop(files));
@@ -862,7 +875,8 @@ describe("drop de archivos sobre hojas", () => {
   });
 
   it("dragover sobre el fantasma no resalta", () => {
-    sembrar("u1", [100]); // llena → fantasma
+    // llena → fantasma
+    sembrar("u1", [100]);
     const fantasma = document.querySelector(".sheet-fantasma");
     if (!fantasma) {
       throw new Error("sin fantasma");
@@ -983,10 +997,13 @@ describe("drop de archivos sobre hojas", () => {
       );
     };
     try {
-      borde(790); // y > bottom−70 → scroll hacia abajo
-      await new Promise((r) => setTimeout(r, 60)); // paso corre en rAF reales
+      // y > bottom−70 → scroll hacia abajo
+      borde(790);
+      // paso corre en rAF reales
+      await new Promise((r) => setTimeout(r, 60));
       expect(scrollBy).toHaveBeenCalledWith({ top: 14 });
-      borde(400); // zona muerta → detenerScroll
+      // zona muerta → detenerScroll
+      borde(400);
       const n = scrollBy.mock.calls.length;
       await new Promise((r) => setTimeout(r, 60));
       expect(scrollBy.mock.calls).toHaveLength(n);
@@ -1176,9 +1193,11 @@ describe("lupa", () => {
         }),
       );
     };
-    press(10); // apaga la lupa y arma la supresión…
+    // apaga la lupa y arma la supresión…
+    press(10);
     expect(btn.getAttribute("aria-pressed")).toBe("false");
-    press(20); // …pero el clic nunca llega (soltar fuera): se purga
+    // …pero el clic nunca llega (soltar fuera): se purga
+    press(20);
     const libre = new Event("click", { bubbles: true, cancelable: true });
     document.dispatchEvent(libre);
     expect(libre.defaultPrevented).toBe(false);
@@ -1241,7 +1260,8 @@ describe("lupa", () => {
         Object.assign(new Event(tipo, { bubbles: true }), { clientX: 200, clientY: 200 }),
       );
     };
-    mover("pointerenter"); // apagada: no hace nada
+    // apagada: no hace nada
+    mover("pointerenter");
     expect(el("lupa").style.opacity).toBe("0");
     btn.click();
     mover("pointermove");
@@ -1268,7 +1288,8 @@ describe("lupa", () => {
       return !c.defaultPrevented;
     };
     btn.click();
-    press(); // apaga y arma la supresión…
+    // apaga y arma la supresión…
+    press();
     expect(btn.getAttribute("aria-pressed")).toBe("false");
     // …pero un keydown (click de teclado en camino) la purga:
     document.dispatchEvent(
@@ -1276,9 +1297,11 @@ describe("lupa", () => {
     );
     expect(clicPasa()).toBe(true);
     btn.click();
-    press(); // rearma…
+    // rearma…
+    press();
     document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
-    expect(clicPasa()).toBe(true); // …gesto abortado: nada que tragar
+    // …gesto abortado: nada que tragar
+    expect(clicPasa()).toBe(true);
   });
 });
 
@@ -1302,7 +1325,8 @@ describe("giro manual", () => {
   }
 
   it("botones ⟲⟳ solo en celda ok en modo imagen", () => {
-    sembrar("u1", [100]); // pendiente: sin botones
+    // pendiente: sin botones
+    sembrar("u1", [100]);
     expect(document.querySelector('[data-accion="girar-izq"]')).toBeNull();
     sembrarGirable();
     expect(botonGiro("girar-izq").getAttribute("aria-label")).toBe("Girar a la izquierda");
@@ -1310,7 +1334,8 @@ describe("giro manual", () => {
   });
 
   it("botón ✂ solo en celda ok en modo imagen", () => {
-    sembrar("u1", [100]); // pendiente: sin botón
+    // pendiente: sin botón
+    sembrar("u1", [100]);
     expect(document.querySelector('[data-accion="recortar"]')).toBeNull();
     sembrarGirable();
     const b = document.querySelector<HTMLButtonElement>('[data-accion="recortar"]');
@@ -1462,7 +1487,8 @@ describe("drag: render pendiente y cancelaciones", () => {
   it("render durante el drag se pospone hasta soltar", () => {
     sembrar("u4x2", [100]);
     pressImg();
-    renderHojas(); // pospuesto: la grilla no se reconstruye en arrastre
+    // pospuesto: la grilla no se reconstruye en arrastre
+    renderHojas();
     soltarDoc(10, 10);
     expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
@@ -1618,7 +1644,8 @@ describe("drag entre celdas (swap)", () => {
       const h = sembrar("u4x2", [100, 200]);
       pressCelda(0, 10, 10);
       moverDoc(170, 50);
-      await esperarRaf(); // moveRaf: resalta destino + autoscroll en vuelo
+      // moveRaf: resalta destino + autoscroll en vuelo
+      await esperarRaf();
       moverDoc(171, 51);
       soltarDoc(170, 50);
       expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([200, 100]);
@@ -1639,7 +1666,8 @@ describe("drag entre celdas (swap)", () => {
       try {
         pressCelda(0, 10, 10);
         moverDoc(170, 50);
-        await esperarRaf(); // moveRaf: el destino propio se anula
+        // moveRaf: el destino propio se anula
+        await esperarRaf();
         soltarDoc(170, 50);
         expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
       } finally {
@@ -1715,7 +1743,8 @@ describe("drag entre celdas (swap)", () => {
       const h = sembrar("u4x2", [100, 200]);
       pressCelda(0, 10, 10);
       moverDoc(170, 50);
-      soltarDoc(170, 50); // centro exacto de la celda destino: dx=dy=0
+      // centro exacto de la celda destino: dx=dy=0
+      soltarDoc(170, 50);
       expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([200, 100]);
       // imgA salta por hypot<2 y solo imgB vuela: sin el guard serían 2.
       expect(vuelos).toHaveLength(1);
@@ -1924,7 +1953,8 @@ describe("reorden por teclado (2.5.7)", () => {
     sembrar("u1", [100]);
     const b = sembrar("u4x2", [200, null]);
     tecla(0, "ArrowRight");
-    expect(state.hojas.map(montos)).toStrictEqual([[200], [100, null]]); // swap 200↔100, nada se pierde
+    // swap 200↔100, nada se pierde
+    expect(state.hojas.map(montos)).toStrictEqual([[200], [100, null]]);
     const foco = document.activeElement;
     expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
     expect(foco?.getAttribute("data-slot")).toBe("0");
@@ -1939,7 +1969,8 @@ describe("reorden por teclado (2.5.7)", () => {
   it("Ctrl+↓ conserva el slot; fila corta cae al primer hueco y enfoca", () => {
     const a = sembrar("u4x2", [100, null, null, 300]);
     const b = sembrar("u2h", [200, null]);
-    tecla(1, "ArrowDown"); // slot 3 no existe en u2h: cae al hueco 1
+    // slot 3 no existe en u2h: cae al hueco 1
+    tecla(1, "ArrowDown");
     expect(montos(b)).toStrictEqual([200, 300]);
     expect(montos(a)).toStrictEqual([100, null, null, null]);
     const foco = document.activeElement;
@@ -1950,7 +1981,8 @@ describe("reorden por teclado (2.5.7)", () => {
   it("hoja destino llena sin hueco: silencio", () => {
     sembrar("u4x2", [null, null, null, 300]);
     sembrar("u1", [200]);
-    tecla(0, "ArrowDown"); // u1 no tiene slot 3 ni hueco
+    // u1 no tiene slot 3 ni hueco
+    tecla(0, "ArrowDown");
     expect(state.hojas.map(montos)).toStrictEqual([[null, null, null, 300], [200]]);
   });
 
@@ -1958,7 +1990,8 @@ describe("reorden por teclado (2.5.7)", () => {
     sembrar("u1", [100]);
     const b = sembrar("u1", [null]);
     tecla(0, "ArrowRight");
-    expect(state.hojas).toHaveLength(1); // la primera quedó vacía: limpiarHojas
+    // la primera quedó vacía: limpiarHojas
+    expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]?.slots.map((c) => (c ? c.montoCents : null))).toStrictEqual([100]);
     const foco = document.activeElement;
     expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));

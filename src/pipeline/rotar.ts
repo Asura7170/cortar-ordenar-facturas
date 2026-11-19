@@ -245,9 +245,10 @@ async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
     // ponytail: las sesiones ORT son singletons sin mutex interno (un run()
     // concurrente de la cola + este cuelga a ambos): el OCR espera su turno.
     await drenarSiLaColaTrabaja();
+    // el item murió en la espera: nada que releer
     if (!buscarSlot(id)) {
       return;
-    } // el item murió en la espera: nada que releer
+    }
     const texto = await textoDeOcr(blob, deps);
     // ponytail: ok ANTES del lote (candidatos exige ok: en procesando se autoexcluía).
     if (buscarSlot(id)) {
@@ -259,7 +260,8 @@ async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
     // texto ya quedaron pintados arriba).
     if (!item.montoManual && buscarSlot(id)) {
       item.montoCents = null;
-      renderHojas(); // el lote puede ser no-op: sin esto el badge viejo miente
+      // el lote puede ser no-op: sin esto el badge viejo miente
+      renderHojas();
       await reabrirMonto();
     }
   } catch {

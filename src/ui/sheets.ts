@@ -34,7 +34,8 @@ const tarjetaVacia: HTMLElement = getEl("dropzone");
 function btnPegarVacio(): HTMLButtonElement | null {
   return document.querySelector<HTMLButtonElement>("#btnPegar");
 }
-const canvasEl: HTMLElement = getEl("canvas"); // <main class="canvas" id="canvas"> (fallo fuerte al boot)
+// <main class="canvas" id="canvas"> (fallo fuerte al boot)
+const canvasEl: HTMLElement = getEl("canvas");
 
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
 
@@ -109,7 +110,8 @@ function pintarCelda(
     pintarBotonesDeOk(div);
   }
   const img = document.createElement("img");
-  img.src = item.imgUrl; // full-res con lazy, sin miniaturas
+  // full-res con lazy, sin miniaturas
+  img.src = item.imgUrl;
   img.alt = sanear(item.nombre);
   img.draggable = false;
   img.loading = "lazy";
@@ -344,7 +346,8 @@ function setStats(hojas: number, comps: number): void {
     for (const el of [statHojas, statComp]) {
       el.classList.remove("bump");
     }
-    void statHojas.offsetWidth; // reinicia el pop one-shot si estaba en vuelo
+    // reinicia el pop one-shot si estaba en vuelo
+    void statHojas.offsetWidth;
     statHojas.classList.add("bump");
     statComp.classList.add("bump");
   }
@@ -468,7 +471,8 @@ export function aplicarATodas(hojaId: string | number): void {
   state.hojas.forEach((x) => {
     x.layout = layoutId;
   });
-  redistribuir(layoutId); // las nuevas también reciben la plantilla propagada
+  // las nuevas también reciben la plantilla propagada
+  redistribuir(layoutId);
   renderHojas();
 }
 
@@ -650,9 +654,10 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
 
 /** ¿La celda es apta para repintar el badge? (modo, nodo, ítem y monto). */
 function celdaRepintable(id: number): boolean {
+  // en modo OCR la celda no lleva badge
   if (state.modoOcr) {
     return false;
-  } // en modo OCR la celda no lleva badge
+  }
   const cell = cellById(id);
   if (!cell) {
     return false;
@@ -664,11 +669,13 @@ function celdaRepintable(id: number): boolean {
 /** ¿El parche no pisaría una edición? (foco en el input o borrador sin foco). */
 function celdaSinEdicion(cell: HTMLElement): boolean {
   const activo = document.activeElement;
+  // edición en curso: no pisar
   if (activo instanceof HTMLInputElement && cell.contains(activo)) {
     return false;
-  } // edición en curso: no pisar
+  }
   const borrador = cell.querySelector("input.cell-monto");
-  return !(borrador instanceof HTMLInputElement && borrador.value !== ""); // borrador sin foco: no pisar
+  // borrador sin foco: no pisar
+  return !(borrador instanceof HTMLInputElement && borrador.value !== "");
 }
 
 // Repinta SOLO el monto de una celda (tick del re-chequeo) sin reconstruir la
@@ -678,11 +685,13 @@ export function actualizarMontoCelda(id: number): boolean {
   if (!celdaRepintable(id)) {
     return false;
   }
-  const cell = cellById(id) as HTMLElement; // celdaRepintable garantiza el nodo
+  // celdaRepintable garantiza el nodo
+  const cell = cellById(id) as HTMLElement;
   if (!celdaSinEdicion(cell)) {
     return false;
   }
-  const item = obtenerComprobante(id) as Comprobante; // garantizado arriba
+  // garantizado arriba
+  const item = obtenerComprobante(id) as Comprobante;
   const viejo = cell.querySelector(".cell-badge, input.cell-monto");
   const badge = document.createElement("button");
   badge.type = "button";
@@ -698,7 +707,8 @@ export function actualizarMontoCelda(id: number): boolean {
       cell.append(badge);
     }
   });
-  renderMonto(); // total general con suma local exacta
+  // total general con suma local exacta
+  renderMonto();
   return true;
 }
 
@@ -718,7 +728,8 @@ interface DragState {
 
 let pointerDrag: DragState | null = null;
 let scrollRaf: number | null = null;
-let scrollDir = 0; // dirección vigente del loop; autoScroll la actualiza
+// dirección vigente del loop; autoScroll la actualiza
+let scrollDir = 0;
 let moveRaf: number | null = null;
 let celdaResaltada: HTMLElement | null = null;
 let rectsCache: Map<Element, DOMRect> | null = null;
@@ -899,7 +910,8 @@ function autoScroll(x: number, y: number): void {
     const paso = (): void => {
       // ponytail: paso solo corre con scrollDir ≠ 0 (detenerScroll cancela el
       // rAF pendiente) y scrollRaf ≠ null (solo se anula al cancelar este paso).
-      canvasEl.scrollBy?.({ top: scrollDir }); // ?. : jsdom no implementa scrollBy; en Chrome siempre existe.
+      // ?. : jsdom no implementa scrollBy; en Chrome siempre existe.
+      canvasEl.scrollBy?.({ top: scrollDir });
       scrollRaf = requestAnimationFrame(paso);
     };
     scrollRaf = requestAnimationFrame(paso);
@@ -1161,12 +1173,14 @@ function vecinoLineal(
     fila destino es más corta. El re-enfoque sigue el patrón escaparMonto. */
 function cablearReordenTeclado(): void {
   sheetsEl.addEventListener("keydown", (e) => {
+    // mismo bloqueo que el drag manual
     if (state.modoOcr || pointerDrag) {
       return;
-    } // mismo bloqueo que el drag manual
+    }
+    // las flechas editan texto (no mover)
     if (esCampoTexto(e.target)) {
       return;
-    } // las flechas editan texto (no mover)
+    }
     const cell = e.target instanceof Element ? e.target.closest(".cell") : null;
     if (!(cell instanceof HTMLElement) || !cell.dataset["id"]) {
       return;
@@ -1189,9 +1203,10 @@ function cablearReordenTeclado(): void {
     let destino: { hoja: Hoja; slot: number };
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       const vecino = vecinoLineal(actual.hoja, actual.idx, e.key === "ArrowRight");
+      // borde del lote: no hay vecino
       if (!vecino) {
         return;
-      } // borde del lote: no hay vecino
+      }
       destino = vecino;
     } else {
       const otra = state.hojas[state.hojas.indexOf(actual.hoja) + (e.key === "ArrowDown" ? 1 : -1)];
@@ -1648,7 +1663,8 @@ function escaparMonto(e: KeyboardEvent, id: number): void {
   editandoMonto = null;
   descartarBorrador = true;
   try {
-    renderHojas(); // descarta el borrador sin disparar change
+    // descarta el borrador sin disparar change
+    renderHojas();
   } finally {
     descartarBorrador = false;
   }
@@ -1718,7 +1734,8 @@ function cablearArchivosFuera(): void {
     const sheet = target?.closest?.(".sheet");
     if (sheet instanceof HTMLElement && !sheet.contains(related)) {
       sheet.classList.remove("file-drop");
-      detenerScroll(); // el arrastre salió: sin esto el loop rAF seguía scrolleando.
+      // el arrastre salió: sin esto el loop rAF seguía scrolleando.
+      detenerScroll();
     }
   });
 }
@@ -1730,9 +1747,10 @@ function cablearArchivosSoltar(): void {
       return;
     }
     e.preventDefault();
+    // drop no-Elemento: nada que hacer (mismo guard que cablearAcciones)
     if (!(e.target instanceof Element)) {
       return;
-    } // drop no-Elemento: nada que hacer (mismo guard que cablearAcciones)
+    }
     const sheet = e.target.closest(".sheet");
     cancelarDragVisual();
     if (sheet instanceof HTMLElement) {
@@ -1789,7 +1807,8 @@ function cablearLupaApagar(): void {
     "pointerdown",
     (e) => {
       if (!lupaActiva) {
-        lupaSuprimirClic = false; // clic en vuelo que nunca llegó: no envenenar el próximo
+        // clic en vuelo que nunca llegó: no envenenar el próximo
+        lupaSuprimirClic = false;
         return;
       }
       if (!e.isPrimary) {

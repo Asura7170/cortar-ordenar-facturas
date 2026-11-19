@@ -157,7 +157,8 @@ function crearToast(m: ToastMensaje): HTMLDivElement {
       const archivo = document.createElement("span");
       archivo.className = "toast-archivo";
       archivo.textContent = sanear(m.archivo);
-      archivo.title = sanear(m.archivo); // completo: el ellipsis nunca esconde el valor
+      // completo: el ellipsis nunca esconde el valor
+      archivo.title = sanear(m.archivo);
       detalle.append(archivo);
     }
     cuerpo.append(detalle);
@@ -186,11 +187,13 @@ function apilarToast(el: HTMLElement, m: ToastMensaje): void {
     if (!primero) {
       break;
     }
-    cerrarToast(primero); // el más viejo hace lugar (con fade)
+    // el más viejo hace lugar (con fade)
+    cerrarToast(primero);
   }
   const toast = crearToast(m);
   programar(toast);
-  el.append(toast); // al final: el nuevo queda pegado a la esquina (abajo)
+  // al final: el nuevo queda pegado a la esquina (abajo)
+  el.append(toast);
 }
 
 /** Apila un lote de mensajos (respeta el cap: el más viejo sale primero). */

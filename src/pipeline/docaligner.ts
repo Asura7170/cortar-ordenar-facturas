@@ -667,7 +667,8 @@ let sesionEnCurso: Promise<SesionDetectora> | null = null;
 export function obtenerSesion(): Promise<SesionDetectora> {
   if (!sesionEnCurso) {
     sesionEnCurso = crearSesion().catch((error: unknown) => {
-      sesionEnCurso = null; // el siguiente comprobante reintenta
+      // el siguiente comprobante reintenta
+      sesionEnCurso = null;
       throw error;
     });
   }
@@ -905,7 +906,8 @@ async function intentoDeDescarga(
       throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
     }
     await guardarEnCache(cache, llave, pesos);
-    frioHasta.delete(clave); // el éxito reseca el enfriamiento
+    // el éxito reseca el enfriamiento
+    frioHasta.delete(clave);
     return pesos;
   } catch (error: unknown) {
     frioHasta.set(clave, Date.now() + ENFRIAMIENTO_MS);

@@ -476,20 +476,24 @@ async function elegirGiro(
     try {
       r = await verOrientacion(det, foto, g, crear, rec);
     } catch {
-      continue; // giro fallido: se salta (el externo aún protege ver(0))
+      // giro fallido: se salta (el externo aún protege ver(0))
+      continue;
     }
     // P1: la telemetría de giros cumplió (ver lote denso); la consola queda limpia.
+    // sin texto: ni giros
     if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) {
       return null;
-    } // sin texto: ni giros
+    }
     if (!mejor || r.c > mejor.c) {
       mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
     }
+    // bypass: la primera que convence gana
     if (r.c >= UMBRAL_REC_OK) {
       break;
-    } // bypass: la primera que convence gana
+    }
   }
-  return mejor; // null si todos fallaron
+  // null si todos fallaron
+  return mejor;
 }
 
 /** Materializa el giro ganador (blob rotado o el original si no se puede). */
@@ -524,12 +528,14 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
     if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) {
       return quieto;
     }
-    const foto: ImageBitmap = bmp; // copia estrechada para los helpers
+    // copia estrechada para los helpers
+    const foto: ImageBitmap = bmp;
     const { det, rec } = await fabrica();
     const mejor = await elegirGiro(det, rec, foto, crear);
+    // todos los giros fallaron
     if (!mejor) {
       return quieto;
-    } // todos los giros fallaron
+    }
     // ponytail: sin OK gana el más alto (aunque sea bajo); solo el vacío no gira.
     return materializarGiro(blob, foto, mejor, crear);
   } catch {
@@ -713,7 +719,8 @@ export async function reconocerLote(
     const trozo = orden.slice(i, i + TAMANO_CHUNK_REC);
     const res = await correrChunk(rec, trozo);
     if (!res) {
-      ok = false; // el chunk no cuadra (EP sin batch, formas raras): individual abajo.
+      // el chunk no cuadra (EP sin batch, formas raras): individual abajo.
+      ok = false;
       break;
     }
     const { datos, pasos, porLote } = res;
@@ -737,7 +744,8 @@ export async function reconocerLote(
   const runs = chunks + (await reintentarIndividuales(rec, norms, hechos, fuera));
   if (diag) {
     diag.fallback = true;
-    diag.recRuns = runs + 1; // + el chunk que falló
+    // + el chunk que falló
+    diag.recRuns = runs + 1;
     diag.anchoMax = Math.max(...norms.map((n) => n.lin.anchoTotal));
   }
   return fuera;

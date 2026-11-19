@@ -193,14 +193,16 @@ describe("fileInput / canvas / paste", () => {
       configurable: true,
     });
     fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-    await vi.advanceTimersByTimeAsync(0); // el intake ahora es async
+    // el intake ahora es async
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
     expect(fileInput.value).toBe("");
   });
 
   it("dragenter con Files marca el canvas; dragleave limpia (contador)", () => {
     canvas.dispatchEvent(eventoDragenter());
-    canvas.dispatchEvent(eventoDragenter()); // anidado: sigue marcado
+    // anidado: sigue marcado
+    canvas.dispatchEvent(eventoDragenter());
     expect(canvas.classList.contains("arrastrando")).toBe(true);
     canvas.dispatchEvent(eventoDragleave());
     expect(canvas.classList.contains("arrastrando")).toBe(true);
@@ -232,14 +234,16 @@ describe("fileInput / canvas / paste", () => {
     canvas.classList.add("arrastrando");
     // La tarjeta burbujea al canvas (igual que el fondo del área).
     el("dropzone").dispatchEvent(eventoDrop([archivo("d.png", "image/png")]));
-    await vi.advanceTimersByTimeAsync(0); // el intake ahora es async
+    // el intake ahora es async
+    await vi.advanceTimersByTimeAsync(0);
     expect(canvas.classList.contains("arrastrando")).toBe(false);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
   });
 
   it("paste con archivo agrega; sin archivos no hace nada", async () => {
     document.dispatchEvent(eventoPaste([archivo("p.png", "image/png")]));
-    await vi.advanceTimersByTimeAsync(0); // el intake ahora es async
+    // el intake ahora es async
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
     document.dispatchEvent(new Event("paste", { bubbles: true }));
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
@@ -341,7 +345,8 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
       value: vi.fn<() => void>(),
       configurable: true,
     });
-    elegirArchivos(b.id); // jsdom sin picker: noop simulado
+    // jsdom sin picker: noop simulado
+    elegirArchivos(b.id);
     Object.defineProperty(fileInput, "files", {
       value: [archivo("h.png", "image/png")],
       configurable: true,
@@ -389,7 +394,8 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
       configurable: true,
     });
     elegirArchivos(b.id);
-    await agregarArchivos([archivo("d.png", "image/png")], a.id); // drop sobre A
+    // drop sobre A
+    await agregarArchivos([archivo("d.png", "image/png")], a.id);
     expect(a.slots.some((c) => c?.nombre === "d.png")).toBe(true);
     Object.defineProperty(fileInput, "files", {
       value: [archivo("e.png", "image/png")],
@@ -459,7 +465,8 @@ describe("gate PDF (tamaño + páginas)", () => {
     expect(toasts[0]?.querySelector(".toast-detalle")?.textContent).toBe(
       "pesa más de 5 MB, comprimila y probá de nuevo · gordo.pdf",
     );
-    expect(toasts[0]?.querySelector(".toast-archivo")?.innerHTML).toBe("gordo.pdf"); // sin marcado inyectado
+    // sin marcado inyectado
+    expect(toasts[0]?.querySelector(".toast-archivo")?.innerHTML).toBe("gordo.pdf");
   });
 
   it("mezcla de válidos e inválidos: un toast por rechazo y el válido entra igual", async () => {
@@ -703,7 +710,8 @@ describe("pegarEnCelda (clic en vacía)", () => {
     await pegarEnCelda(h.id, 2);
     expect(h.slots[2]?.nombre).toBe("pegado.png");
     expect(h.slots[1]).toBeNull();
-    expect(aviso.textContent).toBe(""); // éxito limpio: sin avisos nuevos
+    // éxito limpio: sin avisos nuevos
+    expect(aviso.textContent).toBe("");
   });
 
   it("slot ocupado → primer hueco de la misma hoja", async () => {
@@ -862,13 +870,16 @@ describe("pegarEnCelda (clic en vacía)", () => {
     for (let i = 0; i < 50; i++) {
       await Promise.resolve();
     }
-    expect(state.hojas).toHaveLength(1); // aún no materializada: normalizando
-    state.hojas = [crearHoja("u4x2")]; // barrido en el ínterin
+    // aún no materializada: normalizando
+    expect(state.hojas).toHaveLength(1);
+    // barrido en el ínterin
+    state.hojas = [crearHoja("u4x2")];
     abrir();
     await pendiente;
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
-    expect(h.slots.filter(Boolean)).toHaveLength(1); // la desvinculada intacta
+    // la desvinculada intacta
+    expect(h.slots.filter(Boolean)).toHaveLength(1);
   });
 
   it("fantasma + normalización que rechaza no deja hoja vacía", async () => {
@@ -950,7 +961,8 @@ describe("pegarDelPortapapeles (lote vacío)", () => {
     await pegarDelPortapapeles();
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
-    expect(aviso.textContent).toBe(""); // éxito limpio: sin avisos nuevos
+    // éxito limpio: sin avisos nuevos
+    expect(aviso.textContent).toBe("");
   });
 
   it("sin imagen avisa sin crear hojas", async () => {

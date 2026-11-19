@@ -393,9 +393,10 @@ function cajaEnCelda(
   origen: TamanoDb,
 ): CajaDb | null {
   const pixeles = inundar(bin, w, marca, x, y, etiqueta);
+  // puntito sin área
   if (pixeles.length < 3) {
     return null;
-  } // puntito sin área
+  }
   const mini = rectanguloMinimo(cascoConvexo(pixeles));
   if (!mini) {
     return null;

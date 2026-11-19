@@ -252,7 +252,8 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
     iaFalsa.sesion.mockResolvedValue({});
     iaFalsa.nucleo.mockResolvedValue({});
     btnAjustes.click();
-    await pausa(); // deja asentar el estado de modelos antes de la prueba
+    // deja asentar el estado de modelos antes de la prueba
+    await pausa();
     btnProbarIa.click();
     await pausa();
     expect(estadoModelos.textContent).toContain("IA: sesiones listas");
@@ -291,7 +292,8 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
     expect(btnProbarIa.disabled).toBe(true);
     expect(btnDescargarModelos.disabled).toBe(true);
     expect(btnBorrarModelos.disabled).toBe(true);
-    expect(iaFalsa.reactiva).toHaveBeenCalledOnce(); // el 2º Probar no repite
+    // el 2º Probar no repite
+    expect(iaFalsa.reactiva).toHaveBeenCalledOnce();
     suelta({});
     await pausa();
     expect(estadoModelos.textContent).toContain("IA: sesiones listas");

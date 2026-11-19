@@ -49,7 +49,8 @@ function leerTemaGuardado(): string | null {
   try {
     return localStorage.getItem(TEMA_KEY);
   } catch {
-    return null; // almacenamiento bloqueado: cae al SO/default, nunca aborta el boot
+    // almacenamiento bloqueado: cae al SO/default, nunca aborta el boot
+    return null;
   }
 }
 
