@@ -17,7 +17,9 @@ import {
 import type { Enderezado, Giro } from "./ocr";
 /** Blob del comprobante: file en imágenes; en PDF se recupera de su imgUrl (no guarda file). */
 async function blobDeItem(sig: Comprobante): Promise<Blob> {
-  if (sig.file) return sig.file;
+  if (sig.file) {
+    return sig.file;
+  }
   const res = await fetch(sig.imgUrl);
   return res.blob();
 }
@@ -30,12 +32,17 @@ async function blobDeItem(sig: Comprobante): Promise<Blob> {
  */
 let precalentado = false;
 export function precalentarModelos(): void {
-  if (precalentado) return;
+  if (precalentado) {
+    return;
+  }
   precalentado = true;
   const ceder = (): Promise<void> =>
     new Promise((res) => {
-      if ("requestIdleCallback" in window) window.requestIdleCallback(() => res());
-      else setTimeout(() => res(), 0);
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(() => res());
+      } else {
+        setTimeout(() => res(), 0);
+      }
     });
   void (async (): Promise<void> => {
     try {
@@ -55,7 +62,9 @@ type ModuloOcr = typeof import("./ocr");
 /** Blob vigente para el OCR: file del commit (recorte/giro) o refetch en PDF. */
 async function blobActual(sig: Comprobante): Promise<Blob | null> {
   // ponytail: L1 — el blob ya está en memoria tras el recorte (file) o se refetchea (PDF, sin file guardado). Un solo decode por comprobante.
-  if (sig.file) return sig.file;
+  if (sig.file) {
+    return sig.file;
+  }
   try {
     return await blobDeItem(sig);
   } catch {
@@ -124,7 +133,9 @@ async function faseEnderezar(
           if (!buscarSlot(sig.id)) {
             URL.revokeObjectURL(imgNueva);
           } else {
-            if (previoGirado) sig.previoDocAligner = previoGirado;
+            if (previoGirado) {
+              sig.previoDocAligner = previoGirado;
+            }
             // ponytail: si el giro del previo falló, se conserva el viejo (fallo
             // transitorio no destruye la fuente de recuperación del sobre-recorte).
             sig.file = end.blob;
@@ -164,8 +175,9 @@ function completarItem(sig: Comprobante): void {
   // (textoOcr ya asignado por faseOcr en ambas salidas.)
   const textoLimpio = limpiarTextoCompleto(sig.textoOcr as string);
   const rapido = extraerRapidoCents(textoLimpio);
-  if (rapido !== null)
+  if (rapido !== null) {
     aplicarTotales([{ idx: 1, id: sig.id, texto: textoLimpio }], new Map([[1, rapido]]));
+  }
   try {
     renderHojas(); // imagen visible al instante
   } catch {
@@ -182,7 +194,9 @@ async function procesarItem(sig: Comprobante): Promise<boolean> {
     /* el render nunca aborta la cola */
   }
   await faseRecorte(sig);
-  if (!buscarSlot(sig.id)) return false; // limpiado durante la espera: no resucita
+  if (!buscarSlot(sig.id)) {
+    return false;
+  } // limpiado durante la espera: no resucita
   // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
   const ocr = await import("./ocr").catch((error: unknown): null => {
     falloIa(error, "OCR");
@@ -191,9 +205,13 @@ async function procesarItem(sig: Comprobante): Promise<boolean> {
   const blob: Blob | null = await blobActual(sig);
   // Endereza por confianza del rec (det solo recorta líneas, no vota).
   const end = await faseEnderezar(sig, blob, ocr);
-  if (!buscarSlot(sig.id)) return false; // limpiado durante el enderezado: no resucita
+  if (!buscarSlot(sig.id)) {
+    return false;
+  } // limpiado durante el enderezado: no resucita
   await faseOcr(sig, sig.file ?? blob, ocr, end);
-  if (!buscarSlot(sig.id)) return false; // limpiado durante el OCR: no resucita
+  if (!buscarSlot(sig.id)) {
+    return false;
+  } // limpiado durante el OCR: no resucita
   completarItem(sig);
   return true;
 }
@@ -204,9 +222,13 @@ async function drenarCola(): Promise<boolean> {
   for (;;) {
     // Relee el estado actual: Limpiar puede reemplazar state.hojas durante el await.
     const sig = aplanar().find((c) => c.estado === "pendiente");
-    if (!sig) break;
+    if (!sig) {
+      break;
+    }
     try {
-      if (await procesarItem(sig)) tocada = true;
+      if (await procesarItem(sig)) {
+        tocada = true;
+      }
     } catch {
       // ponytail: ítem envenenado → celda de error visible; los hermanos
       // siguen (antes un throw dejaba a todos "cargando" para siempre).
@@ -222,13 +244,17 @@ async function drenarCola(): Promise<boolean> {
 }
 
 export async function procesarCola(): Promise<void> {
-  if (state.colaEnProceso) return;
+  if (state.colaEnProceso) {
+    return;
+  }
   state.colaEnProceso = true;
   try {
     // ponytail: drenado por pendiente, no snapshot; token generación si el MOCK se vuelve concurrente.
     // Fase 1: el "procesando" y el "ok" (imagen) se pintan por ítem; el monto cae por regex.
     for (;;) {
-      if (!(await drenarCola())) break;
+      if (!(await drenarCola())) {
+        break;
+      }
       // Re-chequeo del drenado: lo que el fast-path dejó (texto nuevo con giro,
       // intake tardío) va por extraerPendientes (síncrono, nunca tumba la cola).
       try {

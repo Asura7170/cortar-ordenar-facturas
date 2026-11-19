@@ -228,7 +228,9 @@ describe("girarYReleer", () => {
     const { candidatos } = await vi.importActual<typeof import("./extract")>("./extract");
     // Lote simulado con la lógica real de inclusión: si la celda es candidata, la rellena.
     vi.mocked(extraerPendientes).mockImplementationOnce((): void => {
-      if (candidatos().some((x) => x.id === c.id)) c.montoCents = 999;
+      if (candidatos().some((x) => x.id === c.id)) {
+        c.montoCents = 999;
+      }
     });
     await girarYReleer(c.id, 90, deps);
     await vi.advanceTimersByTimeAsync(1500);
@@ -273,7 +275,9 @@ describe("girarYReleer", () => {
         }),
     });
     // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- soltar lo muta el executor; cota 100
-    for (let i = 0; i < 100 && !soltar; i++) await Promise.resolve();
+    for (let i = 0; i < 100 && !soltar; i++) {
+      await Promise.resolve();
+    }
     soltar?.(bmp as unknown as ImageBitmap);
     const urlAntes = c.imgUrl;
     state.hojas = [crearHoja()]; // Limpiar reemplaza el array a mitad del giro
@@ -304,7 +308,9 @@ describe("girarYReleer", () => {
           }) as unknown as HTMLCanvasElement,
       });
       // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- soltar lo muta el executor; cota 100
-      for (let i = 0; i < 100 && !soltar; i++) await Promise.resolve();
+      for (let i = 0; i < 100 && !soltar; i++) {
+        await Promise.resolve();
+      }
       soltar?.(bmp as unknown as ImageBitmap);
       state.hojas = [crearHoja()]; // Limpiar durante el await.
       await p;
@@ -331,7 +337,9 @@ describe("girarYReleer", () => {
       const lienzo = (crearBase?.() ?? {}) as {
         toBlob: (cb: (b: Blob | null) => void) => void;
       } & Record<string, unknown>;
-      if (llamadas === 2) lienzo.toBlob = (cb) => cb(null);
+      if (llamadas === 2) {
+        lienzo.toBlob = (cb) => cb(null);
+      }
       return lienzo as unknown as HTMLCanvasElement;
     });
     await girarYReleer(c.id, 90, deps);
@@ -420,12 +428,16 @@ describe("girarYReleer", () => {
       const pg = girarYReleer(c.id, 90, depsGiroEnVuelo as never);
       await abrirRecorte(c.id, depsCrop as never);
       // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- lo muta el executor; cota 100
-      for (let i = 0; i < 100 && !soltarGiro; i++) await Promise.resolve();
+      for (let i = 0; i < 100 && !soltarGiro; i++) {
+        await Promise.resolve();
+      }
       soltarGiro?.(bmpGiro as unknown as ImageBitmap);
       // El giro queda suspendido entre imgUrl= y file= (código viejo): ahí
       // commitea el recorte entero y recién después termina el giro.
       // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- lo muta el executor; cota 200
-      for (let i = 0; i < 200 && !soltarPrevio; i++) await Promise.resolve();
+      for (let i = 0; i < 200 && !soltarPrevio; i++) {
+        await Promise.resolve();
+      }
       document.getElementById("btnRecorteOk")?.click();
       await new Promise((r) => setTimeout(r, 200)); // confirmar entero (C gana píxeles)
       await expect((c.file as Blob).text()).resolves.toBe("recorte");
@@ -437,7 +449,9 @@ describe("girarYReleer", () => {
       await expect((c.file as Blob).text()).resolves.toBe("girado");
       expect(c.imgUrl).toBe("blob:6");
       const modal = document.getElementById("modalRecorte") as HTMLDialogElement | null;
-      if (modal?.open) modal.close();
+      if (modal?.open) {
+        modal.close();
+      }
     } finally {
       ctx.mockRestore();
       crearUrl.mockRestore();
@@ -510,7 +524,9 @@ describe("ramas de cubrimiento (lote 10)", () => {
 
   it("relectura con id ausente: no-op silenciosa", async () => {
     const aviso = document.getElementById("aviso");
-    if (aviso) aviso.textContent = "";
+    if (aviso) {
+      aviso.textContent = "";
+    }
     await expect(releerTrasEdicion(999_999, new Blob(["x"]))).resolves.toBeUndefined();
     expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
     expect(vi.mocked(renderHojas)).not.toHaveBeenCalled();

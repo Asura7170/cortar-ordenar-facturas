@@ -59,7 +59,9 @@ afterEach(() => {
 async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
   const t0 = Date.now();
   while (!cond()) {
-    if (Date.now() - t0 > ms) throw new Error("timeout esperando condición");
+    if (Date.now() - t0 > ms) {
+      throw new Error("timeout esperando condición");
+    }
     await new Promise((r) => setTimeout(r, 10));
   }
 }
@@ -75,13 +77,17 @@ function sembrar(layout: LayoutId, montos: (number | null)[]): Hoja {
 
 function boton(accion: string): HTMLButtonElement {
   const b = document.querySelector<HTMLButtonElement>(`[data-accion="${accion}"]`);
-  if (!b) throw new Error(`sin botón ${accion}`);
+  if (!b) {
+    throw new Error(`sin botón ${accion}`);
+  }
   return b;
 }
 
 /** Espera a que el import dinámico (clic → abrirRecorte) termine. */
 async function vaciar(): Promise<void> {
-  for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
 }
 
 describe("cambiarLayoutHoja / aplicarATodas", () => {
@@ -361,9 +367,13 @@ describe("celdas", () => {
     // La celda propia es la última real (el fantasma va en .sheet-fantasma).
     const celdas = document.querySelectorAll(".sheet:not(.sheet-fantasma) .cell");
     const cell = celdas.item(celdas.length - 1);
-    if (!(cell instanceof HTMLElement)) throw new Error("sin celda propia");
+    if (!(cell instanceof HTMLElement)) {
+      throw new Error("sin celda propia");
+    }
     const input = cell.querySelector("input.cell-monto");
-    if (!(input instanceof HTMLInputElement)) throw new Error("sin input de monto");
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error("sin input de monto");
+    }
     input.value = "abc"; // borrador inválido tras blur, sin foco
     c.montoCents = 1250; // como lo deja aplicarTotales
     expect(actualizarMontoCelda(c.id)).toBe(false);
@@ -405,8 +415,11 @@ describe("celdas", () => {
       expect(spy).toHaveBeenCalledOnce();
     } finally {
       state.loteEnCurso = false;
-      if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
-      else Reflect.deleteProperty(document, "startViewTransition");
+      if (descriptor) {
+        Object.defineProperty(document, "startViewTransition", descriptor);
+      } else {
+        Reflect.deleteProperty(document, "startViewTransition");
+      }
     }
   });
 });
@@ -424,7 +437,9 @@ describe("monto manual", () => {
 
   function inputMonto(): HTMLInputElement {
     const input = document.querySelector<HTMLInputElement>("input.cell-monto");
-    if (!input) throw new Error("sin input de monto");
+    if (!input) {
+      throw new Error("sin input de monto");
+    }
     return input;
   }
 
@@ -497,8 +512,11 @@ describe("monto manual", () => {
       expect(deNuevo.getAttribute("aria-invalid")).toBe("true");
       expect(deNuevo.value).toBe("12,3");
     } finally {
-      if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
-      else Reflect.deleteProperty(document, "startViewTransition");
+      if (descriptor) {
+        Object.defineProperty(document, "startViewTransition", descriptor);
+      } else {
+        Reflect.deleteProperty(document, "startViewTransition");
+      }
     }
   });
 
@@ -506,7 +524,9 @@ describe("monto manual", () => {
     sembrarOk();
     // Limpio el aviso del test anterior (el fixture es un DOM compartido).
     const aviso = document.getElementById("aviso");
-    if (aviso) aviso.textContent = "";
+    if (aviso) {
+      aviso.textContent = "";
+    }
     const input = inputMonto();
     input.value = "";
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -712,7 +732,9 @@ describe("monto manual", () => {
   it("pointerdown en la imagen sí inicia drag (control)", () => {
     sembrarOk();
     const img = document.querySelector(".cell img");
-    if (!img) throw new Error("sin imagen");
+    if (!img) {
+      throw new Error("sin imagen");
+    }
     img.dispatchEvent(
       Object.assign(new Event("pointerdown", { bubbles: true }), {
         button: 0,
@@ -739,7 +761,9 @@ describe("monto manual", () => {
     const c = sembrarOk();
     renderHojas();
     const cell = document.querySelector(".cell");
-    if (!(cell instanceof HTMLElement)) throw new Error("sin celda");
+    if (!(cell instanceof HTMLElement)) {
+      throw new Error("sin celda");
+    }
     cell.querySelector("input.cell-monto")?.remove();
     c.montoCents = 1250;
     expect(actualizarMontoCelda(c.id)).toBe(true);
@@ -840,7 +864,9 @@ describe("drop de archivos sobre hojas", () => {
   it("dragover sobre el fantasma no resalta", () => {
     sembrar("u1", [100]); // llena → fantasma
     const fantasma = document.querySelector(".sheet-fantasma");
-    if (!fantasma) throw new Error("sin fantasma");
+    if (!fantasma) {
+      throw new Error("sin fantasma");
+    }
     fantasma.dispatchEvent(eventoDragover());
     expect(fantasma.classList.contains("file-drop")).toBe(false);
   });
@@ -860,7 +886,9 @@ describe("drop de archivos sobre hojas", () => {
   it("dragover con Files resalta la hoja; sin Files no", () => {
     sembrar("u4x2", [100]);
     const sheet = document.querySelector(".sheet");
-    if (!sheet) throw new Error("sin .sheet");
+    if (!sheet) {
+      throw new Error("sin .sheet");
+    }
     sheet.dispatchEvent(eventoDragover());
     expect(sheet.classList.contains("file-drop")).toBe(true);
     sheet.classList.remove("file-drop");
@@ -909,7 +937,9 @@ describe("drop de archivos sobre hojas", () => {
   it("dragleave quita el resaltado y para el scroll", () => {
     sembrar("u1", [10]);
     const sheet = document.querySelector(".sheet");
-    if (!(sheet instanceof HTMLElement)) throw new Error("sin .sheet");
+    if (!(sheet instanceof HTMLElement)) {
+      throw new Error("sin .sheet");
+    }
     sheet.dispatchEvent(
       Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
         dataTransfer: { files: [], types: ["Files"] },
@@ -941,7 +971,9 @@ describe("drop de archivos sobre hojas", () => {
     Object.defineProperty(canvas, "scrollBy", { value: scrollBy, configurable: true });
     const borde = (y: number): void => {
       const sheet = document.querySelector(".sheet");
-      if (!sheet) throw new Error("sin .sheet");
+      if (!sheet) {
+        throw new Error("sin .sheet");
+      }
       sheet.dispatchEvent(
         Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
           dataTransfer: { files: [], types: ["Files"] },
@@ -1052,7 +1084,9 @@ describe("lupa", () => {
   // Red ante asserts que fallen a mitad: cada test parte con la lupa apagada.
   afterEach(() => {
     const apagado = el<HTMLButtonElement>("btnLupa");
-    if (apagado.getAttribute("aria-pressed") === "true") apagado.click();
+    if (apagado.getAttribute("aria-pressed") === "true") {
+      apagado.click();
+    }
   });
 
   it("el botón alterna y Escape la cierra", () => {
@@ -1261,7 +1295,9 @@ describe("giro manual", () => {
 
   function botonGiro(accion: "girar-izq" | "girar-der"): HTMLButtonElement {
     const b = document.querySelector<HTMLButtonElement>(`[data-accion="${accion}"]`);
-    if (!b) throw new Error(`sin botón ${accion}`);
+    if (!b) {
+      throw new Error(`sin botón ${accion}`);
+    }
     return b;
   }
 
@@ -1336,7 +1372,9 @@ describe("giro manual", () => {
     state.hojas.push(h);
     renderHojas();
     const badge = document.querySelector<HTMLButtonElement>('[data-accion="corregir-monto"]');
-    if (!badge) throw new Error("sin badge corregir-monto");
+    if (!badge) {
+      throw new Error("sin badge corregir-monto");
+    }
     badge.click();
     // ponytail: apertura no destructiva (el null al abrir era el bug del Escape).
     expect(c.montoCents).toBe(500);
@@ -1377,7 +1415,9 @@ describe("giro manual", () => {
 describe("drag: render pendiente y cancelaciones", () => {
   function pressImg(x = 10, y = 10): void {
     const img = document.querySelector(".cell img");
-    if (!img) throw new Error("sin imagen");
+    if (!img) {
+      throw new Error("sin imagen");
+    }
     img.dispatchEvent(
       Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
         button: 0,
@@ -1503,8 +1543,11 @@ describe("drag entre celdas (swap)", () => {
     return () => {
       rect.mockRestore();
       delete (Element.prototype as unknown as Record<string, unknown>)["animate"];
-      if (mm === undefined) delete (window as unknown as Record<string, unknown>)["matchMedia"];
-      else (window as unknown as Record<string, unknown>)["matchMedia"] = mm;
+      if (mm === undefined) {
+        delete (window as unknown as Record<string, unknown>)["matchMedia"];
+      } else {
+        (window as unknown as Record<string, unknown>)["matchMedia"] = mm;
+      }
     };
   }
 
@@ -1519,7 +1562,9 @@ describe("drag entre celdas (swap)", () => {
 
   function pressCelda(idx: number, x: number, y: number): void {
     const img = document.querySelectorAll(".cell img").item(idx);
-    if (!(img instanceof Element)) throw new Error("sin imagen");
+    if (!(img instanceof Element)) {
+      throw new Error("sin imagen");
+    }
     img.dispatchEvent(
       Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
         button: 0,
@@ -1685,7 +1730,9 @@ describe("drag entre celdas (swap)", () => {
 describe("pegar con clic en vacía", () => {
   function botonPegar(): HTMLButtonElement {
     const b = document.querySelector<HTMLButtonElement>('[data-accion="pegar"]');
-    if (!b) throw new Error("sin botón pegar");
+    if (!b) {
+      throw new Error("sin botón pegar");
+    }
     return b;
   }
 
@@ -1836,7 +1883,9 @@ describe("reorden por teclado (2.5.7)", () => {
   /** Ctrl/Alt+flecha desde la celda enfocada (foco previo como el uso real). */
   function tecla(idx: number, key: string, alt = false): void {
     const cell = ocupadas()[idx];
-    if (!cell) throw new Error(`sin celda ocupada ${idx}`);
+    if (!cell) {
+      throw new Error(`sin celda ocupada ${idx}`);
+    }
     /* jsdom no trae matchMedia (animarFlipDesde lo lee pelado): stub
        reduced-motion para apagar el FLIP, restaurado al salir. */
     const previo = window.matchMedia;
@@ -1929,7 +1978,9 @@ describe("reorden por teclado (2.5.7)", () => {
     state.hojas.push(h);
     renderHojas();
     const input = document.querySelector<HTMLInputElement>("input.cell-monto");
-    if (!input) throw new Error("sin input de monto");
+    if (!input) {
+      throw new Error("sin input de monto");
+    }
     input.focus();
     input.dispatchEvent(
       new KeyboardEvent("keydown", {

@@ -87,7 +87,9 @@ function sembrar(): ReturnType<typeof comprobante> {
 
 /** Espera a que los handlers void (click → confirmar) terminen. */
 async function vaciar(): Promise<void> {
-  for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i++) {
+    await new Promise((r) => setTimeout(r, 0));
+  }
 }
 
 /** PointerEvent sintético (jsdom no trae constructor útil). */
@@ -111,7 +113,9 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.mocked(extraerTexto).mockClear();
   vi.mocked(renderHojas).mockClear();
-  if (modal.open) modal.close();
+  if (modal.open) {
+    modal.close();
+  }
   state.hojas.length = 0;
 });
 

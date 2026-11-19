@@ -19,9 +19,13 @@ export function parsearMonto(texto: string): Cents | null {
   const s = texto.trim().replaceAll(/[\s$€£]/g, "");
   const m = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?$/.exec(s);
   // ponytail: miles con coma exigen decimal con punto ("1,234" solo → escribir 1234).
-  if (!m || ((m[1] ?? "").includes(",") && m[2] === undefined)) return null;
+  if (!m || ((m[1] ?? "").includes(",") && m[2] === undefined)) {
+    return null;
+  }
   const entera = (m[1] ?? "").replaceAll(",", "");
-  if (!/^\d{1,12}$/.test(entera)) return null;
+  if (!/^\d{1,12}$/.test(entera)) {
+    return null;
+  }
   return Number(entera) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
 }
 
@@ -58,7 +62,9 @@ const BOTONES_LOTE = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLim
 // renderMonto lo sincroniza, sin importar qué camino mutó las hojas.
 function pintarBarraBoton(): void {
   const btn = document.getElementById("btnCalcular");
-  if (!(btn instanceof HTMLButtonElement)) return;
+  if (!(btn instanceof HTMLButtonElement)) {
+    return;
+  }
   const total = totalItems();
   const hechos = aplanar().filter((c) => c.montoCents !== null).length;
   btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
@@ -67,7 +73,9 @@ function pintarBarraBoton(): void {
   // .disabled de estos ids en src/ (grep previo): el sync no pisa a nadie.
   for (const id of BOTONES_LOTE) {
     const boton = document.getElementById(id);
-    if (boton instanceof HTMLButtonElement) boton.disabled = total === 0;
+    if (boton instanceof HTMLButtonElement) {
+      boton.disabled = total === 0;
+    }
   }
   // ponytail: etiqueta y cuenta en spans separados (la etiqueta parte en 2
   // líneas y la caja de la cuenta queda fija; así el icono no se corre).
@@ -91,7 +99,9 @@ function pintarBarraBoton(): void {
 /** Largo del prefijo común posicional de dos textos (la ruleta lo deja fijo). */
 export function prefijoComun(viejo: string, texto: string): number {
   let k = 0;
-  while (k < viejo.length && k < texto.length && viejo[k] === texto[k]) k += 1;
+  while (k < viejo.length && k < texto.length && viejo[k] === texto[k]) {
+    k += 1;
+  }
   return k;
 }
 
@@ -143,7 +153,9 @@ function esDigito(ch: string): boolean {
 
 /** Defs con los filtros feGaussianBlur verticales (el blur de la referencia); 1× por página. */
 function garantizarDefs(): void {
-  if (document.getElementById("monto-blur-defs")) return;
+  if (document.getElementById("monto-blur-defs")) {
+    return;
+  }
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("id", "monto-blur-defs");
@@ -170,12 +182,16 @@ function garantizarDefs(): void {
 /** Blur vertical del filtro `i` mientras la tira gira (decae a 0 con rAF). */
 function blurEn(i: number, y: number): void {
   const fe = document.getElementById(`monto-blur-fe-${i}`);
-  if (fe) fe.setAttribute("stdDeviation", `0 ${y}`);
+  if (fe) {
+    fe.setAttribute("stdDeviation", `0 ${y}`);
+  }
 }
 
 /** blanquea las ranuras: sin residuo tras cancelar una rueda o armar plano. */
 function resetearBlur(): void {
-  for (let i = 0; i < FILTROS; i += 1) blurEn(i, 0);
+  for (let i = 0; i < FILTROS; i += 1) {
+    blurEn(i, 0);
+  }
 }
 
 /** translateY (px, negativo) que centra la célula `k` en la ventana; el origen de la tira es `base`. */
@@ -186,7 +202,9 @@ export function desplazamiento(base: number, k: number, cell: number): number {
 /** Índice absoluto de la célula visible según la matriz computada; null si no parsea (jsdom/plaino). */
 export function celdaDesdeMatriz(matrix: string, base: number, cell: number): number | null {
   const m = /matrix\(([^)]*)\)/.exec(matrix);
-  if (m === null || !Number.isFinite(cell) || cell <= 0) return null;
+  if (m === null || !Number.isFinite(cell) || cell <= 0) {
+    return null;
+  }
   const y = Number.parseFloat((m[1] ?? "").split(",").at(-1) ?? "");
   return Number.isFinite(y) ? base + Math.round(-y / cell) : null;
 }
@@ -282,7 +300,9 @@ export function renderMonto(): void {
   const alineado = alinearSufijos(sufV, sufN);
   let totalColas = 0;
   for (const ch of sufN) {
-    if (esDigito(ch)) totalColas += 1;
+    if (esDigito(ch)) {
+      totalColas += 1;
+    }
   }
   // Estado visual de las tiras viejas (derecha→izquierda empareja los dígitos
   // posicionalmente, como el odómetro) y el cell actual, medidos ANTES del rebuild.
@@ -290,7 +310,9 @@ export function renderMonto(): void {
   const previas: { matriz: string; base: number }[] = [];
   for (const t of montoEl.querySelectorAll<HTMLElement>(".monto-tira")) {
     const primeraTira = t.querySelector<HTMLElement>(".monto-digito");
-    if (primeraTira?.dataset["i"] === undefined) continue;
+    if (primeraTira?.dataset["i"] === undefined) {
+      continue;
+    }
     previas.push({ matriz: getComputedStyle(t).transform, base: +primeraTira.dataset["i"] });
   }
   const viejaCol = montoEl.querySelector<HTMLElement>(".monto-col");
@@ -352,21 +374,29 @@ export function renderMonto(): void {
     c.tira.style.transition = "none";
     c.tira.style.transform = `translateY(${desplazamiento(c.base, c.inicio, cell)}px)`;
   }
-  if (colas.every((c) => c.fin === c.inicio)) return;
+  if (colas.every((c) => c.fin === c.inicio)) {
+    return;
+  }
   void montoEl.offsetWidth; // reflow: clava el punto de partida
   colas.forEach((c, i) => {
-    if (c.fin === c.inicio) return;
+    if (c.fin === c.inicio) {
+      return;
+    }
     c.tira.style.transition = `transform ${DURACION}ms cubic-bezier(0.16, 1, 0.3, 1) ${i * ESCALON}ms`;
     c.tira.style.transform = `translateY(${desplazamiento(c.base, c.fin, cell)}px)`;
   });
-  if (rafId !== null) cancelAnimationFrame(rafId);
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+  }
   resetearBlur();
   const t0 = performance.now();
   const maximo = (colas.length - 1) * ESCALON + DURACION;
   const tick = (): void => {
     const t = performance.now() - t0;
     colas.forEach((c, i) => {
-      if (c.blurIdx < 0) return;
+      if (c.blurIdx < 0) {
+        return;
+      }
       const local = Math.min(1, Math.max(0, (t - i * ESCALON) / DURACION));
       blurEn(c.blurIdx, +(BLUR_MAXIMO * (1 - local)).toFixed(2));
     });
@@ -374,7 +404,9 @@ export function renderMonto(): void {
       rafId = requestAnimationFrame(tick);
     } else {
       colas.forEach((c) => {
-        if (c.blurIdx >= 0) blurEn(c.blurIdx, 0);
+        if (c.blurIdx >= 0) {
+          blurEn(c.blurIdx, 0);
+        }
       });
       rafId = null;
     }

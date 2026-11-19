@@ -70,8 +70,11 @@ beforeEach(() => {
 afterEach(() => {
   g["fetch"] = real.fetch;
   g["Response"] = real.Response;
-  if (real.caches === undefined) delete g["caches"];
-  else g["caches"] = real.caches;
+  if (real.caches === undefined) {
+    delete g["caches"];
+  } else {
+    g["caches"] = real.caches;
+  }
   vi.restoreAllMocks();
   reactivarIa();
   notarSesionOk(DET);
@@ -99,7 +102,9 @@ describe("nucleoReal (ORT falso, det/rec reales en la red falsa)", () => {
 
   it("la baja de red de rec no expulsa a det sano (strike por clave, no en bloque)", async () => {
     subida.mockImplementation(async (url: unknown) => {
-      if (String(url).endsWith("rec.onnx")) throw new Error("la bajada de rec murió");
+      if (String(url).endsWith("rec.onnx")) {
+        throw new Error("la bajada de rec murió");
+      }
       return { ok: true, status: 200, arrayBuffer: async () => BUF_DET };
     });
     // Bajada 1: det baja y cachea; rec falla → strike 1 SOLO de rec.

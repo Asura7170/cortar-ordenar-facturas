@@ -124,7 +124,9 @@ describe("renderMonto", () => {
   }
   function tiraDe(c: HTMLElement): HTMLElement {
     const t = c.querySelector<HTMLElement>(".monto-tira");
-    if (!t) throw new Error("sin tira");
+    if (!t) {
+      throw new Error("sin tira");
+    }
     return t;
   }
 
@@ -133,7 +135,9 @@ describe("renderMonto", () => {
     hojaCon([123_456]);
     renderMonto(); // primera vez: plano
     const montoEl = document.getElementById("montoTotal");
-    if (!montoEl) throw new Error("sin #montoTotal");
+    if (!montoEl) {
+      throw new Error("sin #montoTotal");
+    }
     expect(montoEl.getAttribute("aria-label")).toBe("US$ 1,234.56");
     const colasPlano = cols();
     expect(colasPlano.map((c) => c.dataset["muestra"])).toStrictEqual([
@@ -147,7 +151,9 @@ describe("renderMonto", () => {
     // regresión del "8": la ventana cae sobre la célula del dígito, no de la base
     expect(tiraDe(colasPlano[0] as HTMLElement).style.transform).toBe("translateY(-48px)");
     // las estáticas del plano no portan filtro de blur
-    for (const c of colasPlano) expect(tiraDe(c).style.filter).toBe("");
+    for (const c of colasPlano) {
+      expect(tiraDe(c).style.filter).toBe("");
+    }
   });
 
   it("aumento: lo que cambia rueda hacia arriba, incluidas las posiciones nuevas", () => {
@@ -177,7 +183,9 @@ describe("renderMonto", () => {
     for (const c of colasAlto) {
       const celulas = [...c.querySelectorAll<HTMLElement>(".monto-digito")];
       const ultima = celulas[celulas.length - 1];
-      if (!ultima) throw new Error("sin células");
+      if (!ultima) {
+        throw new Error("sin células");
+      }
       expect(Number(c.dataset["muestra"])).toBeLessThanOrEqual(Number(ultima.dataset["i"]));
     }
     // solo giratorias portan filtro (las estáticas sin blur fantasma; jsdom cita la url)
@@ -224,7 +232,9 @@ describe("renderMonto", () => {
     state.moneda = "ARS"; // mismos cents, otro texto
     renderMonto();
     expect(cols().map((c) => c.dataset["muestra"])).toStrictEqual(["3", "5", "1", "0", "0"]);
-    for (const c of cols()) expect(tiraDe(c).style.transition).toBe("none");
+    for (const c of cols()) {
+      expect(tiraDe(c).style.transition).toBe("none");
+    }
   });
 
   it("llamada duplicada no toca el DOM", () => {
@@ -252,7 +262,9 @@ describe("renderMonto", () => {
     // y toda rueda avanza hacia arriba, nunca hacia abajo (delta +)
     const saltos = cols().map((c) => Number(c.dataset["muestra"]) - Number(c.dataset["arranque"]));
     expect(saltos.some((salto) => salto !== 0)).toBe(true); // al menos una rueda se movió
-    for (const salto of saltos.filter((s) => s !== 0)) expect(salto).toBeGreaterThan(0);
+    for (const salto of saltos.filter((s) => s !== 0)) {
+      expect(salto).toBeGreaterThan(0);
+    }
   });
 
   it("vuelo a mitad condelta invertido: el cambio de sentido también respeta el delta", () => {
@@ -269,14 +281,18 @@ describe("renderMonto", () => {
     );
     const saltos = cols().map((c) => Number(c.dataset["muestra"]) - Number(c.dataset["arranque"]));
     expect(saltos.some((salto) => salto !== 0)).toBe(true); // al menos una rueda se movió
-    for (const salto of saltos.filter((s) => s !== 0)) expect(salto).toBeLessThan(0);
+    for (const salto of saltos.filter((s) => s !== 0)) {
+      expect(salto).toBeLessThan(0);
+    }
   });
 });
 
 describe("barraBoton", () => {
   function botonCalcular(): HTMLButtonElement {
     const b = document.getElementById("btnCalcular");
-    if (!(b instanceof HTMLButtonElement)) throw new Error("sin #btnCalcular");
+    if (!(b instanceof HTMLButtonElement)) {
+      throw new Error("sin #btnCalcular");
+    }
     return b;
   }
 
@@ -333,7 +349,9 @@ describe("barraBoton", () => {
 
   it("btnLimpiar deshabilitado con lote vacío, habilitado con items", () => {
     const limpiar = document.getElementById("btnLimpiar");
-    if (!(limpiar instanceof HTMLButtonElement)) throw new Error("sin #btnLimpiar");
+    if (!(limpiar instanceof HTMLButtonElement)) {
+      throw new Error("sin #btnLimpiar");
+    }
     renderMonto(); // sin hojas
     expect(limpiar.disabled).toBe(true);
     const h = crearHoja("u6x2");
@@ -346,7 +364,9 @@ describe("barraBoton", () => {
   it("lote vacío: TODOS los botones de acción de la sidebar deshabilitados", () => {
     const botones = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLimpiar"].map((id) => {
       const b = document.getElementById(id);
-      if (!(b instanceof HTMLButtonElement)) throw new Error(`sin #${id}`);
+      if (!(b instanceof HTMLButtonElement)) {
+        throw new Error(`sin #${id}`);
+      }
       return b;
     });
     renderMonto(); // sin hojas

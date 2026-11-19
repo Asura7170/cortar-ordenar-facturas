@@ -73,7 +73,9 @@ describe("toggle con storage bloqueado", () => {
   it("aplica el tema aunque el guardado falle", () => {
     const g = globalThis as unknown as { __temaClicks?: (() => void)[] };
     const handler = g.__temaClicks?.[0];
-    if (!handler) throw new Error("sin handler de tema");
+    if (!handler) {
+      throw new Error("sin handler de tema");
+    }
     const original = localStorage.setItem.bind(localStorage);
     Object.defineProperty(localStorage, "setItem", {
       value: () => {

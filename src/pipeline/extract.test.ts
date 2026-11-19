@@ -351,7 +351,9 @@ describe("extraerPendientes", () => {
   it("parcial con forzado: avisa conteo y resto manual", () => {
     lote2();
     const amb = state.hojas[0]?.slots[1];
-    if (amb) amb.textoOcr = "PROPINA 1.00 TOTAL 7.00"; // 2 distintos → manual
+    if (amb) {
+      amb.textoOcr = "PROPINA 1.00 TOTAL 7.00";
+    } // 2 distintos → manual
     extraerPendientes({ forzado: true });
     expect(aviso.textContent).toBe("Local: 1/2 totales.");
   });
@@ -359,7 +361,9 @@ describe("extraerPendientes", () => {
   it("sin nodo de aviso no tira (aviso previo vacío)", () => {
     const { c1 } = lote2();
     const nodo = document.getElementById("aviso");
-    if (!nodo) throw new Error("sin #aviso en el fixture");
+    if (!nodo) {
+      throw new Error("sin #aviso en el fixture");
+    }
     nodo.remove();
     try {
       extraerPendientes();

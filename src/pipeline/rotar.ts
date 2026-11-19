@@ -49,11 +49,15 @@ async function blobGiradoDe(
   crear: typeof crearReal,
 ): Promise<Blob> {
   const lienzo = lienzoGirado(bmp, grados, crear);
-  if (!lienzo) throw new Error("sin contexto 2d");
+  if (!lienzo) {
+    throw new Error("sin contexto 2d");
+  }
   const girado = await new Promise<Blob | null>((res) =>
     lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
   );
-  if (!girado) throw new Error("sin blob girado");
+  if (!girado) {
+    throw new Error("sin blob girado");
+  }
   return girado;
 }
 
@@ -65,9 +69,13 @@ async function previoGirado(
   cargar: typeof cargarReal,
   crear: typeof crearReal,
 ): Promise<Blob | null> {
-  if (!item.previoDocAligner) return null;
+  if (!item.previoDocAligner) {
+    return null;
+  }
   const girado = await girarBlob(item.previoDocAligner, grados, cargar, crear);
-  if (!girado) throw new Error("sin previo girado");
+  if (!girado) {
+    throw new Error("sin previo girado");
+  }
   return girado;
 }
 
@@ -79,7 +87,9 @@ function programarRelectura(id: number, girado: Blob, deps?: DepsOcr): void {
     setTimeout(() => {
       relecturas.delete(id);
       // ponytail: si un recorte commitió después, el giro es rancio: no relee.
-      if (obtenerComprobante(id)?.file !== girado) return;
+      if (obtenerComprobante(id)?.file !== girado) {
+        return;
+      }
       void releerTrasEdicion(id, girado, deps);
     }, QUIETUD_GIRO_MS),
   );
@@ -88,7 +98,9 @@ function programarRelectura(id: number, girado: Blob, deps?: DepsOcr): void {
 /** Gira al instante y programa la relectura diferida. No-op si no está ok. */
 export async function girarYReleer(id: number, grados: GiroManual, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
-  if (!item || item.estado !== "ok") return;
+  if (!item || item.estado !== "ok") {
+    return;
+  }
   // ponytail: cadena tolerante (un turno fallido no envenena los siguientes).
   const anterior = girosEnCurso.get(id) ?? Promise.resolve();
   const turno = anterior.catch(() => {}).then(() => girar(id, grados, deps));
@@ -96,14 +108,18 @@ export async function girarYReleer(id: number, grados: GiroManual, deps?: DepsOc
   try {
     await turno;
   } finally {
-    if (girosEnCurso.get(id) === turno) girosEnCurso.delete(id);
+    if (girosEnCurso.get(id) === turno) {
+      girosEnCurso.delete(id);
+    }
   }
 }
 
 /** Fase instantánea: gira el blob, pinta y (re)programa el OCR. Nunca lanza. */
 async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
-  if (!item || item.estado !== "ok") return;
+  if (!item || item.estado !== "ok") {
+    return;
+  }
   // ponytail: render dinámico dentro del try (sheets importa este módulo:
   // estático sería ciclo; fuera del try un chunk fallido era rejection muda).
   try {
@@ -124,7 +140,9 @@ async function girar(id: number, grados: GiroManual, deps?: DepsOcr): Promise<vo
       URL.revokeObjectURL(item.imgUrl);
       item.imgUrl = imgNueva;
       item.file = girado;
-      if (giradoPrevio) item.previoDocAligner = giradoPrevio;
+      if (giradoPrevio) {
+        item.previoDocAligner = giradoPrevio;
+      }
       renderHojas();
       programarRelectura(id, girado, deps);
     } finally {
@@ -154,7 +172,9 @@ export async function releerTrasEdicion(id: number, blob: Blob, deps?: DepsOcr):
   try {
     await turno;
   } finally {
-    if (relecturasEnCurso.get(id) === turno) relecturasEnCurso.delete(id);
+    if (relecturasEnCurso.get(id) === turno) {
+      relecturasEnCurso.delete(id);
+    }
   }
 }
 
@@ -167,7 +187,9 @@ async function esperarDrenaje(): Promise<void> {
 
 /** El OCR del lote/espera: flap 250ms×480 — nunca queda huérfano en el turno. */
 async function drenarSiLaColaTrabaja(): Promise<void> {
-  if (state.colaEnProceso) await esperarDrenaje();
+  if (state.colaEnProceso) {
+    await esperarDrenaje();
+  }
 }
 
 /** OCR del blob girado; "" si el módulo cargó roto (mejor vacío que rancio). */
@@ -199,7 +221,9 @@ async function restaurarSinTexto(item: Comprobante, id: number): Promise<void> {
   // ponytail: sin relectura no vale el texto viejo (es de otra orientación).
   if (buscarSlot(id)) {
     item.textoOcr = "";
-    if (!item.montoManual) item.montoCents = null;
+    if (!item.montoManual) {
+      item.montoCents = null;
+    }
     item.estado = "ok";
     await import("../ui/sheets").then((m) => m.renderHojas()).catch(() => {});
   }
@@ -211,7 +235,9 @@ async function restaurarSinTexto(item: Comprobante, id: number): Promise<void> {
  * También la usa el recorte manual, que invalida texto y monto igual.) */
 async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
   const item = obtenerComprobante(id);
-  if (!item || !buscarSlot(id)) return;
+  if (!item || !buscarSlot(id)) {
+    return;
+  }
   try {
     const { renderHojas } = await import("../ui/sheets");
     item.estado = "procesando";
@@ -219,7 +245,9 @@ async function releer(id: number, blob: Blob, deps?: DepsOcr): Promise<void> {
     // ponytail: las sesiones ORT son singletons sin mutex interno (un run()
     // concurrente de la cola + este cuelga a ambos): el OCR espera su turno.
     await drenarSiLaColaTrabaja();
-    if (!buscarSlot(id)) return; // el item murió en la espera: nada que releer
+    if (!buscarSlot(id)) {
+      return;
+    } // el item murió en la espera: nada que releer
     const texto = await textoDeOcr(blob, deps);
     // ponytail: ok ANTES del lote (candidatos exige ok: en procesando se autoexcluía).
     if (buscarSlot(id)) {

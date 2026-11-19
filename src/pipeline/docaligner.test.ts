@@ -107,9 +107,13 @@ function lienzoFalso(pixeles: Uint8ClampedArray): {
     },
     getImageData: (_x: number, _y: number, w: number, h: number): { data: Uint8ClampedArray } => {
       // Tras un put (el warp de rectificar), se lee lo puesto si encaja en dims.
-      if (puesto && puesto.w === w && puesto.h === h) return { data: puesto.datos };
+      if (puesto && puesto.w === w && puesto.h === h) {
+        return { data: puesto.datos };
+      }
       // Si el lienzo pide más píxeles de los dados, se completa en negro (?? 0 del lector).
-      if (pixeles.length >= w * h * 4) return { data: pixeles };
+      if (pixeles.length >= w * h * 4) {
+        return { data: pixeles };
+      }
       const ext = new Uint8ClampedArray(w * h * 4);
       ext.set(pixeles);
       return { data: ext };
@@ -251,7 +255,9 @@ describe("calcularHomografia", () => {
     expect(h[0] ?? 0).toBeCloseTo(1, 9);
     expect(h[4] ?? 0).toBeCloseTo(1, 9);
     expect(h[8]).toBe(1);
-    for (const i of [1, 2, 3, 5, 6, 7]) expect(h[i] ?? 0).toBeCloseTo(0, 9);
+    for (const i of [1, 2, 3, 5, 6, 7]) {
+      expect(h[i] ?? 0).toBeCloseTo(0, 9);
+    }
   });
 
   it("sistemaDLT arma 8×8 de 4 pares", () => {
@@ -646,7 +652,9 @@ describe("iniciarSesion", () => {
     const vistos: string[] = [];
     const intentar: IntentarEp = async (ep) => {
       vistos.push(ep);
-      if (ep === "webgpu") throw new Error("sin GPU");
+      if (ep === "webgpu") {
+        throw new Error("sin GPU");
+      }
       return buena;
     };
     await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 1000)).resolves.toBe(buena);
@@ -770,8 +778,11 @@ describe("descargarPesos", () => {
     return () => {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     };
   }
 
@@ -813,7 +824,9 @@ describe("descargarPesos", () => {
       expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       g["fetch"] = real.fetch;
-      if (real.caches !== undefined) g["caches"] = real.caches;
+      if (real.caches !== undefined) {
+        g["caches"] = real.caches;
+      }
     }
   });
 
@@ -852,7 +865,9 @@ describe("descargarPesos", () => {
       await expect(tamanoModelos()).resolves.toBe(0);
       await expect(borrarModelos()).resolves.toBe(false);
     } finally {
-      if (realCaches !== undefined) g["caches"] = realCaches;
+      if (realCaches !== undefined) {
+        g["caches"] = realCaches;
+      }
     }
   });
 
@@ -931,8 +946,11 @@ describe("descargarPesos", () => {
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     }
   });
 
@@ -1033,8 +1051,11 @@ describe("descargarPesos", () => {
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     }
   });
 
@@ -1094,8 +1115,11 @@ describe("descargarPesos", () => {
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     }
   });
 });

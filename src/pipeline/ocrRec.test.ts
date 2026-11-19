@@ -29,7 +29,9 @@ describe("normalizarLinea", () => {
 
   it("negro → −1", () => {
     const lin = normalizarLinea(new Uint8Array(2 * 2 * 3), 2, 2);
-    if (!lin) throw new Error("sin línea");
+    if (!lin) {
+      throw new Error("sin línea");
+    }
     expect(lin.tensor[0]).toBeCloseTo(-1, 5);
   });
 
@@ -47,7 +49,9 @@ describe("normalizarLinea", () => {
   it("borde izquierdo replica (sin extrapolar fuera de [-1,1])", () => {
     // 2×1: px0 oscuro, px1 claro. La 1ª columna muestrea x<0 → réplica px0.
     const lin = normalizarLinea(new Uint8Array([10, 20, 30, 200, 210, 220]), 2, 1);
-    if (!lin) throw new Error("sin línea");
+    if (!lin) {
+      throw new Error("sin línea");
+    }
     expect(lin.tensor[0]).toBeCloseTo((10 / 255 - 0.5) / 0.5, 5);
   });
 
@@ -64,12 +68,16 @@ describe("normalizarLote", () => {
   it("apila con pad de ceros: la ancha intacta, la corta con ceros (L2)", () => {
     const a = normalizarLinea(bgrA, 100, 20);
     const b = normalizarLinea(bgrB, 640, 30);
-    if (!a || !b) throw new Error("sin líneas");
+    if (!a || !b) {
+      throw new Error("sin líneas");
+    }
     const lote = normalizarLote([
       { bgr: bgrA, w: 100, h: 20 },
       { bgr: bgrB, w: 640, h: 30 },
     ]);
-    if (!lote) throw new Error("sin lote");
+    if (!lote) {
+      throw new Error("sin lote");
+    }
     expect(lote.lote).toBe(2);
     const wMax = Math.max(a.anchoTotal, b.anchoTotal);
     expect(lote.anchoMax).toBe(wMax);

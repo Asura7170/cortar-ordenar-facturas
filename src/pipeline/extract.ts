@@ -39,11 +39,18 @@ export function extraerRapidoCents(contenido = ""): Cents | null {
   let unico: Cents | null = null;
   let vistos = 0;
   for (const c of extractCandidates(contenido)) {
-    if (c.previo !== "") return null;
+    if (c.previo !== "") {
+      return null;
+    }
     const cents = parsearMonto(c.valor);
-    if (cents === null) continue;
-    if (vistos === 0) unico = cents;
-    else if (unico !== cents) return null;
+    if (cents === null) {
+      continue;
+    }
+    if (vistos === 0) {
+      unico = cents;
+    } else if (unico !== cents) {
+      return null;
+    }
     vistos++;
   }
   return vistos > 0 ? unico : null;
@@ -78,8 +85,9 @@ function montoEnEdicion(id: number): boolean {
     a instanceof HTMLInputElement &&
     a.dataset["accion"] === "monto" &&
     a.closest(".cell")?.getAttribute("data-id") === String(id)
-  )
+  ) {
     return true;
+  }
   const input = document.querySelector(`.cell[data-id="${id}"] input.cell-monto`);
   return input instanceof HTMLInputElement && input.value !== "";
 }
@@ -91,13 +99,23 @@ export function aplicarTotales(
   let aplicados = 0;
   for (const it of items) {
     const cents = montos.get(it.idx) ?? null;
-    if (cents === null) continue;
-    if (montoEnEdicion(it.id)) continue; // el borrador en curso gana
+    if (cents === null) {
+      continue;
+    }
+    if (montoEnEdicion(it.id)) {
+      continue;
+    } // el borrador en curso gana
     const slot = buscarSlot(it.id);
-    if (!slot) continue; // limpiado/quitado en el ínterin: no resucita
+    if (!slot) {
+      continue;
+    } // limpiado/quitado en el ínterin: no resucita
     const actual = slot.hoja.slots[slot.idx];
-    if (!actual || actual.montoCents !== null) continue; // manual ganó en el ínterin
-    if (limpiarTextoCompleto(actual.textoOcr) !== it.texto) continue; // girado: rancio
+    if (!actual || actual.montoCents !== null) {
+      continue;
+    } // manual ganó en el ínterin
+    if (limpiarTextoCompleto(actual.textoOcr) !== it.texto) {
+      continue;
+    } // girado: rancio
     actual.montoCents = cents;
     aplicados++;
   }
@@ -117,19 +135,29 @@ export type LoteListo =
 
 /** Clasifica el lote sin efectos (testeable sin fixture). */
 export function computarLote(lista: readonly Comprobante[]): LoteListo {
-  if (lista.length === 0) return { tipo: "sin-candidatos" };
+  if (lista.length === 0) {
+    return { tipo: "sin-candidatos" };
+  }
   const items: ItemLote[] = [];
   lista.forEach((c, i) => {
     const texto = limpiarTextoCompleto(c.textoOcr);
-    if (texto !== "") items.push({ idx: i + 1, id: c.id, texto });
+    if (texto !== "") {
+      items.push({ idx: i + 1, id: c.id, texto });
+    }
   });
-  if (items.length === 0) return { tipo: "sin-texto" };
+  if (items.length === 0) {
+    return { tipo: "sin-texto" };
+  }
   const mapa = new Map<number, Cents>();
   for (const it of items) {
     const r = extraerRapidoCents(it.texto);
-    if (r !== null) mapa.set(it.idx, r);
+    if (r !== null) {
+      mapa.set(it.idx, r);
+    }
   }
-  if (mapa.size === 0) return { tipo: "sin-totales" };
+  if (mapa.size === 0) {
+    return { tipo: "sin-totales" };
+  }
   return { tipo: "listo", items, mapa };
 }
 
@@ -139,20 +167,26 @@ function avisoVacio(
   tipo: LoteListo["tipo"],
   opciones?: { forzado?: boolean },
 ): { texto: string; esError: boolean } | null {
-  if (!opciones?.forzado) return null;
-  if (tipo === "sin-candidatos")
+  if (!opciones?.forzado) {
+    return null;
+  }
+  if (tipo === "sin-candidatos") {
     return { texto: "Sin pendientes (todo ya tiene total o es manual).", esError: false };
-  if (tipo === "sin-totales")
+  }
+  if (tipo === "sin-totales") {
     return {
       texto: "Sin totales para leer: revisá manualmente o recortá de nuevo.",
       esError: true,
     };
+  }
   return null; // sin-texto: silencioso aunque sea forzado
 }
 
 /** Mensaje final del lote (puro): éxito total con aviso previo lo restaura. */
 export function mensajeLote(ok: number, total: number, avisoPrevio: string): string {
-  if (ok === total && avisoPrevio.trim() !== "") return avisoPrevio;
+  if (ok === total && avisoPrevio.trim() !== "") {
+    return avisoPrevio;
+  }
   return `Local: ${ok}/${total} totales.`;
 }
 
@@ -172,7 +206,9 @@ function parchearCeldas(items: readonly ItemLote[], mapa: ReadonlyMap<number, Ce
 /** Gate de cola en proceso (con aviso si es forzado): true = no extraer ahora. */
 function bloqueadoPorCola(opciones?: { forzado?: boolean; desdeCola?: boolean }): boolean {
   if (state.colaEnProceso && !opciones?.desdeCola) {
-    if (opciones?.forzado) avisar("OCR en curso: los totales se calculan al terminar.");
+    if (opciones?.forzado) {
+      avisar("OCR en curso: los totales se calculan al terminar.");
+    }
     return true;
   }
   return false;
@@ -182,13 +218,18 @@ function bloqueadoPorCola(opciones?: { forzado?: boolean; desdeCola?: boolean })
     cola): 1 distinto fija el total; ≥2 distintos o signo previo quedan manual.
     Síncrono y sin red: nunca lanza. */
 export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: boolean }): void {
-  if (bloqueadoPorCola(opciones)) return;
+  if (bloqueadoPorCola(opciones)) {
+    return;
+  }
   const lote = computarLote(candidatos());
   if (lote.tipo !== "listo") {
     const vacio = avisoVacio(lote.tipo, opciones);
     if (vacio !== null) {
-      if (vacio.esError) avisarError(vacio.texto);
-      else avisar(vacio.texto);
+      if (vacio.esError) {
+        avisarError(vacio.texto);
+      } else {
+        avisar(vacio.texto);
+      }
     }
     return;
   }

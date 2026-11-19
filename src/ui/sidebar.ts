@@ -146,7 +146,9 @@ function tieneHueco(h: Hoja): boolean {
 /** Despacha el resto en la fila de huecos. */
 function llenarHuecos(slots: (Comprobante | null)[], resto: Comprobante[]): void {
   for (let j = 0; j < slots.length && resto.length; j++) {
-    if (!slots[j]) slots[j] = resto.shift() ?? null;
+    if (!slots[j]) {
+      slots[j] = resto.shift() ?? null;
+    }
   }
 }
 
@@ -170,7 +172,9 @@ function crearColocacion(destino: number | null): (items: Comprobante[]) => void
       // Perezosa: el intake vacío o todo-rechazado no crea hojas (el test
       // "null o vacío" lo exige; antes el return temprano lo garantizaba).
       hoja = state.hojas.find(tieneHueco) ?? state.hojas[state.hojas.length - 1] ?? crearHoja();
-      if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
+      if (!state.hojas.includes(hoja)) {
+        state.hojas.push(hoja);
+      }
     }
     llenarHuecos(hoja.slots, items);
     // Los desbordes continúan en la hoja recién creada (la próxima llamada
@@ -273,10 +277,14 @@ export async function agregarArchivos(
     for (const f of lista) {
       await cederTurno();
       if (esImagen(f)) {
-        if (await intakeImagen(f, colocar, avisos)) colocados += 1;
+        if (await intakeImagen(f, colocar, avisos)) {
+          colocados += 1;
+        }
         continue;
       }
-      if (!esPdf(f)) continue;
+      if (!esPdf(f)) {
+        continue;
+      }
       const pags = await paginasUtiles(f, avisos);
       if (pags) {
         colocar(pags);
@@ -289,7 +297,9 @@ export async function agregarArchivos(
   }
   despejarToasts("intake"); // siempre: los rechazos viejos de otro lote salen con fade
   avisar(avisos); // y los del lote actual, uno por archivo, entran abajo
-  if (colocados === 0) return;
+  if (colocados === 0) {
+    return;
+  }
 
   renderHojas();
   precalentarModelos(); // warm-up tras el intake: sin competir con los decodes
@@ -357,7 +367,9 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   let formatoNoSoportado = false;
   for (const item of items) {
     const tipo = tipoImagenDe(item);
-    if (!tipo) continue;
+    if (!tipo) {
+      continue;
+    }
     const cruda = subtipoImagen(tipo);
     if (!MIME_IMAGEN.test(`image/${cruda}`)) {
       formatoNoSoportado = true; // mismo mensaje que Ctrl+V para esos bytes
@@ -396,7 +408,9 @@ function destinoFantasma(): Hoja {
 /** Hoja real para el clic: la pedida, o la fantasma resuelta. */
 function destinoDelClic(hojaId: number): Hoja | null {
   let destino = hojaId === HOJA_FANTASMA ? undefined : hojaPorId(hojaId);
-  if (!destino && hojaId === HOJA_FANTASMA) destino = destinoFantasma();
+  if (!destino && hojaId === HOJA_FANTASMA) {
+    destino = destinoFantasma();
+  }
   return destino ?? null;
 }
 
@@ -423,7 +437,9 @@ function vigenteParaEscribir(destino: Hoja, hojaId: number): Hoja | null {
 /** Última hoja con hueco, o una nueva (ya en state) heredando el layout. */
 function huecoOAnueva(layoutRespaldo: LayoutId, vinculado: LayoutId | undefined): Hoja {
   const conHueco = state.hojas.find((x) => x.slots.includes(null));
-  if (conHueco) return conHueco;
+  if (conHueco) {
+    return conHueco;
+  }
   const nueva = crearHoja(vinculado ?? layoutRespaldo);
   state.hojas.push(nueva);
   return nueva;
@@ -453,16 +469,24 @@ function colocarEnVigente(
 }
 
 export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
-  if (state.modoOcr) return;
+  if (state.modoOcr) {
+    return;
+  }
   // Lee antes de mutar: si no hay imagen no se toca el estado (el fantasma
   // no se materializa ni se consume la hoja pedida). Sin await previo: el
   // gesto del clic autoriza el read() en Chrome.
   const archivos = await leerImagenesPortapapeles();
-  if (!archivos) return;
+  if (!archivos) {
+    return;
+  }
   const primero = archivos[0];
-  if (!primero) return;
+  if (!primero) {
+    return;
+  }
   const destino = destinoDelClic(hojaId);
-  if (!destino) return;
+  if (!destino) {
+    return;
+  }
   // Elección explícita de destino: consume la pendiente del picker (si no, el
   // próximo intake caería en una hoja abandonada).
   hojaPedida = null;
@@ -488,8 +512,11 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     renderHojas();
     // Resto (raro desde WhatsApp): sigue a la hoja donde cayó `primero`.
     const resto = archivos.slice(1);
-    if (resto.length > 0) await agregarArchivos(resto, hojaFinal.id);
-    else despejarToasts("intake"); // éxito: los rechazos viejos de otro intento salen con fade
+    if (resto.length > 0) {
+      await agregarArchivos(resto, hojaFinal.id);
+    } else {
+      despejarToasts("intake");
+    } // éxito: los rechazos viejos de otro intento salen con fade
     precalentarModelos();
     void procesarCola();
   } finally {
@@ -502,7 +529,9 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
 // por el flujo normal de entrada (crea la hoja sola).
 export async function pegarDelPortapapeles(): Promise<void> {
   const archivos = await leerImagenesPortapapeles();
-  if (!archivos) return;
+  if (!archivos) {
+    return;
+  }
   await agregarArchivos(archivos);
 }
 
@@ -539,7 +568,9 @@ function cablearPicker(): void {
   // El label solo reenvía clics: Enter/Espacio sobre él no abren el picker
   // (sin activation behavior propio), por eso el keydown es manual.
   dropzone.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
+    if (e.key !== "Enter" && e.key !== " ") {
+      return;
+    }
     e.preventDefault();
     fileInput.showPicker();
   });
@@ -562,16 +593,22 @@ function cablearArrastreCanvas(): void {
   // Head-start: entrar al canvas anticipa la intención (una sola vez).
   canvas.addEventListener("pointerenter", () => precalentarModelos(), { once: true });
   canvas.addEventListener("dragenter", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     e.preventDefault();
     marcarArrastre(arrastresCanvas + 1);
   });
   canvas.addEventListener("dragover", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     e.preventDefault();
   });
   canvas.addEventListener("dragleave", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     marcarArrastre(arrastresCanvas - 1);
   });
 }
@@ -582,20 +619,30 @@ function cablearArrastreCanvas(): void {
 function cablearSoltar(): void {
   canvas.addEventListener("drop", (e) => {
     marcarArrastre(0);
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     e.preventDefault();
-    if ((e.target as HTMLElement | null)?.closest?.(".sheet")) return;
+    if ((e.target as HTMLElement | null)?.closest?.(".sheet")) {
+      return;
+    }
     void agregarArchivos(e.dataTransfer?.files);
   });
   window.addEventListener("dragover", (e) => {
-    if (esDragDeArchivos(e)) e.preventDefault();
+    if (esDragDeArchivos(e)) {
+      e.preventDefault();
+    }
   });
   window.addEventListener("drop", (e) => {
     marcarArrastre(0);
-    if (esDragDeArchivos(e)) e.preventDefault();
+    if (esDragDeArchivos(e)) {
+      e.preventDefault();
+    }
   });
   document.addEventListener("dragleave", (e) => {
-    if (e.relatedTarget === null) marcarArrastre(0); // el arrastre salió de la ventana
+    if (e.relatedTarget === null) {
+      marcarArrastre(0);
+    } // el arrastre salió de la ventana
   });
 }
 
@@ -610,7 +657,9 @@ function archivosDePaste(e: ClipboardEvent): File[] {
 function cablearPaste(): void {
   document.addEventListener("paste", (e) => {
     const files = archivosDePaste(e);
-    if (files.length) void agregarArchivos(files);
+    if (files.length) {
+      void agregarArchivos(files);
+    }
   });
 }
 
@@ -618,7 +667,9 @@ function cablearPaste(): void {
     ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces). */
 function cablearBtnPegar(): void {
   btnPegar.addEventListener("click", () => {
-    if (btnPegar.dataset["pegando"] === "1") return;
+    if (btnPegar.dataset["pegando"] === "1") {
+      return;
+    }
     btnPegar.dataset["pegando"] = "1";
     void pegarDelPortapapeles().finally(() => {
       delete btnPegar.dataset["pegando"];
@@ -630,7 +681,9 @@ function cablearBtnPegar(): void {
 function cablearSwitchCodigo(): void {
   chkCodigo.addEventListener("change", () => {
     state.codigoActivo = chkCodigo.checked;
-    if (!chkCodigo.checked) borrarCodigo();
+    if (!chkCodigo.checked) {
+      borrarCodigo();
+    }
     renderCodigo();
   });
   inputCodigo.addEventListener("input", () => {
@@ -639,7 +692,9 @@ function cablearSwitchCodigo(): void {
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
     inputCodigo.classList.remove("codigo-error", "sacudir");
     inputCodigo.removeAttribute("aria-invalid");
-    if (chkCodigo.checked) guardarCodigo();
+    if (chkCodigo.checked) {
+      guardarCodigo();
+    }
   });
 }
 
@@ -647,9 +702,13 @@ function cablearSwitchCodigo(): void {
 function cablearRadiosPosicion(): void {
   radiosPosicion().forEach((r) =>
     r.addEventListener("change", () => {
-      if (!r.checked || !isPosicionCodigo(r.value)) return;
+      if (!r.checked || !isPosicionCodigo(r.value)) {
+        return;
+      }
       state.codigoPosicion = r.value;
-      if (chkCodigo.checked) guardarCodigo();
+      if (chkCodigo.checked) {
+        guardarCodigo();
+      }
     }),
   );
 }
@@ -658,19 +717,24 @@ function cablearRadiosPosicion(): void {
     ejecuta el vaciado si se confirmó. Esc/backdrop/Cancelar → returnValue ''. */
 function cablearModalLimpiar(): void {
   modalLimpiar.addEventListener("close", () => {
-    if (modalLimpiar.returnValue !== "ok") return;
+    if (modalLimpiar.returnValue !== "ok") {
+      return;
+    }
     hojaPedida = null; // la hoja destino pudo dejar de existir
-    for (const h of state.hojas)
+    for (const h of state.hojas) {
       for (const c of itemsDe(h)) {
         URL.revokeObjectURL(c.imgUrl);
       }
+    }
     state.hojas = [crearHoja()];
     // ponytail: cada lote trae código distinto; solo el número, resto intacto.
     state.codigoValor = "";
     renderCodigo();
     renderHojas();
     // Último: si el storage falla, los renders ya corrieron.
-    if (state.codigoActivo) guardarCodigo();
+    if (state.codigoActivo) {
+      guardarCodigo();
+    }
   });
 }
 
