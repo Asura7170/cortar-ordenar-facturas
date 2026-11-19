@@ -171,9 +171,11 @@ describe("envolver", () => {
     ({
       outputMetadata: [{ name: "x", isTensor: true, type: 1, shape }],
     }) as unknown as import("onnxruntime-web").InferenceSession;
+
   it("rec con clases distintas al dict lanza en init", () => {
     expect(() => envolver({} as never, sesion([100, 80, 999]), "rec")).toThrow(/999 clases/);
   });
+
   it("rec compatible no lanza", () => {
     expect(() => envolver({} as never, sesion([100, 80, DICT_OCR.length]), "rec")).not.toThrow();
   });
