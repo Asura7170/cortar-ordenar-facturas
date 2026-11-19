@@ -109,7 +109,8 @@ async function blobDe(c: Comprobante): Promise<Blob> {
   if (c.file) {
     return c.file;
   }
-  return await (await fetch(c.imgUrl)).blob();
+  const respuesta = await fetch(c.imgUrl);
+  return await respuesta.blob();
 }
 
 /** JPEG para el docx (declara jpg): todo pasa por decode con EXIF + re-encode.

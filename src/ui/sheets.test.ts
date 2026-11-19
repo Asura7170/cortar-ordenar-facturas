@@ -1,4 +1,5 @@
 /* Tests P1: hojas — layouts, quitar, clic delegado, drop y celdas (DOM aislado). */
+
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
@@ -9,6 +10,7 @@ import {
   eventoDragleave,
   puntoPorDefecto,
 } from "../test/fixture";
+import type { Comprobante, Hoja, LayoutId } from "../types";
 
 // El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
 vi.mock("../pipeline/rotar", () => ({
@@ -40,7 +42,6 @@ const { archivo, comprobante } = await import("../test/factoria");
 const { girarYReleer } = await import("../pipeline/rotar");
 const { abrirRecorte } = await import("./recorte");
 const { extraerPendientes } = await import("../pipeline/extract");
-import type { Comprobante, Hoja, LayoutId } from "../types";
 
 const agregarArchivos =
   vi.fn<(files: FileList | File[] | null | undefined, hojaId?: number | null) => void>();
@@ -519,8 +520,8 @@ describe("monto manual", () => {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       expect(input.classList.contains("monto-error")).toBe(true);
       // el swap llega después
-      for (const cb of diferidos) {
-        cb();
+      for (const diferido of diferidos) {
+        diferido();
       }
       const deNuevo = inputMonto();
       expect(deNuevo.classList.contains("monto-error")).toBe(true);
