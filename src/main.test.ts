@@ -37,7 +37,7 @@ vi.mock("./utils", () => ({
     title: "",
     setAttribute: (_k: string, _v: string) => {},
     addEventListener: (_ev: string, fn: () => void) => {
-      const g = globalThis as unknown as { __temaClicks?: Array<() => void> };
+      const g = globalThis as unknown as { __temaClicks?: (() => void)[] };
       g.__temaClicks ??= [];
       g.__temaClicks.push(fn);
     },
@@ -71,7 +71,7 @@ describe("resolverTema", () => {
 
 describe("toggle con storage bloqueado", () => {
   it("aplica el tema aunque el guardado falle", () => {
-    const g = globalThis as unknown as { __temaClicks?: Array<() => void> };
+    const g = globalThis as unknown as { __temaClicks?: (() => void)[] };
     const handler = g.__temaClicks?.[0];
     if (!handler) throw new Error("sin handler de tema");
     const original = localStorage.setItem.bind(localStorage);

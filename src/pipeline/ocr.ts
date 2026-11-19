@@ -45,7 +45,7 @@ const DET_LADO_MIN = 8;
 /** Salida mínima de sesión (ort.Tensor la satisface con cast en el borde). */
 export interface SalidaOcr {
   readonly data: ArrayLike<number>;
-  readonly dims: ReadonlyArray<number | string>;
+  readonly dims: readonly (number | string)[];
 }
 
 /** Subsesión (det o rec): crear tensores + ejecutar. */
@@ -264,7 +264,7 @@ export interface Enderezado {
 
 /** Mapa de probabilidad del det sobre un lienzo ya a tamaño det. Null sin salida válida. */
 /** Dimensión entera ≥ 1 (0 si ausente o inválida). */
-export function dimEntera(dims: ReadonlyArray<number | string> | undefined, i: number): number {
+export function dimEntera(dims: readonly (number | string)[] | undefined, i: number): number {
   const v = Number(dims?.[i] ?? 0);
   return Number.isInteger(v) && v >= 1 ? v : 0;
 }
@@ -581,7 +581,7 @@ export function chunkValido(
 /** Un chunk del lote: run + validación de formas (null si no cuadra). */
 async function correrChunk(
   rec: SubsesionOcr,
-  trozo: Array<{ lin: LineaNorm }>,
+  trozo: { lin: LineaNorm }[],
 ): Promise<{ datos: Float32Array; pasos: number; porLote: number; lote: LoteNorm } | null> {
   // ponytail: trozo no vacío ⇒ apilarLineas no falla.
   const lote = apilarLineas(trozo.map((t) => t.lin)) as LoteNorm;
@@ -598,7 +598,7 @@ async function correrChunk(
 /** Reintento individual de las líneas sin resultado (muta fuera; devuelve runs). */
 async function reintentarIndividuales(
   rec: SubsesionOcr,
-  norms: Array<{ idx: number; lin: LineaNorm }>,
+  norms: { idx: number; lin: LineaNorm }[],
   hechos: ReadonlySet<number>,
   fuera: TextoRec[],
 ): Promise<number> {

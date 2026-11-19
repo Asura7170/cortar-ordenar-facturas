@@ -480,7 +480,7 @@ describe("monto manual", () => {
     const input = inputMonto();
     input.value = "12,3";
     const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
-    const diferidos: Array<() => void> = [];
+    const diferidos: (() => void)[] = [];
     Object.defineProperty(document, "startViewTransition", {
       value: (cb: () => void): object => {
         diferidos.push(cb); // Chrome invoca el callback en la oportunidad de render

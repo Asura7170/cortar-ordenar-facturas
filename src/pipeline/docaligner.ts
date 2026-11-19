@@ -383,7 +383,7 @@ export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: numb
 /** Decodifica un heatmap (1,4,H,W) a esquinas en píxeles: por canal, centroide ponderado del blob mayor. */
 // ponytail: búfers locales por llamada (plano ~4K, barato); evita estado global mutable entre disparos.
 /** Cruces 4-vecinos dentro del mapa. */
-const VECINOS: ReadonlyArray<readonly [number, number]> = [
+const VECINOS: readonly (readonly [number, number])[] = [
   [-1, 0],
   [1, 0],
   [0, -1],

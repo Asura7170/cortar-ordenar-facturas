@@ -167,7 +167,7 @@ describe("tensorDet", () => {
 });
 
 describe("envolver", () => {
-  const sesion = (shape: ReadonlyArray<number | string>) =>
+  const sesion = (shape: readonly (number | string)[]) =>
     ({
       outputMetadata: [{ name: "x", isTensor: true, type: 1, shape }],
     }) as unknown as import("onnxruntime-web").InferenceSession;
@@ -823,7 +823,7 @@ describe("enderezar (decisión rec)", () => {
 
   /** Núcleo falso: det por nº de llamada det, rec con conf por nº de llamada rec. */
   function nucleoGiros(
-    mapas: Array<{ data: Float32Array; dims: number[] }>,
+    mapas: { data: Float32Array; dims: number[] }[],
     confs: number[],
     detLlamadas: number[],
     recLlamadas: number[],
@@ -864,7 +864,7 @@ describe("enderezar (decisión rec)", () => {
   }
 
   function base(
-    mapas: Array<{ data: Float32Array; dims: number[] }>,
+    mapas: { data: Float32Array; dims: number[] }[],
     confs: number[],
     fallaRecEn?: number,
   ): {

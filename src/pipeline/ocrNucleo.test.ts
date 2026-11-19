@@ -58,7 +58,7 @@ beforeEach(() => {
       put: async (k: unknown, r: unknown): Promise<void> => {
         tienda.set(claveDe(k), r as RespuestaFalsa);
       },
-      keys: async (): Promise<Array<{ url: string }>> => [...tienda.keys()].map((url) => ({ url })),
+      keys: async (): Promise<{ url: string }[]> => [...tienda.keys()].map((url) => ({ url })),
       delete: async (k: unknown): Promise<boolean> => tienda.delete(claveDe(k)),
     }),
   };

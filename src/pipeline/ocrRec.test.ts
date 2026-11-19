@@ -145,7 +145,7 @@ describe("decodificarCtc", () => {
   const dict = ["blank", "a", "b", " ", "c"];
 
   /** Logits de pasos×clases con argmax y prob dados por fila. */
-  function logits(filas: Array<readonly [number, number]>): Float32Array {
+  function logits(filas: (readonly [number, number])[]): Float32Array {
     const out = new Float32Array(filas.length * dict.length);
     filas.forEach(([cls, p], t) => {
       out[(t ?? 0) * dict.length + (cls ?? 0)] = p ?? 0;

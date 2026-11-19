@@ -143,7 +143,7 @@ const blanco = (w: number, h: number): Uint8ClampedArray =>
   new Uint8ClampedArray(w * h * 4).fill(255);
 
 // Heatmap (1,4,L,L) con un pico por canal en las celdas dadas.
-function heatConPicos(L: number, celdas: Array<[number, number]>): Float32Array {
+function heatConPicos(L: number, celdas: [number, number][]): Float32Array {
   const heat = new Float32Array(4 * L * L);
   celdas.forEach(([cx, cy], c) => {
     heat[c * L * L + cy * L + cx] = 1;
@@ -567,7 +567,7 @@ describe("detectarYRecortar", () => {
     const L = 8;
     const sesion: SesionDetectora = {
       inferir: async (): Promise<{ datos: Float32Array; dims: readonly number[] }> => ({
-        datos: heatConPicos(L, celdas as Array<[number, number]>),
+        datos: heatConPicos(L, celdas as [number, number][]),
         dims: [1, 4, L, L],
       }),
     };
