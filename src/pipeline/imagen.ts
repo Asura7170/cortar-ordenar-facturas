@@ -195,7 +195,7 @@ export function medianaCanal(v: number[]): number {
   if (v.length === 0) {
     return 0;
   }
-  const o = [...v].sort((a, b) => a - b);
+  const o = v.toSorted((a, b) => a - b);
   // ponytail: length ≥ 1 ⇒ floor(len/2) < len.
   return o[Math.floor(o.length / 2)] as number;
 }

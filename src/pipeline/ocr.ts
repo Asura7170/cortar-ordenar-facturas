@@ -421,7 +421,7 @@ async function confiarRec(
   cajas: CajaDb[],
   crear: CrearLienzo,
 ): Promise<number> {
-  const top = [...cajas].sort((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
+  const top = cajas.toSorted((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
   const rs = await reconocerLote(rec, base, top, crear);
   const confs: number[] = [];
   for (const r of rs) {
@@ -711,7 +711,7 @@ export async function reconocerLote(
     idx: v.idx,
     lin: normalizarLinea(v.bgr, v.w, v.h) as LineaNorm,
   }));
-  const orden = [...norms].sort((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
+  const orden = norms.toSorted((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
   let anchoMax = 0;
   let chunks = 0;
   let ok = true;

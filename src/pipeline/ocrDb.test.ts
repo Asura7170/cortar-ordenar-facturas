@@ -67,7 +67,7 @@ describe("inundar", () => {
     ]);
     const pts = inundar(bin, 6, new Uint32Array(36), 2, 2, 1)
       .map(([x, y]) => `${x},${y}`)
-      .sort();
+      .toSorted();
     expect(pts).toStrictEqual(["1,1", "1,2", "2,1", "2,2"]);
   });
 

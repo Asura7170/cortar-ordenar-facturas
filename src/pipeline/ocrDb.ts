@@ -127,7 +127,7 @@ function cadenaCasco(unicos: readonly PuntoDb[], delReves: boolean): PuntoDb[] {
 
 /** Casco convexo de Andrew (monotone chain), sin duplicar el cierre. */
 export function cascoConvexo(puntos: readonly PuntoDb[]): PuntoDb[] {
-  const pts = [...puntos].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const pts = puntos.toSorted((a, b) => a[0] - b[0] || a[1] - b[1]);
   const unicos = sinDuplicados(pts);
   if (unicos.length < 3) {
     return unicos;
