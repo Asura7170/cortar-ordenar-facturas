@@ -18,15 +18,20 @@ export function formatearMoneda(cents: Cents): string {
 export function parsearMonto(texto: string): Cents | null {
   const s = texto.trim().replaceAll(/[\s$€£]/gu, "");
   const m = /^(?<entera>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?<decimales>\d{1,2}))?$/u.exec(s);
+  const g = m?.groups;
+  if (!g) {
+    return null;
+  }
+  const { entera = "", decimales } = g;
   // ponytail: miles con coma exigen decimal con punto ("1,234" solo → escribir 1234).
-  if (!m || ((m[1] ?? "").includes(",") && m[2] === undefined)) {
+  if (entera.includes(",") && decimales === undefined) {
     return null;
   }
-  const entera = (m[1] ?? "").replaceAll(",", "");
-  if (!/^\d{1,12}$/u.test(entera)) {
+  const digitos = entera.replaceAll(",", "");
+  if (!/^\d{1,12}$/u.test(digitos)) {
     return null;
   }
-  return Number(entera) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
+  return Number(digitos) * 100 + Number((decimales ?? "").padEnd(2, "0"));
 }
 
 export function itemsDe(hoja: Hoja): Comprobante[] {

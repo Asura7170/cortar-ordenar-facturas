@@ -23,7 +23,7 @@ export function extractCandidates(contenido = ""): Candidato[] {
   let m: RegExpExecArray | null;
   while ((m = MONEY_RE.exec(contenido)) !== null) {
     out.push({
-      valor: m[1] ?? "",
+      valor: m.groups?.["monto"] ?? "",
       // Un "-" de un run separador no es signo (solo vale sin guion previo).
       previo:
         /(?:^|[^-])(?<menos>-)\s*$|(?<abre>\()\s*$/u
