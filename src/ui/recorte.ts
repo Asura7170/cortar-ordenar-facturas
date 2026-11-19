@@ -208,7 +208,7 @@ function restablecer(): void {
 
 function cerrarAnterior(): void {
   // invalida la confirmación en vuelo (ya no es su diálogo)
-  sesion++;
+  sesion += 1;
   if (raf !== null) {
     cancelAnimationFrame(raf);
     raf = null;

@@ -867,7 +867,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
     h.slots[0] = comprobante();
     state.hojas.push(h);
     const pendiente = pegarEnCelda(HOJA_FANTASMA, 0);
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 50; i += 1) {
       await Promise.resolve();
     }
     // aún no materializada: normalizando

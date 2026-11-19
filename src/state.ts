@@ -41,11 +41,13 @@ let seq = 0;
 let seqHoja = 0;
 
 export function nextComprobanteId(): number {
-  return ++seq;
+  seq += 1;
+  return seq;
 }
 
 export function nextHojaId(): number {
-  return ++seqHoja;
+  seqHoja += 1;
+  return seqHoja;
 }
 
 function leerBlob(): Record<string, unknown> {
@@ -245,13 +247,13 @@ export function redistribuir(layoutNuevas?: LayoutId): void {
   // ponytail: cada llamada ocurre con pos < items.length ⇒ el índice es válido.
   const tomar = (): Comprobante => {
     const item = items[pos] as Comprobante;
-    pos++;
+    pos += 1;
     return item;
   };
   for (const h of state.hojas) {
     const cap = layoutDe(h.layout).total;
     h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
-    for (let i = 0; i < cap && pos < items.length; i++) {
+    for (let i = 0; i < cap && pos < items.length; i += 1) {
       h.slots[i] = tomar();
     }
   }
@@ -261,7 +263,7 @@ export function redistribuir(layoutNuevas?: LayoutId): void {
     const h = crearHoja(layoutNuevas);
     const cap = layoutDe(h.layout).total;
     h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
-    for (let i = 0; i < cap && pos < items.length; i++) {
+    for (let i = 0; i < cap && pos < items.length; i += 1) {
       h.slots[i] = tomar();
     }
     state.hojas.push(h);

@@ -85,7 +85,7 @@ function boton(accion: string): HTMLButtonElement {
 
 /** Espera a que el import dinámico (clic → abrirRecorte) termine. */
 async function vaciar(): Promise<void> {
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 10; i += 1) {
     await new Promise((r) => setTimeout(r, 0));
   }
 }
@@ -1579,7 +1579,7 @@ describe("drag entre celdas (swap)", () => {
 
   /** Espera N frames reales (los rAF pendientes van primero: moveRaf/paso corren antes de volver). */
   async function esperarRaf(n = 2): Promise<void> {
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       await new Promise<void>((r) => {
         requestAnimationFrame(() => r());
       });

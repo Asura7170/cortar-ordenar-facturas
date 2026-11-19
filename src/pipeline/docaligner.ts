@@ -78,7 +78,7 @@ function cuatroPuntosDe(puntos: readonly Punto[]): [Punto, Punto, Punto, Punto] 
 function inicioSupIzquierda(orden: readonly Punto[]): number {
   let inicio = 0;
   let mejor = Infinity;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4; i += 1) {
     // ponytail: orden viene del quarteto validado: índice denso por construcción.
     const p = orden[i] as Punto;
     const s = p.x + p.y;
@@ -215,7 +215,7 @@ export function sistemaDLT(
 } {
   const a: number[][] = [];
   const b: number[] = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 4; i += 1) {
     // ponytail: paresDLT garantiza 4 densos.
     const s = src[i] as Punto;
     const d = dst[i] as Punto;
@@ -240,7 +240,7 @@ function filaMut(a: number[][], f: number): number[] {
 /** Pivoteo parcial + normalización de la columna col (muta a/b). */
 export function pivotar(a: number[][], b: number[], col: number, n: number): void {
   let piv = col;
-  for (let fil = col + 1; fil < n; fil++) {
+  for (let fil = col + 1; fil < n; fil += 1) {
     if (Math.abs(celda(a, fil, col)) > Math.abs(celda(a, piv, col))) {
       piv = fil;
     }
@@ -260,7 +260,7 @@ export function pivotar(a: number[][], b: number[], col: number, n: number): voi
   }
   const div = celda(a, col, col);
   const fila = filaMut(a, col);
-  for (let k = col; k < n; k++) {
+  for (let k = col; k < n; k += 1) {
     fila[k] = celda(a, col, k) / div;
   }
   b[col] = (b[col] as number) / div;
@@ -268,7 +268,7 @@ export function pivotar(a: number[][], b: number[], col: number, n: number): voi
 
 /** Anula la columna col en las demás filas (muta a/b). */
 export function eliminar(a: number[][], b: number[], col: number, n: number): void {
-  for (let fil = 0; fil < n; fil++) {
+  for (let fil = 0; fil < n; fil += 1) {
     if (fil === col) {
       continue;
     }
@@ -277,7 +277,7 @@ export function eliminar(a: number[][], b: number[], col: number, n: number): vo
       continue;
     }
     const fr = filaMut(a, fil);
-    for (let k = col; k < n; k++) {
+    for (let k = col; k < n; k += 1) {
       fr[k] = celda(a, fil, k) - factor * celda(a, col, k);
     }
     // ponytail: b denso (ver pivotar).
@@ -294,13 +294,13 @@ export function calcularHomografia(
   const { src, dst } = paresDLT(destino, origen);
   const { a, b } = sistemaDLT(src, dst);
   const n = 8;
-  for (let col = 0; col < n; col++) {
+  for (let col = 0; col < n; col += 1) {
     pivotar(a, b, col, n);
     eliminar(a, b, col, n);
   }
   const h = new Float64Array(9);
   // ponytail: b trae 8 (sistemaDLT).
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 8; i += 1) {
     h[i] = b[i] as number;
   }
   h[8] = 1;
@@ -393,12 +393,12 @@ export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: numb
   const ent = src.datos;
   const an = src.ancho;
   const al = src.alto;
-  for (let v = 0; v < alto; v++) {
+  for (let v = 0; v < alto; v += 1) {
     let X = h1 * v + h2;
     let Y = h4 * v + h5;
     let W = h7 * v + h8;
     let o = v * ancho * 4;
-    for (let u = 0; u < ancho; u++, X += h0, Y += h3, W += h6, o += 4) {
+    for (let u = 0; u < ancho; u += 1, X += h0, Y += h3, W += h6, o += 4) {
       const sx = X / W;
       const sy = Y / W;
       // Fuera de la fuente: queda el blanco de fondo.
@@ -453,14 +453,16 @@ export function masaComponente(
   pila: Int32Array,
 ): { masa: number; sumaX: number; sumaY: number } {
   let cima = 0;
-  pila[cima++] = ini;
+  pila[cima] = ini;
+  cima += 1;
   visitados[ini] = 1;
   let masa = 0;
   let sumaX = 0;
   let sumaY = 0;
   while (cima > 0) {
     // ponytail: índices acotados (semilla < plano; vecinos chequeados).
-    const idx = pila[--cima] as number;
+    cima -= 1;
+    const idx = pila[cima] as number;
     const val = heat[base + idx] ?? 0;
     const x = idx % w;
     const y = (idx / w) | 0;
@@ -478,7 +480,8 @@ export function masaComponente(
         continue;
       }
       visitados[ni] = 1;
-      pila[cima++] = ni;
+      pila[cima] = ni;
+      cima += 1;
     }
   }
   return { masa, sumaX, sumaY };
@@ -501,7 +504,7 @@ export function mejorComponente(
   let mejorY = -1;
   let pico = 0;
   const plano = w * h;
-  for (let ini = 0; ini < plano; ini++) {
+  for (let ini = 0; ini < plano; ini += 1) {
     const v = heat[base + ini] ?? 0;
     if (v > pico) {
       pico = v;
@@ -540,7 +543,7 @@ export function decodificarHeatmap(
   const pila = new Int32Array(plano);
   const puntos: Punto[] = [];
   const confianzas: number[] = [];
-  for (let c = 0; c < 4; c++) {
+  for (let c = 0; c < 4; c += 1) {
     const { punto, pico } = mejorComponente(
       heat,
       c * plano,
@@ -592,7 +595,7 @@ export function bitmapATensor(bmp: FuenteDibujable, crear: CrearLienzo = crearRe
   const { data } = ctx.getImageData(0, 0, LADO_MODELO, LADO_MODELO);
   const plano = LADO_MODELO * LADO_MODELO;
   const tensor = new Float32Array(3 * plano);
-  for (let i = 0; i < plano; i++) {
+  for (let i = 0; i < plano; i += 1) {
     const j = i * 4;
     tensor[i] = (data[j] ?? 0) / 255;
     tensor[i + plano] = (data[j + 1] ?? 0) / 255;

@@ -399,7 +399,7 @@ describe("warpear", () => {
     const w = 4;
     const h = 4;
     const datos = new Uint8ClampedArray(w * h * 4);
-    for (let i = 0; i < w * h; i++) {
+    for (let i = 0; i < w * h; i += 1) {
       datos[i * 4] = i * 10;
       datos[i * 4 + 1] = i * 5;
       datos[i * 4 + 2] = i;
@@ -407,7 +407,7 @@ describe("warpear", () => {
     }
     const fuera = warpear({ datos, ancho: w, alto: h }, esquinas(w, h), w, h);
     // La homografía se resuelve por Gauss: error ~1e-13 que el redondeo a u8 puede mover ±1.
-    for (let i = 0; i < fuera.datos.length; i++) {
+    for (let i = 0; i < fuera.datos.length; i += 1) {
       expect(Math.abs((fuera.datos[i] ?? 0) - (datos[i] ?? 0))).toBeLessThanOrEqual(1);
     }
   });
@@ -505,7 +505,7 @@ describe("bitmapATensor/rectificar", () => {
   it("tensor CHW 0..1 con el rojo en el primer plano", () => {
     const n = LADO_MODELO * LADO_MODELO;
     const pix = new Uint8ClampedArray(n * 4);
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       pix[i * 4] = 255;
       pix[i * 4 + 3] = 255;
     }

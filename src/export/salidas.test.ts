@@ -135,8 +135,8 @@ function dentroDeCarta(rects: readonly Rect[]): void {
 }
 
 function sinSolapes(rects: readonly Rect[]): void {
-  for (let i = 0; i < rects.length; i++) {
-    for (let j = i + 1; j < rects.length; j++) {
+  for (let i = 0; i < rects.length; i += 1) {
+    for (let j = i + 1; j < rects.length; j += 1) {
       const a = rects[i];
       const b = rects[j];
       if (!a || !b) {
@@ -149,8 +149,8 @@ function sinSolapes(rects: readonly Rect[]): void {
 
 /** Vecinas del mismo eje separadas por al menos la calle (el hueco visible). */
 function conCalle(rects: readonly Rect[], calle: number): void {
-  for (let i = 0; i < rects.length; i++) {
-    for (let j = i + 1; j < rects.length; j++) {
+  for (let i = 0; i < rects.length; i += 1) {
+    for (let j = i + 1; j < rects.length; j += 1) {
       const a = rects[i];
       const b = rects[j];
       if (!a || !b) {
@@ -270,7 +270,7 @@ describe("encajar", () => {
 describe("construirDocumento (docx mockeado)", () => {
   function hojaCon(n: number): void {
     const h = crearHoja();
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       h.slots[i] = comprobante({ file: new Blob([`jpg${i}`], { type: "image/jpeg" }) });
     }
     state.hojas.push(h);
@@ -502,7 +502,7 @@ describe("initExport", () => {
 describe("hojaPrint", () => {
   function hojaLlena(n: number, layout: LayoutId = "u4x2") {
     const h = crearHoja(layout);
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       h.slots[i] = comprobante();
     }
     return h;

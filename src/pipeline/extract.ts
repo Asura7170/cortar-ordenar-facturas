@@ -51,7 +51,7 @@ export function extraerRapidoCents(contenido = ""): Cents | null {
     } else if (unico !== cents) {
       return null;
     }
-    vistos++;
+    vistos += 1;
   }
   return vistos > 0 ? unico : null;
 }
@@ -121,7 +121,7 @@ export function aplicarTotales(
       continue;
     }
     actual.montoCents = cents;
-    aplicados++;
+    aplicados += 1;
   }
   return aplicados;
 }

@@ -145,7 +145,7 @@ function tieneHueco(h: Hoja): boolean {
 
 /** Despacha el resto en la fila de huecos. */
 function llenarHuecos(slots: (Comprobante | null)[], resto: Comprobante[]): void {
-  for (let j = 0; j < slots.length && resto.length; j++) {
+  for (let j = 0; j < slots.length && resto.length; j += 1) {
     if (!slots[j]) {
       slots[j] = resto.shift() ?? null;
     }
@@ -271,7 +271,7 @@ export async function agregarArchivos(
   let colocados = 0;
   // Sin VT ni rebuilds por archivo durante el intake (ver sheets.renderHojas):
   // el flag cubre todo el loop y el finally lo suelta aunque un PDF falle.
-  intakesActivos++;
+  intakesActivos += 1;
   state.loteEnCurso = true;
   try {
     for (const f of lista) {
@@ -292,7 +292,7 @@ export async function agregarArchivos(
       }
     }
   } finally {
-    intakesActivos--;
+    intakesActivos -= 1;
     state.loteEnCurso = intakesActivos > 0;
   }
   // siempre: los rechazos viejos de otro lote salen con fade
@@ -497,7 +497,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
   // próximo intake caería en una hoja abandonada).
   hojaPedida = null;
   const layoutRespaldo = destino.layout;
-  intakesActivos++;
+  intakesActivos += 1;
   state.loteEnCurso = true;
   try {
     let comp: Comprobante;
@@ -527,7 +527,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     precalentarModelos();
     void procesarCola();
   } finally {
-    intakesActivos--;
+    intakesActivos -= 1;
     state.loteEnCurso = intakesActivos > 0;
   }
 }

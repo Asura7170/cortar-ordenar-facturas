@@ -180,7 +180,7 @@ export async function releerTrasEdicion(id: number, blob: Blob, deps?: DepsOcr):
 
 /** Espera a que la cola suelte el flag (tope 120s: el lote nunca queda huérfano). */
 async function esperarDrenaje(): Promise<void> {
-  for (let i = 0; i < 480 && state.colaEnProceso; i++) {
+  for (let i = 0; i < 480 && state.colaEnProceso; i += 1) {
     await new Promise((res) => setTimeout(res, 250));
   }
 }

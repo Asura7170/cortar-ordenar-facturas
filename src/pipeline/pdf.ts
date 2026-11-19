@@ -175,7 +175,7 @@ export async function expandirPdf(
       return utiles;
     }
     // ponytail: secuencial a propósito; N renders en paralelo saturan memoria.
-    for (let i = 1; i <= total; i++) {
+    for (let i = 1; i <= total; i += 1) {
       const pagina = await paginaUtil(doc, total, i, crear);
       if (pagina) {
         utiles.push(pagina);

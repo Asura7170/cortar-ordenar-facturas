@@ -154,7 +154,7 @@ function parrafoCodigo(codigo: string, posicion: PosicionCodigo): Paragraph {
 async function parrafoHoja(hoja: Hoja, posicion: PosicionCodigo): Promise<Paragraph> {
   const rects = geometria(hoja.layout, posicion);
   const runs: ImageRun[] = [];
-  for (let i = 0; i < hoja.slots.length; i++) {
+  for (let i = 0; i < hoja.slots.length; i += 1) {
     const item = hoja.slots[i];
     const rect = rects[i];
     if (!item || !rect) {
