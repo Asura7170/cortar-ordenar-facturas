@@ -634,7 +634,7 @@ function cablearSwitchCodigo(): void {
     renderCodigo();
   });
   inputCodigo.addEventListener("input", () => {
-    state.codigoValor = inputCodigo.value.replace(/\D/g, "");
+    state.codigoValor = inputCodigo.value.replaceAll(/\D/g, "");
     inputCodigo.value = state.codigoValor;
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
     inputCodigo.classList.remove("codigo-error", "sacudir");

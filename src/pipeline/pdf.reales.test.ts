@@ -28,8 +28,8 @@ if (typeof proto["toHex"] !== "function") {
 // vite-node no resuelve el worker `?url` (da file:// roto o http:): se fija
 // el file:// real desde dirname (con pnpm hay symlink y ESM lo sigue).
 // En producción el `?url` del bundle manda (el ||= de pdf.ts lo respeta).
-const workerRuta = `${DIRNAME}/../../node_modules/pdfjs-dist/build/pdf.worker.mjs`.replace(
-  /\\/g,
+const workerRuta = `${DIRNAME}/../../node_modules/pdfjs-dist/build/pdf.worker.mjs`.replaceAll(
+  "\\",
   "/",
 );
 const workerUrl: string = new URL(`file:///${workerRuta}`).href;
