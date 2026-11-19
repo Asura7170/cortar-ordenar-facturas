@@ -211,7 +211,7 @@ export function celdaDesdeMatriz(matrix: string, base: number, cell: number): nu
   if (m === null || !Number.isFinite(cell) || cell <= 0) {
     return null;
   }
-  const y = Number.parseFloat((m[1] ?? "").split(",").at(-1) ?? "");
+  const y = Number((m[1] ?? "").split(",").at(-1) ?? "");
   return Number.isFinite(y) ? base + Math.round(-y / cell) : null;
 }
 

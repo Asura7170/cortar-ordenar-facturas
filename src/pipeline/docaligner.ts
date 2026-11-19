@@ -464,7 +464,7 @@ export function masaComponente(
     const idx = pila[cima] as number;
     const val = heat[base + idx] ?? 0;
     const x = idx % w;
-    const y = (idx / w) | 0;
+    const y = Math.trunc(idx / w);
     masa += val;
     sumaX += x * val;
     sumaY += y * val;

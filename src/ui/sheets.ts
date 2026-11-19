@@ -281,7 +281,7 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
   row.className = "sheet-row";
   row.dataset["hoja"] = String(hoja.id);
   row.innerHTML = panelHoja(hoja, idx);
-  row.insertBefore(sheet, row.firstChild);
+  row.prepend(sheet);
   // Columna derecha: panel arriba, botón de agregar debajo (misma columna).
   const lado = document.createElement("div");
   lado.className = "sheet-side";

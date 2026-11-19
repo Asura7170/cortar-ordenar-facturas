@@ -322,7 +322,7 @@ describe("construirDocumento (docx mockeado)", () => {
     } as unknown as CanvasRenderingContext2D);
     const toBlob = vi
       .spyOn(HTMLCanvasElement.prototype, "toBlob")
-      .mockImplementation(function toBlob(this: HTMLCanvasElement, cb: BlobCallback): void {
+      .mockImplementation((cb: BlobCallback): void => {
         cb(new Blob([jpg], { type: "image/jpeg" }));
       });
     try {

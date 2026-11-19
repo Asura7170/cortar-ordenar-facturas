@@ -555,7 +555,7 @@ describe("abrirRecorte", () => {
       .spyOn(HTMLCanvasElement.prototype, "getContext")
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
     try {
-      const { promise, resolve } = Promise.withResolvers<void>();
+      const { promise, resolve } = Promise.withResolvers<undefined>();
       const bmp = { width: 100, height: 80, close: vi.fn<() => void>() };
       const deps = {
         cargar: vi.fn<() => Promise<unknown>>(async () => {
@@ -568,7 +568,7 @@ describe("abrirRecorte", () => {
       const apertura = abrirRecorte(c.id, deps as never);
       // Limpiar durante el decode.
       state.hojas.length = 0;
-      resolve();
+      resolve(undefined);
       await apertura;
       expect(modal.open).toBe(false);
       expect(bmp.close).toHaveBeenCalled();
