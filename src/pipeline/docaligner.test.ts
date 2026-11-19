@@ -595,12 +595,12 @@ describe("detectarYRecortar", () => {
       },
     };
     const falso = lienzoFalso(blanco(80, 80));
-    expect(
-      await detectarYRecortar(original, { cargar, crear: falso.crear, sesion: async () => vacia }),
-    ).toBe(original);
-    expect(
-      await detectarYRecortar(original, { cargar, crear: falso.crear, sesion: async () => rota }),
-    ).toBe(original);
+    await expect(
+      detectarYRecortar(original, { cargar, crear: falso.crear, sesion: async () => vacia }),
+    ).resolves.toBe(original);
+    await expect(
+      detectarYRecortar(original, { cargar, crear: falso.crear, sesion: async () => rota }),
+    ).resolves.toBe(original);
   });
 });
 

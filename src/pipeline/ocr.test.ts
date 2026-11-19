@@ -259,14 +259,14 @@ describe("extraerTexto", () => {
   it("mapa vacío → sin texto y sin rec", async () => {
     const vacio = { data: new Float32Array(16 * 8).fill(0.01), dims: [1, 1, 8, 16] };
     const { deps, espia } = base(vacio, logitsAA());
-    expect(await extraerTexto(new Blob(["x"]), deps)).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps)).resolves.toBe("");
     expect(espia.rec).toHaveLength(0);
   });
 
   it("rec todo blank → línea vacía filtrada", async () => {
     const n = DICT_OCR.length;
     const { deps } = base(mapaUnaLinea(), { data: new Float32Array(n), dims: [1, 1, n] });
-    expect(await extraerTexto(new Blob(["x"]), deps)).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps)).resolves.toBe("");
   });
 
   it("núcleo caído → sin lanzar", async () => {
@@ -315,12 +315,16 @@ describe("extraerTexto", () => {
 
   it("reuse sin base ni cajas → decode fresca", async () => {
     const { deps, espia } = base();
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas: [], base: null })).toBe("AA");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas: [], base: null })).resolves.toBe(
+      "AA",
+    );
     expect(espia.det).toHaveLength(1);
     const { lienzo } = lienzoFalso(BLANCO32);
     lienzo.width = 32;
     lienzo.height = 32;
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas: [], base: lienzo })).toBe("AA");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas: [], base: lienzo })).resolves.toBe(
+      "AA",
+    );
   });
 
   it("reuse chico → vacío directo sin decode", async () => {
@@ -339,7 +343,7 @@ describe("extraerTexto", () => {
         puntaje: 0.9,
       },
     ];
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas, base: lienzo })).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas, base: lienzo })).resolves.toBe("");
     expect(espia.det).toHaveLength(0);
     expect(espia.rec).toHaveLength(0);
   });
@@ -743,7 +747,7 @@ describe("reconocerLote", () => {
     const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
     const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
     const { lienzo } = lienzoFalso(BLANCO32);
-    expect(await reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).toStrictEqual([]);
+    await expect(reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).resolves.toStrictEqual([]);
     expect(espia.rec).toHaveLength(0);
   });
 
@@ -760,7 +764,7 @@ describe("reconocerLote", () => {
       ] as const,
       puntaje: 0.9,
     };
-    expect(await reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).toStrictEqual([
+    await expect(reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).resolves.toStrictEqual([
       { texto: "", puntaje: 0 },
     ]);
     expect(espia.rec).toHaveLength(0);

@@ -55,17 +55,19 @@ describe("admiteTamanoPdf", () => {
 describe("admitirPdf", () => {
   it("admite ≤ 10 páginas y rechaza 11+", async () => {
     const contar = async (): Promise<number> => 5;
-    expect(await admitirPdf(pdfDe("a.pdf", "application/pdf", 100), contar)).toStrictEqual({
+    await expect(admitirPdf(pdfDe("a.pdf", "application/pdf", 100), contar)).resolves.toStrictEqual(
+      {
+        admite: true,
+      },
+    );
+    await expect(
+      admitirPdf(pdfDe("b.pdf", "application/pdf", 100), () => Promise.resolve(10)),
+    ).resolves.toStrictEqual({
       admite: true,
     });
-    expect(
-      await admitirPdf(pdfDe("b.pdf", "application/pdf", 100), () => Promise.resolve(10)),
-    ).toStrictEqual({
-      admite: true,
-    });
-    expect(
-      await admitirPdf(pdfDe("c.pdf", "application/pdf", 100), () => Promise.resolve(11)),
-    ).toStrictEqual({
+    await expect(
+      admitirPdf(pdfDe("c.pdf", "application/pdf", 100), () => Promise.resolve(11)),
+    ).resolves.toStrictEqual({
       admite: false,
       motivo: "paginas",
     });
@@ -74,9 +76,9 @@ describe("admitirPdf", () => {
 
   it("rechaza por tamaño sin abrir el documento", async () => {
     const contar = vi.fn<(f: File) => Promise<number>>(async (): Promise<number> => 5);
-    expect(
-      await admitirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), contar),
-    ).toStrictEqual({
+    await expect(
+      admitirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), contar),
+    ).resolves.toStrictEqual({
       admite: false,
       motivo: "tamano",
     });
@@ -85,7 +87,7 @@ describe("admitirPdf", () => {
 
   it("cero bytes es ilegible sin abrir", async () => {
     const contar = vi.fn<(f: File) => Promise<number>>(async (): Promise<number> => 5);
-    expect(await admitirPdf(pdfDe("v.pdf", "application/pdf", 0), contar)).toStrictEqual({
+    await expect(admitirPdf(pdfDe("v.pdf", "application/pdf", 0), contar)).resolves.toStrictEqual({
       admite: false,
       motivo: "ilegible",
     });
@@ -98,14 +100,14 @@ describe("admitirPdf", () => {
       e.name = "PasswordException";
       throw e;
     };
-    expect(await admitirPdf(pdfDe("c.pdf", "application/pdf", 100), clave)).toStrictEqual({
+    await expect(admitirPdf(pdfDe("c.pdf", "application/pdf", 100), clave)).resolves.toStrictEqual({
       admite: false,
       motivo: "cifrado",
     });
     const roto = (): Promise<number> => {
       throw new Error("bytes basura");
     };
-    expect(await admitirPdf(pdfDe("r.pdf", "application/pdf", 100), roto)).toStrictEqual({
+    await expect(admitirPdf(pdfDe("r.pdf", "application/pdf", 100), roto)).resolves.toStrictEqual({
       admite: false,
       motivo: "ilegible",
     });
@@ -256,9 +258,9 @@ describe("expandirPdf", () => {
   it("peso excedido → [] sin abrir", async () => {
     const { abrir } = abrirFalso();
     const espia = vi.fn<(f: File) => Promise<DocumentoPdf>>(abrir);
-    expect(
-      await expandirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), espia),
-    ).toStrictEqual([]);
+    await expect(
+      expandirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), espia),
+    ).resolves.toStrictEqual([]);
     expect(espia).not.toHaveBeenCalled();
   });
 
@@ -273,13 +275,17 @@ describe("expandirPdf", () => {
 
   it("más de 10 páginas → [] (gate de contador)", async () => {
     const { abrir, fueCerrado } = abrirFalso({ total: 12 });
-    expect(await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).toStrictEqual([]);
+    await expect(expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).resolves.toStrictEqual(
+      [],
+    );
     expect(fueCerrado()).toBe(true);
   });
 
   it("0 páginas → [] (gate inferior)", async () => {
     const { abrir } = abrirFalso({ total: 0 });
-    expect(await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).toStrictEqual([]);
+    await expect(expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).resolves.toStrictEqual(
+      [],
+    );
   });
 
   it("página negra y toBlob nulo se saltan (la útil sobrevive)", async () => {

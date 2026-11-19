@@ -428,13 +428,13 @@ describe("girarYReleer", () => {
       for (let i = 0; i < 200 && !soltarPrevio; i++) await Promise.resolve();
       document.getElementById("btnRecorteOk")?.click();
       await new Promise((r) => setTimeout(r, 200)); // confirmar entero (C gana píxeles)
-      expect(await (c.file as Blob).text()).toBe("recorte");
+      await expect((c.file as Blob).text()).resolves.toBe("recorte");
       soltarPrevio?.(bmpGiro as unknown as ImageBitmap);
       await pg;
       await new Promise((r) => setTimeout(r, 100));
       cancelarRelecturaProgramada(c.id); // el timer del giro no fuga al resto
       // El giro terminó último: todo G ("girado" 6B), nada de C ("recorte" 7B).
-      expect(await (c.file as Blob).text()).toBe("girado");
+      await expect((c.file as Blob).text()).resolves.toBe("girado");
       expect(c.imgUrl).toBe("blob:6");
       const modal = document.getElementById("modalRecorte") as HTMLDialogElement | null;
       if (modal?.open) modal.close();
@@ -461,7 +461,7 @@ describe("ramas de cubrimiento (lote 10)", () => {
       await girarYReleer(c.id, 90, deps);
       expect(fetchSpy).toHaveBeenCalledWith(urlOrigen);
       expect(c.file).toBeInstanceOf(Blob);
-      expect(await (c.file as Blob).text()).toBe("girado");
+      await expect((c.file as Blob).text()).resolves.toBe("girado");
     } finally {
       fetchSpy.mockRestore();
     }

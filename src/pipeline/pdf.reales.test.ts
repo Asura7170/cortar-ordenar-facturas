@@ -54,28 +54,28 @@ describe.skipIf(!HAY)("pdf reales (local, archivos-test/ ignorado)", () => {
   it("t1: 1 página liviana → admitido", async () => {
     const f = cargar("test1_1pagina_under5mb.pdf");
     expect(admiteTamanoPdf(f)).toBe(true);
-    expect(await contarPaginasPdf(f)).toBe(1);
-    expect(await admitirPdf(f, contarPaginasPdf)).toStrictEqual({ admite: true });
+    await expect(contarPaginasPdf(f)).resolves.toBe(1);
+    await expect(admitirPdf(f, contarPaginasPdf)).resolves.toStrictEqual({ admite: true });
   });
 
   it("t2: > 5 MB → tamano sin abrir", async () => {
     const f = cargar("test2_1pagina_over5mb.pdf");
     expect(f.size).toBeGreaterThan(PDF_MAX_BYTES);
     const contar = noAbrir();
-    expect(await admitirPdf(f, contar)).toStrictEqual({ admite: false, motivo: "tamano" });
+    await expect(admitirPdf(f, contar)).resolves.toStrictEqual({ admite: false, motivo: "tamano" });
     expect(contar).not.toHaveBeenCalled();
   });
 
   it("t3: 10 páginas livianas → admitido (borde inclusivo)", async () => {
     const f = cargar("test3_10paginas_under5mb.pdf");
-    expect(await contarPaginasPdf(f)).toBe(10);
-    expect(await admitirPdf(f, contarPaginasPdf)).toStrictEqual({ admite: true });
+    await expect(contarPaginasPdf(f)).resolves.toBe(10);
+    await expect(admitirPdf(f, contarPaginasPdf)).resolves.toStrictEqual({ admite: true });
   });
 
   it("t4: 12 páginas → paginas", async () => {
     const f = cargar("test4_12paginas_under5mb.pdf");
-    expect(await contarPaginasPdf(f)).toBe(12);
-    expect(await admitirPdf(f, contarPaginasPdf)).toStrictEqual({
+    await expect(contarPaginasPdf(f)).resolves.toBe(12);
+    await expect(admitirPdf(f, contarPaginasPdf)).resolves.toStrictEqual({
       admite: false,
       motivo: "paginas",
     });
@@ -83,8 +83,8 @@ describe.skipIf(!HAY)("pdf reales (local, archivos-test/ ignorado)", () => {
 
   it("t9: 11 páginas → paginas (off-by-one)", async () => {
     const f = cargar("test9_limite_borde_11paginas.pdf");
-    expect(await contarPaginasPdf(f)).toBe(11);
-    expect(await admitirPdf(f, contarPaginasPdf)).toStrictEqual({
+    await expect(contarPaginasPdf(f)).resolves.toBe(11);
+    await expect(admitirPdf(f, contarPaginasPdf)).resolves.toStrictEqual({
       admite: false,
       motivo: "paginas",
     });
@@ -94,7 +94,7 @@ describe.skipIf(!HAY)("pdf reales (local, archivos-test/ ignorado)", () => {
     const f = cargar("test8_over5mb_12paginas.pdf");
     expect(f.size).toBeGreaterThan(PDF_MAX_BYTES);
     const contar = noAbrir();
-    expect(await admitirPdf(f, contar)).toStrictEqual({ admite: false, motivo: "tamano" });
+    await expect(admitirPdf(f, contar)).resolves.toStrictEqual({ admite: false, motivo: "tamano" });
     expect(contar).not.toHaveBeenCalled();
   });
 
@@ -117,13 +117,13 @@ describe.skipIf(!HAY)("pdf reales (local, archivos-test/ ignorado)", () => {
 
   it("t5/t6/t7: gate cuenta y admite (blancas → manual en Chrome)", async () => {
     const t5 = cargar("test5_8paginas_4blancas_under5mb.pdf");
-    expect(await contarPaginasPdf(t5)).toBe(8);
-    expect(await admitirPdf(t5, contarPaginasPdf)).toStrictEqual({ admite: true });
+    await expect(contarPaginasPdf(t5)).resolves.toBe(8);
+    await expect(admitirPdf(t5, contarPaginasPdf)).resolves.toStrictEqual({ admite: true });
     const t6 = cargar("test6_3paginas_todas_blancas.pdf");
-    expect(await contarPaginasPdf(t6)).toBe(3);
-    expect(await admitirPdf(t6, contarPaginasPdf)).toStrictEqual({ admite: true });
+    await expect(contarPaginasPdf(t6)).resolves.toBe(3);
+    await expect(admitirPdf(t6, contarPaginasPdf)).resolves.toStrictEqual({ admite: true });
     const t7 = cargar("test7_paginas_visualmente_blancas.pdf");
-    expect(await contarPaginasPdf(t7)).toBe(2);
-    expect(await admitirPdf(t7, contarPaginasPdf)).toStrictEqual({ admite: true });
+    await expect(contarPaginasPdf(t7)).resolves.toBe(2);
+    await expect(admitirPdf(t7, contarPaginasPdf)).resolves.toStrictEqual({ admite: true });
   });
 });
