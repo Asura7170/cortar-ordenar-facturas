@@ -231,7 +231,7 @@ describe("calcularHomografia", () => {
       { x: 2, y: 2 },
       { x: 3, y: 3 },
     ];
-    expect(() => calcularHomografia(linea, linea)).toThrow();
+    expect(() => calcularHomografia(linea, linea)).toThrow("degenerada");
   });
 
   it("lanza con menos de 4 pares", () => {
@@ -613,6 +613,7 @@ describe("conTimeout", () => {
     vi.useFakeTimers();
     try {
       const cuelga = new Promise<number>(() => {});
+      // oxlint-disable-next-line vitest/valid-expect -- diferido a propósito: await p (fake timers)
       const p = expect(conTimeout(cuelga, 1000)).rejects.toThrow("timeout tras 1000ms");
       await vi.advanceTimersByTimeAsync(1000);
       await p;
@@ -662,6 +663,7 @@ describe("iniciarSesion", () => {
         vistos.push(ep);
         return ep === "webgpu" ? cuelga : Promise.resolve(buena);
       };
+      // oxlint-disable-next-line vitest/valid-expect -- diferido a propósito: await p (fake timers)
       const p = expect(iniciarSesion(intentar, ["webgpu", "wasm"], 5000)).resolves.toBe(buena);
       await vi.advanceTimersByTimeAsync(5000);
       await p;
@@ -677,8 +679,8 @@ describe("iniciarSesion", () => {
       intentos += 1;
       throw new Error("caído");
     };
-    await expect(iniciarSesion(intentar, ["webgpu"], 100)).rejects.toThrow();
-    await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 100)).rejects.toThrow();
+    await expect(iniciarSesion(intentar, ["webgpu"], 100)).rejects.toThrow("caído");
+    await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 100)).rejects.toThrow("caído");
     // Solo el primer llamado intentó webgpu; el segundo lo saltó por el latch (wasm = intento 2).
     expect(intentos).toBe(2);
   });
@@ -945,12 +947,12 @@ describe("descargarPesos", () => {
         intentos += 1;
         throw new Error("create corrupto");
       };
-      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("create corrupto");
       expect(intentos).toBe(1);
       // El 1er strike suelta el latch sin borrar 79MB buenos.
       await olvidarSesionFallida();
       expect(tienda.size).toBe(1);
-      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("create corrupto");
       expect(intentos).toBe(2); // latch suelto: webgpu se reintenta
       // El 2º consecutivo es el "Borrar modelos" automático: los bytes muertos salen.
       await olvidarSesionFallida();
@@ -972,10 +974,10 @@ describe("descargarPesos", () => {
       const caido: IntentarEp = async (): Promise<never> => {
         throw new Error("GPU busy");
       };
-      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("GPU busy");
       await olvidarSesionFallida(); // strike 1
       notarSesionOk(); // la sesión resolvió: el historial muere
-      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("GPU busy");
       await olvidarSesionFallida(); // strike 1 otra vez
       expect(tienda.size).toBe(1); // nunca llegó al 2º consecutivo real
     } finally {

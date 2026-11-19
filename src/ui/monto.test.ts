@@ -236,11 +236,9 @@ describe("renderMonto", () => {
       expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
     );
     // y toda rueda avanza hacia arriba, nunca hacia abajo (delta +)
-    for (const c of cols()) {
-      const fin = Number(c.dataset["muestra"]);
-      const arranque = Number(c.dataset["arranque"]);
-      if (fin !== arranque) expect(fin - arranque).toBeGreaterThan(0);
-    }
+    const saltos = cols().map((c) => Number(c.dataset["muestra"]) - Number(c.dataset["arranque"]));
+    expect(saltos.some((salto) => salto !== 0)).toBe(true); // al menos una rueda se movió
+    for (const salto of saltos.filter((s) => s !== 0)) expect(salto).toBeGreaterThan(0);
   });
 
   it("vuelo a mitad condelta invertido: el cambio de sentido también respeta el delta", () => {
@@ -255,11 +253,9 @@ describe("renderMonto", () => {
     cols().forEach((c, i) =>
       expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
     );
-    for (const c of cols()) {
-      const fin = Number(c.dataset["muestra"]);
-      const arranque = Number(c.dataset["arranque"]);
-      if (fin !== arranque) expect(fin - arranque).toBeLessThan(0);
-    }
+    const saltos = cols().map((c) => Number(c.dataset["muestra"]) - Number(c.dataset["arranque"]));
+    expect(saltos.some((salto) => salto !== 0)).toBe(true); // al menos una rueda se movió
+    for (const salto of saltos.filter((s) => s !== 0)) expect(salto).toBeLessThan(0);
   });
 });
 

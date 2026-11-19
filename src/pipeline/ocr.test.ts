@@ -369,6 +369,7 @@ describe("extraerTexto", () => {
       const texto = await extraerTexto(new Blob(["x"]), {
         cargar: () => Promise.resolve(bitmapFalso(64, 32)),
         crear: () => lienzo,
+        // oxlint-disable-next-line eslint/prefer-promise-reject-errors -- rechazo no-Error es el caso bajo prueba
         nucleo: () => Promise.reject("corte de luz"),
       });
       expect(texto).toBe("");
@@ -1140,7 +1141,7 @@ describe("descargarPesosOcr", () => {
         }),
     );
     try {
-      await expect(descargarPesosOcr(50)).rejects.toThrow();
+      await expect(descargarPesosOcr(50)).rejects.toThrow("abortado");
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;

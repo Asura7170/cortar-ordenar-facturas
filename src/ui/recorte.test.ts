@@ -433,6 +433,7 @@ describe("abrirRecorte", () => {
         width: 0,
         height: 0,
         getContext: () => ({ drawImage: vi.fn() }),
+        // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
         toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
       }));
       const c = sembrar();
@@ -466,6 +467,7 @@ describe("abrirRecorte", () => {
         width: 0,
         height: 0,
         getContext: () => ({ drawImage: vi.fn() }),
+        // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
         toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
       }));
       const c = sembrar();

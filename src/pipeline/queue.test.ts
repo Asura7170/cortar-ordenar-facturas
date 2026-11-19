@@ -254,8 +254,8 @@ describe("procesarCola", () => {
   });
 
   it("fallo del OCR deja texto vacío sin abortar el ítem", async () => {
-    const { extraerTexto } = await import("./ocr");
-    vi.mocked(extraerTexto).mockRejectedValueOnce(new Error("ocr caído"));
+    const { extraerTexto: extraerTextoOcr } = await import("./ocr");
+    vi.mocked(extraerTextoOcr).mockRejectedValueOnce(new Error("ocr caído"));
     const h = crearHoja();
     const c = comprobante({ nombre: "t.png", file: new Blob(["foto"]) });
     h.slots[0] = c;
@@ -268,14 +268,14 @@ describe("procesarCola", () => {
   });
 
   it("enderezar que rechaza deja el blob sin girar y sigue a ok (catch de la fase)", async () => {
-    const { enderezar, extraerTexto } = await import("./ocr");
+    const { enderezar, extraerTexto: extraerTextoOcr } = await import("./ocr");
     const h = crearHoja();
     const intake = new Blob(["intake"]);
     const c = comprobante({ nombre: "t.png", file: intake });
     h.slots[0] = c;
     state.hojas.push(h);
     vi.mocked(enderezar).mockRejectedValueOnce(new Error("giro roto"));
-    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 30");
+    vi.mocked(extraerTextoOcr).mockResolvedValueOnce("TOTAL 30");
     const p = procesarCola();
     await vi.advanceTimersByTimeAsync(2000);
     await p;
