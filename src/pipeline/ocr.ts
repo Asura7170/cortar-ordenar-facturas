@@ -129,9 +129,9 @@ async function nucleoReal(): Promise<NucleoOcr> {
     // ponytail: los run() tampoco se solapan (la relectura espera a la cola en rotar).
     // bajar() etiqueta la clave caída: el catch escupe strikes solo a las de bajada.
     const bajar = (clave: string, minBytes: number): Promise<ArrayBuffer> =>
-      descargarConCache(clave, TIMEOUT_OCR_MS, minBytes).catch((e: unknown) => {
+      descargarConCache(clave, TIMEOUT_OCR_MS, minBytes).catch((error: unknown) => {
         clavesFallidas.push(clave);
-        throw e;
+        throw error;
       });
     const [detBuf, recBuf] = await Promise.all([
       bajar(RUTA_DET, 5_000_000),
@@ -143,15 +143,15 @@ async function nucleoReal(): Promise<NucleoOcr> {
     notarSesionOk(RUTA_REC);
     iaOk();
     return { det, rec };
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     // Strikes: 2 fallos seguidos expulsan la copia cacheada de la clave (pesos
     // muertos); el fallo avisa una vez (toast) y el siguiente comprobante reintenta.
     // Si la baja fue de descarga, solo esa clave recibe el golpe; si fue de
     // sesión (create/EP), no se sabe cuál corrompe → ambas, como siempre.
     if (clavesFallidas.length === 0) clavesFallidas.push(RUTA_DET, RUTA_REC);
     for (const clave of clavesFallidas) await olvidarSesionFallida(clave);
-    falloIa(e, "OCR");
-    throw e;
+    falloIa(error, "OCR");
+    throw error;
   }
 }
 
@@ -160,9 +160,9 @@ let nucleoEnCurso: Promise<NucleoOcr> | null = null;
 /** Singleton lazy del núcleo (falla y el siguiente comprobante reintenta). */
 export function obtenerNucleo(): Promise<NucleoOcr> {
   if (!nucleoEnCurso) {
-    nucleoEnCurso = nucleoReal().catch((e: unknown) => {
+    nucleoEnCurso = nucleoReal().catch((error: unknown) => {
       nucleoEnCurso = null;
-      throw e;
+      throw error;
     });
   }
   return nucleoEnCurso;
@@ -739,8 +739,8 @@ export async function extraerTexto(
       if (r.texto !== "") lineas.push(r.texto);
     }
     return lineas.join("\n");
-  } catch (e: unknown) {
-    console.error(`OCR: texto omitido (${e instanceof Error ? e.message : String(e)})`);
+  } catch (error: unknown) {
+    console.error(`OCR: texto omitido (${error instanceof Error ? error.message : String(error)})`);
     return "";
   }
 }

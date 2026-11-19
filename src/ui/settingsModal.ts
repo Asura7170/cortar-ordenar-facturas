@@ -82,8 +82,8 @@ export function initSettings(): void {
         await obtenerSesion(); // recorte: fastvit
         await obtenerNucleo(); // OCR: det+rec (en serie: la GPU no compite)
         estadoModelos.textContent = "IA: sesiones listas — recorte y OCR van bien";
-      } catch (e: unknown) {
-        const msj = e instanceof Error ? e.message : String(e);
+      } catch (error: unknown) {
+        const msj = error instanceof Error ? error.message : String(error);
         estadoModelos.textContent = esImportDinamicoMuerto(msj)
           ? "IA: sin archivos de la app (recargá el navegador — hay versión nueva)"
           : `IA: no disponible (${msj}). Probá de nuevo o borrá los modelos`;

@@ -71,8 +71,8 @@ export async function admitirPdf(f: File, contar: ContadorPaginas): Promise<Vere
   let paginas: number;
   try {
     paginas = await contar(f);
-  } catch (e: unknown) {
-    return { admite: false, motivo: esPassword(e) ? "cifrado" : "ilegible" };
+  } catch (error: unknown) {
+    return { admite: false, motivo: esPassword(error) ? "cifrado" : "ilegible" };
   }
   return paginas <= PDF_MAX_PAGINAS ? { admite: true } : { admite: false, motivo: "paginas" };
 }

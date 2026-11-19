@@ -1357,7 +1357,7 @@ function abrirRecorteSiHaceFalta(id: number): void {
   // sale el "recargá el navegador").
   void import("./recorte")
     .then((m) => m.abrirRecorte(id))
-    .catch((e: unknown) => falloIa(e, "recorte"));
+    .catch((error: unknown) => falloIa(error, "recorte"));
 }
 
 /** Acción `agregar`: pedir archivos para la hoja del botón. */
