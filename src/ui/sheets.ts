@@ -988,14 +988,14 @@ function moverSlot(
   const imgOcupante = imagenDelOcupante(ocupante);
   const rB = imgOcupante?.getBoundingClientRect();
 
-  const idsHojasAntes = state.hojas.map((h) => h.id).join();
+  const idsHojasAntes = state.hojas.map((h) => h.id).join(",");
   const reemplazo = hojaDestino.slots[slotDestino] as Comprobante | null;
   const movida = origen.slots[idxOrigen] as Comprobante | null;
   hojaDestino.slots[slotDestino] = movida;
   origen.slots[idxOrigen] = reemplazo;
   limpiarHojas();
 
-  const estructural = state.hojas.map((h) => h.id).join() !== idsHojasAntes;
+  const estructural = state.hojas.map((h) => h.id).join(",") !== idsHojasAntes;
   const nodoOrigen = nodoCeldaHoja(origen.id, idxOrigen);
   const nodoDestino = nodoCeldaHoja(hojaDestino.id, slotDestino);
   if (estructural || !nodoOrigen || !nodoDestino) {
