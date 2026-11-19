@@ -449,7 +449,7 @@ export function aplicarATodas(hojaId: string | number): void {
 export function quitarComprobante(id: number): void {
   for (const h of state.hojas) {
     const idx = h.slots.findIndex((c) => c?.id === id);
-    if (idx >= 0) {
+    if (idx !== -1) {
       const c = h.slots[idx];
       if (c) {
         URL.revokeObjectURL(c.imgUrl);
@@ -1028,7 +1028,7 @@ function centroDeCelda(cell: HTMLElement): { x: number; y: number } {
 /** Si un hueco existe en la hoja: índice; si está llena, null. */
 function primerHueco(h: Hoja): number | null {
   const hueco = h.slots.indexOf(null);
-  return hueco < 0 ? null : hueco;
+  return hueco === -1 ? null : hueco;
 }
 
 /** Vecino lineal del lote (hoja + slot), cruzando el borde de la hoja si toca;

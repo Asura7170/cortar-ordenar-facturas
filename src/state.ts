@@ -190,7 +190,7 @@ export function hojaPorId(id: string | number): Hoja | undefined {
 export function buscarSlot(id: number): { hoja: Hoja; idx: number } | null {
   for (const h of state.hojas) {
     const idx = h.slots.findIndex((c) => c?.id === id);
-    if (idx >= 0) return { hoja: h, idx };
+    if (idx !== -1) return { hoja: h, idx };
   }
   return null;
 }

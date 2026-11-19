@@ -1487,7 +1487,7 @@ describe("drag entre celdas (swap)", () => {
       const cells = [...document.querySelectorAll(".cell")];
       const host = this.closest?.(".cell") ?? this;
       const i = cells.indexOf(host as Element);
-      const left = i < 0 ? 0 : i * 120;
+      const left = i === -1 ? 0 : i * 120;
       return {
         left,
         top: 0,
