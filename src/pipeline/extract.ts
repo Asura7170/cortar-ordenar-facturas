@@ -102,23 +102,23 @@ export function aplicarTotales(
     if (cents === null) {
       continue;
     }
+    // el borrador en curso gana
     if (montoEnEdicion(it.id)) {
       continue;
-      // el borrador en curso gana
     }
     const slot = buscarSlot(it.id);
+    // limpiado/quitado en el ínterin: no resucita
     if (!slot) {
       continue;
-      // limpiado/quitado en el ínterin: no resucita
     }
     const actual = slot.hoja.slots[slot.idx];
+    // manual ganó en el ínterin
     if (!actual || actual.montoCents !== null) {
       continue;
-      // manual ganó en el ínterin
     }
+    // girado: rancio
     if (limpiarTextoCompleto(actual.textoOcr) !== it.texto) {
       continue;
-      // girado: rancio
     }
     actual.montoCents = cents;
     aplicados++;

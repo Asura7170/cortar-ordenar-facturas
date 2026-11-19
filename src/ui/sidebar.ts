@@ -521,8 +521,8 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     if (resto.length > 0) {
       await agregarArchivos(resto, hojaFinal.id);
     } else {
-      despejarToasts("intake");
       // éxito: los rechazos viejos de otro intento salen con fade
+      despejarToasts("intake");
     }
     precalentarModelos();
     void procesarCola();
@@ -647,9 +647,9 @@ function cablearSoltar(): void {
     }
   });
   document.addEventListener("dragleave", (e) => {
+    // el arrastre salió de la ventana
     if (e.relatedTarget === null) {
       marcarArrastre(0);
-      // el arrastre salió de la ventana
     }
   });
 }

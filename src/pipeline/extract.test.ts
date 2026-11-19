@@ -356,9 +356,9 @@ describe("extraerPendientes", () => {
   it("parcial con forzado: avisa conteo y resto manual", () => {
     lote2();
     const amb = state.hojas[0]?.slots[1];
+    // 2 distintos → manual
     if (amb) {
       amb.textoOcr = "PROPINA 1.00 TOTAL 7.00";
-      // 2 distintos → manual
     }
     extraerPendientes({ forzado: true });
     expect(aviso.textContent).toBe("Local: 1/2 totales.");

@@ -197,9 +197,9 @@ async function procesarItem(sig: Comprobante): Promise<boolean> {
     /* el render nunca aborta la cola */
   }
   await faseRecorte(sig);
+  // limpiado durante la espera: no resucita
   if (!buscarSlot(sig.id)) {
     return false;
-    // limpiado durante la espera: no resucita
   }
   // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
   const ocr = await import("./ocr").catch((error: unknown): null => {
@@ -209,14 +209,14 @@ async function procesarItem(sig: Comprobante): Promise<boolean> {
   const blob: Blob | null = await blobActual(sig);
   // Endereza por confianza del rec (det solo recorta líneas, no vota).
   const end = await faseEnderezar(sig, blob, ocr);
+  // limpiado durante el enderezado: no resucita
   if (!buscarSlot(sig.id)) {
     return false;
-    // limpiado durante el enderezado: no resucita
   }
   await faseOcr(sig, sig.file ?? blob, ocr, end);
+  // limpiado durante el OCR: no resucita
   if (!buscarSlot(sig.id)) {
     return false;
-    // limpiado durante el OCR: no resucita
   }
   completarItem(sig);
   return true;

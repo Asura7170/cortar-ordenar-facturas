@@ -480,16 +480,16 @@ async function elegirGiro(
       continue;
     }
     // P1: la telemetría de giros cumplió (ver lote denso); la consola queda limpia.
+    // sin texto: ni giros
     if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) {
       return null;
-      // sin texto: ni giros
     }
     if (!mejor || r.c > mejor.c) {
       mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
     }
+    // bypass: la primera que convence gana
     if (r.c >= UMBRAL_REC_OK) {
       break;
-      // bypass: la primera que convence gana
     }
   }
   // null si todos fallaron
@@ -532,9 +532,9 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
     const foto: ImageBitmap = bmp;
     const { det, rec } = await fabrica();
     const mejor = await elegirGiro(det, rec, foto, crear);
+    // todos los giros fallaron
     if (!mejor) {
       return quieto;
-      // todos los giros fallaron
     }
     // ponytail: sin OK gana el más alto (aunque sea bajo); solo el vacío no gira.
     return materializarGiro(blob, foto, mejor, crear);

@@ -654,9 +654,9 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
 
 /** ¿La celda es apta para repintar el badge? (modo, nodo, ítem y monto). */
 function celdaRepintable(id: number): boolean {
+  // en modo OCR la celda no lleva badge
   if (state.modoOcr) {
     return false;
-    // en modo OCR la celda no lleva badge
   }
   const cell = cellById(id);
   if (!cell) {
@@ -669,9 +669,9 @@ function celdaRepintable(id: number): boolean {
 /** ¿El parche no pisaría una edición? (foco en el input o borrador sin foco). */
 function celdaSinEdicion(cell: HTMLElement): boolean {
   const activo = document.activeElement;
+  // edición en curso: no pisar
   if (activo instanceof HTMLInputElement && cell.contains(activo)) {
     return false;
-    // edición en curso: no pisar
   }
   const borrador = cell.querySelector("input.cell-monto");
   // borrador sin foco: no pisar
@@ -1173,13 +1173,13 @@ function vecinoLineal(
     fila destino es más corta. El re-enfoque sigue el patrón escaparMonto. */
 function cablearReordenTeclado(): void {
   sheetsEl.addEventListener("keydown", (e) => {
+    // mismo bloqueo que el drag manual
     if (state.modoOcr || pointerDrag) {
       return;
-      // mismo bloqueo que el drag manual
     }
+    // las flechas editan texto (no mover)
     if (esCampoTexto(e.target)) {
       return;
-      // las flechas editan texto (no mover)
     }
     const cell = e.target instanceof Element ? e.target.closest(".cell") : null;
     if (!(cell instanceof HTMLElement) || !cell.dataset["id"]) {
@@ -1203,9 +1203,9 @@ function cablearReordenTeclado(): void {
     let destino: { hoja: Hoja; slot: number };
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       const vecino = vecinoLineal(actual.hoja, actual.idx, e.key === "ArrowRight");
+      // borde del lote: no hay vecino
       if (!vecino) {
         return;
-        // borde del lote: no hay vecino
       }
       destino = vecino;
     } else {
@@ -1747,9 +1747,9 @@ function cablearArchivosSoltar(): void {
       return;
     }
     e.preventDefault();
+    // drop no-Elemento: nada que hacer (mismo guard que cablearAcciones)
     if (!(e.target instanceof Element)) {
       return;
-      // drop no-Elemento: nada que hacer (mismo guard que cablearAcciones)
     }
     const sheet = e.target.closest(".sheet");
     cancelarDragVisual();
