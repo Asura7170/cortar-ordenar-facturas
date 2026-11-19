@@ -965,7 +965,7 @@ describe("enderezar (decisión rec)", () => {
   it("lote rec falla en 270 → reintenta individual y gana 270 (L2)", async () => {
     const { deps, detLlamadas, recLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
-      [0.3, 0.0, 0.95],
+      [0.3, 0, 0.95],
       1,
     );
     const r = await enderezar(new Blob(["foto"]), deps);
@@ -1071,7 +1071,7 @@ describe("enderezar (decisión rec)", () => {
   it("rec blank → conf 0 y gana 0°", async () => {
     const { blob, deps, detLlamadas, recLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
-      [0.0, 0.0, 0.0, 0.0],
+      [0, 0, 0, 0],
     );
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
