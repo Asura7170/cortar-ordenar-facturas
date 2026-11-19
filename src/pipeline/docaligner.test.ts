@@ -497,7 +497,7 @@ describe("bitmapATensor/rectificar", () => {
     }
     const falso = lienzoFalso(pix);
     const t = bitmapATensor(bitmapFalso(500, 500), falso.crear);
-    expect(t.length).toBe(3 * n);
+    expect(t).toHaveLength(3 * n);
     expect(t[0]).toBe(1);
     expect(t[n]).toBe(0);
   });

@@ -957,7 +957,7 @@ describe("drop de archivos sobre hojas", () => {
       borde(400); // zona muerta → detenerScroll
       const n = scrollBy.mock.calls.length;
       await new Promise((r) => setTimeout(r, 60));
-      expect(scrollBy.mock.calls.length).toBe(n);
+      expect(scrollBy.mock.calls).toHaveLength(n);
     } finally {
       rect.mockRestore();
       delete (canvas as unknown as Record<string, unknown>)["scrollBy"];

@@ -21,7 +21,7 @@ describe("normalizarLinea", () => {
     expect(lin?.anchoUtil).toBe(96);
     expect(lin?.anchoTotal).toBe(320);
     const t = lin?.tensor as Float32Array;
-    expect(t.length).toBe(3 * REC_ALTO * 320);
+    expect(t).toHaveLength(3 * REC_ALTO * 320);
     expect(t[0]).toBeCloseTo(1, 5);
     expect(t[2 * REC_ALTO * 320]).toBeCloseTo(1, 5); // plano R también
     expect(t[100]).toBeCloseTo(0, 6); // pad derecho
@@ -73,7 +73,7 @@ describe("normalizarLote", () => {
     expect(lote.lote).toBe(2);
     const wMax = Math.max(a.anchoTotal, b.anchoTotal);
     expect(lote.anchoMax).toBe(wMax);
-    expect(lote.tensor.length).toBe(2 * 3 * REC_ALTO * wMax);
+    expect(lote.tensor).toHaveLength(2 * 3 * REC_ALTO * wMax);
     const plano = REC_ALTO * wMax;
     // La ancha (sin pad si es la mayor): bloque idéntico al individual.
     const ancha = b.anchoTotal >= a.anchoTotal ? { n: b, base: 3 } : { n: a, base: 0 };
@@ -203,7 +203,7 @@ describe("decodificarCtc", () => {
 
 describe("DICT_OCR", () => {
   it("18710 clases del rec + marcas", () => {
-    expect(DICT_OCR.length).toBe(18_710);
+    expect(DICT_OCR).toHaveLength(18_710);
     expect(DICT_OCR[0]).toBe("blank");
     expect(DICT_OCR[1]).toBe("!");
     expect(DICT_OCR[4]).toBe("$");

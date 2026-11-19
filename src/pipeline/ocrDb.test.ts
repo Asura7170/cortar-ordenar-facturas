@@ -46,7 +46,7 @@ describe("binarizarMapa", () => {
   it("umbral 0.2 y borde cero", () => {
     // 0.19 bajo el umbral (0.2f en Float32 queda apenas sobre 0.2: se evita el borde).
     const bin = binarizarMapa(new Float32Array([0.1, 0.3, 0.19, 0.9]), 2, 2);
-    expect(bin.length).toBe(16);
+    expect(bin).toHaveLength(16);
     // Interior 2x2 en máscara 4x4 con borde.
     expect([bin[5], bin[6], bin[9], bin[10]]).toStrictEqual([0, 1, 0, 1]);
     expect(bin[0]).toBe(0);

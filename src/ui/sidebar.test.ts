@@ -167,7 +167,7 @@ describe("agregarArchivos", () => {
     const antes = state.hojas.flatMap((h) => h.slots).filter(Boolean).length;
     await agregarArchivos([archivo("f.png", "image/png"), archivo("g.png", "image/png")]);
     expect(state.loteEnCurso).toBe(false);
-    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean).length).toBe(antes + 2);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(antes + 2);
   });
 
   it("dos intakes solapados no sueltan el flag a medias", async () => {
