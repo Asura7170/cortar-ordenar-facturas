@@ -87,8 +87,10 @@ function sembrar(): ReturnType<typeof comprobante> {
 
 /** Espera a que los handlers void (click → confirmar) terminen. */
 async function vaciar(): Promise<void> {
-  for (let i = 0; i < 10; i++) {
-    await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i += 1) {
+    await new Promise((r) => {
+      setTimeout(r, 0);
+    });
   }
 }
 
@@ -447,8 +449,10 @@ describe("abrirRecorte", () => {
         width: 0,
         height: 0,
         getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
-        // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
-        toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
+        toBlob: (cb: (b: Blob | null) => void) => {
+          // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
+          void promise.then(cb);
+        },
       }));
       const c = sembrar();
       const antes = c.file;
@@ -483,8 +487,10 @@ describe("abrirRecorte", () => {
         width: 0,
         height: 0,
         getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
-        // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
-        toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
+        toBlob: (cb: (b: Blob | null) => void) => {
+          // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
+          void promise.then(cb);
+        },
       }));
       const c = sembrar();
       const antes = c.file;
@@ -549,7 +555,7 @@ describe("abrirRecorte", () => {
       .spyOn(HTMLCanvasElement.prototype, "getContext")
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
     try {
-      const { promise, resolve } = Promise.withResolvers<void>();
+      const { promise, resolve } = Promise.withResolvers<undefined>();
       const bmp = { width: 100, height: 80, close: vi.fn<() => void>() };
       const deps = {
         cargar: vi.fn<() => Promise<unknown>>(async () => {
@@ -562,7 +568,7 @@ describe("abrirRecorte", () => {
       const apertura = abrirRecorte(c.id, deps as never);
       // Limpiar durante el decode.
       state.hojas.length = 0;
-      resolve();
+      resolve(undefined);
       await apertura;
       expect(modal.open).toBe(false);
       expect(bmp.close).toHaveBeenCalled();

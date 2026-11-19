@@ -91,7 +91,7 @@ describe("guardar/cargar por ventana", () => {
     guardarAjustes();
 
     const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "{}") as Record<string, unknown>;
-    expect(Object.keys(raw).sort()).toStrictEqual([
+    expect(Object.keys(raw).toSorted()).toStrictEqual([
       "codigoActivo",
       "codigoPosicion",
       "codigoValor",

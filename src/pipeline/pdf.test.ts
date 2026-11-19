@@ -195,8 +195,12 @@ describe("expandirPdf", () => {
   } {
     let cerrado = false;
     // Tinta gris media: ni blanca ni negra para los gates (el 2x2 solo muestrea el píxel 0).
-    const tin = (blanca: boolean, negra: boolean): number[] =>
-      negra ? [0, 0, 0, 255] : blanca ? [255, 255, 255, 255] : [100, 100, 100, 255];
+    const tin = (blanca: boolean, negra: boolean): number[] => {
+      if (negra) {
+        return [0, 0, 0, 255];
+      }
+      return blanca ? [255, 255, 255, 255] : [100, 100, 100, 255];
+    };
     const abrir = async (): Promise<DocumentoPdf> => ({
       total: opc.total ?? 3,
       renderizar: async (i: number): Promise<HTMLCanvasElement | null> => {

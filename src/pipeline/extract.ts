@@ -8,7 +8,7 @@ import { aplanar, parsearMonto } from "../ui/monto";
 import { actualizarMontoCelda, renderHojas } from "../ui/sheets";
 import { avisar, avisarError, sanear } from "../utils";
 
-const MONEY_RE = /(?:Bs\.?|BOB|\$)?\s*(\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)/g;
+const MONEY_RE = /(?:Bs\.?|BOB|\$)?\s*(?<monto>\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)/gu;
 
 export interface Candidato {
   readonly valor: string;
@@ -26,8 +26,10 @@ export function extractCandidates(contenido = ""): Candidato[] {
       valor: m[1] ?? "",
       // Un "-" de un run separador no es signo (solo vale sin guion previo).
       previo:
-        /(?:^|[^-])(-)\s*$|(\()\s*$/.exec(contenido.slice(0, m.index))?.slice(1).find(Boolean) ??
-        "",
+        /(?:^|[^-])(?<menos>-)\s*$|(?<abre>\()\s*$/u
+          .exec(contenido.slice(0, m.index))
+          ?.slice(1)
+          .find(Boolean) ?? "",
     });
   }
   return out;
@@ -51,7 +53,7 @@ export function extraerRapidoCents(contenido = ""): Cents | null {
     } else if (unico !== cents) {
       return null;
     }
-    vistos++;
+    vistos += 1;
   }
   return vistos > 0 ? unico : null;
 }
@@ -65,7 +67,7 @@ export function candidatos(): Comprobante[] {
 
 /** Normalizado sin tope: el monto se clasifica sobre el texto completo. */
 export function limpiarTextoCompleto(s: string): string {
-  return sanear(s).replaceAll(/\s+/g, " ").trim();
+  return sanear(s).replaceAll(/\s+/gu, " ").trim();
 }
 
 export interface ItemLote {
@@ -121,7 +123,7 @@ export function aplicarTotales(
       continue;
     }
     actual.montoCents = cents;
-    aplicados++;
+    aplicados += 1;
   }
   return aplicados;
 }
@@ -143,12 +145,12 @@ export function computarLote(lista: readonly Comprobante[]): LoteListo {
     return { tipo: "sin-candidatos" };
   }
   const items: ItemLote[] = [];
-  lista.forEach((c, i) => {
+  for (const [i, c] of lista.entries()) {
     const texto = limpiarTextoCompleto(c.textoOcr);
     if (texto !== "") {
       items.push({ idx: i + 1, id: c.id, texto });
     }
-  });
+  }
   if (items.length === 0) {
     return { tipo: "sin-texto" };
   }

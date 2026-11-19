@@ -105,7 +105,7 @@ export function apilarLineas(norms: readonly LineaNorm[]): LoteNorm | null {
   }
   const plano = REC_ALTO * anchoMax;
   const tensor = new Float32Array(norms.length * 3 * plano);
-  norms.forEach((n, b) => {
+  for (const [b, n] of norms.entries()) {
     const planoLin = REC_ALTO * n.anchoTotal;
     for (let c = 0; c < 3; c += 1) {
       for (let y = 0; y < REC_ALTO; y += 1) {
@@ -115,7 +115,7 @@ export function apilarLineas(norms: readonly LineaNorm[]): LoteNorm | null {
         );
       }
     }
-  });
+  }
   return { tensor, lote: norms.length, anchoMax };
 }
 

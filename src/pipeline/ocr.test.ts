@@ -175,7 +175,7 @@ describe("envolver", () => {
     }) as unknown as import("onnxruntime-web").InferenceSession;
 
   it("rec con clases distintas al dict lanza en init", () => {
-    expect(() => envolver({} as never, sesion([100, 80, 999]), "rec")).toThrow(/999 clases/);
+    expect(() => envolver({} as never, sesion([100, 80, 999]), "rec")).toThrow(/999 clases/u);
   });
 
   it("rec compatible no lanza", () => {
@@ -525,8 +525,14 @@ describe("reconocerCaja", () => {
     let h = 0;
     const crear = (): HTMLCanvasElement =>
       ({
+        get width(): number {
+          return w;
+        },
         set width(v: number) {
           w = v;
+        },
+        get height(): number {
+          return h;
         },
         set height(v: number) {
           h = v;

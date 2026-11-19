@@ -594,11 +594,15 @@ describe("código de pedido", () => {
     renderCodigo();
     expect(radio("sup-izq").checked).toBe(true);
     expect(radio("inf-der").checked).toBe(false);
-    radios().forEach((r) => expect(r.disabled).toBe(false));
+    for (const r of radios()) {
+      expect(r.disabled).toBe(false);
+    }
 
     state.codigoActivo = false;
     renderCodigo();
-    radios().forEach((r) => expect(r.disabled).toBe(true));
+    for (const r of radios()) {
+      expect(r.disabled).toBe(true);
+    }
   });
 
   it("cambiar de esquina actualiza el estado y persiste solo armado", () => {
@@ -867,7 +871,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
     h.slots[0] = comprobante();
     state.hojas.push(h);
     const pendiente = pegarEnCelda(HOJA_FANTASMA, 0);
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 50; i += 1) {
       await Promise.resolve();
     }
     // aún no materializada: normalizando

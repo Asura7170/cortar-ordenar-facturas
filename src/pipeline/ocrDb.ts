@@ -113,10 +113,7 @@ function cadenaCasco(unicos: readonly PuntoDb[], delReves: boolean): PuntoDb[] {
   for (let k = 0; k < n; k += 1) {
     // ponytail: k < n en ambas direcciones.
     const p = unicos[delReves ? n - 1 - k : k] as PuntoDb;
-    while (
-      cadena.length >= 2 &&
-      cruz(cadena[cadena.length - 2] as PuntoDb, cadena[cadena.length - 1] as PuntoDb, p) <= 0
-    ) {
+    while (cadena.length >= 2 && cruz(cadena.at(-2) as PuntoDb, cadena.at(-1) as PuntoDb, p) <= 0) {
       cadena.pop();
     }
     cadena.push(p);
@@ -127,7 +124,7 @@ function cadenaCasco(unicos: readonly PuntoDb[], delReves: boolean): PuntoDb[] {
 
 /** Casco convexo de Andrew (monotone chain), sin duplicar el cierre. */
 export function cascoConvexo(puntos: readonly PuntoDb[]): PuntoDb[] {
-  const pts = [...puntos].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const pts = puntos.toSorted((a, b) => a[0] - b[0] || a[1] - b[1]);
   const unicos = sinDuplicados(pts);
   if (unicos.length < 3) {
     return unicos;

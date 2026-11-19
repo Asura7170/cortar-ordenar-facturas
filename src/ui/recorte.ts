@@ -208,7 +208,7 @@ function restablecer(): void {
 
 function cerrarAnterior(): void {
   // invalida la confirmación en vuelo (ya no es su diálogo)
-  sesion++;
+  sesion += 1;
   if (raf !== null) {
     cancelAnimationFrame(raf);
     raf = null;
@@ -252,7 +252,7 @@ function dibujarGuia(): void {
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#fff";
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-  TIRADORES.forEach((t, i) => {
+  for (const [i, t] of TIRADORES.entries()) {
     const hx = rect.x + rect.w * t.fx;
     const hy = rect.y + rect.h * t.fy;
     const l = LADO_VISUAL / 2;
@@ -261,7 +261,7 @@ function dibujarGuia(): void {
     ctx.lineWidth = 2;
     ctx.strokeStyle = i === activo ? "#1d7a3a" : "#fff";
     ctx.strokeRect(hx - l, hy - l, LADO_VISUAL, LADO_VISUAL);
-  });
+  }
 }
 
 function punto(e: PointerEvent): { x: number; y: number } {
@@ -290,7 +290,10 @@ function conVertice(
   esqFin: Borde,
   lado: Borde,
 ): Borde {
-  return p < ini + RADIO_ESQUINA ? esqIni : p > fin - RADIO_ESQUINA ? esqFin : lado;
+  if (p < ini + RADIO_ESQUINA) {
+    return esqIni;
+  }
+  return p > fin - RADIO_ESQUINA ? esqFin : lado;
 }
 
 /** Línea más próxima en banda, con esquinas que mandan cerca del vértice. */
@@ -426,9 +429,9 @@ async function recortarBlobDe(foto: ImageBitmap, crear: typeof crearReal): Promi
     throw new Error("sin contexto 2d");
   }
   ctx.drawImage(foto, sx, sy, w, h, 0, 0, w, h);
-  const recortado = await new Promise<Blob | null>((res) =>
-    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-  );
+  const recortado = await new Promise<Blob | null>((res) => {
+    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+  });
   if (!recortado) {
     throw new Error("sin blob recortado");
   }
@@ -539,7 +542,14 @@ function cablearPunteroAbajo(): void {
     const p = punto(e);
     const b = bordeEn(p);
     e.preventDefault();
-    if (!b) {
+    if (b) {
+      borde = b;
+      activo = Math.max(
+        0,
+        TIRADORES.findIndex((t) => t.b === b),
+      );
+      enArrastre = true;
+    } else {
       // Interior sin borde cerca: se mueve el área completa.
       if (!dentroDe(p)) {
         return;
@@ -547,13 +557,6 @@ function cablearPunteroAbajo(): void {
       moviendoEntero = true;
       agarreX = p.x - rect.x;
       agarreY = p.y - rect.y;
-    } else {
-      borde = b;
-      activo = Math.max(
-        0,
-        TIRADORES.findIndex((t) => t.b === b),
-      );
-      enArrastre = true;
     }
     try {
       guia.setPointerCapture(e.pointerId);
@@ -619,15 +622,19 @@ function destinoTecla(e: KeyboardEvent, t: Tirador): { x: number; y: number } | 
   const hx = rect.x + rect.w * t.fx;
   const hy = rect.y + rect.h * t.fy;
   const paso = (e.shiftKey ? 5 : 1) * PASO_TECLA;
-  return e.key === "ArrowUp"
-    ? { x: hx, y: hy - paso }
-    : e.key === "ArrowDown"
-      ? { x: hx, y: hy + paso }
-      : e.key === "ArrowLeft"
-        ? { x: hx - paso, y: hy }
-        : e.key === "ArrowRight"
-          ? { x: hx + paso, y: hy }
-          : null;
+  if (e.key === "ArrowUp") {
+    return { x: hx, y: hy - paso };
+  }
+  if (e.key === "ArrowDown") {
+    return { x: hx, y: hy + paso };
+  }
+  if (e.key === "ArrowLeft") {
+    return { x: hx - paso, y: hy };
+  }
+  if (e.key === "ArrowRight") {
+    return { x: hx + paso, y: hy };
+  }
+  return null;
 }
 
 /** Teclado: [ ] rotan el tirador activo, flechas lo mueven, Enter confirma. */

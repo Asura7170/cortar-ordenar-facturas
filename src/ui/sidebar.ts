@@ -69,6 +69,9 @@ function textoMotivo(m: MotivoRechazo): string {
     case "ilegible": {
       return "no se pudo leer: puede estar corrupta, probá con otra foto";
     }
+    default: {
+      return "no se pudo procesar el archivo";
+    }
   }
 }
 
@@ -87,6 +90,9 @@ function tituloDeMotivo(m: MotivoRechazo): string {
     case "ilegible": {
       return "No se pudo leer";
     }
+    default: {
+      return "Archivo rechazado";
+    }
   }
 }
 
@@ -97,7 +103,7 @@ function tituloDeMotivo(m: MotivoRechazo): string {
 let intakesActivos = 0;
 
 // Formatos de imagen del intake (clic / Ctrl+V / drop): un solo allowlist.
-const MIME_IMAGEN = /^image\/(jpeg|png|webp|bmp|gif)$/i;
+const MIME_IMAGEN = /^image\/(?<ext>jpeg|png|webp|bmp|gif)$/iu;
 
 /** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
 let hojaPedida: number | null = null;
@@ -145,7 +151,7 @@ function tieneHueco(h: Hoja): boolean {
 
 /** Despacha el resto en la fila de huecos. */
 function llenarHuecos(slots: (Comprobante | null)[], resto: Comprobante[]): void {
-  for (let j = 0; j < slots.length && resto.length; j++) {
+  for (let j = 0; j < slots.length && resto.length; j += 1) {
     if (!slots[j]) {
       slots[j] = resto.shift() ?? null;
     }
@@ -164,14 +170,14 @@ function crearColocacion(destino: number | null): (items: Comprobante[]) => void
   // Commit incremental: cada archivo se pinta antes del siguiente. Los gaps
   // async del decode/encode le dan al navegador ventanas de paint con DOM ya
   // comprometido (antes solo había un render al final del lote: freeze).
-  let hoja: Hoja | undefined = destino != null ? hojaPorId(destino) : undefined;
+  let hoja: Hoja | undefined = destino == null ? undefined : hojaPorId(destino);
   let colocados = 0;
   let ultimoRender = 0;
   return (items: Comprobante[]): void => {
     if (!hoja) {
       // Perezosa: el intake vacío o todo-rechazado no crea hojas (el test
       // "null o vacío" lo exige; antes el return temprano lo garantizaba).
-      hoja = state.hojas.find(tieneHueco) ?? state.hojas[state.hojas.length - 1] ?? crearHoja();
+      hoja = state.hojas.find(tieneHueco) ?? state.hojas.at(-1) ?? crearHoja();
       if (!state.hojas.includes(hoja)) {
         state.hojas.push(hoja);
       }
@@ -217,7 +223,7 @@ async function paginasUtiles(f: File, avisos: AvisoRechazo[]): Promise<Comproban
     });
     return null;
   }
-  const base = sanear(f.name).replace(/\.pdf$/i, "");
+  const base = sanear(f.name).replace(/\.pdf$/iu, "");
   return pags.map((p) => {
     const url = URL.createObjectURL(p.blob);
     return {
@@ -271,7 +277,7 @@ export async function agregarArchivos(
   let colocados = 0;
   // Sin VT ni rebuilds por archivo durante el intake (ver sheets.renderHojas):
   // el flag cubre todo el loop y el finally lo suelta aunque un PDF falle.
-  intakesActivos++;
+  intakesActivos += 1;
   state.loteEnCurso = true;
   try {
     for (const f of lista) {
@@ -292,7 +298,7 @@ export async function agregarArchivos(
       }
     }
   } finally {
-    intakesActivos--;
+    intakesActivos -= 1;
     state.loteEnCurso = intakesActivos > 0;
   }
   // siempre: los rechazos viejos de otro lote salen con fade
@@ -312,7 +318,7 @@ export async function agregarArchivos(
 /** Item del portapapeles con al menos una imagen (shape mínimo de ClipboardItem). */
 interface ItemConImagen {
   readonly types: readonly string[];
-  getType(tipo: string): Promise<Blob>;
+  getType: (tipo: string) => Promise<Blob>;
 }
 
 // Sin bytes de imagen el clic no puede pegar: el Ctrl+C al ARCHIVO en el
@@ -405,7 +411,7 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
 /** La hoja del clic fantasma: la última si tiene huecos, o una nueva (aún
     sin apuntar a state) heredando su layout. */
 function destinoFantasma(): Hoja {
-  const ultima = state.hojas[state.hojas.length - 1];
+  const ultima = state.hojas.at(-1);
   return ultima && ultima.slots.includes(null) ? ultima : crearHoja(ultima?.layout ?? "u4x2");
 }
 
@@ -485,7 +491,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
   if (!archivos) {
     return;
   }
-  const primero = archivos[0];
+  const [primero] = archivos;
   if (!primero) {
     return;
   }
@@ -497,7 +503,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
   // próximo intake caería en una hoja abandonada).
   hojaPedida = null;
   const layoutRespaldo = destino.layout;
-  intakesActivos++;
+  intakesActivos += 1;
   state.loteEnCurso = true;
   try {
     let comp: Comprobante;
@@ -527,7 +533,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     precalentarModelos();
     void procesarCola();
   } finally {
-    intakesActivos--;
+    intakesActivos -= 1;
     state.loteEnCurso = intakesActivos > 0;
   }
 }
@@ -550,10 +556,10 @@ export function renderCodigo(): void {
   // ponytail: el error visual vive hasta que el usuario corrige o se re-renderiza.
   inputCodigo.classList.remove("codigo-error", "sacudir");
   inputCodigo.removeAttribute("aria-invalid");
-  radiosPosicion().forEach((r) => {
+  for (const r of radiosPosicion()) {
     r.checked = r.value === state.codigoPosicion;
     r.disabled = !state.codigoActivo;
-  });
+  }
 }
 
 /** Abre el diálogo para subir directo a una hoja (la consume cualquier intake). */
@@ -695,7 +701,7 @@ function cablearSwitchCodigo(): void {
     renderCodigo();
   });
   inputCodigo.addEventListener("input", () => {
-    state.codigoValor = inputCodigo.value.replaceAll(/\D/g, "");
+    state.codigoValor = inputCodigo.value.replaceAll(/\D/gu, "");
     inputCodigo.value = state.codigoValor;
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
     inputCodigo.classList.remove("codigo-error", "sacudir");
@@ -708,7 +714,7 @@ function cablearSwitchCodigo(): void {
 
 /** La esquina es otro dato de la ventana Código: cambiarla persiste igual. */
 function cablearRadiosPosicion(): void {
-  radiosPosicion().forEach((r) =>
+  for (const r of radiosPosicion()) {
     r.addEventListener("change", () => {
       if (!r.checked || !isPosicionCodigo(r.value)) {
         return;
@@ -717,8 +723,8 @@ function cablearRadiosPosicion(): void {
       if (chkCodigo.checked) {
         guardarCodigo();
       }
-    }),
-  );
+    });
+  }
 }
 
 /** El botón Limpiar abre el dialog vía commandfor (cero JS); acá solo se

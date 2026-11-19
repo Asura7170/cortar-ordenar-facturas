@@ -12,7 +12,13 @@ export function getEl<T extends HTMLElement>(id: string): T {
 /** Sanea entrada del usuario (nombres de archivo, texto OCR) antes del DOM. */
 export function sanear(s: unknown): string {
   // ponytail: solo string/number llegan al DOM; objetos → "" (nunca "[object Object]").
-  return (typeof s === "string" ? s : typeof s === "number" ? String(s) : "").toWellFormed();
+  if (typeof s === "string") {
+    return s.toWellFormed();
+  }
+  if (typeof s === "number") {
+    return String(s).toWellFormed();
+  }
+  return "";
 }
 
 /* Canal global de avisos (#aviso): pila de toasts fijos abajo-derecha. Cada
@@ -183,7 +189,7 @@ function apilarToast(el: HTMLElement, m: ToastMensaje): void {
   }
   const vivos = (): NodeListOf<HTMLElement> => el.querySelectorAll(".toast:not(.saliendo)");
   while (vivos().length >= MAX_TOASTS) {
-    const primero = vivos()[0];
+    const [primero] = vivos();
     if (!primero) {
       break;
     }
@@ -222,5 +228,5 @@ export function avisar(texto: string): void {
     "Failed to fetch dynamically imported module: <url>" y viejo
     "Importing a module script failed". */
 export function esImportDinamicoMuerto(mensaje: string): boolean {
-  return /dynamically imported|importing a module|dynamic import/i.test(mensaje);
+  return /dynamically imported|importing a module|dynamic import/iu.test(mensaje);
 }

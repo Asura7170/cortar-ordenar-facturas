@@ -47,7 +47,7 @@ export function codigoValido(): boolean {
   if (!state.codigoActivo) {
     return true;
   }
-  return /^\d+$/.test(state.codigoValor);
+  return /^\d+$/u.test(state.codigoValor);
 }
 
 export function nombreArchivo(ext = "docx"): string {
@@ -130,9 +130,9 @@ async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, lienzo.width, lienzo.height);
     ctx.drawImage(bmp, 0, 0);
-    const jpg = await new Promise<Blob | null>((res) =>
-      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
-    );
+    const jpg = await new Promise<Blob | null>((res) => {
+      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG);
+    });
     if (!jpg) {
       throw new Error("sin blob jpeg");
     }
@@ -154,7 +154,7 @@ function parrafoCodigo(codigo: string, posicion: PosicionCodigo): Paragraph {
 async function parrafoHoja(hoja: Hoja, posicion: PosicionCodigo): Promise<Paragraph> {
   const rects = geometria(hoja.layout, posicion);
   const runs: ImageRun[] = [];
-  for (let i = 0; i < hoja.slots.length; i++) {
+  for (let i = 0; i < hoja.slots.length; i += 1) {
     const item = hoja.slots[i];
     const rect = rects[i];
     if (!item || !rect) {
@@ -221,13 +221,12 @@ export async function construirDocumento(
           },
         },
         // Sin código no hay banda que rotular: se omite el elemento.
-        ...(codigo === ""
-          ? {}
-          : supra
-            ? { headers: { default: new Header({ children: [parrafoCodigo(codigo, posicion)] }) } }
-            : {
-                footers: { default: new Footer({ children: [parrafoCodigo(codigo, posicion)] }) },
-              }),
+        ...(codigo !== "" && supra
+          ? { headers: { default: new Header({ children: [parrafoCodigo(codigo, posicion)] }) } }
+          : {}),
+        ...(codigo !== "" && !supra
+          ? { footers: { default: new Footer({ children: [parrafoCodigo(codigo, posicion)] }) } }
+          : {}),
         children: hijos,
       },
     ],
@@ -316,10 +315,10 @@ export function hojaPrint(hoja: Hoja, codigo: string, posicion: PosicionCodigo):
   rejilla.className = "rejilla-print";
   rejilla.style.gridTemplateColumns = `repeat(${p.cols}, 1fr)`;
   rejilla.style.gridTemplateRows = `repeat(${p.filas}, 1fr)`;
-  p.pos.forEach(([fila, col, span, spanFila], i) => {
+  for (const [i, [fila, col, span, spanFila]] of p.pos.entries()) {
     const item = hoja.slots[i];
     if (!item) {
-      return;
+      continue;
     }
     const celda = document.createElement("div");
     celda.className = "celda-print";
@@ -331,7 +330,7 @@ export function hojaPrint(hoja: Hoja, codigo: string, posicion: PosicionCodigo):
     img.alt = item.nombre;
     celda.append(img);
     rejilla.append(celda);
-  });
+  }
   seccion.append(rejilla);
   if (!supra && banda) {
     seccion.append(banda);
@@ -387,7 +386,7 @@ async function imprimirZona(conTitulo: boolean): Promise<void> {
     await esperarImagenes();
     // ponytail: título DESPUÉS del await: un 2.º clic nunca captura el temporal.
     if (conTitulo) {
-      document.title = nombreArchivo("pdf").replace(/\.pdf$/, "");
+      document.title = nombreArchivo("pdf").replace(/\.pdf$/u, "");
     }
     let listo = false;
     const limpiar = (): void => {

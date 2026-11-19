@@ -195,7 +195,7 @@ export function medianaCanal(v: number[]): number {
   if (v.length === 0) {
     return 0;
   }
-  const o = [...v].sort((a, b) => a - b);
+  const o = v.toSorted((a, b) => a - b);
   // ponytail: length ≥ 1 ⇒ floor(len/2) < len.
   return o[Math.floor(o.length / 2)] as number;
 }
@@ -441,9 +441,9 @@ export async function normalizarImagen(
     if (directo && escala === 1 && recortado === lienzo) {
       return f;
     }
-    const blob = await new Promise<Blob | null>((res) =>
-      recortado.toBlob(res, "image/webp", CALIDAD_WEBP),
-    );
+    const blob = await new Promise<Blob | null>((res) => {
+      recortado.toBlob(res, "image/webp", CALIDAD_WEBP);
+    });
     if (!blob) {
       throw new Error("ilegible");
     }

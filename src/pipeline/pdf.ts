@@ -175,7 +175,7 @@ export async function expandirPdf(
       return utiles;
     }
     // ponytail: secuencial a propósito; N renders en paralelo saturan memoria.
-    for (let i = 1; i <= total; i++) {
+    for (let i = 1; i <= total; i += 1) {
       const pagina = await paginaUtil(doc, total, i, crear);
       if (pagina) {
         utiles.push(pagina);
@@ -209,9 +209,9 @@ async function paginaUtil(
     if (esPaginaBlanca(lienzo) || esPaginaNegra(lienzo)) {
       return null;
     }
-    const blob = await new Promise<Blob | null>((res) =>
-      lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-    );
+    const blob = await new Promise<Blob | null>((res) => {
+      lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+    });
     return blob ? { indice: i, total, blob } : null;
   } catch {
     // ponytail: página mala no tumba a las hermanas

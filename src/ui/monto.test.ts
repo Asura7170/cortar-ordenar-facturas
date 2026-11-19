@@ -189,7 +189,7 @@ describe("renderMonto", () => {
     // la ventana nunca sale de la tira (regresión del "desaparecen")
     for (const c of colasAlto) {
       const celulas = [...c.querySelectorAll<HTMLElement>(".monto-digito")];
-      const ultima = celulas[celulas.length - 1];
+      const ultima = celulas.at(-1);
       if (!ultima) {
         throw new Error("sin células");
       }
@@ -269,9 +269,9 @@ describe("renderMonto", () => {
     // aterriza en el dígito correcto (sea barrido limpio o continuación)
     const normal = (nn: number): number => ((nn % 10) + 10) % 10;
     const esperados = [1, 0, 0, 0, 9, 9];
-    cols().forEach((c, i) =>
-      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
-    );
+    for (const [i, c] of cols().entries()) {
+      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number);
+    }
     // y toda rueda avanza hacia arriba, nunca hacia abajo (delta +)
     const saltos = cols().map((c) => Number(c.dataset["muestra"]) - Number(c.dataset["arranque"]));
     // al menos una rueda se movió
@@ -292,9 +292,9 @@ describe("renderMonto", () => {
     renderMonto();
     const normal = (nn: number): number => ((nn % 10) + 10) % 10;
     const esperados = [3, 5, 0, 0, 0];
-    cols().forEach((c, i) =>
-      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
-    );
+    for (const [i, c] of cols().entries()) {
+      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number);
+    }
     const saltos = cols().map((c) => Number(c.dataset["muestra"]) - Number(c.dataset["arranque"]));
     // al menos una rueda se movió
     expect(saltos.some((salto) => salto !== 0)).toBe(true);
@@ -308,7 +308,7 @@ describe("barraBoton", () => {
   function botonCalcular(): HTMLButtonElement {
     const b = document.getElementById("btnCalcular");
     if (!(b instanceof HTMLButtonElement)) {
-      throw new Error("sin #btnCalcular");
+      throw new TypeError("sin #btnCalcular");
     }
     return b;
   }
@@ -370,7 +370,7 @@ describe("barraBoton", () => {
   it("btnLimpiar deshabilitado con lote vacío, habilitado con items", () => {
     const limpiar = document.getElementById("btnLimpiar");
     if (!(limpiar instanceof HTMLButtonElement)) {
-      throw new Error("sin #btnLimpiar");
+      throw new TypeError("sin #btnLimpiar");
     }
     // sin hojas
     renderMonto();
@@ -386,18 +386,22 @@ describe("barraBoton", () => {
     const botones = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLimpiar"].map((id) => {
       const b = document.getElementById(id);
       if (!(b instanceof HTMLButtonElement)) {
-        throw new Error(`sin #${id}`);
+        throw new TypeError(`sin #${id}`);
       }
       return b;
     });
     // sin hojas
     renderMonto();
-    botones.forEach((b) => expect(b.disabled).toBe(true));
+    for (const b of botones) {
+      expect(b.disabled).toBe(true);
+    }
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5" });
     state.hojas.push(h);
     renderMonto();
-    botones.forEach((b) => expect(b.disabled).toBe(false));
+    for (const b of botones) {
+      expect(b.disabled).toBe(false);
+    }
   });
 });
 

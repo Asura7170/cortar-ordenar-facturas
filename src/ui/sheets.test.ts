@@ -62,7 +62,9 @@ async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
     if (Date.now() - t0 > ms) {
       throw new Error("timeout esperando condición");
     }
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
   }
 }
 
@@ -85,8 +87,10 @@ function boton(accion: string): HTMLButtonElement {
 
 /** Espera a que el import dinámico (clic → abrirRecorte) termine. */
 async function vaciar(): Promise<void> {
-  for (let i = 0; i < 10; i++) {
-    await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i += 1) {
+    await new Promise((r) => {
+      setTimeout(r, 0);
+    });
   }
 }
 
@@ -371,11 +375,11 @@ describe("celdas", () => {
     const celdas = document.querySelectorAll(".sheet:not(.sheet-fantasma) .cell");
     const cell = celdas.item(celdas.length - 1);
     if (!(cell instanceof HTMLElement)) {
-      throw new Error("sin celda propia");
+      throw new TypeError("sin celda propia");
     }
     const input = cell.querySelector("input.cell-monto");
     if (!(input instanceof HTMLInputElement)) {
-      throw new Error("sin input de monto");
+      throw new TypeError("sin input de monto");
     }
     // borrador inválido tras blur, sin foco
     input.value = "abc";
@@ -515,7 +519,9 @@ describe("monto manual", () => {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       expect(input.classList.contains("monto-error")).toBe(true);
       // el swap llega después
-      diferidos.forEach((cb) => cb());
+      for (const cb of diferidos) {
+        cb();
+      }
       const deNuevo = inputMonto();
       expect(deNuevo.classList.contains("monto-error")).toBe(true);
       expect(deNuevo.getAttribute("aria-invalid")).toBe("true");
@@ -774,7 +780,7 @@ describe("monto manual", () => {
     renderHojas();
     const cell = document.querySelector(".cell");
     if (!(cell instanceof HTMLElement)) {
-      throw new Error("sin celda");
+      throw new TypeError("sin celda");
     }
     cell.querySelector("input.cell-monto")?.remove();
     c.montoCents = 1250;
@@ -952,7 +958,7 @@ describe("drop de archivos sobre hojas", () => {
     sembrar("u1", [10]);
     const sheet = document.querySelector(".sheet");
     if (!(sheet instanceof HTMLElement)) {
-      throw new Error("sin .sheet");
+      throw new TypeError("sin .sheet");
     }
     sheet.dispatchEvent(
       Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
@@ -1000,13 +1006,17 @@ describe("drop de archivos sobre hojas", () => {
       // y > bottom−70 → scroll hacia abajo
       borde(790);
       // paso corre en rAF reales
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => {
+        setTimeout(r, 60);
+      });
       expect(scrollBy).toHaveBeenCalledWith({ top: 14 });
       // zona muerta → detenerScroll
       borde(400);
       const n = scrollBy.mock.calls.length;
-      await new Promise((r) => setTimeout(r, 60));
-      expect(scrollBy.mock.calls).toHaveLength(n);
+      await new Promise((r) => {
+        setTimeout(r, 60);
+      });
+      expect(scrollBy).toHaveBeenCalledTimes(n);
     } finally {
       rect.mockRestore();
       delete (canvas as unknown as Record<string, unknown>)["scrollBy"];
@@ -1135,7 +1145,9 @@ describe("lupa", () => {
         clientY: 200,
       }),
     );
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => {
+      setTimeout(r, 50);
+    });
     expect(el("lupa").style.transform).toBe("translate(100px, 100px)");
     el<HTMLButtonElement>("btnLupa").click();
   });
@@ -1579,7 +1591,7 @@ describe("drag entre celdas (swap)", () => {
 
   /** Espera N frames reales (los rAF pendientes van primero: moveRaf/paso corren antes de volver). */
   async function esperarRaf(n = 2): Promise<void> {
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       await new Promise<void>((r) => {
         requestAnimationFrame(() => r());
       });
@@ -1589,7 +1601,7 @@ describe("drag entre celdas (swap)", () => {
   function pressCelda(idx: number, x: number, y: number): void {
     const img = document.querySelectorAll(".cell img").item(idx);
     if (!(img instanceof Element)) {
-      throw new Error("sin imagen");
+      throw new TypeError("sin imagen");
     }
     img.dispatchEvent(
       Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {

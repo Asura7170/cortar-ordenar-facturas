@@ -50,8 +50,8 @@ export interface SalidaOcr {
 
 /** Subsesión (det o rec): crear tensores + ejecutar. */
 export interface SubsesionOcr {
-  tensor(datos: Float32Array, formas: readonly number[]): unknown;
-  run(feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>>;
+  tensor: (datos: Float32Array, formas: readonly number[]) => unknown;
+  run: (feeds: Record<string, unknown>) => Promise<Record<string, SalidaOcr>>;
 }
 
 /** Núcleo OCR: ambas sesiones listas. */
@@ -88,9 +88,9 @@ export function envolver(
 ): SubsesionOcr {
   if (nombre === "rec") {
     // ponytail: ValueMetadata de ort-web 1.29 expone shape (nunca dimensions).
-    const meta = sesion.outputMetadata[0];
+    const [meta] = sesion.outputMetadata;
     const forma = meta && meta.isTensor ? meta.shape : undefined;
-    const clases = forma?.[forma.length - 1];
+    const clases = forma?.at(-1);
     // ponytail: fallo fuerte en init si el modelo no casa con el dict (no basura silenciosa).
     if (typeof clases === "number" && clases !== DICT_OCR.length) {
       throw new Error(`rec con ${clases} clases, dict con ${DICT_OCR.length}`);
@@ -318,8 +318,8 @@ function masaMapa(mapa: Float32Array): number {
     return 0;
   }
   let suma = 0;
-  for (let i = 0; i < mapa.length; i += 1) {
-    suma += mapa[i] ?? 0;
+  for (const v of mapa) {
+    suma += v ?? 0;
   }
   return suma / mapa.length;
 }
@@ -371,9 +371,9 @@ export async function girarBlob(
       if (!lienzo) {
         return null;
       }
-      return await new Promise<Blob | null>((res) =>
-        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-      );
+      return await new Promise<Blob | null>((res) => {
+        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+      });
     } finally {
       bmp.close();
     }
@@ -421,7 +421,7 @@ async function confiarRec(
   cajas: CajaDb[],
   crear: CrearLienzo,
 ): Promise<number> {
-  const top = [...cajas].sort((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
+  const top = cajas.toSorted((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
   const rs = await reconocerLote(rec, base, top, crear);
   const confs: number[] = [];
   for (const r of rs) {
@@ -696,12 +696,12 @@ export async function reconocerLote(
 ): Promise<TextoRec[]> {
   const fuera: TextoRec[] = cajas.map(() => ({ texto: "", puntaje: 0 }));
   const validos: { idx: number; bgr: Uint8Array; w: number; h: number }[] = [];
-  cajas.forEach((caja, idx) => {
+  for (const [idx, caja] of cajas.entries()) {
     const r = recorteCaja(base, caja, crear);
     if (r) {
       validos.push({ idx, ...r });
     }
-  });
+  }
   if (validos.length === 0) {
     return fuera;
   }
@@ -711,7 +711,7 @@ export async function reconocerLote(
     idx: v.idx,
     lin: normalizarLinea(v.bgr, v.w, v.h) as LineaNorm,
   }));
-  const orden = [...norms].sort((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
+  const orden = norms.toSorted((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
   let anchoMax = 0;
   let chunks = 0;
   let ok = true;
@@ -724,9 +724,9 @@ export async function reconocerLote(
       break;
     }
     const { datos, pasos, porLote } = res;
-    trozo.forEach((t, b) => {
+    for (const [b, t] of trozo.entries()) {
       fuera[t.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
-    });
+    }
     chunks += 1;
     anchoMax = Math.max(anchoMax, res.lote.anchoMax);
   }

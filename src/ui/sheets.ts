@@ -152,14 +152,13 @@ function pintarCeldaOcr(div: HTMLElement, item: Comprobante): void {
   div.classList.add("cell-ocr");
   const pre = document.createElement("pre");
   pre.className = "cell-ocr-text";
-  pre.textContent = sanear(
-    item.textoOcr ||
-      (item.estado === "procesando"
-        ? "Procesando…"
-        : item.estado === "pendiente"
-          ? "Pendiente"
-          : "Sin texto OCR"),
-  );
+  let sinTexto = "Sin texto OCR";
+  if (item.estado === "procesando") {
+    sinTexto = "Procesando…";
+  } else if (item.estado === "pendiente") {
+    sinTexto = "Pendiente";
+  }
+  pre.textContent = sanear(item.textoOcr || sinTexto);
   const btn = document.createElement("button");
   btn.className = "cell-remove";
   btn.dataset["accion"] = "copiar-ocr";
@@ -270,7 +269,9 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "sheet-grid";
   grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
-  l.pos.forEach((p, i) => grid.append(celda(hoja.slots[i] ?? null, p, i, hoja.id)));
+  for (const [i, p] of l.pos.entries()) {
+    grid.append(celda(hoja.slots[i] ?? null, p, i, hoja.id));
+  }
   const tag = document.createElement("span");
   tag.className = "sheet-tag";
   tag.textContent = `HOJA ${idx + 1}`;
@@ -280,7 +281,7 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
   row.className = "sheet-row";
   row.dataset["hoja"] = String(hoja.id);
   row.innerHTML = panelHoja(hoja, idx);
-  row.insertBefore(sheet, row.firstChild);
+  row.prepend(sheet);
   // Columna derecha: panel arriba, botón de agregar debajo (misma columna).
   const lado = document.createElement("div");
   lado.className = "sheet-side";
@@ -307,7 +308,7 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
 
 /** Fila fantasma de hoja nueva (solo visual; hereda el layout de la última). */
 function armarFilaFantasma(): HTMLElement {
-  const ultima = state.hojas[state.hojas.length - 1];
+  const ultima = state.hojas.at(-1);
   const l = layoutDe(ultima?.layout ?? "u4x2");
   const fila = document.createElement("div");
   fila.className = "sheet-row";
@@ -318,7 +319,9 @@ function armarFilaFantasma(): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "sheet-grid";
   grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
-  l.pos.forEach((p, i) => grid.append(celda(null, p, i, HOJA_FANTASMA)));
+  for (const [i, p] of l.pos.entries()) {
+    grid.append(celda(null, p, i, HOJA_FANTASMA));
+  }
   const tag = document.createElement("span");
   tag.className = "sheet-tag";
   tag.textContent = `HOJA ${state.hojas.length + 1} · nueva`;
@@ -376,7 +379,9 @@ function renderCuerpo(borrador: BorradorMonto | null): void {
     return;
   }
 
-  state.hojas.forEach((hoja, idx) => sheetsEl.append(armarFilaHoja(hoja, idx)));
+  for (const [idx, hoja] of state.hojas.entries()) {
+    sheetsEl.append(armarFilaHoja(hoja, idx));
+  }
   // Hoja fantasma: solo visual (nunca entra a state.hojas, así no se
   // exporta ni se cuenta). Hereda el layout de la última; al pegar en
   // ella se materializa como hoja real. Va en .sheet-row con la columna
@@ -468,9 +473,9 @@ export function aplicarATodas(hojaId: string | number): void {
     return;
   }
   const layoutId = h.layout;
-  state.hojas.forEach((x) => {
+  for (const x of state.hojas) {
     x.layout = layoutId;
-  });
+  }
   // las nuevas también reciben la plantilla propagada
   redistribuir(layoutId);
   renderHojas();
@@ -547,9 +552,9 @@ interface BorradorSucio {
 function borradoresVisibles(): Map<number, BorradorSucio> {
   const sucios = new Map<number, BorradorSucio>();
   const a = document.activeElement;
-  sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto").forEach((input) => {
+  for (const input of sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto")) {
     if (input === a || input.value === "") {
-      return;
+      continue;
     }
     const cell = input.closest(".cell");
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
@@ -559,13 +564,13 @@ function borradoresVisibles(): Map<number, BorradorSucio> {
         error: input.classList.contains("monto-error"),
       });
     }
-  });
+  }
   return sucios;
 }
 
 /** Restaura borradores sin foco tras el render (valor y error, nunca foco: B2). */
 function restaurarSucios(sucios: Map<number, BorradorSucio>): void {
-  sucios.forEach(({ valor, error }, id) => {
+  for (const [id, { valor, error }] of sucios) {
     const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
     if (input && document.activeElement !== input) {
       input.value = valor;
@@ -574,7 +579,7 @@ function restaurarSucios(sucios: Map<number, BorradorSucio>): void {
         input.setAttribute("aria-invalid", "true");
       }
     }
-  });
+  }
 }
 
 /** Restaura un borrador tras el render (la celda puede haber cambiado a badge). */
@@ -865,7 +870,7 @@ function fondoBajoPunto(x: number, y: number): string {
   let el = document.elementFromPoint(x, y);
   while (el && el !== document.documentElement) {
     const bg = getComputedStyle(el).backgroundColor;
-    if (bg && !/^rgba\(0,\s*0,\s*0,\s*0\)$/.test(bg)) {
+    if (bg && !/^rgba\(0,\s*0,\s*0,\s*0\)$/u.test(bg)) {
       return bg;
     }
     el = el.parentElement;
@@ -882,11 +887,21 @@ function detenerScroll(): void {
 }
 
 function cancelarDragVisual(): void {
-  sheetsEl.querySelectorAll(".drop-target").forEach((c) => c.classList.remove("drop-target"));
-  sheetsEl.querySelectorAll(".sheet-grid.dragging").forEach((g) => g.classList.remove("dragging"));
-  sheetsEl.querySelectorAll(".sheet.file-drop").forEach((s) => s.classList.remove("file-drop"));
-  sheetsEl.querySelectorAll(".cell.pickup").forEach((c) => c.classList.remove("pickup"));
-  document.querySelectorAll(".drag-ghost").forEach((g) => g.remove());
+  for (const c of sheetsEl.querySelectorAll(".drop-target")) {
+    c.classList.remove("drop-target");
+  }
+  for (const g of sheetsEl.querySelectorAll(".sheet-grid.dragging")) {
+    g.classList.remove("dragging");
+  }
+  for (const s of sheetsEl.querySelectorAll(".sheet.file-drop")) {
+    s.classList.remove("file-drop");
+  }
+  for (const c of sheetsEl.querySelectorAll(".cell.pickup")) {
+    c.classList.remove("pickup");
+  }
+  for (const g of document.querySelectorAll(".drag-ghost")) {
+    g.remove();
+  }
   document.body.classList.remove("is-dragging");
   celdaResaltada = null;
   rectsCache = null;
@@ -903,9 +918,13 @@ function cancelarDragVisual(): void {
 
 function autoScroll(x: number, y: number): void {
   const r = canvasEl.getBoundingClientRect();
-  const margen = 70,
-    vel = 14;
-  scrollDir = y < r.top + margen ? -vel : y > r.bottom - margen ? vel : 0;
+  const margen = 70;
+  const vel = 14;
+  if (y < r.top + margen) {
+    scrollDir = -vel;
+  } else {
+    scrollDir = y > r.bottom - margen ? vel : 0;
+  }
   if (scrollDir && scrollRaf === null) {
     const paso = (): void => {
       // ponytail: paso solo corre con scrollDir ≠ 0 (detenerScroll cancela el
@@ -1601,8 +1620,12 @@ function pegarDesdeBoton(btn: HTMLElement): void {
 const ACCIONES_CLIC: Readonly<Record<string, (btn: HTMLElement, id: number) => void>> = {
   "copiar-ocr": (btn, id) => copiarOcrAlPortapapeles(id, btn),
   quitar: (_btn, id) => quitarComprobante(id),
-  "girar-izq": (_btn, id) => void girarYReleer(id, 270),
-  "girar-der": (_btn, id) => void girarYReleer(id, 90),
+  "girar-izq": (_btn, id) => {
+    void girarYReleer(id, 270);
+  },
+  "girar-der": (_btn, id) => {
+    void girarYReleer(id, 90);
+  },
   recortar: (_btn, id) => abrirRecorteSiHaceFalta(id),
   "corregir-monto": (_btn, id) => abrirCorreccionMonto(id),
   layout: (btn) => cambiarLayoutHoja(btn.dataset["hoja"] ?? "", btn.dataset["layout"] ?? ""),
@@ -1712,11 +1735,11 @@ function cablearArchivosEntrada(): void {
     autoScroll(e.clientX, e.clientY);
     const target = e.target as HTMLElement | null;
     const sheet = target?.closest?.(".sheet");
-    sheetsEl.querySelectorAll(".sheet.file-drop").forEach((s) => {
+    for (const s of sheetsEl.querySelectorAll(".sheet.file-drop")) {
       if (s !== sheet) {
         s.classList.remove("file-drop");
       }
-    });
+    }
     if (sheet instanceof HTMLElement && sheet.dataset["hoja"] !== String(HOJA_FANTASMA)) {
       sheet.classList.add("file-drop");
     }

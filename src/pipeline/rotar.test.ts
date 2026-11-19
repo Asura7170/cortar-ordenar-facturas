@@ -119,7 +119,9 @@ describe("girarYReleer", () => {
     vi.mocked(extraerTexto).mockImplementation(async (b: Blob) => {
       const tag = b === blobA ? "A" : "B";
       eventos.push(`${tag}-ini`);
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => {
+        setTimeout(r, 10);
+      });
       eventos.push(`${tag}-fin`);
       return "LEÍDO";
     });
@@ -280,7 +282,7 @@ describe("girarYReleer", () => {
         }),
     });
     // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- soltar lo muta el executor; cota 100
-    for (let i = 0; i < 100 && !soltar; i++) {
+    for (let i = 0; i < 100 && !soltar; i += 1) {
       await Promise.resolve();
     }
     soltar?.(bmp as unknown as ImageBitmap);
@@ -315,7 +317,7 @@ describe("girarYReleer", () => {
           }) as unknown as HTMLCanvasElement,
       });
       // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- soltar lo muta el executor; cota 100
-      for (let i = 0; i < 100 && !soltar; i++) {
+      for (let i = 0; i < 100 && !soltar; i += 1) {
         await Promise.resolve();
       }
       soltar?.(bmp as unknown as ImageBitmap);
@@ -341,7 +343,7 @@ describe("girarYReleer", () => {
     const crearBase = deps.crear.getMockImplementation();
     let llamadas = 0;
     deps.crear.mockImplementation(() => {
-      llamadas++;
+      llamadas += 1;
       const lienzo = (crearBase?.() ?? {}) as {
         toBlob: (cb: (b: Blob | null) => void) => void;
       } & Record<string, unknown>;
@@ -438,23 +440,27 @@ describe("girarYReleer", () => {
       const pg = girarYReleer(c.id, 90, depsGiroEnVuelo as never);
       await abrirRecorte(c.id, depsCrop as never);
       // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- lo muta el executor; cota 100
-      for (let i = 0; i < 100 && !soltarGiro; i++) {
+      for (let i = 0; i < 100 && !soltarGiro; i += 1) {
         await Promise.resolve();
       }
       soltarGiro?.(bmpGiro as unknown as ImageBitmap);
       // El giro queda suspendido entre imgUrl= y file= (código viejo): ahí
       // commitea el recorte entero y recién después termina el giro.
       // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- lo muta el executor; cota 200
-      for (let i = 0; i < 200 && !soltarPrevio; i++) {
+      for (let i = 0; i < 200 && !soltarPrevio; i += 1) {
         await Promise.resolve();
       }
       document.getElementById("btnRecorteOk")?.click();
       // confirmar entero (C gana píxeles)
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => {
+        setTimeout(r, 200);
+      });
       await expect((c.file as Blob).text()).resolves.toBe("recorte");
       soltarPrevio?.(bmpGiro as unknown as ImageBitmap);
       await pg;
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => {
+        setTimeout(r, 100);
+      });
       // el timer del giro no fuga al resto
       cancelarRelecturaProgramada(c.id);
       // El giro terminó último: todo G ("girado" 6B), nada de C ("recorte" 7B).

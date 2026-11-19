@@ -135,8 +135,8 @@ function dentroDeCarta(rects: readonly Rect[]): void {
 }
 
 function sinSolapes(rects: readonly Rect[]): void {
-  for (let i = 0; i < rects.length; i++) {
-    for (let j = i + 1; j < rects.length; j++) {
+  for (let i = 0; i < rects.length; i += 1) {
+    for (let j = i + 1; j < rects.length; j += 1) {
       const a = rects[i];
       const b = rects[j];
       if (!a || !b) {
@@ -149,8 +149,8 @@ function sinSolapes(rects: readonly Rect[]): void {
 
 /** Vecinas del mismo eje separadas por al menos la calle (el hueco visible). */
 function conCalle(rects: readonly Rect[], calle: number): void {
-  for (let i = 0; i < rects.length; i++) {
-    for (let j = i + 1; j < rects.length; j++) {
+  for (let i = 0; i < rects.length; i += 1) {
+    for (let j = i + 1; j < rects.length; j += 1) {
       const a = rects[i];
       const b = rects[j];
       if (!a || !b) {
@@ -166,7 +166,7 @@ function conCalle(rects: readonly Rect[], calle: number): void {
 
 function seccionDe(doc: Registro): Record<string, unknown> {
   const secs = (doc.opc as { sections: Record<string, unknown>[] }).sections;
-  const sec = secs[0];
+  const [sec] = secs;
   if (!sec) {
     throw new Error("sección ausente");
   }
@@ -226,7 +226,7 @@ describe("geometria", () => {
   it("u1 sup-izq: 1 rect con banda superior libre", () => {
     const rects = geometria("u1", "sup-izq");
     expect(rects).toHaveLength(1);
-    const r = rects[0];
+    const [r] = rects;
     if (!r) {
       throw new Error("rect ausente");
     }
@@ -270,7 +270,7 @@ describe("encajar", () => {
 describe("construirDocumento (docx mockeado)", () => {
   function hojaCon(n: number): void {
     const h = crearHoja();
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       h.slots[i] = comprobante({ file: new Blob([`jpg${i}`], { type: "image/jpeg" }) });
     }
     state.hojas.push(h);
@@ -303,7 +303,7 @@ describe("construirDocumento (docx mockeado)", () => {
     }
     const docs = deTipo("Document");
     expect(docs).toHaveLength(1);
-    const doc = docs[0];
+    const [doc] = docs;
     if (!doc) {
       throw new Error("documento ausente");
     }
@@ -322,7 +322,7 @@ describe("construirDocumento (docx mockeado)", () => {
     } as unknown as CanvasRenderingContext2D);
     const toBlob = vi
       .spyOn(HTMLCanvasElement.prototype, "toBlob")
-      .mockImplementation(function toBlob(this: HTMLCanvasElement, cb: BlobCallback): void {
+      .mockImplementation((cb: BlobCallback): void => {
         cb(new Blob([jpg], { type: "image/jpeg" }));
       });
     try {
@@ -332,7 +332,7 @@ describe("construirDocumento (docx mockeado)", () => {
       await construirDocumento(state.hojas, "", "inf-der");
       const imgs = deTipo("ImageRun");
       expect(imgs).toHaveLength(1);
-      const img = imgs[0];
+      const [img] = imgs;
       if (!img) {
         throw new Error("imagen ausente");
       }
@@ -350,7 +350,7 @@ describe("construirDocumento (docx mockeado)", () => {
     hojaCon(1);
     await construirDocumento(state.hojas, "123456", "sup-izq");
     const docs = deTipo("Document");
-    const doc = docs[0];
+    const [doc] = docs;
     if (!doc) {
       throw new Error("documento ausente");
     }
@@ -375,7 +375,7 @@ describe("construirDocumento (docx mockeado)", () => {
     hojaCon(1);
     await construirDocumento(state.hojas, "", "inf-der");
     const docs = deTipo("Document");
-    const doc = docs[0];
+    const [doc] = docs;
     if (!doc) {
       throw new Error("documento ausente");
     }
@@ -502,7 +502,7 @@ describe("initExport", () => {
 describe("hojaPrint", () => {
   function hojaLlena(n: number, layout: LayoutId = "u4x2") {
     const h = crearHoja(layout);
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       h.slots[i] = comprobante();
     }
     return h;
@@ -535,8 +535,7 @@ describe("hojaPrint", () => {
 
   it("u3h: casilla alta con row-span 2 (geometria + print)", () => {
     const rects = geometria("u3h", "inf-der");
-    const simple = rects[0];
-    const alta = rects[2];
+    const [simple, , alta] = rects;
     if (!simple || !alta) {
       throw new Error("rect ausente");
     }
