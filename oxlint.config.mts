@@ -5,50 +5,9 @@ import vitest from "ultracite/oxlint/vitest";
 // ponytail: la deuda del preset está en 0; `pnpm check` es gate de lint junto a
 // `vp check`. Cada regla que sale del preset lleva su razón al lado; nada de
 // `-A` global ni `eslint-disable` de archivo.
-// ponytail: tercer `extends` porque el preset vitest declara estas reglas en su
-// propio override; el último config de `extends` es el que gana.
-const politicaLocal = defineConfig({
-  overrides: [
-    {
-      files: ["**/*.test.ts"],
-      plugins: ["vitest"],
-      rules: {
-        // ponytail: mocks que implementan () => Promise<T> no tienen await propio.
-        "require-await": "off",
-        // ponytail: los fixtures declaran varias clases a propósito.
-        "max-classes-per-file": "off",
-        // ponytail: comparan booleanos reales; toBeTruthy/toBeFalsy debilitan la aserción.
-        "vitest/prefer-to-be-truthy": "off",
-        "vitest/prefer-to-be-falsy": "off",
-        // ponytail: tests de integración con varias aserciones; los describe ya se organizan por archivo.
-        "vitest/max-expects": "off",
-        "vitest/require-top-level-describe": "off",
-        // ponytail: los stubs por asignación no se restauran con spyOn.
-        "vitest/prefer-spy-on": "off",
-        // ponytail: títulos de comportamiento; el fix exige refs y rompe tipos.
-        "vitest/prefer-describe-function-title": "off",
-        // ponytail: factory parcial de vi.mock; importar el real ejecuta efectos de módulo.
-        "vitest/prefer-import-in-mock": "off",
-        // ponytail: toHaveBeenCalledWith() sin args cambia la aserción y rompió 5 tests.
-        "vitest/prefer-called-with": "off",
-      },
-    },
-    {
-      // ponytail: vite.config.ts es intocable en esta limpieza (COOP/COEP/ORT);
-      // el named import, el regex sin `u` y el `.then().catch()` no son defectos.
-      files: ["vite.config.ts"],
-      rules: {
-        "unicorn/import-style": "off",
-        "require-unicode-regexp": "off",
-        "promise/always-return": "off",
-      },
-    },
-  ],
-});
-
 export default defineConfig({
   env: core.env,
-  extends: [core, vitest, politicaLocal],
+  extends: [core, vitest],
   // ponytail: upstream vendoreado y scratch local fuera del lint (mismo set que .prettierignore).
   ignorePatterns: [
     ...(core.ignorePatterns ?? []),
@@ -99,4 +58,41 @@ export default defineConfig({
     // ponytail: el fix de dataset rompe los tipos de getAttribute.
     "unicorn/prefer-dom-node-dataset": "off",
   },
+  overrides: [
+    {
+      // ponytail: declarar el plugin aquí es lo que permite apagar sus reglas; el preset vitest las fija en su propio override.
+      files: ["**/*.test.ts"],
+      plugins: ["vitest"],
+      rules: {
+        // ponytail: mocks que implementan () => Promise<T> no tienen await propio.
+        "require-await": "off",
+        // ponytail: los fixtures declaran varias clases a propósito.
+        "max-classes-per-file": "off",
+        // ponytail: comparan booleanos reales; toBeTruthy/toBeFalsy debilitan la aserción.
+        "vitest/prefer-to-be-truthy": "off",
+        "vitest/prefer-to-be-falsy": "off",
+        // ponytail: tests de integración con varias aserciones; los describe ya se organizan por archivo.
+        "vitest/max-expects": "off",
+        "vitest/require-top-level-describe": "off",
+        // ponytail: los stubs por asignación no se restauran con spyOn.
+        "vitest/prefer-spy-on": "off",
+        // ponytail: títulos de comportamiento; el fix exige refs y rompe tipos.
+        "vitest/prefer-describe-function-title": "off",
+        // ponytail: factory parcial de vi.mock; importar el real ejecuta efectos de módulo.
+        "vitest/prefer-import-in-mock": "off",
+        // ponytail: toHaveBeenCalledWith() sin args cambia la aserción y rompió 5 tests.
+        "vitest/prefer-called-with": "off",
+      },
+    },
+    {
+      // ponytail: vite.config.ts es intocable en esta limpieza (COOP/COEP/ORT);
+      // el named import, el regex sin `u` y el `.then().catch()` no son defectos.
+      files: ["vite.config.ts"],
+      rules: {
+        "unicorn/import-style": "off",
+        "require-unicode-regexp": "off",
+        "promise/always-return": "off",
+      },
+    },
+  ],
 });
