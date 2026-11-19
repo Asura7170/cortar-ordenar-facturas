@@ -245,15 +245,15 @@ describe("encajar", () => {
   const rect: Rect = { x: 0, y: 0, w: 800 * 9525, h: 600 * 9525 };
 
   it("apaisada llena el ancho", () => {
-    expect(encajar(1600, 600, rect)).toEqual({ w: 800, h: 300 });
+    expect(encajar(1600, 600, rect)).toStrictEqual({ w: 800, h: 300 });
   });
 
   it("vertical llena el alto", () => {
-    expect(encajar(600, 1200, rect)).toEqual({ w: 300, h: 600 });
+    expect(encajar(600, 1200, rect)).toStrictEqual({ w: 300, h: 600 });
   });
 
   it("sin dimensiones usa el rect entero", () => {
-    expect(encajar(0, 0, rect)).toEqual({ w: 800, h: 600 });
+    expect(encajar(0, 0, rect)).toStrictEqual({ w: 800, h: 600 });
   });
 });
 
@@ -324,7 +324,7 @@ describe("construirDocumento (docx mockeado)", () => {
       if (!img) throw new Error("imagen ausente");
       const data = (img.opc as { data: ArrayBuffer }).data;
       const bytes = new Uint8Array(data).slice(0, 3);
-      expect(bytes).toEqual(new Uint8Array([0xff, 0xd8, 0xff]));
+      expect(bytes).toStrictEqual(new Uint8Array([0xff, 0xd8, 0xff]));
       expect(toBlob).toHaveBeenCalledWith(expect.any(Function), "image/jpeg", expect.any(Number));
     } finally {
       ctx.mockRestore();

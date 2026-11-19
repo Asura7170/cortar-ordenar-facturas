@@ -119,7 +119,7 @@ describe("agregarArchivos", () => {
       archivo("c.PDF", "application/pdf"),
     ]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["a.png", "c p.1/1", null, null]);
+    expect(nombres).toStrictEqual(["a.png", "c p.1/1", null, null]);
   });
 
   it("acepta pdf por extensión aunque el type sea genérico", async () => {
@@ -145,7 +145,7 @@ describe("agregarArchivos", () => {
     expect(state.hojas).toHaveLength(2);
     expect(state.hojas.every((x) => x.layout === "u2h")).toBe(true);
     const nombres = state.hojas.flatMap((x) => x.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["factura.png", "1.png", "2.png", "3.png"]);
+    expect(nombres).toStrictEqual(["factura.png", "1.png", "2.png", "3.png"]);
   });
 
   it("con hojaId rellena ESA hoja aunque otra tenga hueco", async () => {
@@ -435,7 +435,7 @@ describe("gate PDF (tamaño + páginas)", () => {
       archivo("vale.pdf", "application/pdf"),
     ]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["ok.png", "vale p.1/1", null, null]);
+    expect(nombres).toStrictEqual(["ok.png", "vale p.1/1", null, null]);
     expect(aviso.textContent).toContain("gordo.pdf");
   });
 
@@ -469,7 +469,7 @@ describe("gate PDF (tamaño + páginas)", () => {
     const toasts = aviso.querySelectorAll(".toast-error");
     expect(toasts).toHaveLength(3);
     const archivos = Array.from(toasts).map((t) => t.querySelector(".toast-archivo")?.textContent);
-    expect(archivos).toEqual(["nota.txt", "b.har", "gordo.pdf"]);
+    expect(archivos).toStrictEqual(["nota.txt", "b.har", "gordo.pdf"]);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
   });
 
@@ -487,7 +487,7 @@ describe("gate PDF (tamaño + páginas)", () => {
     expansionSimulada = [paginaSimulada(1, 3), paginaSimulada(3, 3)];
     await agregarArchivos([archivo("fac.pdf", "application/pdf")]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["fac p.1/3", "fac p.3/3", null, null]);
+    expect(nombres).toStrictEqual(["fac p.1/3", "fac p.3/3", null, null]);
     const imgs = state.hojas.flatMap((h) => h.slots.map((c) => c?.imgUrl ?? null));
     expect(imgs.slice(0, 2).every((t) => t?.startsWith("blob:mock-") ?? false)).toBe(true);
     expect(aviso.textContent).toBe("");
@@ -506,7 +506,7 @@ describe("gate PDF (tamaño + páginas)", () => {
     fallosImagen.set("b.png", "blanca");
     await agregarArchivos([archivo("b.png", "image/png"), archivo("ok.png", "image/png")]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["ok.png", null, null, null]);
+    expect(nombres).toStrictEqual(["ok.png", null, null, null]);
     expect(aviso.textContent).toContain("no se pudo leer");
   });
 
@@ -675,7 +675,7 @@ describe("modalLimpiar", () => {
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]).toBe(h);
     expect(state.codigoValor).toBe("123456");
-    expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toEqual(blob);
+    expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toStrictEqual(blob);
   });
 });
 

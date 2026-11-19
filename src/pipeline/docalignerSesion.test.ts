@@ -61,7 +61,7 @@ describe("crearSesion (ORT falso, resto real)", () => {
     }));
     crearFalso.mockResolvedValue(sesionFalsa(runFalso) as never);
     const sesion = await obtenerSesion();
-    await expect(sesion.inferir(new Float32Array([1, 2, 3]))).resolves.toEqual({
+    await expect(sesion.inferir(new Float32Array([1, 2, 3]))).resolves.toStrictEqual({
       datos: new Float32Array([1]),
       dims: [1, 1],
     });

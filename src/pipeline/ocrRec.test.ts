@@ -85,7 +85,7 @@ describe("normalizarLote", () => {
             (ancha.base + c) * plano + y * wMax,
             (ancha.base + c) * plano + (y + 1) * wMax,
           ),
-        ).toEqual(
+        ).toStrictEqual(
           ancha.n.tensor.slice(
             c * planoAncha + y * ancha.n.anchoTotal,
             c * planoAncha + (y + 1) * ancha.n.anchoTotal,
@@ -125,7 +125,7 @@ describe("matrizAfin", () => {
         100,
         20,
       ),
-    ).toEqual([1, 0, 0, 1, 10, 10]);
+    ).toStrictEqual([1, 0, 0, 1, 10, 10]);
   });
 
   it("lleva (W,0)→p1 y (0,H)→p3", () => {
@@ -136,8 +136,8 @@ describe("matrizAfin", () => {
       [3, 15],
     ] as const;
     const [a, b, c, d, e, f] = matrizAfin([poli[0], poli[1], poli[2], poli[3]], 20, 10);
-    expect([a * 20 + e, b * 20 + f]).toEqual([25, 9]);
-    expect([c * 10 + e, d * 10 + f]).toEqual([3, 15]);
+    expect([a * 20 + e, b * 20 + f]).toStrictEqual([25, 9]);
+    expect([c * 10 + e, d * 10 + f]).toStrictEqual([3, 15]);
   });
 });
 
@@ -185,16 +185,16 @@ describe("decodificarCtc", () => {
   });
 
   it("todo blank → vacío con puntaje 0", () => {
-    expect(decodificarCtc(logits([[0, 1]]), 1, dict)).toEqual({ texto: "", puntaje: 0 });
+    expect(decodificarCtc(logits([[0, 1]]), 1, dict)).toStrictEqual({ texto: "", puntaje: 0 });
   });
 
   it("formas que no cuadran → vacío sin lanzar", () => {
-    expect(decodificarCtc(new Float32Array(7), 3, dict)).toEqual({ texto: "", puntaje: 0 });
-    expect(decodificarCtc(new Float32Array(0), 0, dict)).toEqual({ texto: "", puntaje: 0 });
+    expect(decodificarCtc(new Float32Array(7), 3, dict)).toStrictEqual({ texto: "", puntaje: 0 });
+    expect(decodificarCtc(new Float32Array(0), 0, dict)).toStrictEqual({ texto: "", puntaje: 0 });
   });
 
   it("dict de otro tamaño → vacío sin lanzar", () => {
-    expect(decodificarCtc(new Float32Array(2 * 5).fill(0.1), 2, ["blank", "a"])).toEqual({
+    expect(decodificarCtc(new Float32Array(2 * 5).fill(0.1), 2, ["blank", "a"])).toStrictEqual({
       texto: "",
       puntaje: 0,
     });

@@ -64,7 +64,7 @@ describe("colecciones", () => {
   it("aplanar preserva el orden visual entre hojas", () => {
     const a = hojaCon([10, 20]);
     const b = hojaCon([30]);
-    expect(aplanar()).toEqual([...itemsDe(a), ...itemsDe(b)]);
+    expect(aplanar()).toStrictEqual([...itemsDe(a), ...itemsDe(b)]);
   });
 
   it("sumaTotal trata null como 0 y totalItems solo cuenta ocupados", () => {
@@ -136,7 +136,14 @@ describe("renderMonto", () => {
     if (!montoEl) throw new Error("sin #montoTotal");
     expect(montoEl.getAttribute("aria-label")).toBe("US$ 1,234.56");
     const colasPlano = cols();
-    expect(colasPlano.map((c) => c.dataset["muestra"])).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(colasPlano.map((c) => c.dataset["muestra"])).toStrictEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+    ]);
     // regresión del "8": la ventana cae sobre la célula del dígito, no de la base
     expect(tiraDe(colasPlano[0] as HTMLElement).style.transform).toBe("translateY(-48px)");
     // las estáticas del plano no portan filtro de blur
@@ -158,7 +165,14 @@ describe("renderMonto", () => {
     // los 9→0 suben (fin 20 > 9); los 9 finales quedan fijos. El bug del
     // pop-que-bajaba muere aquí: ninguna posición nueva desciende.
     const colasAlto = cols();
-    expect(colasAlto.map((c) => c.dataset["muestra"])).toEqual(["11", "20", "20", "20", "9", "9"]);
+    expect(colasAlto.map((c) => c.dataset["muestra"])).toStrictEqual([
+      "11",
+      "20",
+      "20",
+      "20",
+      "9",
+      "9",
+    ]);
     // la ventana nunca sale de la tira (regresión del "desaparecen")
     for (const c of colasAlto) {
       const celulas = [...c.querySelectorAll<HTMLElement>(".monto-digito")];
@@ -183,7 +197,7 @@ describe("renderMonto", () => {
     hojaCon([10000]); // US$ 100.00
     renderMonto();
     // sufV= sufN "350.00"→"100.00": 3→1 baja -12 (fin -9), 5→0 baja -15 (fin -10)
-    expect(cols().map((c) => c.dataset["muestra"])).toEqual(["-9", "-10", "0", "0", "0"]);
+    expect(cols().map((c) => c.dataset["muestra"])).toStrictEqual(["-9", "-10", "0", "0", "0"]);
   });
 
   it("dígito sin cambio queda fijo: transition none y clavado en su dígito", () => {
@@ -198,7 +212,7 @@ describe("renderMonto", () => {
     hojaCon([35100]); // US$ 351.00: solo el 0→1 del sufijo rueda
     renderMonto();
     const colas = cols();
-    expect(colas.map((c) => c.dataset["muestra"])).toEqual(["11", "0", "0"]);
+    expect(colas.map((c) => c.dataset["muestra"])).toStrictEqual(["11", "0", "0"]);
     expect(tiraDe(colas[1] as HTMLElement).style.transition).toBe("none");
     expect(tiraDe(colas[2] as HTMLElement).style.transition).toBe("none");
   });
@@ -209,7 +223,7 @@ describe("renderMonto", () => {
     renderMonto(); // sincroniza
     state.moneda = "ARS"; // mismos cents, otro texto
     renderMonto();
-    expect(cols().map((c) => c.dataset["muestra"])).toEqual(["3", "5", "1", "0", "0"]);
+    expect(cols().map((c) => c.dataset["muestra"])).toStrictEqual(["3", "5", "1", "0", "0"]);
     for (const c of cols()) expect(tiraDe(c).style.transition).toBe("none");
   });
 
@@ -291,11 +305,11 @@ describe("barraBoton", () => {
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     state.hojas.push(h);
     renderMonto();
-    expect([...btn.querySelectorAll(".calculo-txt")].map((s) => s.textContent)).toEqual([
+    expect([...btn.querySelectorAll(".calculo-txt")].map((s) => s.textContent)).toStrictEqual([
       "Montos extraídos: ",
       "Montos extraídos: ",
     ]);
-    expect([...btn.querySelectorAll(".calculo-cuenta")].map((s) => s.textContent)).toEqual([
+    expect([...btn.querySelectorAll(".calculo-cuenta")].map((s) => s.textContent)).toStrictEqual([
       "1/2",
       "1/2",
     ]);

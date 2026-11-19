@@ -98,6 +98,8 @@ describe("cableado de hojas", () => {
   it("initSheets recibe pegarEnCelda (sin esta red el clic muere en silencio)", () => {
     const llamadas = argsInitSheets()[0] as unknown[];
     expect(argsInitSheets()).toHaveLength(1);
-    expect(llamadas[0]).toEqual(expect.objectContaining({ pegarEnCelda: expect.any(Function) }));
+    expect(llamadas[0]).toStrictEqual(
+      expect.objectContaining({ pegarEnCelda: expect.any(Function) }),
+    );
   });
 });

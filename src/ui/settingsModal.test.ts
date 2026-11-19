@@ -295,6 +295,6 @@ describe("secciones del modal", () => {
     const leyendas = [...formAjustes.querySelectorAll("fieldset.grupo-modelos > legend")].map(
       (l) => l.textContent,
     );
-    expect(leyendas).toEqual(["Moneda", "Modelos en este equipo"]);
+    expect(leyendas).toStrictEqual(["Moneda", "Modelos en este equipo"]);
   });
 });

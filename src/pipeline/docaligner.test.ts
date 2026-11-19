@@ -159,7 +159,7 @@ describe("ordenarQuad/esConvexo", () => {
       { x: 9, y: 0 },
       { x: 0, y: 9 },
     ]);
-    expect(q).toEqual([
+    expect(q).toStrictEqual([
       { x: 0, y: 0 },
       { x: 9, y: 0 },
       { x: 9, y: 9 },
@@ -218,7 +218,7 @@ describe("esQuadPlausible", () => {
 
 describe("tamanoSalida/areaQuad", () => {
   it("usa la media de aristas opuestas", () => {
-    expect(tamanoSalida(esquinas(101, 51))).toEqual({ width: 100, height: 50 });
+    expect(tamanoSalida(esquinas(101, 51))).toStrictEqual({ width: 100, height: 50 });
     expect(areaQuad(esquinas(101, 51))).toBe(100 * 50);
   });
 });
@@ -264,7 +264,7 @@ describe("calcularHomografia", () => {
     const { a, b } = sistemaDLT(src, src);
     expect(a).toHaveLength(8);
     expect(a.every((f) => f.length === 8)).toBe(true);
-    expect(b).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+    expect(b).toStrictEqual([0, 0, 1, 0, 1, 1, 0, 1]);
   });
 });
 
@@ -276,13 +276,13 @@ describe("pivotar/eliminar", () => {
     ];
     const b = [1, 2];
     pivotar(a, b, 0, 2);
-    expect(a).toEqual([
+    expect(a).toStrictEqual([
       [1, 0],
       [0, 1],
     ]);
-    expect(b).toEqual([2, 1]);
+    expect(b).toStrictEqual([2, 1]);
     pivotar(a, b, 1, 2); // ya pivoteado: sin swap
-    expect(a).toEqual([
+    expect(a).toStrictEqual([
       [1, 0],
       [0, 1],
     ]);
@@ -295,19 +295,19 @@ describe("pivotar/eliminar", () => {
     ];
     const b = [5, 7];
     eliminar(a, b, 0, 2); // factores 0: sin cambios
-    expect(a).toEqual([
+    expect(a).toStrictEqual([
       [1, 0],
       [0, 1],
     ]);
-    expect(b).toEqual([5, 7]);
+    expect(b).toStrictEqual([5, 7]);
     const c = [
       [1, 2],
       [3, 4],
     ];
     const d = [5, 11];
     eliminar(c, d, 0, 2); // fil 1 con factor 3
-    expect(c[1]).toEqual([0, -2]);
-    expect(d).toEqual([5, -4]);
+    expect(c[1]).toStrictEqual([0, -2]);
+    expect(d).toStrictEqual([5, -4]);
   });
 });
 
@@ -315,7 +315,7 @@ describe("muestrearBilinear", () => {
   it("interpola el centro de 4 píxeles", () => {
     const ent = new Uint8ClampedArray([0, 0, 0, 255, 100, 0, 0, 255, 0, 0, 0, 255, 200, 0, 0, 255]);
     // (0.5, 0.5) en 2×2: promedio de los 4 rojos.
-    expect(muestrearBilinear(ent, 2, 2, 0.5, 0.5)).toEqual([75, 0, 0]);
+    expect(muestrearBilinear(ent, 2, 2, 0.5, 0.5)).toStrictEqual([75, 0, 0]);
   });
 });
 
@@ -374,9 +374,9 @@ describe("masaComponente/mejorComponente", () => {
     const h = 4;
     const visitados = new Uint8Array(w * h);
     const pila = new Int32Array(w * h);
-    expect(mejorComponente(new Float32Array(w * h), 0, w, h, 0.3, 40, 40, visitados, pila)).toEqual(
-      { punto: null, pico: 0 },
-    );
+    expect(
+      mejorComponente(new Float32Array(w * h), 0, w, h, 0.3, 40, 40, visitados, pila),
+    ).toStrictEqual({ punto: null, pico: 0 });
   });
 });
 
@@ -415,7 +415,7 @@ describe("warpear", () => {
     ];
     const grande = warpear(src, fueraMarco, 8, 8);
     // Esquina (0,0) de la salida mapea a (-2,-2), fuera de la fuente → blanco opaco.
-    expect([grande.datos[0], grande.datos[1], grande.datos[2], grande.datos[3]]).toEqual([
+    expect([grande.datos[0], grande.datos[1], grande.datos[2], grande.datos[3]]).toStrictEqual([
       255, 255, 255, 255,
     ]);
     // Centro mapea dentro → negro de la fuente.
@@ -425,7 +425,7 @@ describe("warpear", () => {
       grande.datos[c + 1],
       grande.datos[c + 2],
       grande.datos[c + 3],
-    ]).toEqual([0, 0, 0, 255]);
+    ]).toStrictEqual([0, 0, 0, 255]);
     // Todo fuera → todo blanco.
     const lejos: Quad = [
       { x: 20, y: 20 },
@@ -452,7 +452,7 @@ describe("decodificarHeatmap", () => {
       80,
       UMBRAL_HEATMAP,
     );
-    expect(confianzas).toEqual([1, 1, 1, 1]);
+    expect(confianzas).toStrictEqual([1, 1, 1, 1]);
     expect(quad).not.toBeNull();
     // Celda (1,1) → ((1.5)/8)*80 = 15.
     expect(quad?.[0].x).toBeCloseTo(15, 0);
@@ -467,7 +467,7 @@ describe("decodificarHeatmap", () => {
   it("plano degenerado → null sin lanzar", () => {
     const { quad, confianzas } = decodificarHeatmap(new Float32Array(0), [1, 4, 0, 0], 80, 80);
     expect(quad).toBeNull();
-    expect(confianzas).toEqual([]);
+    expect(confianzas).toStrictEqual([]);
   });
 
   it("expansión a vecinos cubre bordes del mapa (x=0, x=w-1, y=0, y=h-1)", () => {
@@ -482,7 +482,7 @@ describe("decodificarHeatmap", () => {
     heat[1] = 0.9;
     heat[L] = 0.9;
     const { quad, confianzas } = decodificarHeatmap(heat, [1, 4, L, L], 80, 80);
-    expect(confianzas).toEqual([1, 1, 1, 1]);
+    expect(confianzas).toStrictEqual([1, 1, 1, 1]);
     expect(quad).not.toBeNull();
   });
 });
@@ -638,7 +638,7 @@ describe("iniciarSesion", () => {
       return buena;
     };
     await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 1000)).resolves.toBe(buena);
-    expect(vistos).toEqual(["webgpu"]);
+    expect(vistos).toStrictEqual(["webgpu"]);
     expect(console.warn).not.toHaveBeenCalled();
   });
 
@@ -650,7 +650,7 @@ describe("iniciarSesion", () => {
       return buena;
     };
     await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 1000)).resolves.toBe(buena);
-    expect(vistos).toEqual(["webgpu", "wasm"]);
+    expect(vistos).toStrictEqual(["webgpu", "wasm"]);
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("webgpu"));
   });
 
@@ -667,7 +667,7 @@ describe("iniciarSesion", () => {
       const p = expect(iniciarSesion(intentar, ["webgpu", "wasm"], 5000)).resolves.toBe(buena);
       await vi.advanceTimersByTimeAsync(5000);
       await p;
-      expect(vistos).toEqual(["webgpu", "wasm"]);
+      expect(vistos).toStrictEqual(["webgpu", "wasm"]);
     } finally {
       vi.useRealTimers();
     }
@@ -700,7 +700,7 @@ describe("conBorde/quitarBorde", () => {
     expect(lienzo.width).toBe(10 + PAD_BORDE * 2);
     expect(lienzo.height).toBe(8 + PAD_BORDE * 2);
     expect(falso.relleno()).toBe("#000");
-    expect(falso.rect()).toEqual([0, 0, 10 + PAD_BORDE * 2, 8 + PAD_BORDE * 2]);
+    expect(falso.rect()).toStrictEqual([0, 0, 10 + PAD_BORDE * 2, 8 + PAD_BORDE * 2]);
     const dibujo = falso.dibujo() ?? [];
     expect(dibujo[1]).toBe(PAD_BORDE);
     expect(dibujo[2]).toBe(PAD_BORDE);
@@ -714,7 +714,7 @@ describe("conBorde/quitarBorde", () => {
         { x: 200, y: 200 },
         { x: 100, y: 200 },
       ]),
-    ).toEqual([
+    ).toStrictEqual([
       { x: 0, y: 0 },
       { x: 100, y: 0 },
       { x: 100, y: 100 },
