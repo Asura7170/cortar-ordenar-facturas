@@ -8,7 +8,7 @@ import { aplanar, parsearMonto } from "../ui/monto";
 import { actualizarMontoCelda, renderHojas } from "../ui/sheets";
 import { avisar, avisarError, sanear } from "../utils";
 
-const MONEY_RE = /(?:Bs\.?|BOB|\$)?\s*(\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)/gu;
+const MONEY_RE = /(?:Bs\.?|BOB|\$)?\s*(?<monto>\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)/gu;
 
 export interface Candidato {
   readonly valor: string;
@@ -26,8 +26,10 @@ export function extractCandidates(contenido = ""): Candidato[] {
       valor: m[1] ?? "",
       // Un "-" de un run separador no es signo (solo vale sin guion previo).
       previo:
-        /(?:^|[^-])(-)\s*$|(\()\s*$/u.exec(contenido.slice(0, m.index))?.slice(1).find(Boolean) ??
-        "",
+        /(?:^|[^-])(?<menos>-)\s*$|(?<abre>\()\s*$/u
+          .exec(contenido.slice(0, m.index))
+          ?.slice(1)
+          .find(Boolean) ?? "",
     });
   }
   return out;

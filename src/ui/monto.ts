@@ -17,7 +17,7 @@ export function formatearMoneda(cents: Cents): string {
  */
 export function parsearMonto(texto: string): Cents | null {
   const s = texto.trim().replaceAll(/[\s$€£]/gu, "");
-  const m = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?$/u.exec(s);
+  const m = /^(?<entera>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?<decimales>\d{1,2}))?$/u.exec(s);
   // ponytail: miles con coma exigen decimal con punto ("1,234" solo → escribir 1234).
   if (!m || ((m[1] ?? "").includes(",") && m[2] === undefined)) {
     return null;
@@ -207,7 +207,7 @@ export function desplazamiento(base: number, k: number, cell: number): number {
 
 /** Índice absoluto de la célula visible según la matriz computada; null si no parsea (jsdom/plaino). */
 export function celdaDesdeMatriz(matrix: string, base: number, cell: number): number | null {
-  const m = /matrix\(([^)]*)\)/u.exec(matrix);
+  const m = /matrix\((?<params>[^)]*)\)/u.exec(matrix);
   if (m === null || !Number.isFinite(cell) || cell <= 0) {
     return null;
   }

@@ -97,7 +97,7 @@ function tituloDeMotivo(m: MotivoRechazo): string {
 let intakesActivos = 0;
 
 // Formatos de imagen del intake (clic / Ctrl+V / drop): un solo allowlist.
-const MIME_IMAGEN = /^image\/(jpeg|png|webp|bmp|gif)$/iu;
+const MIME_IMAGEN = /^image\/(?<ext>jpeg|png|webp|bmp|gif)$/iu;
 
 /** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
 let hojaPedida: number | null = null;
