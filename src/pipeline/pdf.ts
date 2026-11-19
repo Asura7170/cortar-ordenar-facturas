@@ -209,9 +209,9 @@ async function paginaUtil(
     if (esPaginaBlanca(lienzo) || esPaginaNegra(lienzo)) {
       return null;
     }
-    const blob = await new Promise<Blob | null>((res) =>
-      lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-    );
+    const blob = await new Promise<Blob | null>((res) => {
+      lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+    });
     return blob ? { indice: i, total, blob } : null;
   } catch {
     // ponytail: página mala no tumba a las hermanas

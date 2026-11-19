@@ -426,9 +426,9 @@ async function recortarBlobDe(foto: ImageBitmap, crear: typeof crearReal): Promi
     throw new Error("sin contexto 2d");
   }
   ctx.drawImage(foto, sx, sy, w, h, 0, 0, w, h);
-  const recortado = await new Promise<Blob | null>((res) =>
-    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-  );
+  const recortado = await new Promise<Blob | null>((res) => {
+    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+  });
   if (!recortado) {
     throw new Error("sin blob recortado");
   }

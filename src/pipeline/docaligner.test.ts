@@ -1121,7 +1121,9 @@ describe("descargarPesos", () => {
     };
     try {
       const p = descargarConCache("k", 30_000, 2);
-      await new Promise((res) => setTimeout(res, 10));
+      await new Promise((res) => {
+        setTimeout(res, 10);
+      });
       // fetch listo, put atascado
       expect(tienda.size).toBe(0);
       abrir();

@@ -52,9 +52,9 @@ async function blobGiradoDe(
   if (!lienzo) {
     throw new Error("sin contexto 2d");
   }
-  const girado = await new Promise<Blob | null>((res) =>
-    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-  );
+  const girado = await new Promise<Blob | null>((res) => {
+    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+  });
   if (!girado) {
     throw new Error("sin blob girado");
   }
@@ -181,7 +181,9 @@ export async function releerTrasEdicion(id: number, blob: Blob, deps?: DepsOcr):
 /** Espera a que la cola suelte el flag (tope 120s: el lote nunca queda huérfano). */
 async function esperarDrenaje(): Promise<void> {
   for (let i = 0; i < 480 && state.colaEnProceso; i += 1) {
-    await new Promise((res) => setTimeout(res, 250));
+    await new Promise((res) => {
+      setTimeout(res, 250);
+    });
   }
 }
 

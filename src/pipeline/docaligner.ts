@@ -648,9 +648,9 @@ export async function rectificar(
   ctx2.putImageData(new ImageData(fuera.datos, width, height), 0, 0);
   // ponytail: el warp deja cuñas blancas si el quad se salió de la foto; el mismo recorte las quita.
   const limpio = recortarMargenesBlancos(lienzo, crear);
-  const blob = await new Promise<Blob | null>((res) =>
-    limpio.toBlob(res, "image/webp", CALIDAD_WEBP),
-  );
+  const blob = await new Promise<Blob | null>((res) => {
+    limpio.toBlob(res, "image/webp", CALIDAD_WEBP);
+  });
   if (!blob) {
     throw new Error("rectificar: sin blob");
   }

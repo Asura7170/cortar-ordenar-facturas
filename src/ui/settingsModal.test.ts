@@ -85,7 +85,10 @@ describe("Restablecer", () => {
 });
 
 describe("Modelos", () => {
-  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+  const pausa = (): Promise<void> =>
+    new Promise((res) => {
+      setTimeout(res, 10);
+    });
 
   function conRed(tienda: Map<unknown, unknown>, fetchFn: ReturnType<typeof vi.fn>): () => void {
     const g = globalThis as Record<string, unknown>;
@@ -240,7 +243,10 @@ describe("Modelos", () => {
 });
 
 describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
-  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+  const pausa = (): Promise<void> =>
+    new Promise((res) => {
+      setTimeout(res, 10);
+    });
 
   beforeEach(() => {
     iaFalsa.sesion.mockReset();
@@ -278,7 +284,11 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
   it("fieldset ocupado: Borrar/Descargar/2º Probar quedan excluidos hasta que vuela", async () => {
     let suelta: (v: unknown) => void = () => {};
     iaFalsa.sesion.mockResolvedValue({});
-    iaFalsa.nucleo.mockReturnValue(new Promise((r) => (suelta = r)));
+    iaFalsa.nucleo.mockReturnValue(
+      new Promise((r) => {
+        suelta = r;
+      }),
+    );
     btnAjustes.click();
     await pausa();
     btnProbarIa.click();

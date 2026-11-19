@@ -130,9 +130,9 @@ async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, lienzo.width, lienzo.height);
     ctx.drawImage(bmp, 0, 0);
-    const jpg = await new Promise<Blob | null>((res) =>
-      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
-    );
+    const jpg = await new Promise<Blob | null>((res) => {
+      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG);
+    });
     if (!jpg) {
       throw new Error("sin blob jpeg");
     }

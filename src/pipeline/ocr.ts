@@ -371,9 +371,9 @@ export async function girarBlob(
       if (!lienzo) {
         return null;
       }
-      return await new Promise<Blob | null>((res) =>
-        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-      );
+      return await new Promise<Blob | null>((res) => {
+        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+      });
     } finally {
       bmp.close();
     }

@@ -62,7 +62,9 @@ async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
     if (Date.now() - t0 > ms) {
       throw new Error("timeout esperando condición");
     }
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
   }
 }
 
@@ -86,7 +88,9 @@ function boton(accion: string): HTMLButtonElement {
 /** Espera a que el import dinámico (clic → abrirRecorte) termine. */
 async function vaciar(): Promise<void> {
   for (let i = 0; i < 10; i += 1) {
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => {
+      setTimeout(r, 0);
+    });
   }
 }
 
@@ -1000,12 +1004,16 @@ describe("drop de archivos sobre hojas", () => {
       // y > bottom−70 → scroll hacia abajo
       borde(790);
       // paso corre en rAF reales
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => {
+        setTimeout(r, 60);
+      });
       expect(scrollBy).toHaveBeenCalledWith({ top: 14 });
       // zona muerta → detenerScroll
       borde(400);
       const n = scrollBy.mock.calls.length;
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => {
+        setTimeout(r, 60);
+      });
       expect(scrollBy.mock.calls).toHaveLength(n);
     } finally {
       rect.mockRestore();
@@ -1135,7 +1143,9 @@ describe("lupa", () => {
         clientY: 200,
       }),
     );
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => {
+      setTimeout(r, 50);
+    });
     expect(el("lupa").style.transform).toBe("translate(100px, 100px)");
     el<HTMLButtonElement>("btnLupa").click();
   });

@@ -441,9 +441,9 @@ export async function normalizarImagen(
     if (directo && escala === 1 && recortado === lienzo) {
       return f;
     }
-    const blob = await new Promise<Blob | null>((res) =>
-      recortado.toBlob(res, "image/webp", CALIDAD_WEBP),
-    );
+    const blob = await new Promise<Blob | null>((res) => {
+      recortado.toBlob(res, "image/webp", CALIDAD_WEBP);
+    });
     if (!blob) {
       throw new Error("ilegible");
     }

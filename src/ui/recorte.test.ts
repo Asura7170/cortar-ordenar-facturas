@@ -88,7 +88,9 @@ function sembrar(): ReturnType<typeof comprobante> {
 /** Espera a que los handlers void (click → confirmar) terminen. */
 async function vaciar(): Promise<void> {
   for (let i = 0; i < 10; i += 1) {
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => {
+      setTimeout(r, 0);
+    });
   }
 }
 

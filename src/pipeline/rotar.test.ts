@@ -119,7 +119,9 @@ describe("girarYReleer", () => {
     vi.mocked(extraerTexto).mockImplementation(async (b: Blob) => {
       const tag = b === blobA ? "A" : "B";
       eventos.push(`${tag}-ini`);
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => {
+        setTimeout(r, 10);
+      });
       eventos.push(`${tag}-fin`);
       return "LEÍDO";
     });
@@ -450,11 +452,15 @@ describe("girarYReleer", () => {
       }
       document.getElementById("btnRecorteOk")?.click();
       // confirmar entero (C gana píxeles)
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise((r) => {
+        setTimeout(r, 200);
+      });
       await expect((c.file as Blob).text()).resolves.toBe("recorte");
       soltarPrevio?.(bmpGiro as unknown as ImageBitmap);
       await pg;
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => {
+        setTimeout(r, 100);
+      });
       // el timer del giro no fuga al resto
       cancelarRelecturaProgramada(c.id);
       // El giro terminó último: todo G ("girado" 6B), nada de C ("recorte" 7B).

@@ -51,7 +51,9 @@ async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
     if (Date.now() - t0 > ms) {
       throw new Error("timeout esperando rAF");
     }
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
   }
 }
 
