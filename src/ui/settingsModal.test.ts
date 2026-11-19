@@ -107,7 +107,7 @@ describe("Modelos", () => {
           return tienda.get(url) ?? undefined;
         },
         put: async (k: unknown, v: unknown): Promise<void> => {
-          const cuerpo = (v as { cuerpo?: ArrayBuffer }).cuerpo;
+          const { cuerpo } = v as { cuerpo?: ArrayBuffer };
           tienda.set(k, {
             arrayBuffer: async () => bytes,
             headers: { get: () => String(cuerpo?.byteLength ?? 0) },

@@ -158,7 +158,7 @@ export async function expandirPdf(
   try {
     if (!admiteTamanoPdf(f)) return utiles;
     doc = await abrir(f);
-    const total = doc.total;
+    const { total } = doc;
     if (total < 1 || total > PDF_MAX_PAGINAS) return utiles;
     // ponytail: secuencial a propósito; N renders en paralelo saturan memoria.
     for (let i = 1; i <= total; i++) {

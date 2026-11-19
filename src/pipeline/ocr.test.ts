@@ -623,7 +623,7 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         llamadas.push(formas);
         if ((formas[0] ?? 0) > 1) return Promise.reject(new Error("sin batch"));
         return Promise.resolve({ fetch_name_0: logitsAA() });
@@ -650,7 +650,7 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         llamadas.push(formas);
         n += 1;
         if (n === 2) return Promise.reject(new Error("chunk caído"));
@@ -691,7 +691,7 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         formasRun.push(formas);
         const b = formas[0] ?? 0;
         const data = new Float32Array(b * 3 * n);

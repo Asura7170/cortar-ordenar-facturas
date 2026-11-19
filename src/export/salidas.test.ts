@@ -321,7 +321,7 @@ describe("construirDocumento (docx mockeado)", () => {
       expect(imgs).toHaveLength(1);
       const img = imgs[0];
       if (!img) throw new Error("imagen ausente");
-      const data = (img.opc as { data: ArrayBuffer }).data;
+      const { data } = img.opc as { data: ArrayBuffer };
       const bytes = new Uint8Array(data).slice(0, 3);
       expect(bytes).toStrictEqual(new Uint8Array([0xff, 0xd8, 0xff]));
       expect(toBlob).toHaveBeenCalledWith(expect.any(Function), "image/jpeg", expect.any(Number));
