@@ -224,4 +224,4 @@ Oxlint + Oxfmt will catch most mechanical issues automatically. Focus your atten
 
 ---
 
-En este repo el formato lo aplica `vp check --fix`; no corras `ultracite fix` a ciegas: sus autofixes de lint rompieron tipos y tests (ver `oxlint.config.mts`). El gate es `vp check`; `pnpm check` mide la deuda del preset.
+En este repo el formato lo aplica `vp check --fix`; no corras `ultracite fix` a ciegas: sus autofixes de lint rompieron tipos y tests (ver `oxlint.config.mts`). `vp check` es el gate de formato+tipos y `pnpm check` también es gate: el CI corre ambos en el job requerido.
