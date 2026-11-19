@@ -20,7 +20,7 @@ const HAY: boolean = fs.existsSync(DIR);
 // No es código muerto: lo usa pdfjs-dist internamente al abrir documentos.
 const proto = Uint8Array.prototype as unknown as Record<string, unknown>;
 if (typeof proto["toHex"] !== "function") {
-  proto["toHex"] = function (this: Uint8Array): string {
+  proto["toHex"] = function toHex(this: Uint8Array): string {
     return Array.from(this, (b) => b.toString(16).padStart(2, "0")).join("");
   };
 }

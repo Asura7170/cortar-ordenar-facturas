@@ -307,12 +307,11 @@ describe("construirDocumento (docx mockeado)", () => {
       fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
       drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
     } as unknown as CanvasRenderingContext2D);
-    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
-      this: HTMLCanvasElement,
-      cb: BlobCallback,
-    ): void {
-      cb(new Blob([jpg], { type: "image/jpeg" }));
-    });
+    const toBlob = vi
+      .spyOn(HTMLCanvasElement.prototype, "toBlob")
+      .mockImplementation(function toBlob(this: HTMLCanvasElement, cb: BlobCallback): void {
+        cb(new Blob([jpg], { type: "image/jpeg" }));
+      });
     try {
       const h = crearHoja();
       h.slots[0] = comprobante({ file: new Blob(["webp"], { type: "image/webp" }) });

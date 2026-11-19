@@ -1058,7 +1058,7 @@ describe("editor: filas de borde, teclado y extremos del commit", () => {
 
   it("sin crear en deps usa el lienzo real y avisa sin commitear", async () => {
     // Los lienzos del fixture tienen id; el creado por crearReal, no.
-    const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
+    const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function ctx(
       this: HTMLCanvasElement,
     ) {
       return (this.id ? ctxFalso() : null) as unknown as CanvasRenderingContext2D;

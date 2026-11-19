@@ -1481,25 +1481,25 @@ describe("drag entre celdas (swap)", () => {
       configurable: true,
       writable: true,
     });
-    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
-      this: Element,
-    ) {
-      const cells = [...document.querySelectorAll(".cell")];
-      const host = this.closest?.(".cell") ?? this;
-      const i = cells.indexOf(host as Element);
-      const left = i === -1 ? 0 : i * 120;
-      return {
-        left,
-        top: 0,
-        width: 100,
-        height: 100,
-        right: left + 100,
-        bottom: 100,
-        x: left,
-        y: 0,
-        toJSON: () => ({}),
-      } as DOMRect;
-    });
+    const rect = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockImplementation(function rect(this: Element) {
+        const cells = [...document.querySelectorAll(".cell")];
+        const host = this.closest?.(".cell") ?? this;
+        const i = cells.indexOf(host as Element);
+        const left = i === -1 ? 0 : i * 120;
+        return {
+          left,
+          top: 0,
+          width: 100,
+          height: 100,
+          right: left + 100,
+          bottom: 100,
+          x: left,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
     return () => {
       rect.mockRestore();
       delete (Element.prototype as unknown as Record<string, unknown>)["animate"];

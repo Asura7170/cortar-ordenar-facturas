@@ -39,10 +39,13 @@ Object.defineProperty(navigator, "clipboard", {
 });
 
 // jsdom no implementa <dialog> modal: emula open/returnValue + evento close.
-HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement): void {
+HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
   this.setAttribute("open", "");
 };
-HTMLDialogElement.prototype.close = function (this: HTMLDialogElement, returnValue?: string): void {
+HTMLDialogElement.prototype.close = function close(
+  this: HTMLDialogElement,
+  returnValue?: string,
+): void {
   if (returnValue !== undefined) this.returnValue = returnValue;
   this.removeAttribute("open");
   this.dispatchEvent(new Event("close"));
