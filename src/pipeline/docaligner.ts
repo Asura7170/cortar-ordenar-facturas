@@ -91,7 +91,7 @@ export function ordenarQuad(puntos: readonly Punto[]): Quad {
   const [a, b, c, d] = cuatroPuntosDe(puntos);
   const cx = (a.x + b.x + c.x + d.x) / 4;
   const cy = (a.y + b.y + c.y + d.y) / 4;
-  const orden = [a, b, c, d].sort(
+  const orden = [a, b, c, d].toSorted(
     (p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx),
   );
   const inicio = inicioSupIzquierda(orden);
@@ -687,7 +687,9 @@ export function reactivarIa(): void {
 export function conTimeout<T>(promesa: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resuelve, rechaza) => {
     const id = setTimeout(() => rechaza(new Error(`timeout tras ${ms}ms`)), ms);
+    // oxlint-disable-next-line promise/catch-or-return, promise/prefer-catch -- .then(onFul, onRej) cubre ambos caminos sin tragar rechazos
     promesa.then(
+      // oxlint-disable-next-line promise/always-return -- los handlers resuelven o rechazan; no devuelven valor
       (v) => {
         clearTimeout(id);
         resuelve(v);
@@ -867,6 +869,7 @@ export async function tamanoModelos(): Promise<number> {
 
 /** Borra los modelos descargados (recorte + OCR); true si había algo. Propaga
     el fallo: "no se pudo borrar" es mentible en Ajustes, nunca tragado. */
+// oxlint-disable-next-line eslint/require-await -- conserva async: un throw síncrono de caches.delete llega como rechazo
 export async function borrarModelos(): Promise<boolean> {
   if (typeof caches === "undefined") return false;
   return caches.delete("modelos");

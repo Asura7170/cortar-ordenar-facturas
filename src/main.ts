@@ -6,8 +6,7 @@ import { initGithub } from "./ui/github";
 import { initOcrMode, renderOcrToggle } from "./ui/ocrMode";
 import { initRecorte } from "./ui/recorte";
 import { initSettings } from "./ui/settingsModal";
-import { initSheets } from "./ui/sheets";
-import { renderHojas } from "./ui/sheets";
+import { initSheets, renderHojas } from "./ui/sheets";
 import {
   agregarArchivos,
   elegirArchivos,

@@ -95,33 +95,35 @@ export function initSettings(): void {
   btnDescargarModelos.addEventListener("click", () => {
     if (!ocuparModelos()) return;
     estadoModelos.textContent = "Modelos: descargando…";
-    void Promise.all([descargarPesos(), descargarPesosOcr()])
-      .then(
-        () => pintarModelos(),
-        (e: unknown) => {
-          console.warn("modelos:", e);
-          estadoModelos.textContent =
-            "Modelos: no se pudo descargar: falta espacio o conexión. Probá de nuevo";
-        },
-      )
-      .finally(() => soltarModelos());
+    void (async (): Promise<void> => {
+      try {
+        await Promise.all([descargarPesos(), descargarPesosOcr()]);
+        await pintarModelos();
+      } catch (error: unknown) {
+        console.warn("modelos:", error);
+        estadoModelos.textContent =
+          "Modelos: no se pudo descargar: falta espacio o conexión. Probá de nuevo";
+      } finally {
+        soltarModelos();
+      }
+    })();
   });
   btnBorrarModelos.addEventListener("click", () => {
     if (!ocuparModelos()) return;
-    void borrarModelos()
-      .then(
-        (habia) => {
-          estadoModelos.textContent = habia
-            ? "Modelos: borrados (se descargan de nuevo al usarse)"
-            : "Modelos: no había nada descargado";
-        },
-        (e: unknown) => {
-          console.warn("modelos:", e);
-          estadoModelos.textContent =
-            "Modelos: no se pudo borrar: hay algo bloqueando el almacenamiento. Probá de nuevo";
-        },
-      )
-      .finally(() => soltarModelos());
+    void (async (): Promise<void> => {
+      try {
+        const habia = await borrarModelos();
+        estadoModelos.textContent = habia
+          ? "Modelos: borrados (se descargan de nuevo al usarse)"
+          : "Modelos: no había nada descargado";
+      } catch (error: unknown) {
+        console.warn("modelos:", error);
+        estadoModelos.textContent =
+          "Modelos: no se pudo borrar: hay algo bloqueando el almacenamiento. Probá de nuevo";
+      } finally {
+        soltarModelos();
+      }
+    })();
   });
   formAjustes.addEventListener("submit", () => {
     state.moneda = isMoneda(cfgMoneda.value) ? cfgMoneda.value : MONEDA_DEFAULT;
