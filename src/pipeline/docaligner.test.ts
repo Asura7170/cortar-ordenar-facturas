@@ -941,7 +941,7 @@ describe("descargarPesos", () => {
     g["fetch"] = redOk();
     g["caches"] = {
       open: async (): Promise<unknown> => ({
-        match: async () => undefined,
+        match: async () => {},
         put: async (): Promise<void> => {
           throw new Error("quota");
         },
@@ -1112,7 +1112,7 @@ describe("descargarPesos", () => {
     g["fetch"] = redOk();
     g["caches"] = {
       open: async (): Promise<unknown> => ({
-        match: async () => undefined,
+        match: async () => {},
         put: async (k: unknown): Promise<void> => {
           await puerta;
           tienda.set(k, { arrayBuffer: async () => BYTES });
