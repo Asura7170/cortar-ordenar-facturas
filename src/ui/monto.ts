@@ -187,7 +187,7 @@ export function desplazamiento(base: number, k: number, cell: number): number {
 export function celdaDesdeMatriz(matrix: string, base: number, cell: number): number | null {
   const m = /matrix\(([^)]*)\)/.exec(matrix);
   if (m === null || !Number.isFinite(cell) || cell <= 0) return null;
-  const y = parseFloat((m[1] ?? "").split(",").at(-1) ?? "");
+  const y = Number.parseFloat((m[1] ?? "").split(",").at(-1) ?? "");
   return Number.isFinite(y) ? base + Math.round(-y / cell) : null;
 }
 

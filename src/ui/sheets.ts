@@ -491,7 +491,7 @@ function borradorEnEdicion(): BorradorMonto | null {
   const a = document.activeElement;
   if (!(a instanceof HTMLInputElement) || a.dataset["accion"] !== "monto") return null;
   const cell = a.closest(".cell");
-  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
   if (!Number.isInteger(id)) return null;
   return {
     id,
@@ -514,7 +514,7 @@ function borradoresVisibles(): Map<number, BorradorSucio> {
   sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto").forEach((input) => {
     if (input === a || input.value === "") return;
     const cell = input.closest(".cell");
-    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
     if (Number.isInteger(id)) {
       sucios.set(id, {
         valor: input.value,
@@ -568,7 +568,7 @@ function textoEditable(cents: Cents): string {
 /** Valida y guarda el input (change o Enter). Id del comprobante o null si no hubo monto. */
 function commitearMonto(input: HTMLInputElement, reenfocar = false): number | null {
   const cell = input.closest(".cell");
-  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
   const item = obtenerComprobante(id);
   if (!item) return null;
   const cents = parsearMonto(input.value);
@@ -1413,7 +1413,7 @@ function cablearAcciones(): void {
     const btn = e.target.closest("[data-accion]");
     if (!(btn instanceof HTMLElement)) return;
     const cell = btn.closest(".cell");
-    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
     // ponytail: el selector garantiza data-accion presente; una acción fuera de
     // la tabla no existe hoy (el lookup undefined es guard, no flujo).
     const fn = ACCIONES_CLIC[btn.dataset["accion"] as string];
@@ -1462,7 +1462,7 @@ function cablearMontoTeclado(): void {
     const target = e.target as HTMLElement | null;
     if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") return;
     const cell = target.closest(".cell");
-    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
     if (!Number.isInteger(id)) return;
     if (e.key === "Enter") {
       e.preventDefault();

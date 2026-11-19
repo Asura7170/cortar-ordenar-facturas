@@ -343,7 +343,7 @@ describe("vistaSegura", () => {
     expect(vistaSegura(720, 1000)).toBe(true);
     expect(vistaSegura(1, 1000)).toBe(true); // base angosta pero real; el escalado la filtra
     expect(vistaSegura(720, 720_000)).toBe(false); // 518M px colgaría la pestaña
-    expect(vistaSegura(NaN, 100)).toBe(false);
+    expect(vistaSegura(Number.NaN, 100)).toBe(false);
     expect(vistaSegura(0, 100)).toBe(false);
   });
 });
