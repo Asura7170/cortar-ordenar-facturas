@@ -164,7 +164,7 @@ function crearColocacion(destino: number | null): (items: Comprobante[]) => void
   // Commit incremental: cada archivo se pinta antes del siguiente. Los gaps
   // async del decode/encode le dan al navegador ventanas de paint con DOM ya
   // comprometido (antes solo había un render al final del lote: freeze).
-  let hoja: Hoja | undefined = destino != null ? hojaPorId(destino) : undefined;
+  let hoja: Hoja | undefined = destino == null ? undefined : hojaPorId(destino);
   let colocados = 0;
   let ultimoRender = 0;
   return (items: Comprobante[]): void => {

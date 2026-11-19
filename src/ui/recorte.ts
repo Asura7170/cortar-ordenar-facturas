@@ -542,7 +542,14 @@ function cablearPunteroAbajo(): void {
     const p = punto(e);
     const b = bordeEn(p);
     e.preventDefault();
-    if (!b) {
+    if (b) {
+      borde = b;
+      activo = Math.max(
+        0,
+        TIRADORES.findIndex((t) => t.b === b),
+      );
+      enArrastre = true;
+    } else {
       // Interior sin borde cerca: se mueve el área completa.
       if (!dentroDe(p)) {
         return;
@@ -550,13 +557,6 @@ function cablearPunteroAbajo(): void {
       moviendoEntero = true;
       agarreX = p.x - rect.x;
       agarreY = p.y - rect.y;
-    } else {
-      borde = b;
-      activo = Math.max(
-        0,
-        TIRADORES.findIndex((t) => t.b === b),
-      );
-      enArrastre = true;
     }
     try {
       guia.setPointerCapture(e.pointerId);

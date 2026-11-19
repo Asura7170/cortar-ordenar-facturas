@@ -82,15 +82,15 @@ async function faseRecorte(sig: Comprobante): Promise<void> {
       // ponytail: commit tras el await — si se limpió durante la espera, se
       // revocan las nuevas y el guard de abajo evita resucitar.
       const imgNueva = URL.createObjectURL(recortada);
-      if (!buscarSlot(sig.id)) {
-        URL.revokeObjectURL(imgNueva);
-      } else {
+      if (buscarSlot(sig.id)) {
         URL.revokeObjectURL(sig.imgUrl);
         sig.imgUrl = imgNueva;
         // ponytail: el intake pre-warp se conserva para el recorte manual
         // (recuperar lo cortado de más); sin object URL, el GC lo recoge.
         sig.previoDocAligner = original;
         sig.file = recortada;
+      } else {
+        URL.revokeObjectURL(imgNueva);
       }
     }
   } catch {
@@ -123,24 +123,24 @@ async function faseEnderezar(
       if (end.grados !== 0 && buscarSlot(sig.id)) {
         // ponytail: commit tras el await (igual que el recorte: sin dueño no se guarda).
         const imgNueva = URL.createObjectURL(end.blob);
-        if (!buscarSlot(sig.id)) {
-          URL.revokeObjectURL(imgNueva);
-        } else {
+        if (buscarSlot(sig.id)) {
           URL.revokeObjectURL(sig.imgUrl);
           sig.imgUrl = imgNueva;
           const previoGirado = await girarPrevio(sig, ocr, end.grados);
           // ponytail: re-chequeo tras el await (limpiado en la ventana:
           // se revoca lo nuevo, no se muta el sig huérfano).
-          if (!buscarSlot(sig.id)) {
-            URL.revokeObjectURL(imgNueva);
-          } else {
+          if (buscarSlot(sig.id)) {
             if (previoGirado) {
               sig.previoDocAligner = previoGirado;
             }
             // ponytail: si el giro del previo falló, se conserva el viejo (fallo
             // transitorio no destruye la fuente de recuperación del sobre-recorte).
             sig.file = end.blob;
+          } else {
+            URL.revokeObjectURL(imgNueva);
           }
+        } else {
+          URL.revokeObjectURL(imgNueva);
         }
       }
     }
