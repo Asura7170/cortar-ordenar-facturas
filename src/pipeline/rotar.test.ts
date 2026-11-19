@@ -284,7 +284,7 @@ describe("girarYReleer", () => {
 
   it("giro huérfano revoca el imgUrl nuevo (sin fuga)", async () => {
     const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const crearUrl = vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:nuevo");
+    const crearUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:nuevo");
     try {
       let soltar: ((b: ImageBitmap) => void) | undefined;
       const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
