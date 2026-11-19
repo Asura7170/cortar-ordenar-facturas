@@ -405,14 +405,14 @@ describe("descargarWord", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     await descargarWord();
-    expect(click).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledOnce();
     const a = click.mock.instances[0] as HTMLAnchorElement;
     expect(a.download).toBe("sincodigo-comprobante.docx");
     expect(a.href).toContain("blob:mock-");
     vi.advanceTimersByTime(2000);
     expect(revoke).not.toHaveBeenCalled();
     vi.advanceTimersByTime(28_000);
-    expect(revoke).toHaveBeenCalledTimes(1);
+    expect(revoke).toHaveBeenCalledOnce();
   });
 
   it("fallo de generación: avisa y no descarga", async () => {
@@ -437,7 +437,7 @@ describe("initExport", () => {
     initExport();
     document.getElementById("btnWord")?.click();
     // descargarWord es async (mide + empaca): el clic del anchor llega después.
-    await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledOnce());
   });
 
   it("idempotente: recablear no duplica el print", async () => {
@@ -450,7 +450,7 @@ describe("initExport", () => {
       initExport();
       initExport();
       document.getElementById("btnImprimir")?.click();
-      await vi.waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(print).toHaveBeenCalledOnce());
     } finally {
       vi.unstubAllGlobals();
       window.dispatchEvent(new Event("afterprint"));

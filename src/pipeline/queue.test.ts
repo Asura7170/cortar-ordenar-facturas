@@ -381,8 +381,8 @@ describe("precalentarModelos", () => {
       // El warmup avanzó hasta el núcleo (sesiones falsas, sin onnx).
       const { obtenerSesion } = await import("./docaligner");
       const { obtenerNucleo } = await import("./ocr");
-      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledOnce();
+      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledOnce();
     } finally {
       if (previa !== undefined) w["requestIdleCallback"] = previa;
     }
@@ -403,9 +403,9 @@ describe("precalentarModelos", () => {
       await vi.advanceTimersByTimeAsync(100);
       const { obtenerSesion } = await import("./docaligner");
       const { obtenerNucleo } = await import("./ocr");
-      expect(ocioso).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledTimes(1);
+      expect(ocioso).toHaveBeenCalledOnce();
+      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledOnce();
+      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledOnce();
     } finally {
       if (previa === undefined) delete w["requestIdleCallback"];
       else w["requestIdleCallback"] = previa;

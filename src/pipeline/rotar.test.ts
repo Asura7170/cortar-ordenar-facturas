@@ -93,9 +93,9 @@ describe("girarYReleer", () => {
     expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.textoOcr).toBe("TOTAL LEÍDO");
-    expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
     expect(c.montoCents).toBeNull(); // el lote lo relee (mock: queda manual)
-    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
     // giro + procesando + ok + reapertura (el null se pinta aunque el lote sea no-op)
     expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(4);
   });
@@ -147,8 +147,8 @@ describe("girarYReleer", () => {
       state.colaEnProceso = false;
       await vi.advanceTimersByTimeAsync(1000);
       await p;
-      expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
+      expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
       expect(c.estado).toBe("ok");
     } finally {
       state.colaEnProceso = false;
@@ -195,8 +195,8 @@ describe("girarYReleer", () => {
     expect(c.textoOcr).toBe("VIEJO");
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.textoOcr).toBe("TOTAL LEÍDO");
-    expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
   });
 
   it("giros separados por la quietud: un OCR por giro", async () => {

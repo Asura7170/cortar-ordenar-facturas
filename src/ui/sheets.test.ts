@@ -402,7 +402,7 @@ describe("celdas", () => {
       expect(spy).not.toHaveBeenCalled();
       state.loteEnCurso = false;
       renderHojas();
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledOnce();
     } finally {
       state.loteEnCurso = false;
       if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
@@ -1728,7 +1728,7 @@ describe("pegar con clic en vacía", () => {
     const btn = botonPegar();
     btn.click();
     btn.click();
-    expect(pegarEnCelda).toHaveBeenCalledTimes(1);
+    expect(pegarEnCelda).toHaveBeenCalledOnce();
     soltar();
     await Promise.resolve();
     btn.click();

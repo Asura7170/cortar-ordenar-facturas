@@ -253,7 +253,7 @@ describe("extraerPendientes", () => {
     extraerPendientes();
     expect(c1.montoCents).toBe(1250);
     expect(c2.montoCents).toBe(700);
-    expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(renderHojas)).toHaveBeenCalledOnce();
     expect(aviso.textContent).toBe("Local: 2/2 totales.");
   });
 

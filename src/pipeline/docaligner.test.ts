@@ -794,9 +794,9 @@ describe("descargarPesos", () => {
     const restaurar = conRed(tienda, fetchFn);
     try {
       await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
       await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       restaurar();
     }
@@ -810,7 +810,7 @@ describe("descargarPesos", () => {
     g["fetch"] = fetchFn;
     try {
       await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       g["fetch"] = real.fetch;
       if (real.caches !== undefined) g["caches"] = real.caches;
@@ -884,7 +884,7 @@ describe("descargarPesos", () => {
       // Enfriamiento: el reintento inmediato no va a red (la cola de fotos no
       // se estaca 300s por foto sin el backoff).
       await expect(descargarPesos()).rejects.toThrow("recién falló");
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
       reactivarIa(); // como el botón "Probar IA": suelta el enfriamiento
       await expect(descargarPesos()).rejects.toThrow("corrupto");
       expect(fetchFn).toHaveBeenCalledTimes(2);
@@ -904,7 +904,7 @@ describe("descargarPesos", () => {
       ]);
       expect(a).toBe(BYTES);
       expect(b).toBe(a);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       restaurar();
     }
@@ -1027,7 +1027,7 @@ describe("descargarPesos", () => {
     };
     try {
       await expect(descargarConCache("k", 30_000, 2)).resolves.toBe(BYTES);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
       await expect(tamanoModelos()).resolves.toBe(0);
       await expect(borrarModelos()).resolves.toBe(false);
     } finally {
@@ -1052,14 +1052,14 @@ describe("descargarPesos", () => {
     try {
       const r = await descargarConCache("k", 30_000, 50_000_000);
       expect(r).toBe(grande);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
       // el put falso guarda 3B: se siembra la buena a mano y el hit ya no refetchea.
       tienda.set(claveCache("k"), {
         arrayBuffer: async () => grande,
         headers: { get: () => "60000000" },
       });
       await expect(descargarConCache("k", 30_000, 50_000_000)).resolves.toBe(grande);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       restaurar();
     }
