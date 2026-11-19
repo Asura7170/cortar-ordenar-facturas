@@ -97,7 +97,7 @@ function tituloDeMotivo(m: MotivoRechazo): string {
 let intakesActivos = 0;
 
 // Formatos de imagen del intake (clic / Ctrl+V / drop): un solo allowlist.
-const MIME_IMAGEN = /^image\/(jpeg|png|webp|bmp|gif)$/i;
+const MIME_IMAGEN = /^image\/(jpeg|png|webp|bmp|gif)$/iu;
 
 /** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
 let hojaPedida: number | null = null;
@@ -217,7 +217,7 @@ async function paginasUtiles(f: File, avisos: AvisoRechazo[]): Promise<Comproban
     });
     return null;
   }
-  const base = sanear(f.name).replace(/\.pdf$/i, "");
+  const base = sanear(f.name).replace(/\.pdf$/iu, "");
   return pags.map((p) => {
     const url = URL.createObjectURL(p.blob);
     return {
@@ -695,7 +695,7 @@ function cablearSwitchCodigo(): void {
     renderCodigo();
   });
   inputCodigo.addEventListener("input", () => {
-    state.codigoValor = inputCodigo.value.replaceAll(/\D/g, "");
+    state.codigoValor = inputCodigo.value.replaceAll(/\D/gu, "");
     inputCodigo.value = state.codigoValor;
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
     inputCodigo.classList.remove("codigo-error", "sacudir");

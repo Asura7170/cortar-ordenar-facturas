@@ -47,7 +47,7 @@ export function codigoValido(): boolean {
   if (!state.codigoActivo) {
     return true;
   }
-  return /^\d+$/.test(state.codigoValor);
+  return /^\d+$/u.test(state.codigoValor);
 }
 
 export function nombreArchivo(ext = "docx"): string {
@@ -387,7 +387,7 @@ async function imprimirZona(conTitulo: boolean): Promise<void> {
     await esperarImagenes();
     // ponytail: título DESPUÉS del await: un 2.º clic nunca captura el temporal.
     if (conTitulo) {
-      document.title = nombreArchivo("pdf").replace(/\.pdf$/, "");
+      document.title = nombreArchivo("pdf").replace(/\.pdf$/u, "");
     }
     let listo = false;
     const limpiar = (): void => {

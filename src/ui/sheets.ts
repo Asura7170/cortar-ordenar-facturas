@@ -871,7 +871,7 @@ function fondoBajoPunto(x: number, y: number): string {
   let el = document.elementFromPoint(x, y);
   while (el && el !== document.documentElement) {
     const bg = getComputedStyle(el).backgroundColor;
-    if (bg && !/^rgba\(0,\s*0,\s*0,\s*0\)$/.test(bg)) {
+    if (bg && !/^rgba\(0,\s*0,\s*0,\s*0\)$/u.test(bg)) {
       return bg;
     }
     el = el.parentElement;

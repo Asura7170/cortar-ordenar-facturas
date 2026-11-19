@@ -5,7 +5,7 @@ import { VERSION_ORT, rutaWasmOrt } from "./ortWasm";
 
 describe("rutaWasmOrt", () => {
   test("PROD al CDN pineado con trailing /, dev al local", () => {
-    expect(VERSION_ORT).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(VERSION_ORT).toMatch(/^\d+\.\d+\.\d+$/u);
     expect(rutaWasmOrt(true, "/")).toBe(
       `https://cdn.jsdelivr.net/npm/onnxruntime-web@${VERSION_ORT}/dist/`,
     );

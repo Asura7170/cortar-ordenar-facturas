@@ -222,5 +222,5 @@ export function avisar(texto: string): void {
     "Failed to fetch dynamically imported module: <url>" y viejo
     "Importing a module script failed". */
 export function esImportDinamicoMuerto(mensaje: string): boolean {
-  return /dynamically imported|importing a module|dynamic import/i.test(mensaje);
+  return /dynamically imported|importing a module|dynamic import/iu.test(mensaje);
 }
