@@ -5,9 +5,9 @@ import { montarFixture, el } from "../test/fixture";
 
 // Sesiones IA falsas: el toque real necesita GPU/wasm; el modal solo reporta.
 const iaFalsa = vi.hoisted(() => ({
-  sesion: vi.fn(),
-  nucleo: vi.fn(),
-  reactiva: vi.fn(),
+  sesion: vi.fn<() => Promise<unknown>>(),
+  nucleo: vi.fn<() => Promise<unknown>>(),
+  reactiva: vi.fn<() => void>(),
 }));
 vi.mock("../pipeline/docaligner", async (importOriginal) => {
   const real = await importOriginal<typeof import("../pipeline/docaligner")>();
@@ -146,7 +146,7 @@ describe("Modelos", () => {
   it("descargar pinta el tamaño y borrar lo vacía", async () => {
     const tienda = new Map<unknown, unknown>();
     const grande = new ArrayBuffer(60_000_000);
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,
       arrayBuffer: async () => grande,
@@ -171,7 +171,7 @@ describe("Modelos", () => {
 
   it("descarga fallida muestra el motivo fijo y libera los botones", async () => {
     const tienda = new Map<unknown, unknown>();
-    const fetchFn = vi.fn(async () => {
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => {
       throw new Error("red caída");
     });
     const restaurar = conRed(tienda, fetchFn);

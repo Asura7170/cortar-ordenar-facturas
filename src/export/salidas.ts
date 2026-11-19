@@ -48,7 +48,7 @@ export function codigoValido(): boolean {
   return /^\d+$/.test(state.codigoValor);
 }
 
-export function nombreArchivo(ext: string = "docx"): string {
+export function nombreArchivo(ext = "docx"): string {
   const cod = state.codigoActivo ? state.codigoValor : "sincodigo";
   return `${cod}-comprobante.${ext}`;
 }

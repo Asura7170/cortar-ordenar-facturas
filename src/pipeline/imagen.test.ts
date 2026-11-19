@@ -24,7 +24,7 @@ import {
 import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 function bitmapFalso(w: number, h: number): ImageBitmap {
-  return { width: w, height: h, close: vi.fn() } as unknown as ImageBitmap;
+  return { width: w, height: h, close: vi.fn<() => void>() } as unknown as ImageBitmap;
 }
 
 // Lienzo falso: píxeles dados, captura tipo/calidad del toBlob.

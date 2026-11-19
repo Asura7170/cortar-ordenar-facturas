@@ -6,13 +6,13 @@
    offset del unclip es exacto para quads convexos. */
 
 /** Umbral de binarizado del mapa (PostProcess.thresh del inference.yml). */
-export const DB_UMBRAL_BIN: number = 0.2;
+export const DB_UMBRAL_BIN = 0.2;
 /** Puntaje mínimo de caja (PostProcess.box_thresh del inference.yml). */
-export const DB_UMBRAL_CAJA: number = 0.45;
+export const DB_UMBRAL_CAJA = 0.45;
 /** Tope de componentes (PostProcess.max_candidates del inference.yml). */
-export const DB_MAX_CAJAS: number = 3000;
+export const DB_MAX_CAJAS = 3000;
 /** Expansión del unclip (PostProcess.unclip_ratio del inference.yml). */
-export const DB_UNCLIP: number = 1.4;
+export const DB_UNCLIP = 1.4;
 /** Área mínima en px de entrada (guarda degenerados; Python los conserva). */
 const AREA_MINIMA_CAJA = 4;
 

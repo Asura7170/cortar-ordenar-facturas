@@ -6,7 +6,7 @@ import type { SesionDetectora } from "./docaligner";
 import type { NucleoOcr } from "./ocr";
 
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
-vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
+vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn<() => void>() }));
 // El re-chequeo del drenado sale de este módulo: stub (cada test lo ajusta);
 // aplicarTotales se envuelve con vi.fn(implementación real): la rama rápida
 // la usa y los tests pueden envenenar una llamada (fail-path del drenaje).
@@ -14,8 +14,8 @@ vi.mock("./extract", async (importOriginal) => {
   const real = await importOriginal<typeof import("./extract")>();
   return {
     ...real,
-    extraerPendientes: vi.fn((): void => {}),
-    aplicarTotales: vi.fn(real.aplicarTotales),
+    extraerPendientes: vi.fn<typeof real.extraerPendientes>((): void => {}),
+    aplicarTotales: vi.fn<typeof real.aplicarTotales>(real.aplicarTotales),
   };
 });
 // OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
@@ -25,10 +25,15 @@ vi.mock("./ocr", async (importOriginal) => {
   const nucleoFalso = {} as unknown as NucleoOcr;
   return {
     ...real,
-    enderezar: vi.fn(async (blob: Blob) => ({ blob, grados: 0, cajas: [], base: null })),
-    extraerTexto: vi.fn(async () => ""),
-    girarBlob: vi.fn(async () => null),
-    obtenerNucleo: vi.fn(async () => nucleoFalso),
+    enderezar: vi.fn<typeof real.enderezar>(async (blob: Blob) => ({
+      blob,
+      grados: 0,
+      cajas: [],
+      base: null,
+    })),
+    extraerTexto: vi.fn<typeof real.extraerTexto>(async () => ""),
+    girarBlob: vi.fn<typeof real.girarBlob>(async () => null),
+    obtenerNucleo: vi.fn<typeof real.obtenerNucleo>(async () => nucleoFalso),
   };
 });
 // DocAligner real necesita onnx: identidad por defecto (no-op); cada test simula el corte.
@@ -40,8 +45,8 @@ vi.mock("./docaligner", async (importOriginal) => {
   };
   return {
     ...real,
-    detectarYRecortar: vi.fn(async (b: Blob) => b),
-    obtenerSesion: vi.fn(async () => sesionFalsa),
+    detectarYRecortar: vi.fn<typeof real.detectarYRecortar>(async (b: Blob) => b),
+    obtenerSesion: vi.fn<typeof real.obtenerSesion>(async () => sesionFalsa),
   };
 });
 
@@ -386,7 +391,7 @@ describe("precalentarModelos", () => {
   it("usa requestIdleCallback cuando existe", async () => {
     const w = window as unknown as Record<string, unknown>;
     const previa = w["requestIdleCallback"];
-    const ocioso = vi.fn((cb: () => void): number => {
+    const ocioso = vi.fn<(cb: () => void) => number>((cb: () => void): number => {
       cb();
       return 1;
     });

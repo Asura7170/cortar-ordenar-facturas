@@ -45,7 +45,9 @@ vi.mock("../pipeline/pdf", async (importOriginal) => {
   };
 });
 // El recálculo manual no corre de verdad en tests del sidebar.
-vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn() }));
+vi.mock("../pipeline/extract", () => ({
+  extraerPendientes: vi.fn<typeof import("../pipeline/extract").extraerPendientes>(),
+}));
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -302,7 +304,7 @@ describe("cableado global (window/document)", () => {
 
 describe("elegirArchivos (botón ＋ por hoja)", () => {
   it("usa showPicker si existe", () => {
-    const show = vi.fn();
+    const show = vi.fn<() => void>();
     Object.defineProperty(fileInput, "showPicker", { value: show, configurable: true });
     try {
       elegirArchivos(7);
@@ -314,7 +316,7 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
 
   it("Enter/Espacio en la tarjeta abren el picker (el label solo no lo hace)", () => {
     const dropzone = el("dropzone");
-    const show = vi.fn();
+    const show = vi.fn<() => void>();
     Object.defineProperty(fileInput, "showPicker", { value: show, configurable: true });
     try {
       dropzone.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -331,7 +333,10 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
-    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
+    Object.defineProperty(fileInput, "showPicker", {
+      value: vi.fn<() => void>(),
+      configurable: true,
+    });
     elegirArchivos(b.id); // jsdom sin picker: noop simulado
     Object.defineProperty(fileInput, "files", {
       value: [archivo("h.png", "image/png")],
@@ -355,7 +360,10 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
-    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
+    Object.defineProperty(fileInput, "showPicker", {
+      value: vi.fn<() => void>(),
+      configurable: true,
+    });
     elegirArchivos(b.id);
     fileInput.dispatchEvent(new Event("cancel", { bubbles: true }));
     Object.defineProperty(fileInput, "files", {
@@ -372,7 +380,10 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
-    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
+    Object.defineProperty(fileInput, "showPicker", {
+      value: vi.fn<() => void>(),
+      configurable: true,
+    });
     elegirArchivos(b.id);
     await agregarArchivos([archivo("d.png", "image/png")], a.id); // drop sobre A
     expect(a.slots.some((c) => c?.nombre === "d.png")).toBe(true);
@@ -866,7 +877,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
   });
 
   it("en modo OCR no pega ni lee", async () => {
-    const leer = vi.fn(async () => [itemPng()]);
+    const leer = vi.fn<() => Promise<unknown>>(async () => [itemPng()]);
     mockRead(leer);
     state.modoOcr = true;
     try {

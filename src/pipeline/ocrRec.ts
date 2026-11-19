@@ -8,11 +8,11 @@ import type { CajaDb } from "./ocrDb";
 import { DICT_OCR } from "./ocrDict";
 
 /** Alto fijo de entrada del rec (image_shape [3,48,320]). */
-export const REC_ALTO: number = 48;
+export const REC_ALTO = 48;
 /** Ancho base (crece con el aspecto: resize_norm_img_chinese no trunca). */
-export const REC_ANCHO_BASE: number = 320;
+export const REC_ANCHO_BASE = 320;
 /** Tope del aspecto (una línea de texto nunca es una hebra: guarda memoria/CPU). */
-export const REC_RATIO_MAXIMA: number = 32;
+export const REC_RATIO_MAXIMA = 32;
 
 /** Línea lista para el tensor [1,3,48,anchoTotal] (CHW aplanado). */
 export interface LineaNorm {

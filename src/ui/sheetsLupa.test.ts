@@ -7,10 +7,10 @@ import { montarFixture, el, puntoPorDefecto } from "../test/fixture";
 montarFixture();
 
 const ctx = {
-  setTransform: vi.fn(),
-  clearRect: vi.fn(),
-  fillRect: vi.fn(),
-  drawImage: vi.fn(),
+  setTransform: vi.fn<CanvasRenderingContext2D["setTransform"]>(),
+  clearRect: vi.fn<CanvasRenderingContext2D["clearRect"]>(),
+  fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
+  drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
   imageSmoothingEnabled: false,
   imageSmoothingQuality: "low",
 };
@@ -22,7 +22,11 @@ const { crearHoja, state } = await import("../state");
 const { initSheets, renderHojas } = await import("./sheets");
 const { comprobante } = await import("../test/factoria");
 
-initSheets({ agregarArchivos: vi.fn(), pedirArchivos: vi.fn() });
+initSheets({
+  agregarArchivos:
+    vi.fn<(files: FileList | File[] | null | undefined, hojaId?: number | null) => void>(),
+  pedirArchivos: vi.fn<(hojaId: number) => void>(),
+});
 
 afterEach(() => {
   const btn = el<HTMLButtonElement>("btnLupa");
@@ -55,7 +59,7 @@ describe("dibujarLupa", () => {
     panel.style.backgroundColor = "transparent";
     document.body.appendChild(panel);
     Object.defineProperty(document, "elementFromPoint", {
-      value: vi.fn(() => panel),
+      value: vi.fn<Document["elementFromPoint"]>(() => panel),
       configurable: true,
     });
     try {
@@ -101,7 +105,7 @@ describe("dibujarLupa", () => {
       toJSON: () => ({}),
     } as DOMRect);
     Object.defineProperty(document, "elementFromPoint", {
-      value: vi.fn(() => cell),
+      value: vi.fn<Document["elementFromPoint"]>(() => cell),
       configurable: true,
     });
     try {

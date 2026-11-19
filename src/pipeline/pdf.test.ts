@@ -18,7 +18,7 @@ import type { DocumentoPdf } from "./pdf";
 // documento falso, entrando por el default de expandirPdf (la función real).
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
-  getDocument: vi.fn(),
+  getDocument: vi.fn<typeof import("pdfjs-dist").getDocument>(),
 }));
 
 const pdfjsFalso = await import("pdfjs-dist");
@@ -73,7 +73,7 @@ describe("admitirPdf", () => {
   });
 
   it("rechaza por tamaño sin abrir el documento", async () => {
-    const contar = vi.fn(async (): Promise<number> => 5);
+    const contar = vi.fn<(f: File) => Promise<number>>(async (): Promise<number> => 5);
     expect(await admitirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), contar)).toEqual({
       admite: false,
       motivo: "tamano",
@@ -82,7 +82,7 @@ describe("admitirPdf", () => {
   });
 
   it("cero bytes es ilegible sin abrir", async () => {
-    const contar = vi.fn(async (): Promise<number> => 5);
+    const contar = vi.fn<(f: File) => Promise<number>>(async (): Promise<number> => 5);
     expect(await admitirPdf(pdfDe("v.pdf", "application/pdf", 0), contar)).toEqual({
       admite: false,
       motivo: "ilegible",
@@ -253,7 +253,7 @@ describe("expandirPdf", () => {
 
   it("peso excedido → [] sin abrir", async () => {
     const { abrir } = abrirFalso();
-    const espia = vi.fn(abrir);
+    const espia = vi.fn<(f: File) => Promise<DocumentoPdf>>(abrir);
     expect(await expandirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), espia)).toEqual(
       [],
     );

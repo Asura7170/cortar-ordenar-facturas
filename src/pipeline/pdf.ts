@@ -18,7 +18,7 @@ import type { CrearLienzo } from "./imagen";
 export const PDF_MAX_BYTES: number = 5 * 1024 * 1024;
 
 /** Tope de páginas por PDF (inclusivo: 10 entra, 11 no). */
-export const PDF_MAX_PAGINAS: number = 10;
+export const PDF_MAX_PAGINAS = 10;
 
 /** Por qué se rechazó un PDF (para el aviso). */
 export type MotivoRechazo = "tamano" | "paginas" | "cifrado" | "ilegible";

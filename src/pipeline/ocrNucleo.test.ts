@@ -4,10 +4,12 @@
    singleton queda reutilizable (ninguna promesa podrida cacheada). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-const { crearFalso } = vi.hoisted(() => ({ crearFalso: vi.fn() }));
+const { crearFalso } = vi.hoisted(() => ({
+  crearFalso: vi.fn<typeof import("onnxruntime-web/webgpu").InferenceSession.create>(),
+}));
 vi.mock("onnxruntime-web/webgpu", () => ({
   env: { wasm: { wasmPaths: "", numThreads: 0 } },
-  Tensor: vi.fn(),
+  Tensor: vi.fn<typeof import("onnxruntime-web/webgpu").Tensor>(),
   InferenceSession: { create: crearFalso },
 }));
 
@@ -43,7 +45,7 @@ function claveDe(k: unknown): string {
 
 beforeEach(() => {
   tienda = new Map();
-  subida = vi.fn(async (url: unknown): Promise<unknown> => ({
+  subida = vi.fn<(url: unknown) => Promise<unknown>>(async (url: unknown): Promise<unknown> => ({
     ok: true,
     status: 200,
     arrayBuffer: async () => (String(url).endsWith("det.onnx") ? BUF_DET : BUF_REC),

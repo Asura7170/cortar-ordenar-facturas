@@ -45,7 +45,7 @@ function cargar(nombre: string): File {
 
 /** Spy que falla si el gate abre el documento (prueba de peso-primero). */
 function noAbrir(): (f: File) => Promise<number> {
-  return vi.fn(async (): Promise<number> => {
+  return vi.fn<(f: File) => Promise<number>>(async (): Promise<number> => {
     throw new Error("no debe abrir");
   });
 }

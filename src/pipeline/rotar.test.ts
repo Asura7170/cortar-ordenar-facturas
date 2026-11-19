@@ -2,16 +2,19 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { montarFixture } from "../test/fixture";
+import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 // El render real necesita grilla; los tests asertan estado, no DOM.
-vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
+vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn<() => void>() }));
 // Sin onnx en jsdom: el giro real + texto stub (lienzoGirado sigue real).
 vi.mock("./ocr", async (importOriginal) => {
   const real = await importOriginal<typeof import("./ocr")>();
-  return { ...real, extraerTexto: vi.fn(async () => "TOTAL LEÍDO") };
+  return { ...real, extraerTexto: vi.fn<typeof real.extraerTexto>(async () => "TOTAL LEÍDO") };
 });
 // El re-chequeo post-giro va mockeado en tests (rotar lo llama tras releer OCR).
-vi.mock("./extract", () => ({ extraerPendientes: vi.fn((): void => {}) }));
+vi.mock("./extract", () => ({
+  extraerPendientes: vi.fn<typeof import("./extract").extraerPendientes>((): void => {}),
+}));
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
@@ -32,12 +35,12 @@ afterEach(() => {
 /** Bitmap + lienzo falsos (suficiente para el lienzoGirado real). */
 function depsGiro() {
   const creados: { width: number; height: number }[] = [];
-  const bmp = { width: 10, height: 20, close: vi.fn() };
+  const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
   return {
     creados,
     deps: {
-      cargar: vi.fn(async () => bmp as unknown as ImageBitmap),
-      crear: vi.fn(() => {
+      cargar: vi.fn<CargarBitmap>(async () => bmp as unknown as ImageBitmap),
+      crear: vi.fn<CrearLienzo>(() => {
         const lienzo = {
           width: 0,
           height: 0,
@@ -261,7 +264,7 @@ describe("girarYReleer", () => {
 
   it("limpiado a mitad del giro: no escribe ni resucita", async () => {
     let soltar: ((b: ImageBitmap) => void) | undefined;
-    const bmp = { width: 10, height: 20, close: vi.fn() };
+    const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
     const c = sembrar();
     const p = girarYReleer(c.id, 90, {
       cargar: () =>
@@ -284,7 +287,7 @@ describe("girarYReleer", () => {
     const crearUrl = vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:nuevo");
     try {
       let soltar: ((b: ImageBitmap) => void) | undefined;
-      const bmp = { width: 10, height: 20, close: vi.fn() };
+      const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
       const c = sembrar();
       const urlAntes = c.imgUrl;
       const p = girarYReleer(c.id, 90, {
@@ -357,11 +360,11 @@ describe("girarYReleer", () => {
 
   it("giro y recorte en vuelo: el último commit gana entero, sin mezcla", async () => {
     const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      setTransform: vi.fn(),
-      clearRect: vi.fn(),
-      fillRect: vi.fn(),
-      strokeRect: vi.fn(),
-      drawImage: vi.fn(),
+      setTransform: vi.fn<CanvasRenderingContext2D["setTransform"]>(),
+      clearRect: vi.fn<CanvasRenderingContext2D["clearRect"]>(),
+      fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
+      strokeRect: vi.fn<CanvasRenderingContext2D["strokeRect"]>(),
+      drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
     } as unknown as CanvasRenderingContext2D);
     const crearUrl = vi
       .spyOn(URL, "createObjectURL")
@@ -370,7 +373,7 @@ describe("girarYReleer", () => {
     const { cancelarRelecturaProgramada } = await import("./rotar");
     initRecorte();
     try {
-      const bmpGiro = { width: 10, height: 20, close: vi.fn() };
+      const bmpGiro = { width: 10, height: 20, close: vi.fn<() => void>() };
       const previoBlob = new Blob(["previo"]);
       let soltarGiro: ((b: ImageBitmap) => void) | undefined;
       let soltarPrevio: ((b: ImageBitmap) => void) | undefined;
@@ -386,22 +389,31 @@ describe("girarYReleer", () => {
             soltarGiro = res;
           });
         },
-        crear: vi.fn(() => ({
-          width: 0,
-          height: 0,
-          getContext: () => ({ setTransform: vi.fn(), drawImage: vi.fn() }),
-          toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
-        })),
+        crear: vi.fn<CrearLienzo>(
+          () =>
+            ({
+              width: 0,
+              height: 0,
+              getContext: () => ({
+                setTransform: vi.fn<CanvasRenderingContext2D["setTransform"]>(),
+                drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
+              }),
+              toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
+            }) as unknown as HTMLCanvasElement,
+        ),
       };
-      const bmpCrop = { width: 100, height: 80, close: vi.fn() };
+      const bmpCrop = { width: 100, height: 80, close: vi.fn<() => void>() };
       const depsCrop = {
-        cargar: vi.fn(async () => bmpCrop),
-        crear: vi.fn(() => ({
-          width: 0,
-          height: 0,
-          getContext: () => ({ drawImage: vi.fn() }),
-          toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["recorte"])),
-        })),
+        cargar: vi.fn<CargarBitmap>(async () => bmpCrop as unknown as ImageBitmap),
+        crear: vi.fn<CrearLienzo>(
+          () =>
+            ({
+              width: 0,
+              height: 0,
+              getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
+              toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["recorte"])),
+            }) as unknown as HTMLCanvasElement,
+        ),
       };
       const c = sembrar();
       c.previoDocAligner = previoBlob;
@@ -456,12 +468,12 @@ describe("ramas de cubrimiento (lote 10)", () => {
   });
 
   it("contexto 2d ausente: aborta el giro con aviso y sin commit", async () => {
-    const bmp = { width: 10, height: 20, close: vi.fn() };
+    const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
     const c = sembrar();
     const antes = c.file;
     await girarYReleer(c.id, 90, {
-      cargar: vi.fn(async () => bmp as unknown as ImageBitmap),
-      crear: vi.fn(
+      cargar: vi.fn<CargarBitmap>(async () => bmp as unknown as ImageBitmap),
+      crear: vi.fn<CrearLienzo>(
         () =>
           ({
             width: 0,
@@ -477,12 +489,12 @@ describe("ramas de cubrimiento (lote 10)", () => {
   });
 
   it("toBlob nulo en el giro principal: aborta con aviso sin commit", async () => {
-    const bmp = { width: 10, height: 20, close: vi.fn() };
+    const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
     const c = sembrar();
     const antes = c.file;
     await girarYReleer(c.id, 90, {
-      cargar: vi.fn(async () => bmp as unknown as ImageBitmap),
-      crear: vi.fn(
+      cargar: vi.fn<CargarBitmap>(async () => bmp as unknown as ImageBitmap),
+      crear: vi.fn<CrearLienzo>(
         () =>
           ({
             width: 0,
@@ -497,7 +509,8 @@ describe("ramas de cubrimiento (lote 10)", () => {
   });
 
   it("relectura con id ausente: no-op silenciosa", async () => {
-    if (document.getElementById("aviso")) document.getElementById("aviso")!.textContent = "";
+    const aviso = document.getElementById("aviso");
+    if (aviso) aviso.textContent = "";
     await expect(releerTrasEdicion(999999, new Blob(["x"]))).resolves.toBeUndefined();
     expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
     expect(vi.mocked(renderHojas)).not.toHaveBeenCalled();
