@@ -102,7 +102,11 @@ async function fotoComprobante(
   try {
     // ponytail: el editor abre el intake pre-warp (recupera lo cortado de más);
     // sin previo (DocAligner no-op), la imagen actual.
-    const fuente = item.previoDocAligner ?? item.file ?? (await (await fetch(item.imgUrl)).blob());
+    let fuente = item.previoDocAligner ?? item.file;
+    if (!fuente) {
+      const respuesta = await fetch(item.imgUrl);
+      fuente = await respuesta.blob();
+    }
     return await cargar(fuente, { imageOrientation: "from-image" });
   } catch {
     avisar("No se pudo abrir el recorte.");

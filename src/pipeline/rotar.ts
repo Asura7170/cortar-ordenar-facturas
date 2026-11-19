@@ -39,7 +39,11 @@ function crearVigente(deps: DepsOcr | undefined): typeof crearReal {
 
 /** El blob definido por el item, o lo vivo en el URL de mock (recobros intake sin file). */
 async function fuenteDelItem(item: Comprobante): Promise<Blob> {
-  return item.file ?? (await (await fetch(item.imgUrl)).blob());
+  if (item.file) {
+    return item.file;
+  }
+  const respuesta = await fetch(item.imgUrl);
+  return await respuesta.blob();
 }
 
 /** Gira el bitmap para un WebP (o lanza; el catch del giro avisa). */

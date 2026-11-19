@@ -1,5 +1,8 @@
 /* Tests P0: montos en cents y colecciones (monto.ts necesita #montoTotal al importar). */
+
 import { describe, expect, it } from "vite-plus/test";
+
+import type { Hoja } from "../types";
 
 document.body.innerHTML =
   '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button><button id="btnWord" type="button"></button><button id="btnPdf" type="button"></button><button id="btnImprimir" type="button"></button><button id="btnLimpiar" type="button"></button>';
@@ -22,7 +25,6 @@ const {
   totalItems,
 } = await import("./monto");
 const { comprobante } = await import("../test/factoria");
-import type { Hoja } from "../types";
 
 function hojaCon(montos: (number | null)[]): Hoja {
   const h = crearHoja("u6x2");

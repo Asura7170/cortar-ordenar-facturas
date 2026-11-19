@@ -1,7 +1,9 @@
 /* Tests: extract.ts — regex offline, lo manual siempre gana. */
+
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { montarFixture, el } from "../test/fixture";
+import type { ItemLote } from "./extract";
 
 vi.mock("../ui/sheets", () => ({
   renderHojas: vi.fn<() => void>(),
@@ -22,7 +24,6 @@ const {
   limpiarTextoCompleto,
   mensajeLote,
 } = await import("./extract");
-import type { ItemLote } from "./extract";
 
 const { mostrarToasts } = await import("../utils");
 
