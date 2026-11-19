@@ -221,13 +221,12 @@ export async function construirDocumento(
           },
         },
         // Sin código no hay banda que rotular: se omite el elemento.
-        ...(codigo === ""
-          ? {}
-          : supra
-            ? { headers: { default: new Header({ children: [parrafoCodigo(codigo, posicion)] }) } }
-            : {
-                footers: { default: new Footer({ children: [parrafoCodigo(codigo, posicion)] }) },
-              }),
+        ...(codigo !== "" && supra
+          ? { headers: { default: new Header({ children: [parrafoCodigo(codigo, posicion)] }) } }
+          : {}),
+        ...(codigo !== "" && !supra
+          ? { footers: { default: new Footer({ children: [parrafoCodigo(codigo, posicion)] }) } }
+          : {}),
         children: hijos,
       },
     ],

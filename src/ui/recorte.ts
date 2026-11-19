@@ -290,7 +290,10 @@ function conVertice(
   esqFin: Borde,
   lado: Borde,
 ): Borde {
-  return p < ini + RADIO_ESQUINA ? esqIni : p > fin - RADIO_ESQUINA ? esqFin : lado;
+  if (p < ini + RADIO_ESQUINA) {
+    return esqIni;
+  }
+  return p > fin - RADIO_ESQUINA ? esqFin : lado;
 }
 
 /** Línea más próxima en banda, con esquinas que mandan cerca del vértice. */
@@ -619,15 +622,19 @@ function destinoTecla(e: KeyboardEvent, t: Tirador): { x: number; y: number } | 
   const hx = rect.x + rect.w * t.fx;
   const hy = rect.y + rect.h * t.fy;
   const paso = (e.shiftKey ? 5 : 1) * PASO_TECLA;
-  return e.key === "ArrowUp"
-    ? { x: hx, y: hy - paso }
-    : e.key === "ArrowDown"
-      ? { x: hx, y: hy + paso }
-      : e.key === "ArrowLeft"
-        ? { x: hx - paso, y: hy }
-        : e.key === "ArrowRight"
-          ? { x: hx + paso, y: hy }
-          : null;
+  if (e.key === "ArrowUp") {
+    return { x: hx, y: hy - paso };
+  }
+  if (e.key === "ArrowDown") {
+    return { x: hx, y: hy + paso };
+  }
+  if (e.key === "ArrowLeft") {
+    return { x: hx - paso, y: hy };
+  }
+  if (e.key === "ArrowRight") {
+    return { x: hx + paso, y: hy };
+  }
+  return null;
 }
 
 /** Teclado: [ ] rotan el tirador activo, flechas lo mueven, Enter confirma. */

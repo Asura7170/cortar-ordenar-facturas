@@ -152,14 +152,13 @@ function pintarCeldaOcr(div: HTMLElement, item: Comprobante): void {
   div.classList.add("cell-ocr");
   const pre = document.createElement("pre");
   pre.className = "cell-ocr-text";
-  pre.textContent = sanear(
-    item.textoOcr ||
-      (item.estado === "procesando"
-        ? "Procesando…"
-        : item.estado === "pendiente"
-          ? "Pendiente"
-          : "Sin texto OCR"),
-  );
+  let sinTexto = "Sin texto OCR";
+  if (item.estado === "procesando") {
+    sinTexto = "Procesando…";
+  } else if (item.estado === "pendiente") {
+    sinTexto = "Pendiente";
+  }
+  pre.textContent = sanear(item.textoOcr || sinTexto);
   const btn = document.createElement("button");
   btn.className = "cell-remove";
   btn.dataset["accion"] = "copiar-ocr";
@@ -921,7 +920,11 @@ function autoScroll(x: number, y: number): void {
   const r = canvasEl.getBoundingClientRect();
   const margen = 70,
     vel = 14;
-  scrollDir = y < r.top + margen ? -vel : y > r.bottom - margen ? vel : 0;
+  if (y < r.top + margen) {
+    scrollDir = -vel;
+  } else {
+    scrollDir = y > r.bottom - margen ? vel : 0;
+  }
   if (scrollDir && scrollRaf === null) {
     const paso = (): void => {
       // ponytail: paso solo corre con scrollDir ≠ 0 (detenerScroll cancela el
