@@ -117,6 +117,7 @@ async function nucleoReal(): Promise<NucleoOcr> {
     ort.env.wasm.numThreads = 1;
     const crearSesion =
       (pesos: ArrayBuffer) =>
+      // oxlint-disable-next-line eslint/require-await -- normaliza un throw síncrono de create en rechazo (contrato de sesión)
       async (ep: string): Promise<import("onnxruntime-web").InferenceSession> =>
         ort.InferenceSession.create(pesos, {
           executionProviders: [ep],
@@ -544,6 +545,7 @@ async function ejecutarRec(
 }
 
 /** Reconoce una caja: warp afín del quad a su bbox + rec + CTC. */
+// oxlint-disable-next-line eslint/require-await -- conserva async: normaliza un throw síncrono en rechazo
 export async function reconocerCaja(
   rec: SubsesionOcr,
   base: HTMLCanvasElement,

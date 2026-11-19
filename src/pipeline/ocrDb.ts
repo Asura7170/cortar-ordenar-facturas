@@ -195,9 +195,9 @@ export function rectanguloMinimo(casco: readonly PuntoDb[]): CajaDb["poli"] | nu
 /** Ordena el quad: sup-izq, sup-der, inf-der, inf-izq. */
 export function ordenarQuad(poli: CajaDb["poli"]): CajaDb["poli"] {
   const [p0, p1, p2, p3] = poli;
-  const porX = [p0, p1, p2, p3].sort((a, b) => a[0] - b[0]);
-  const izq = porX.slice(0, 2).sort((a, b) => a[1] - b[1]);
-  const der = porX.slice(2).sort((a, b) => a[1] - b[1]);
+  const porX = [p0, p1, p2, p3].toSorted((a, b) => a[0] - b[0]);
+  const izq = porX.slice(0, 2).toSorted((a, b) => a[1] - b[1]);
+  const der = porX.slice(2).toSorted((a, b) => a[1] - b[1]);
   return [izq[0] ?? p0, der[0] ?? p1, der[1] ?? p2, izq[1] ?? p3];
 }
 

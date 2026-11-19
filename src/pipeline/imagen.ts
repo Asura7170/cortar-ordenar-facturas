@@ -266,14 +266,16 @@ function colFondo(
 
 /** Avanza k mientras el tramo siga siendo fondo (pasada ascendente). */
 export function sube(k: number, hasta: number, fondo: (n: number) => boolean): number {
-  while (k < hasta && fondo(k)) k += 1;
-  return k;
+  let i = k;
+  while (i < hasta && fondo(i)) i += 1;
+  return i;
 }
 
 /** Retrocede k mientras el tramo siga siendo fondo (pasada descendente). */
 export function baja(k: number, hasta: number, fondo: (n: number) => boolean): number {
-  while (k > hasta && fondo(k)) k -= 1;
-  return k;
+  let i = k;
+  while (i > hasta && fondo(i)) i -= 1;
+  return i;
 }
 
 /**

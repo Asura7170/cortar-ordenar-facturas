@@ -2,6 +2,7 @@
    El tamaño se chequea sincrónico; las páginas requieren abrir el documento
    (pdf.js vía import dinámico: solo se descarga cuando llega un PDF).
    Todo rechazo se avisa y se descarta sin crear comprobante ni blob URL. */
+// oxlint-disable-next-line import/default -- ?url de Vite no resuelve a un export ES: el módulo vale una URL string
 import workerSrc from "pdfjs-dist/build/pdf.worker.mjs?url";
 
 import {

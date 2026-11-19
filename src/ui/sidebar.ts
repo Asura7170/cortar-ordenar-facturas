@@ -308,8 +308,9 @@ function tipoImagenDe(item: ItemConImagen): string | null {
 
 /** Subtipo crudo de un tipo image/x (png, jpeg): sin parámetros ;. */
 function subtipoImagen(tipo: string): string {
-  // ponytail: split(";") siempre trae [0]; el tipo ya pasó el find image/.
-  return tipo.slice("image/".length).split(";")[0]!.toLowerCase();
+  // ponytail: split(";") siempre trae [0]; el default es inalcanzable.
+  const [subtipo = ""] = tipo.slice("image/".length).split(";");
+  return subtipo.toLowerCase();
 }
 
 /** Motivo del aviso final: el formato raro encontrado o el genérico. */

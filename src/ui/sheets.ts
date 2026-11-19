@@ -910,13 +910,13 @@ function posicionarGhost(d: DragState, x: number, y: number): void {
 }
 
 function resaltarDestino(cell: HTMLElement | null): void {
-  if (cell && cell.dataset["id"] === String(pointerDrag?.id)) cell = null;
-  if (cell === celdaResaltada) return;
+  const destino = cell && cell.dataset["id"] === String(pointerDrag?.id) ? null : cell;
+  if (destino === celdaResaltada) return;
   celdaResaltada?.classList.remove("drop-target");
   celdaResaltada = null;
-  if (cell && sheetsEl.contains(cell)) {
-    cell.classList.add("drop-target");
-    celdaResaltada = cell;
+  if (destino && sheetsEl.contains(destino)) {
+    destino.classList.add("drop-target");
+    celdaResaltada = destino;
   }
 }
 
