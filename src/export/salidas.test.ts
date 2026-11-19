@@ -304,8 +304,8 @@ describe("construirDocumento (docx mockeado)", () => {
     state.hojas = [];
     const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
     const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      fillRect: vi.fn(),
-      drawImage: vi.fn(),
+      fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
+      drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
     } as unknown as CanvasRenderingContext2D);
     const toBlob = vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
       this: HTMLCanvasElement,
@@ -445,7 +445,7 @@ describe("initExport", () => {
     state.hojas.length = 0;
     state.codigoActivo = false;
     sembrar();
-    const print = vi.fn();
+    const print = vi.fn<() => void>();
     vi.stubGlobal("print", print);
     try {
       initExport();
@@ -464,7 +464,7 @@ describe("initExport", () => {
     sembrar();
     const aviso = document.getElementById("aviso");
     if (aviso) aviso.textContent = "";
-    const print = vi.fn();
+    const print = vi.fn<() => void>();
     vi.stubGlobal("print", print);
     try {
       initExport();

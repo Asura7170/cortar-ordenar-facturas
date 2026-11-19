@@ -89,7 +89,7 @@ function tituloDeMotivo(m: MotivoRechazo): string {
 let intakesActivos = 0;
 
 // Formatos de imagen del intake (clic / Ctrl+V / drop): un solo allowlist.
-const MIME_IMAGEN: RegExp = /^image\/(jpeg|png|webp|bmp|gif)$/i;
+const MIME_IMAGEN = /^image\/(jpeg|png|webp|bmp|gif)$/i;
 
 /** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
 let hojaPedida: number | null = null;
@@ -297,8 +297,8 @@ interface ItemConImagen {
 // Sin bytes de imagen el clic no puede pegar: el Ctrl+C al ARCHIVO en el
 // Explorador deja una referencia (no bytes) y el navegador no la entrega vía
 // read() — ese caso solo entra por Ctrl+V o la tarjeta. El mensaje cubre ambos.
-const MOTIVO_FORMATO: string = "formato no soportado: usá JPG, PNG, WEBP o PDF";
-const MOTIVO_SIN_IMAGEN: string =
+const MOTIVO_FORMATO = "formato no soportado: usá JPG, PNG, WEBP o PDF";
+const MOTIVO_SIN_IMAGEN =
   "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pegá con Ctrl+V";
 
 /** Primer tipo image/* del item (null si no trae). */

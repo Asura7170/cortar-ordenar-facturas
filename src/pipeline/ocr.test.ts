@@ -67,7 +67,7 @@ function lienzoFalso(pixeles: Uint8ClampedArray): {
 }
 
 function bitmapFalso(w: number, h: number): ImageBitmap {
-  return { width: w, height: h, close: vi.fn() } as unknown as ImageBitmap;
+  return { width: w, height: h, close: vi.fn<() => void>() } as unknown as ImageBitmap;
 }
 
 /** Mapa 16x8 con rect brillante x2-5/y2-5 (una línea de texto). */
@@ -1091,7 +1091,7 @@ describe("descargarPesosOcr", () => {
     const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
     const tienda = new Map<unknown, unknown>();
     const bytes = new ArrayBuffer(12_000_000); // pasa los mínimos det/rec
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,
       arrayBuffer: async () => bytes,
@@ -1134,7 +1134,7 @@ describe("descargarPesosOcr", () => {
     const g = globalThis as Record<string, unknown>;
     const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
     delete g["caches"];
-    g["fetch"] = vi.fn(
+    g["fetch"] = vi.fn<(_u: unknown, o?: { signal?: AbortSignal }) => Promise<Response>>(
       async (_u: unknown, o?: { signal?: AbortSignal }): Promise<Response> =>
         new Promise((_res, rej) => {
           o?.signal?.addEventListener("abort", () => rej(new Error("abortado")));

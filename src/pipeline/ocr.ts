@@ -33,7 +33,7 @@ const RUTA_REC = `${import.meta.env.BASE_URL}models/ocr/rec.onnx`;
  * oficial; el eval de entrenamiento usa 736/min pero eso reescala hacia
  * arriba los recortes de 720px sin ganar nada).
  */
-const LADO_DET_MAX: number = 960;
+const LADO_DET_MAX = 960;
 /** Normalización ImageNet del det (NormalizeImage del det.yml). */
 const DET_MEDIA: readonly number[] = [0.485, 0.456, 0.406];
 const DET_STD: readonly number[] = [0.229, 0.224, 0.225];
@@ -70,7 +70,7 @@ export interface DepsOcr {
 type OrtModulo = typeof import("onnxruntime-web/webgpu");
 
 /** Presupuesto de descarga det+rec (30MB: el mismo enlace lento que motivó 300s en DocAligner). */
-export const TIMEOUT_OCR_MS: number = 120_000;
+export const TIMEOUT_OCR_MS = 120_000;
 
 /** Precarga det+rec en caché sin crear sesiones (para el botón "Descargar ahora"). */
 export async function descargarPesosOcr(timeoutMs: number = TIMEOUT_OCR_MS): Promise<void> {
@@ -242,11 +242,11 @@ const SALIDA_ONNX = "fetch_name_0";
 /** Giros candidatos (0 = tal cual). El orden es el fast-path: derecha, costados, revés. */
 export type Giro = 0 | 90 | 180 | 270;
 /** Masa mínima del mapa para intentar giros (bajo esto no hay texto). */
-export const UMBRAL_MAPA_VACIO: number = 0.0005;
+export const UMBRAL_MAPA_VACIO = 0.0005;
 /* Calibración Chrome (iriarte de costado; conf rec top-2 por giro):
    0° costado 0.24, 90° cabeza 0.61, 270° derecho 0.99, 180° costado 0.26.
    OK acepta al instante el pico; sin OK gana el más alto (sin suelo). */
-export const UMBRAL_REC_OK: number = 0.9;
+export const UMBRAL_REC_OK = 0.9;
 /** Cajas por orientación que puntúa el rec (más es más recs, no más señal). */
 export const TOP_CAJAS_GIRO = 2;
 /** Orden de prueba: lo común primero (bypass inmediato), el revés al final. */

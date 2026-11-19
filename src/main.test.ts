@@ -2,34 +2,38 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("./state", () => ({
-  cargar: vi.fn(),
-  crearHoja: vi.fn(() => ({})),
+  cargar: vi.fn<() => void>(),
+  crearHoja: vi.fn<() => unknown>(() => ({})),
   state: { hojas: [] as unknown[] },
 }));
 vi.mock("./ui/sheets", () => {
   const registro = globalThis as unknown as { __initSheetsArgs?: unknown[][] };
   registro.__initSheetsArgs ??= [];
   return {
-    initSheets: vi.fn((...args: unknown[]) => {
+    initSheets: vi.fn<(...args: unknown[]) => void>((...args: unknown[]) => {
       registro.__initSheetsArgs?.push(args);
     }),
-    renderHojas: vi.fn(),
+    renderHojas: vi.fn<() => void>(),
   };
 });
 vi.mock("./ui/sidebar", () => ({
-  agregarArchivos: vi.fn(),
-  elegirArchivos: vi.fn(),
-  initSidebar: vi.fn(),
-  pegarEnCelda: vi.fn(),
-  renderCodigo: vi.fn(),
+  agregarArchivos:
+    vi.fn<(files: FileList | readonly File[] | null | undefined, hojaId?: number | null) => void>(),
+  elegirArchivos: vi.fn<(hojaId: number) => void>(),
+  initSidebar: vi.fn<() => void>(),
+  pegarEnCelda: vi.fn<(hojaId: number, slotIdx: number) => Promise<void> | void>(),
+  renderCodigo: vi.fn<() => void>(),
 }));
-vi.mock("./ui/ocrMode", () => ({ initOcrMode: vi.fn(), renderOcrToggle: vi.fn() }));
-vi.mock("./ui/settingsModal", () => ({ initSettings: vi.fn() }));
-vi.mock("./ui/github", () => ({ initGithub: vi.fn() }));
-vi.mock("./ui/recorte", () => ({ initRecorte: vi.fn() }));
-vi.mock("./export/salidas", () => ({ initExport: vi.fn() }));
+vi.mock("./ui/ocrMode", () => ({
+  initOcrMode: vi.fn<() => void>(),
+  renderOcrToggle: vi.fn<() => void>(),
+}));
+vi.mock("./ui/settingsModal", () => ({ initSettings: vi.fn<() => void>() }));
+vi.mock("./ui/github", () => ({ initGithub: vi.fn<() => Promise<void>>() }));
+vi.mock("./ui/recorte", () => ({ initRecorte: vi.fn<() => void>() }));
+vi.mock("./export/salidas", () => ({ initExport: vi.fn<() => void>() }));
 vi.mock("./utils", () => ({
-  getEl: vi.fn(() => ({
+  getEl: vi.fn<(id: string) => unknown>(() => ({
     title: "",
     setAttribute: (_k: string, _v: string) => {},
     addEventListener: (_ev: string, fn: () => void) => {

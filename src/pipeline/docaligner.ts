@@ -25,16 +25,16 @@ export interface BuferPixeles {
 }
 
 /** Lado del tensor cuadrado del modelo (256×256, aspecto achatado como el pipeline de referencia). */
-export const LADO_MODELO: number = 256;
+export const LADO_MODELO = 256;
 
 /** Borde negro alrededor de la foto para que el modelo extrapole esquinas cortadas (receta del demo DocAligner). */
-export const PAD_BORDE: number = 100;
+export const PAD_BORDE = 100;
 
 /** Binarización del heatmap por canal (mismo valor que el gate de confianza). */
-export const UMBRAL_HEATMAP: number = 0.3;
+export const UMBRAL_HEATMAP = 0.3;
 
 /** Pesos en prod: Pages rechaza archivos >25MB; la URL /resolve/ es estable (el 302 firmado caduca). */
-export const URL_MODELO_HF: string =
+export const URL_MODELO_HF =
   "https://huggingface.co/7rplus/pagescan-weights/resolve/main/fastvit_sa24_h_e_bifpn_256_fp32.onnx";
 
 /** Versión de los pesos cacheados. Al cambiar det/rec.onnx vendoreados o re-subir
@@ -614,7 +614,7 @@ export function obtenerSesion(): Promise<SesionDetectora> {
 }
 
 /** Presupuesto por intento de EP: un compile sano tarda ~1s; más es hardware colgado (ORT no siempre rechaza). */
-export const TIMEOUT_EP_MS: number = 30_000;
+export const TIMEOUT_EP_MS = 30_000;
 
 /** EPs caídos en esta carga (fallo o timeout): el fallo de init es determinista, no se reintentan. */
 const epCaidos = new Set<string>();
@@ -728,7 +728,7 @@ export async function iniciarSesion<T>(
 }
 
 /** Presupuesto de descarga de pesos (79MB: 30s no bastan en enlaces lentos; fuera del presupuesto EP). */
-export const TIMEOUT_MODELO_MS: number = 300_000;
+export const TIMEOUT_MODELO_MS = 300_000;
 
 /** Descargas en curso por clave (dos miss concurrentes = un solo fetch). */
 const enVuelo = new Map<string, Promise<ArrayBuffer>>();

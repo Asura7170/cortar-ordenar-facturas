@@ -4,10 +4,12 @@
    crearSesion cierra sobre el descargarPesos local, no sobre el export). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-const { crearFalso } = vi.hoisted(() => ({ crearFalso: vi.fn() }));
+const { crearFalso } = vi.hoisted(() => ({
+  crearFalso: vi.fn<typeof import("onnxruntime-web/webgpu").InferenceSession.create>(),
+}));
 vi.mock("onnxruntime-web/webgpu", () => ({
   env: { wasm: { wasmPaths: "", numThreads: 0 } },
-  Tensor: vi.fn(),
+  Tensor: vi.fn<typeof import("onnxruntime-web/webgpu").Tensor>(),
   InferenceSession: { create: crearFalso },
 }));
 
@@ -54,7 +56,7 @@ describe("crearSesion (ORT falso, resto real)", () => {
   });
 
   it("crea sesión e infiere con nombres por defecto", async () => {
-    const runFalso = vi.fn(async (): Promise<unknown> => ({
+    const runFalso = vi.fn<() => Promise<unknown>>(async (): Promise<unknown> => ({
       heatmap: { data: new Float32Array([1]), dims: [1, 1] },
     }));
     crearFalso.mockResolvedValue(sesionFalsa(runFalso) as never);

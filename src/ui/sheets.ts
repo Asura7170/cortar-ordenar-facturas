@@ -39,19 +39,19 @@ const canvasEl: HTMLElement = getEl("canvas"); // <main class="canvas" id="canva
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
 
 /* X de quitar (Lucide, marcado estático confiable: sin datos de usuario). */
-const X_SVG: string =
+const X_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
 /* Rotor de giro (marcado estático confiable: sin datos de usuario). */
-const GIRAR_SVG: string =
+const GIRAR_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="girar-nucleo"><path d="M15 4.55a8 8 0 0 0 -6 14.9"/><polyline class="girar-aleta" points="9 15 9 20 4 20"/><circle class="punto punto-1" cx="18.37" cy="7.16" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-2" cx="19.94" cy="11" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-3" cx="19.37" cy="15.1" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-4" cx="16.84" cy="18.37" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-5" cx="13" cy="19.94" r="1" fill="currentColor" stroke="none"/></g></svg>';
 
 /* Encuadre de recorte (marcado estático confiable: sin datos de usuario). */
-const CROP_SVG: string =
+const CROP_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="encuadre"><g class="tercios" stroke-width="0.9" opacity="0"><line x1="10" y1="6" x2="10" y2="18" stroke-dasharray="1.2 1.2"/><line x1="14" y1="6" x2="14" y2="18" stroke-dasharray="1.2 1.2"/><line x1="6" y1="10" x2="18" y2="10" stroke-dasharray="1.2 1.2"/><line x1="6" y1="14" x2="18" y2="14" stroke-dasharray="1.2 1.2"/></g><path class="escuadra-inf" d="M6 2v14a2 2 0 0 0 2 2h14"/><path class="escuadra-sup" d="M18 22V8a2 2 0 0 0-2-2H2"/></g></svg>';
 
 /* Copiar OCR (marcado estático confiable: sin datos de usuario). */
-const COPY_SVG: string =
+const COPY_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="hoja-atras" d="M4 7v13a1 1 0 0 0 1 1h10"/><g class="hoja-frente"><rect x="8" y="3" width="11" height="14" rx="1"/><g class="lineas-doc" stroke-width="1.5"><line x1="11" y1="7" x2="16" y2="7"/><line x1="11" y1="10" x2="16" y2="10"/><line x1="11" y1="13" x2="14" y2="13"/></g><line class="rayo-scan" x1="9.5" y1="4.5" x2="17.5" y2="4.5" stroke-width="1.5"/><polyline class="check-ok" points="10.5 10.5 12.5 12.5 16 8.5"/></g></svg>';
 
 function celda(
@@ -1112,7 +1112,7 @@ export interface SheetsCallbacks {
 
 /** Id de la hoja fantasma (solo visual, nunca en state.hojas): los ids reales son ≥1.
     Clic-sí / drag-no (el drag la ignora); el drop la normaliza a null en el borde. */
-export const HOJA_FANTASMA: number = -1;
+export const HOJA_FANTASMA = -1;
 
 // ponytail: callbacks vigentes (initSheets los refresca aunque los listeners ya
 // existan: HMR/tests re-cablean sin duplicar).

@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { montarFixture, el } from "../test/fixture";
 
-vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn(), actualizarMontoCelda: vi.fn() }));
+vi.mock("../ui/sheets", () => ({
+  renderHojas: vi.fn<() => void>(),
+  actualizarMontoCelda: vi.fn<(id: number) => boolean>(),
+}));
 
 montarFixture();
 const { crearHoja, state } = await import("../state");

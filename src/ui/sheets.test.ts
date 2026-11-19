@@ -11,11 +11,17 @@ import {
 } from "../test/fixture";
 
 // El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
-vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
+vi.mock("../pipeline/rotar", () => ({
+  girarYReleer: vi.fn<typeof import("../pipeline/rotar").girarYReleer>(async () => {}),
+}));
 // El editor real abre un modal: se aserta el cableado, no el canvas.
-vi.mock("./recorte", () => ({ abrirRecorte: vi.fn(async () => {}) }));
+vi.mock("./recorte", () => ({
+  abrirRecorte: vi.fn<typeof import("./recorte").abrirRecorte>(async () => {}),
+}));
 // El lote post-corregir no debe pegar a la red en tests.
-vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn((): void => {}) }));
+vi.mock("../pipeline/extract", () => ({
+  extraerPendientes: vi.fn<typeof import("../pipeline/extract").extraerPendientes>((): void => {}),
+}));
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -36,9 +42,10 @@ const { abrirRecorte } = await import("./recorte");
 const { extraerPendientes } = await import("../pipeline/extract");
 import type { Comprobante, Hoja, LayoutId } from "../types";
 
-const agregarArchivos = vi.fn();
-const pedirArchivos = vi.fn();
-const pegarEnCelda = vi.fn();
+const agregarArchivos =
+  vi.fn<(files: FileList | File[] | null | undefined, hojaId?: number | null) => void>();
+const pedirArchivos = vi.fn<(hojaId: number) => void>();
+const pegarEnCelda = vi.fn<(hojaId: number, slotIdx: number) => Promise<void> | void>();
 initSheets({ agregarArchivos, pedirArchivos, pegarEnCelda });
 
 afterEach(() => {
@@ -124,9 +131,9 @@ describe("stats del lote (flanco de marca)", () => {
   it("hoja base sin comprobantes: cifra de hojas 0 (el fantasma no pinta)", () => {
     state.hojas = [crearHoja()];
     renderHojas();
-    expect(document.getElementById("statHojas")!.style.getPropertyValue("--n-hojas")).toBe("0");
-    expect(document.getElementById("statComp")!.style.getPropertyValue("--n-comp")).toBe("0");
-    expect(document.getElementById("metaHojas")!.hasAttribute("data-cero")).toBe(true);
+    expect(el("statHojas").style.getPropertyValue("--n-hojas")).toBe("0");
+    expect(el("statComp").style.getPropertyValue("--n-comp")).toBe("0");
+    expect(el("metaHojas").hasAttribute("data-cero")).toBe(true);
   });
 
   it("con un comprobante: 1 hoja · 1 comp y sale del estado vacío", () => {
@@ -134,9 +141,9 @@ describe("stats del lote (flanco de marca)", () => {
     h.slots[0] = comprobante({ nombre: "x.png" });
     state.hojas = [h];
     renderHojas();
-    expect(document.getElementById("statHojas")!.style.getPropertyValue("--n-hojas")).toBe("1");
-    expect(document.getElementById("statComp")!.style.getPropertyValue("--n-comp")).toBe("1");
-    expect(document.getElementById("metaHojas")!.hasAttribute("data-cero")).toBe(false);
+    expect(el("statHojas").style.getPropertyValue("--n-hojas")).toBe("1");
+    expect(el("statComp").style.getPropertyValue("--n-comp")).toBe("1");
+    expect(el("metaHojas").hasAttribute("data-cero")).toBe(false);
   });
 });
 
@@ -382,7 +389,7 @@ describe("celdas", () => {
 
   it("con loteEnCurso no usa ViewTransition (sin snapshots)", () => {
     const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
-    const spy = vi.fn((cb: () => void): Record<string, unknown> => {
+    const spy = vi.fn<(cb: () => void) => void>((cb: () => void): Record<string, unknown> => {
       cb();
       return {};
     });
@@ -498,7 +505,8 @@ describe("monto manual", () => {
   it("change con campo vacío no marca error ni avisa", () => {
     sembrarOk();
     // Limpio el aviso del test anterior (el fixture es un DOM compartido).
-    if (document.getElementById("aviso")) document.getElementById("aviso")!.textContent = "";
+    const aviso = document.getElementById("aviso");
+    if (aviso) aviso.textContent = "";
     const input = inputMonto();
     input.value = "";
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -929,7 +937,7 @@ describe("drop de archivos sobre hojas", () => {
       toJSON: () => ({}),
     } as DOMRect);
     // jsdom no implementa scrollBy: se espía para asertar el loop (Chrome sí lo tiene).
-    const scrollBy = vi.fn();
+    const scrollBy = vi.fn<Element["scrollBy"]>();
     Object.defineProperty(canvas, "scrollBy", { value: scrollBy, configurable: true });
     const borde = (y: number): void => {
       const sheet = document.querySelector(".sheet");
@@ -1460,12 +1468,14 @@ describe("drag entre celdas (swap)", () => {
   /** Geometría determinista: celdas en fila de 100px + matchMedia para saltar el FLIP. */
   function stubGeometria(flip = true, vuelos?: number[]): () => void {
     const mm = (window as unknown as Record<string, unknown>)["matchMedia"];
-    (window as unknown as Record<string, unknown>)["matchMedia"] = vi.fn(() => ({
+    (window as unknown as Record<string, unknown>)["matchMedia"] = vi.fn<
+      (query: string) => { matches: boolean }
+    >(() => ({
       matches: flip,
     }));
     // jsdom no trae Element.animate: se define por test (el FLIP la llama si el vuelo supera 2px).
     Object.defineProperty(Element.prototype, "animate", {
-      value: vi.fn(() => {
+      value: vi.fn<(...args: Parameters<Element["animate"]>) => void>(() => {
         vuelos?.push(1);
       }),
       configurable: true,
@@ -1548,7 +1558,7 @@ describe("drag entre celdas (swap)", () => {
   /** jsdom no trae elementFromPoint: se define por test y se restaura al salir. */
   function stubPunto(valor: Element | null): () => void {
     Object.defineProperty(document, "elementFromPoint", {
-      value: vi.fn(() => valor),
+      value: vi.fn<Document["elementFromPoint"]>(() => valor),
       configurable: true,
     });
     return () => {
@@ -1830,7 +1840,9 @@ describe("reorden por teclado (2.5.7)", () => {
     /* jsdom no trae matchMedia (animarFlipDesde lo lee pelado): stub
        reduced-motion para apagar el FLIP, restaurado al salir. */
     const previo = window.matchMedia;
-    window.matchMedia = vi.fn(() => ({ matches: true })) as unknown as typeof window.matchMedia;
+    window.matchMedia = vi.fn<(query: string) => { matches: boolean }>(() => ({
+      matches: true,
+    })) as unknown as typeof window.matchMedia;
     try {
       cell.focus();
       cell.dispatchEvent(

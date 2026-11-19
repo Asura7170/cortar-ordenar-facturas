@@ -4,14 +4,16 @@ import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { el, montarFixture } from "../test/fixture";
 
 // El render real necesita grilla; los tests asertan estado, no DOM.
-vi.mock("./sheets", () => ({ renderHojas: vi.fn() }));
+vi.mock("./sheets", () => ({ renderHojas: vi.fn<() => void>() }));
 // Sin onnx en jsdom: texto stub (el commit del lienzo sigue real).
 vi.mock("../pipeline/ocr", async (importOriginal) => {
   const real = await importOriginal<typeof import("../pipeline/ocr")>();
-  return { ...real, extraerTexto: vi.fn(async () => "TOTAL LEÍDO") };
+  return { ...real, extraerTexto: vi.fn<typeof real.extraerTexto>(async () => "TOTAL LEÍDO") };
 });
 // El lote post-recorte no debe pegar a la red en tests.
-vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn((): void => {}) }));
+vi.mock("../pipeline/extract", () => ({
+  extraerPendientes: vi.fn<typeof import("../pipeline/extract").extraerPendientes>((): void => {}),
+}));
 
 montarFixture();
 const { crearHoja, state } = await import("../state");
@@ -29,11 +31,11 @@ initRecorte();
 /** Contexto 2d falso (jsdom no implementa canvas). */
 function ctxFalso(): Record<string, unknown> {
   return {
-    setTransform: vi.fn(),
-    clearRect: vi.fn(),
-    fillRect: vi.fn(),
-    strokeRect: vi.fn(),
-    drawImage: vi.fn(),
+    setTransform: vi.fn<CanvasRenderingContext2D["setTransform"]>(),
+    clearRect: vi.fn<CanvasRenderingContext2D["clearRect"]>(),
+    fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
+    strokeRect: vi.fn<CanvasRenderingContext2D["strokeRect"]>(),
+    drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
     imageSmoothingQuality: "high",
   };
 }
@@ -47,7 +49,7 @@ function depsRecorte(
   creados: { width: number; height: number }[];
   deps: { cargar: () => Promise<unknown>; crear: () => unknown };
 } {
-  const bmp = { width: w, height: h, close: vi.fn() };
+  const bmp = { width: w, height: h, close: vi.fn<() => void>() };
   const creados: { width: number; height: number }[] = [];
   // Viewport fijo: la escala de llenado es determinista (768 → maxH 479.76).
   vi.spyOn(window, "innerHeight", "get").mockReturnValue(768);
@@ -55,12 +57,12 @@ function depsRecorte(
     bmp,
     creados,
     deps: {
-      cargar: vi.fn(async () => bmp),
-      crear: vi.fn(() => {
+      cargar: vi.fn<() => Promise<unknown>>(async () => bmp),
+      crear: vi.fn<() => unknown>(() => {
         const lienzo = {
           width: 0,
           height: 0,
-          getContext: () => ({ drawImage: vi.fn() }),
+          getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
           toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["recorte"])),
         };
         creados.push(lienzo);
@@ -340,13 +342,16 @@ describe("abrirRecorte", () => {
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
     try {
       const { girarYReleer } = await import("../pipeline/rotar");
-      const bmpGiro = { width: 100, height: 80, close: vi.fn() };
+      const bmpGiro = { width: 100, height: 80, close: vi.fn<() => void>() };
       const depsGiro = {
-        cargar: vi.fn(async () => bmpGiro),
-        crear: vi.fn(() => ({
+        cargar: vi.fn<() => Promise<unknown>>(async () => bmpGiro),
+        crear: vi.fn<() => unknown>(() => ({
           width: 0,
           height: 0,
-          getContext: () => ({ setTransform: vi.fn(), drawImage: vi.fn() }),
+          getContext: () => ({
+            setTransform: vi.fn<CanvasRenderingContext2D["setTransform"]>(),
+            drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
+          }),
           toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
         })),
       };
@@ -429,10 +434,10 @@ describe("abrirRecorte", () => {
     try {
       const { promise, resolve } = Promise.withResolvers<Blob | null>();
       const { deps, bmp } = depsRecorte();
-      deps.crear = vi.fn(() => ({
+      deps.crear = vi.fn<() => unknown>(() => ({
         width: 0,
         height: 0,
-        getContext: () => ({ drawImage: vi.fn() }),
+        getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
         // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
         toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
       }));
@@ -463,10 +468,10 @@ describe("abrirRecorte", () => {
     try {
       const { promise, resolve } = Promise.withResolvers<Blob | null>();
       const { deps } = depsRecorte();
-      deps.crear = vi.fn(() => ({
+      deps.crear = vi.fn<() => unknown>(() => ({
         width: 0,
         height: 0,
-        getContext: () => ({ drawImage: vi.fn() }),
+        getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
         // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
         toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
       }));
@@ -531,13 +536,13 @@ describe("abrirRecorte", () => {
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
     try {
       const { promise, resolve } = Promise.withResolvers<void>();
-      const bmp = { width: 100, height: 80, close: vi.fn() };
+      const bmp = { width: 100, height: 80, close: vi.fn<() => void>() };
       const deps = {
-        cargar: vi.fn(async () => {
+        cargar: vi.fn<() => Promise<unknown>>(async () => {
           await promise;
           return bmp;
         }),
-        crear: vi.fn(),
+        crear: vi.fn<() => unknown>(),
       };
       const c = sembrar();
       const apertura = abrirRecorte(c.id, deps as never);
@@ -596,8 +601,12 @@ describe("abrirRecorte", () => {
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
     try {
       const { deps } = depsRecorte();
-      const cerrar = vi.fn();
-      deps.cargar = vi.fn(async () => ({ width: 1, height: 1, close: cerrar }));
+      const cerrar = vi.fn<() => void>();
+      deps.cargar = vi.fn<() => Promise<unknown>>(async () => ({
+        width: 1,
+        height: 1,
+        close: cerrar,
+      }));
       const c = sembrar();
       await abrirRecorte(c.id, deps as never);
       expect(modal.open).toBe(false);
@@ -651,7 +660,7 @@ describe("abrirRecorte", () => {
     document.getElementById("aviso")?.remove();
     try {
       const { deps } = depsRecorte();
-      deps.cargar = vi.fn(async () => {
+      deps.cargar = vi.fn<() => Promise<unknown>>(async () => {
         throw new Error("decode");
       });
       const c = sembrar();
@@ -974,7 +983,7 @@ describe("editor: filas de borde, teclado y extremos del commit", () => {
       await abrirRecorte(c.id, deps as never);
       // jsdom no implementa pointer capture: la función no existe en el elemento.
       const captura = guia as unknown as { setPointerCapture?: unknown };
-      const cap = vi.fn();
+      const cap = vi.fn<Element["setPointerCapture"]>();
       captura.setPointerCapture = cap;
       guia.dispatchEvent(puntero("pointermove", 6, 6)); // esquina "no"
       expect(guia.style.cursor).toBe("nwse-resize");
@@ -1076,10 +1085,10 @@ describe("editor: filas de borde, teclado y extremos del commit", () => {
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
     try {
       const { deps } = depsRecorte();
-      deps.crear = vi.fn(() => ({
+      deps.crear = vi.fn<() => unknown>(() => ({
         width: 0,
         height: 0,
-        getContext: () => ({ drawImage: vi.fn() }),
+        getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
         toBlob: (cb: (b: Blob | null) => void) => cb(null),
       }));
       const c = sembrar();

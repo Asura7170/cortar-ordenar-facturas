@@ -73,7 +73,7 @@ const esquinas = (w: number, h: number): Quad => [
 ];
 
 function bitmapFalso(w: number, h: number): ImageBitmap {
-  return { width: w, height: h, close: vi.fn() } as unknown as ImageBitmap;
+  return { width: w, height: h, close: vi.fn<() => void>() } as unknown as ImageBitmap;
 }
 
 // Lienzo falso: píxeles dados, captura tipo/calidad del toBlob y trazos de dibujo.
@@ -776,7 +776,11 @@ describe("descargarPesos", () => {
   }
 
   const redOk = (): ReturnType<typeof vi.fn> =>
-    vi.fn(async () => ({ ok: true, status: 200, arrayBuffer: async () => BYTES }));
+    vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => BYTES,
+    }));
 
   it("URL_MODELO_HF es el resolve estable de HF (no el CDN firmado)", () => {
     expect(URL_MODELO_HF).toBe(
@@ -815,7 +819,7 @@ describe("descargarPesos", () => {
 
   it("HTTP no-ok lanza", async () => {
     const tienda: Tienda = new Map();
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: false,
       status: 404,
       arrayBuffer: async () => BYTES,
@@ -868,7 +872,7 @@ describe("descargarPesos", () => {
 
   it("peso bajo el mínimo no se cachea y la re-descarga entra en enfriamiento", async () => {
     const tienda: Tienda = new Map();
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,
       arrayBuffer: async () => BYTES,
@@ -1039,7 +1043,7 @@ describe("descargarPesos", () => {
       [claveCache("k"), { arrayBuffer: async () => BYTES, headers: { get: () => "3" } }],
     ]);
     const grande = new ArrayBuffer(60_000_000);
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,
       arrayBuffer: async () => grande,

@@ -4,13 +4,13 @@
    (0 generaciones). El exportador convierte a JPEG al embeber en el docx. */
 
 /** Lado mayor máximo tras normalizar (más píxeles no ayudan al OCR). */
-export const LADO_MAX_IMAGEN: number = 2000;
+export const LADO_MAX_IMAGEN = 2000;
 
 /** Calidad JPEG única (conversión de salida a Word). */
-export const CALIDAD_JPEG: number = 0.9;
+export const CALIDAD_JPEG = 0.9;
 
 /** Calidad WebP del pipeline (intake, warp, giros, recortes, páginas PDF). */
-export const CALIDAD_WEBP: number = 0.85;
+export const CALIDAD_WEBP = 0.85;
 
 /** Formatos que pasan crudos si no hay nada que corregir (sin recompresión). */
 const TIPOS_DIRECTOS: ReadonlySet<string> = new Set(["image/jpeg", "image/png", "image/webp"]);
