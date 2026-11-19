@@ -29,6 +29,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vp check
+      - run: pnpm check
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm run test:coverage
