@@ -84,15 +84,5 @@ export default defineConfig({
         "vitest/prefer-called-with": "off",
       },
     },
-    {
-      // ponytail: vite.config.ts es intocable en esta limpieza (COOP/COEP/ORT);
-      // el named import, el regex sin `u` y el `.then().catch()` no son defectos.
-      files: ["vite.config.ts"],
-      rules: {
-        "unicorn/import-style": "off",
-        "require-unicode-regexp": "off",
-        "promise/always-return": "off",
-      },
-    },
   ],
 });
