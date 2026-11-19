@@ -90,7 +90,7 @@ export function envolver(
     // ponytail: ValueMetadata de ort-web 1.29 expone shape (nunca dimensions).
     const [meta] = sesion.outputMetadata;
     const forma = meta && meta.isTensor ? meta.shape : undefined;
-    const clases = forma?.[forma.length - 1];
+    const clases = forma?.at(-1);
     // ponytail: fallo fuerte en init si el modelo no casa con el dict (no basura silenciosa).
     if (typeof clases === "number" && clases !== DICT_OCR.length) {
       throw new Error(`rec con ${clases} clases, dict con ${DICT_OCR.length}`);

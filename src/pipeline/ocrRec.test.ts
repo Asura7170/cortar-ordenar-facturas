@@ -217,7 +217,7 @@ describe("DICT_OCR", () => {
     expect(DICT_OCR[0]).toBe("blank");
     expect(DICT_OCR[1]).toBe("!");
     expect(DICT_OCR[4]).toBe("$");
-    expect(DICT_OCR[DICT_OCR.length - 1]).toBe(" ");
+    expect(DICT_OCR.at(-1)).toBe(" ");
     expect(DICT_OCR).toContain("€");
     expect(DICT_OCR).toContain("ñ");
     expect(DICT_OCR).toContain("T");

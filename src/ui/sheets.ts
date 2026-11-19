@@ -308,7 +308,7 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
 
 /** Fila fantasma de hoja nueva (solo visual; hereda el layout de la última). */
 function armarFilaFantasma(): HTMLElement {
-  const ultima = state.hojas[state.hojas.length - 1];
+  const ultima = state.hojas.at(-1);
   const l = layoutDe(ultima?.layout ?? "u4x2");
   const fila = document.createElement("div");
   fila.className = "sheet-row";

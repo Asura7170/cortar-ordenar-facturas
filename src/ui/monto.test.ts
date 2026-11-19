@@ -189,7 +189,7 @@ describe("renderMonto", () => {
     // la ventana nunca sale de la tira (regresión del "desaparecen")
     for (const c of colasAlto) {
       const celulas = [...c.querySelectorAll<HTMLElement>(".monto-digito")];
-      const ultima = celulas[celulas.length - 1];
+      const ultima = celulas.at(-1);
       if (!ultima) {
         throw new Error("sin células");
       }

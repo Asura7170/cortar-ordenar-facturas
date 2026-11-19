@@ -177,7 +177,7 @@ function crearColocacion(destino: number | null): (items: Comprobante[]) => void
     if (!hoja) {
       // Perezosa: el intake vacío o todo-rechazado no crea hojas (el test
       // "null o vacío" lo exige; antes el return temprano lo garantizaba).
-      hoja = state.hojas.find(tieneHueco) ?? state.hojas[state.hojas.length - 1] ?? crearHoja();
+      hoja = state.hojas.find(tieneHueco) ?? state.hojas.at(-1) ?? crearHoja();
       if (!state.hojas.includes(hoja)) {
         state.hojas.push(hoja);
       }
@@ -411,7 +411,7 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
 /** La hoja del clic fantasma: la última si tiene huecos, o una nueva (aún
     sin apuntar a state) heredando su layout. */
 function destinoFantasma(): Hoja {
-  const ultima = state.hojas[state.hojas.length - 1];
+  const ultima = state.hojas.at(-1);
   return ultima && ultima.slots.includes(null) ? ultima : crearHoja(ultima?.layout ?? "u4x2");
 }
 

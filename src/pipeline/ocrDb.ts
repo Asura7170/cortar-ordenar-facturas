@@ -113,10 +113,7 @@ function cadenaCasco(unicos: readonly PuntoDb[], delReves: boolean): PuntoDb[] {
   for (let k = 0; k < n; k += 1) {
     // ponytail: k < n en ambas direcciones.
     const p = unicos[delReves ? n - 1 - k : k] as PuntoDb;
-    while (
-      cadena.length >= 2 &&
-      cruz(cadena[cadena.length - 2] as PuntoDb, cadena[cadena.length - 1] as PuntoDb, p) <= 0
-    ) {
+    while (cadena.length >= 2 && cruz(cadena.at(-2) as PuntoDb, cadena.at(-1) as PuntoDb, p) <= 0) {
       cadena.pop();
     }
     cadena.push(p);
