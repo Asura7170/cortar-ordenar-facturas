@@ -319,7 +319,7 @@ function masaMapa(mapa: Float32Array): number {
   }
   let suma = 0;
   for (const v of mapa) {
-    suma += v ?? 0;
+    suma += v;
   }
   return suma / mapa.length;
 }

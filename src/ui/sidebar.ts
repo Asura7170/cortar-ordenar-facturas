@@ -55,45 +55,32 @@ function avisar(rechazos: readonly AvisoRechazo[]): void {
   mostrarToasts(items);
 }
 
+const MOTIVOS: Record<MotivoRechazo, { readonly titulo: string; readonly texto: string }> = {
+  tamano: {
+    titulo: "Archivo demasiado pesado",
+    texto: "pesa más de 5 MB, comprimila y probá de nuevo",
+  },
+  paginas: {
+    titulo: "PDF demasiado largo",
+    texto: "tiene más de 10 páginas, partila en dos PDF",
+  },
+  cifrado: {
+    titulo: "PDF protegido con contraseña",
+    texto: "protegido con contraseña, quitásela y volvé a subir",
+  },
+  ilegible: {
+    titulo: "No se pudo leer",
+    texto: "no se pudo leer: puede estar corrupta, probá con otra foto",
+  },
+};
+
 function textoMotivo(m: MotivoRechazo): string {
-  switch (m) {
-    case "tamano": {
-      return "pesa más de 5 MB, comprimila y probá de nuevo";
-    }
-    case "paginas": {
-      return "tiene más de 10 páginas, partila en dos PDF";
-    }
-    case "cifrado": {
-      return "protegido con contraseña, quitásela y volvé a subir";
-    }
-    case "ilegible": {
-      return "no se pudo leer: puede estar corrupta, probá con otra foto";
-    }
-    default: {
-      return "no se pudo procesar el archivo";
-    }
-  }
+  return MOTIVOS[m].texto;
 }
 
 /** Título corto y escaneable del rechazo, pareja de textoMotivo. */
 function tituloDeMotivo(m: MotivoRechazo): string {
-  switch (m) {
-    case "tamano": {
-      return "Archivo demasiado pesado";
-    }
-    case "paginas": {
-      return "PDF demasiado largo";
-    }
-    case "cifrado": {
-      return "PDF protegido con contraseña";
-    }
-    case "ilegible": {
-      return "No se pudo leer";
-    }
-    default: {
-      return "Archivo rechazado";
-    }
-  }
+  return MOTIVOS[m].titulo;
 }
 
 // Si hojaId se indica, rellena los huecos de ESA hoja (y crea al final si
