@@ -143,12 +143,12 @@ export function computarLote(lista: readonly Comprobante[]): LoteListo {
     return { tipo: "sin-candidatos" };
   }
   const items: ItemLote[] = [];
-  lista.forEach((c, i) => {
+  for (const [i, c] of lista.entries()) {
     const texto = limpiarTextoCompleto(c.textoOcr);
     if (texto !== "") {
       items.push({ idx: i + 1, id: c.id, texto });
     }
-  });
+  }
   if (items.length === 0) {
     return { tipo: "sin-texto" };
   }

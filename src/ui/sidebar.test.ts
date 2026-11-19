@@ -594,11 +594,15 @@ describe("código de pedido", () => {
     renderCodigo();
     expect(radio("sup-izq").checked).toBe(true);
     expect(radio("inf-der").checked).toBe(false);
-    radios().forEach((r) => expect(r.disabled).toBe(false));
+    for (const r of radios()) {
+      expect(r.disabled).toBe(false);
+    }
 
     state.codigoActivo = false;
     renderCodigo();
-    radios().forEach((r) => expect(r.disabled).toBe(true));
+    for (const r of radios()) {
+      expect(r.disabled).toBe(true);
+    }
   });
 
   it("cambiar de esquina actualiza el estado y persiste solo armado", () => {

@@ -316,10 +316,10 @@ export function hojaPrint(hoja: Hoja, codigo: string, posicion: PosicionCodigo):
   rejilla.className = "rejilla-print";
   rejilla.style.gridTemplateColumns = `repeat(${p.cols}, 1fr)`;
   rejilla.style.gridTemplateRows = `repeat(${p.filas}, 1fr)`;
-  p.pos.forEach(([fila, col, span, spanFila], i) => {
+  for (const [i, [fila, col, span, spanFila]] of p.pos.entries()) {
     const item = hoja.slots[i];
     if (!item) {
-      return;
+      continue;
     }
     const celda = document.createElement("div");
     celda.className = "celda-print";
@@ -331,7 +331,7 @@ export function hojaPrint(hoja: Hoja, codigo: string, posicion: PosicionCodigo):
     img.alt = item.nombre;
     celda.append(img);
     rejilla.append(celda);
-  });
+  }
   seccion.append(rejilla);
   if (!supra && banda) {
     seccion.append(banda);

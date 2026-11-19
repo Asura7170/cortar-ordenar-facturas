@@ -149,9 +149,9 @@ const blanco = (w: number, h: number): Uint8ClampedArray =>
 // Heatmap (1,4,L,L) con un pico por canal en las celdas dadas.
 function heatConPicos(L: number, celdas: [number, number][]): Float32Array {
   const heat = new Float32Array(4 * L * L);
-  celdas.forEach(([cx, cy], c) => {
+  for (const [c, [cx, cy]] of celdas.entries()) {
     heat[c * L * L + cy * L + cx] = 1;
-  });
+  }
   return heat;
 }
 

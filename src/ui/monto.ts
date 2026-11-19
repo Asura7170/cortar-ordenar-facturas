@@ -88,12 +88,12 @@ function pintarBarraBoton(): void {
     // fixture: botón sin spans
     btn.textContent = etiqueta + cuenta;
   } else {
-    textos.forEach((txt) => {
+    for (const txt of textos) {
       txt.textContent = etiqueta;
-    });
-    btn.querySelectorAll(".calculo-cuenta").forEach((cta) => {
+    }
+    for (const cta of btn.querySelectorAll(".calculo-cuenta")) {
       cta.textContent = cuenta;
-    });
+    }
   }
 }
 
@@ -330,13 +330,13 @@ export function renderMonto(): void {
     // ponytail: i < k ≤ texto.length ⇒ in-bounds (el ?? "" era rama muerta).
     hijos.push(spanFijo(texto[i] as string));
   }
-  sufN.split("").forEach((ch, j) => {
+  for (const [j, ch] of sufN.split("").entries()) {
     // ponytail: alinearSufijos SIEMPRE retorna sufN.length ⇒ j in-bounds.
     const v = alineado[j] as string;
     if (!esDigito(ch)) {
       // separador que aparece (coma) o marca de moneda
       hijos.push(spanFijo(ch));
-      return;
+      continue;
     }
     let arranque = esDigito(v) ? +v : 0;
     // Sin vuelo: barrido de la referencia desde el dígito viejo. En vuelo: la ruleta
@@ -355,7 +355,7 @@ export function renderMonto(): void {
     const col = crearCola(arranque, fin);
     colas.push(col);
     hijos.push(col.col);
-  });
+  }
   montoEl.replaceChildren(...hijos);
   const reducir =
     typeof window.matchMedia === "function" &&
@@ -388,13 +388,13 @@ export function renderMonto(): void {
   }
   // reflow: clava el punto de partida
   void montoEl.offsetWidth;
-  colas.forEach((c, i) => {
+  for (const [i, c] of colas.entries()) {
     if (c.fin === c.inicio) {
-      return;
+      continue;
     }
     c.tira.style.transition = `transform ${DURACION}ms cubic-bezier(0.16, 1, 0.3, 1) ${i * ESCALON}ms`;
     c.tira.style.transform = `translateY(${desplazamiento(c.base, c.fin, cell)}px)`;
-  });
+  }
   if (rafId !== null) {
     cancelAnimationFrame(rafId);
   }
@@ -403,21 +403,21 @@ export function renderMonto(): void {
   const maximo = (colas.length - 1) * ESCALON + DURACION;
   const tick = (): void => {
     const t = performance.now() - t0;
-    colas.forEach((c, i) => {
+    for (const [i, c] of colas.entries()) {
       if (c.blurIdx < 0) {
-        return;
+        continue;
       }
       const local = Math.min(1, Math.max(0, (t - i * ESCALON) / DURACION));
       blurEn(c.blurIdx, +(BLUR_MAXIMO * (1 - local)).toFixed(2));
-    });
+    }
     if (t < maximo + 40) {
       rafId = requestAnimationFrame(tick);
     } else {
-      colas.forEach((c) => {
+      for (const c of colas) {
         if (c.blurIdx >= 0) {
           blurEn(c.blurIdx, 0);
         }
-      });
+      }
       rafId = null;
     }
   };

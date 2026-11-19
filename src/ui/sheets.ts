@@ -270,7 +270,9 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "sheet-grid";
   grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
-  l.pos.forEach((p, i) => grid.append(celda(hoja.slots[i] ?? null, p, i, hoja.id)));
+  for (const [i, p] of l.pos.entries()) {
+    grid.append(celda(hoja.slots[i] ?? null, p, i, hoja.id));
+  }
   const tag = document.createElement("span");
   tag.className = "sheet-tag";
   tag.textContent = `HOJA ${idx + 1}`;
@@ -318,7 +320,9 @@ function armarFilaFantasma(): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "sheet-grid";
   grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
-  l.pos.forEach((p, i) => grid.append(celda(null, p, i, HOJA_FANTASMA)));
+  for (const [i, p] of l.pos.entries()) {
+    grid.append(celda(null, p, i, HOJA_FANTASMA));
+  }
   const tag = document.createElement("span");
   tag.className = "sheet-tag";
   tag.textContent = `HOJA ${state.hojas.length + 1} · nueva`;
@@ -376,7 +380,9 @@ function renderCuerpo(borrador: BorradorMonto | null): void {
     return;
   }
 
-  state.hojas.forEach((hoja, idx) => sheetsEl.append(armarFilaHoja(hoja, idx)));
+  for (const [idx, hoja] of state.hojas.entries()) {
+    sheetsEl.append(armarFilaHoja(hoja, idx));
+  }
   // Hoja fantasma: solo visual (nunca entra a state.hojas, así no se
   // exporta ni se cuenta). Hereda el layout de la última; al pegar en
   // ella se materializa como hoja real. Va en .sheet-row con la columna
@@ -468,9 +474,9 @@ export function aplicarATodas(hojaId: string | number): void {
     return;
   }
   const layoutId = h.layout;
-  state.hojas.forEach((x) => {
+  for (const x of state.hojas) {
     x.layout = layoutId;
-  });
+  }
   // las nuevas también reciben la plantilla propagada
   redistribuir(layoutId);
   renderHojas();
@@ -547,9 +553,9 @@ interface BorradorSucio {
 function borradoresVisibles(): Map<number, BorradorSucio> {
   const sucios = new Map<number, BorradorSucio>();
   const a = document.activeElement;
-  sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto").forEach((input) => {
+  for (const input of sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto")) {
     if (input === a || input.value === "") {
-      return;
+      continue;
     }
     const cell = input.closest(".cell");
     const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
@@ -559,13 +565,13 @@ function borradoresVisibles(): Map<number, BorradorSucio> {
         error: input.classList.contains("monto-error"),
       });
     }
-  });
+  }
   return sucios;
 }
 
 /** Restaura borradores sin foco tras el render (valor y error, nunca foco: B2). */
 function restaurarSucios(sucios: Map<number, BorradorSucio>): void {
-  sucios.forEach(({ valor, error }, id) => {
+  for (const [id, { valor, error }] of sucios) {
     const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
     if (input && document.activeElement !== input) {
       input.value = valor;
@@ -574,7 +580,7 @@ function restaurarSucios(sucios: Map<number, BorradorSucio>): void {
         input.setAttribute("aria-invalid", "true");
       }
     }
-  });
+  }
 }
 
 /** Restaura un borrador tras el render (la celda puede haber cambiado a badge). */
@@ -882,11 +888,21 @@ function detenerScroll(): void {
 }
 
 function cancelarDragVisual(): void {
-  sheetsEl.querySelectorAll(".drop-target").forEach((c) => c.classList.remove("drop-target"));
-  sheetsEl.querySelectorAll(".sheet-grid.dragging").forEach((g) => g.classList.remove("dragging"));
-  sheetsEl.querySelectorAll(".sheet.file-drop").forEach((s) => s.classList.remove("file-drop"));
-  sheetsEl.querySelectorAll(".cell.pickup").forEach((c) => c.classList.remove("pickup"));
-  document.querySelectorAll(".drag-ghost").forEach((g) => g.remove());
+  for (const c of sheetsEl.querySelectorAll(".drop-target")) {
+    c.classList.remove("drop-target");
+  }
+  for (const g of sheetsEl.querySelectorAll(".sheet-grid.dragging")) {
+    g.classList.remove("dragging");
+  }
+  for (const s of sheetsEl.querySelectorAll(".sheet.file-drop")) {
+    s.classList.remove("file-drop");
+  }
+  for (const c of sheetsEl.querySelectorAll(".cell.pickup")) {
+    c.classList.remove("pickup");
+  }
+  for (const g of document.querySelectorAll(".drag-ghost")) {
+    g.remove();
+  }
   document.body.classList.remove("is-dragging");
   celdaResaltada = null;
   rectsCache = null;
@@ -1712,11 +1728,11 @@ function cablearArchivosEntrada(): void {
     autoScroll(e.clientX, e.clientY);
     const target = e.target as HTMLElement | null;
     const sheet = target?.closest?.(".sheet");
-    sheetsEl.querySelectorAll(".sheet.file-drop").forEach((s) => {
+    for (const s of sheetsEl.querySelectorAll(".sheet.file-drop")) {
       if (s !== sheet) {
         s.classList.remove("file-drop");
       }
-    });
+    }
     if (sheet instanceof HTMLElement && sheet.dataset["hoja"] !== String(HOJA_FANTASMA)) {
       sheet.classList.add("file-drop");
     }

@@ -519,7 +519,9 @@ describe("monto manual", () => {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       expect(input.classList.contains("monto-error")).toBe(true);
       // el swap llega después
-      diferidos.forEach((cb) => cb());
+      for (const cb of diferidos) {
+        cb();
+      }
       const deNuevo = inputMonto();
       expect(deNuevo.classList.contains("monto-error")).toBe(true);
       expect(deNuevo.getAttribute("aria-invalid")).toBe("true");

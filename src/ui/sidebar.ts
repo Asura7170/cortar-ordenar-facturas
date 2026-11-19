@@ -550,10 +550,10 @@ export function renderCodigo(): void {
   // ponytail: el error visual vive hasta que el usuario corrige o se re-renderiza.
   inputCodigo.classList.remove("codigo-error", "sacudir");
   inputCodigo.removeAttribute("aria-invalid");
-  radiosPosicion().forEach((r) => {
+  for (const r of radiosPosicion()) {
     r.checked = r.value === state.codigoPosicion;
     r.disabled = !state.codigoActivo;
-  });
+  }
 }
 
 /** Abre el diálogo para subir directo a una hoja (la consume cualquier intake). */
@@ -708,7 +708,7 @@ function cablearSwitchCodigo(): void {
 
 /** La esquina es otro dato de la ventana Código: cambiarla persiste igual. */
 function cablearRadiosPosicion(): void {
-  radiosPosicion().forEach((r) =>
+  for (const r of radiosPosicion()) {
     r.addEventListener("change", () => {
       if (!r.checked || !isPosicionCodigo(r.value)) {
         return;
@@ -717,8 +717,8 @@ function cablearRadiosPosicion(): void {
       if (chkCodigo.checked) {
         guardarCodigo();
       }
-    }),
-  );
+    });
+  }
 }
 
 /** El botón Limpiar abre el dialog vía commandfor (cero JS); acá solo se

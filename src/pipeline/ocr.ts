@@ -696,12 +696,12 @@ export async function reconocerLote(
 ): Promise<TextoRec[]> {
   const fuera: TextoRec[] = cajas.map(() => ({ texto: "", puntaje: 0 }));
   const validos: { idx: number; bgr: Uint8Array; w: number; h: number }[] = [];
-  cajas.forEach((caja, idx) => {
+  for (const [idx, caja] of cajas.entries()) {
     const r = recorteCaja(base, caja, crear);
     if (r) {
       validos.push({ idx, ...r });
     }
-  });
+  }
   if (validos.length === 0) {
     return fuera;
   }
@@ -724,9 +724,9 @@ export async function reconocerLote(
       break;
     }
     const { datos, pasos, porLote } = res;
-    trozo.forEach((t, b) => {
+    for (const [b, t] of trozo.entries()) {
       fuera[t.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
-    });
+    }
     chunks += 1;
     anchoMax = Math.max(anchoMax, res.lote.anchoMax);
   }

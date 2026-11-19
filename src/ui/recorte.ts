@@ -252,7 +252,7 @@ function dibujarGuia(): void {
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#fff";
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-  TIRADORES.forEach((t, i) => {
+  for (const [i, t] of TIRADORES.entries()) {
     const hx = rect.x + rect.w * t.fx;
     const hy = rect.y + rect.h * t.fy;
     const l = LADO_VISUAL / 2;
@@ -261,7 +261,7 @@ function dibujarGuia(): void {
     ctx.lineWidth = 2;
     ctx.strokeStyle = i === activo ? "#1d7a3a" : "#fff";
     ctx.strokeRect(hx - l, hy - l, LADO_VISUAL, LADO_VISUAL);
-  });
+  }
 }
 
 function punto(e: PointerEvent): { x: number; y: number } {
