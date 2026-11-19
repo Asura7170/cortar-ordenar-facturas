@@ -1016,7 +1016,7 @@ describe("drop de archivos sobre hojas", () => {
       await new Promise((r) => {
         setTimeout(r, 60);
       });
-      expect(scrollBy.mock.calls).toHaveLength(n);
+      expect(scrollBy).toHaveBeenCalledTimes(n);
     } finally {
       rect.mockRestore();
       delete (canvas as unknown as Record<string, unknown>)["scrollBy"];
