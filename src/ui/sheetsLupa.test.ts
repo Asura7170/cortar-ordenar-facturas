@@ -30,7 +30,9 @@ initSheets({
 
 afterEach(() => {
   const btn = el<HTMLButtonElement>("btnLupa");
-  if (btn.getAttribute("aria-pressed") === "true") btn.click();
+  if (btn.getAttribute("aria-pressed") === "true") {
+    btn.click();
+  }
   ctx.clearRect.mockClear();
   ctx.fillRect.mockClear();
   ctx.drawImage.mockClear();
@@ -46,7 +48,9 @@ function moverLupa(x: number, y: number): void {
 async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
   const t0 = Date.now();
   while (!cond()) {
-    if (Date.now() - t0 > ms) throw new Error("timeout esperando rAF");
+    if (Date.now() - t0 > ms) {
+      throw new Error("timeout esperando rAF");
+    }
     await new Promise((r) => setTimeout(r, 10));
   }
 }
@@ -89,8 +93,9 @@ describe("dibujarLupa", () => {
     renderHojas();
     const cell = document.querySelector(".cell");
     const img = cell?.querySelector("img");
-    if (!(cell instanceof HTMLElement) || !(img instanceof HTMLImageElement))
+    if (!(cell instanceof HTMLElement) || !(img instanceof HTMLImageElement)) {
       throw new Error("sin celda con imagen");
+    }
     Object.defineProperty(img, "naturalWidth", { value: 100, configurable: true });
     Object.defineProperty(img, "naturalHeight", { value: 100, configurable: true });
     const rect = vi.spyOn(img, "getBoundingClientRect").mockReturnValue({

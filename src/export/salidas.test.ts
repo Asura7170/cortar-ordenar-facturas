@@ -135,33 +135,41 @@ function dentroDeCarta(rects: readonly Rect[]): void {
 }
 
 function sinSolapes(rects: readonly Rect[]): void {
-  for (let i = 0; i < rects.length; i++)
+  for (let i = 0; i < rects.length; i++) {
     for (let j = i + 1; j < rects.length; j++) {
       const a = rects[i];
       const b = rects[j];
-      if (!a || !b) throw new Error("rect ausente");
+      if (!a || !b) {
+        throw new Error("rect ausente");
+      }
       expect(seSolapan(a, b)).toBe(false);
     }
+  }
 }
 
 /** Vecinas del mismo eje separadas por al menos la calle (el hueco visible). */
 function conCalle(rects: readonly Rect[], calle: number): void {
-  for (let i = 0; i < rects.length; i++)
+  for (let i = 0; i < rects.length; i++) {
     for (let j = i + 1; j < rects.length; j++) {
       const a = rects[i];
       const b = rects[j];
-      if (!a || !b) throw new Error("rect ausente");
+      if (!a || !b) {
+        throw new Error("rect ausente");
+      }
       const huecoX = Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w);
       const huecoY = Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h);
       // En el eje que comparten hay calle; en el otro pueden solaparse (grilla).
       expect(huecoX >= calle || huecoY >= calle).toBe(true);
     }
+  }
 }
 
 function seccionDe(doc: Registro): Record<string, unknown> {
   const secs = (doc.opc as { sections: Record<string, unknown>[] }).sections;
   const sec = secs[0];
-  if (!sec) throw new Error("sección ausente");
+  if (!sec) {
+    throw new Error("sección ausente");
+  }
   return sec;
 }
 
@@ -219,7 +227,9 @@ describe("geometria", () => {
     const rects = geometria("u1", "sup-izq");
     expect(rects).toHaveLength(1);
     const r = rects[0];
-    if (!r) throw new Error("rect ausente");
+    if (!r) {
+      throw new Error("rect ausente");
+    }
     expect(r.y).toBeGreaterThanOrEqual(Math.round(0.6 * EMU));
     expect(r.y + r.h).toBeLessThanOrEqual(Math.round((11 - 0.3) * EMU));
   });
@@ -260,8 +270,9 @@ describe("encajar", () => {
 describe("construirDocumento (docx mockeado)", () => {
   function hojaCon(n: number): void {
     const h = crearHoja();
-    for (let i = 0; i < n; i++)
+    for (let i = 0; i < n; i++) {
       h.slots[i] = comprobante({ file: new Blob([`jpg${i}`], { type: "image/jpeg" }) });
+    }
     state.hojas.push(h);
   }
 
@@ -293,7 +304,9 @@ describe("construirDocumento (docx mockeado)", () => {
     const docs = deTipo("Document");
     expect(docs).toHaveLength(1);
     const doc = docs[0];
-    if (!doc) throw new Error("documento ausente");
+    if (!doc) {
+      throw new Error("documento ausente");
+    }
     const sec = seccionDe(doc);
     expect(sec["footers"]).toBeDefined();
     expect(sec["headers"]).toBeUndefined();
@@ -320,7 +333,9 @@ describe("construirDocumento (docx mockeado)", () => {
       const imgs = deTipo("ImageRun");
       expect(imgs).toHaveLength(1);
       const img = imgs[0];
-      if (!img) throw new Error("imagen ausente");
+      if (!img) {
+        throw new Error("imagen ausente");
+      }
       const { data } = img.opc as { data: ArrayBuffer };
       const bytes = new Uint8Array(data).slice(0, 3);
       expect(bytes).toStrictEqual(new Uint8Array([0xff, 0xd8, 0xff]));
@@ -336,7 +351,9 @@ describe("construirDocumento (docx mockeado)", () => {
     await construirDocumento(state.hojas, "123456", "sup-izq");
     const docs = deTipo("Document");
     const doc = docs[0];
-    if (!doc) throw new Error("documento ausente");
+    if (!doc) {
+      throw new Error("documento ausente");
+    }
     const sec = seccionDe(doc);
     expect(sec["headers"]).toBeDefined();
     expect(sec["footers"]).toBeUndefined();
@@ -359,7 +376,9 @@ describe("construirDocumento (docx mockeado)", () => {
     await construirDocumento(state.hojas, "", "inf-der");
     const docs = deTipo("Document");
     const doc = docs[0];
-    if (!doc) throw new Error("documento ausente");
+    if (!doc) {
+      throw new Error("documento ausente");
+    }
     const sec = seccionDe(doc);
     expect(sec["headers"]).toBeUndefined();
     expect(sec["footers"]).toBeUndefined();
@@ -462,7 +481,9 @@ describe("initExport", () => {
     state.codigoActivo = false;
     sembrar();
     const aviso = document.getElementById("aviso");
-    if (aviso) aviso.textContent = "";
+    if (aviso) {
+      aviso.textContent = "";
+    }
     const print = vi.fn<() => void>();
     vi.stubGlobal("print", print);
     try {
@@ -481,7 +502,9 @@ describe("initExport", () => {
 describe("hojaPrint", () => {
   function hojaLlena(n: number, layout: LayoutId = "u4x2") {
     const h = crearHoja(layout);
-    for (let i = 0; i < n; i++) h.slots[i] = comprobante();
+    for (let i = 0; i < n; i++) {
+      h.slots[i] = comprobante();
+    }
     return h;
   }
 
@@ -514,7 +537,9 @@ describe("hojaPrint", () => {
     const rects = geometria("u3h", "inf-der");
     const simple = rects[0];
     const alta = rects[2];
-    if (!simple || !alta) throw new Error("rect ausente");
+    if (!simple || !alta) {
+      throw new Error("rect ausente");
+    }
     expect(alta.h).toBeGreaterThan(Math.round(simple.h * 1.9));
     const sec = hojaPrint(hojaLlena(3, "u3h"), "1", "inf-der");
     const celdas = sec.querySelectorAll(".celda-print");
@@ -539,7 +564,9 @@ describe("hojaPrint", () => {
 describe("descargarPdf / imprimir", () => {
   function zona(): HTMLElement {
     const z = document.getElementById("zonaPrint");
-    if (!z) throw new Error("zona ausente");
+    if (!z) {
+      throw new Error("zona ausente");
+    }
     return z;
   }
 

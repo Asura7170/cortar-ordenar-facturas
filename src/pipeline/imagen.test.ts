@@ -337,10 +337,14 @@ describe("recortarMargenesBlancos", () => {
       datos[i + 2] = 128;
     };
     for (let x = 0; x < w; x += 1) {
-      for (let y = 10; y <= 12; y += 1) gris(x, y);
+      for (let y = 10; y <= 12; y += 1) {
+        gris(x, y);
+      }
     }
     for (let y = 20; y <= 24; y += 1) {
-      for (let x = 5; x <= 34; x += 1) gris(x, y);
+      for (let x = 5; x <= 34; x += 1) {
+        gris(x, y);
+      }
     }
     const dibujos: unknown[][] = [];
     const salida = {
@@ -512,8 +516,12 @@ describe("recortarMargenesBlancos", () => {
       datos[i + 1] = 128;
       datos[i + 2] = 128;
     };
-    for (let y = 5; y <= 24; y += 1) tinta(11, y);
-    for (let x = 5; x <= 34; x += 1) tinta(x, 7);
+    for (let y = 5; y <= 24; y += 1) {
+      tinta(11, y);
+    }
+    for (let x = 5; x <= 34; x += 1) {
+      tinta(x, 7);
+    }
     const dibujos: unknown[][] = [];
     const salida = {
       width: 0,

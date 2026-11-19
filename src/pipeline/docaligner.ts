@@ -61,12 +61,16 @@ const RUTA_MODELO: string = import.meta.env.PROD
 
 /** El quarteto denso (o lanza: pocas coords o un hueco). */
 function cuatroPuntosDe(puntos: readonly Punto[]): [Punto, Punto, Punto, Punto] {
-  if (puntos.length !== 4) throw new Error(`ordenarQuad espera 4 puntos, llegan ${puntos.length}`);
+  if (puntos.length !== 4) {
+    throw new Error(`ordenarQuad espera 4 puntos, llegan ${puntos.length}`);
+  }
   const a = puntos[0];
   const b = puntos[1];
   const c = puntos[2];
   const d = puntos[3];
-  if (!a || !b || !c || !d) throw new Error("ordenarQuad: puntos ausentes");
+  if (!a || !b || !c || !d) {
+    throw new Error("ordenarQuad: puntos ausentes");
+  }
   return [a, b, c, d];
 }
 
@@ -115,10 +119,15 @@ export function esConvexo(quad: Quad): boolean {
   ];
   let signo = 0;
   for (const cruz of cruces) {
-    if (cruz === 0) return false;
+    if (cruz === 0) {
+      return false;
+    }
     const s = Math.sign(cruz);
-    if (signo === 0) signo = s;
-    else if (s !== signo) return false;
+    if (signo === 0) {
+      signo = s;
+    } else if (s !== signo) {
+      return false;
+    }
   }
   return true;
 }
@@ -151,14 +160,24 @@ export function esQuadPlausible(
   ancho: number,
   alto: number,
 ): quad is Quad {
-  if (!quad) return false;
-  if (confianzas.length === 4 && Math.min(...confianzas) < UMBRAL_HEATMAP) return false;
-  if (!esConvexo(quad)) return false;
+  if (!quad) {
+    return false;
+  }
+  if (confianzas.length === 4 && Math.min(...confianzas) < UMBRAL_HEATMAP) {
+    return false;
+  }
+  if (!esConvexo(quad)) {
+    return false;
+  }
   const areaMarco = ancho * alto;
   const area = areaQuad(quad);
-  if (area < areaMarco * 0.05 || area > areaMarco * 0.98) return false;
+  if (area < areaMarco * 0.05 || area > areaMarco * 0.98) {
+    return false;
+  }
   const diagonal = Math.hypot(ancho, alto);
-  if (Math.min(...ladosQuad(quad)) < diagonal * 0.05) return false;
+  if (Math.min(...ladosQuad(quad)) < diagonal * 0.05) {
+    return false;
+  }
   return true;
 }
 
@@ -167,8 +186,9 @@ function paresDLT(
   destino: readonly Punto[],
   origen: readonly Punto[],
 ): { src: Punto[]; dst: Punto[] } {
-  if (destino.length < 4 || origen.length < 4)
+  if (destino.length < 4 || origen.length < 4) {
     throw new Error("calcularHomografia espera 4 pares de puntos");
+  }
   // ponytail: largo validado + arrays densos ⇒ el índice es válido.
   const src = [destino[0] as Punto, destino[1] as Punto, destino[2] as Punto, destino[3] as Punto];
   const dst = [origen[0] as Punto, origen[1] as Punto, origen[2] as Punto, origen[3] as Punto];
@@ -221,10 +241,13 @@ function filaMut(a: number[][], f: number): number[] {
 export function pivotar(a: number[][], b: number[], col: number, n: number): void {
   let piv = col;
   for (let fil = col + 1; fil < n; fil++) {
-    if (Math.abs(celda(a, fil, col)) > Math.abs(celda(a, piv, col))) piv = fil;
+    if (Math.abs(celda(a, fil, col)) > Math.abs(celda(a, piv, col))) {
+      piv = fil;
+    }
   }
-  if (Math.abs(celda(a, piv, col)) < 1e-12)
+  if (Math.abs(celda(a, piv, col)) < 1e-12) {
     throw new Error("calcularHomografia: configuración degenerada");
+  }
   if (piv !== col) {
     const fa = filaMut(a, col);
     const fb = filaMut(a, piv);
@@ -237,18 +260,26 @@ export function pivotar(a: number[][], b: number[], col: number, n: number): voi
   }
   const div = celda(a, col, col);
   const fila = filaMut(a, col);
-  for (let k = col; k < n; k++) fila[k] = celda(a, col, k) / div;
+  for (let k = col; k < n; k++) {
+    fila[k] = celda(a, col, k) / div;
+  }
   b[col] = (b[col] as number) / div;
 }
 
 /** Anula la columna col en las demás filas (muta a/b). */
 export function eliminar(a: number[][], b: number[], col: number, n: number): void {
   for (let fil = 0; fil < n; fil++) {
-    if (fil === col) continue;
+    if (fil === col) {
+      continue;
+    }
     const factor = celda(a, fil, col);
-    if (factor === 0) continue;
+    if (factor === 0) {
+      continue;
+    }
     const fr = filaMut(a, fil);
-    for (let k = col; k < n; k++) fr[k] = celda(a, fil, k) - factor * celda(a, col, k);
+    for (let k = col; k < n; k++) {
+      fr[k] = celda(a, fil, k) - factor * celda(a, col, k);
+    }
     // ponytail: b denso (ver pivotar).
     b[fil] = (b[fil] as number) - factor * (b[col] as number);
   }
@@ -269,7 +300,9 @@ export function calcularHomografia(
   }
   const h = new Float64Array(9);
   // ponytail: b trae 8 (sistemaDLT).
-  for (let i = 0; i < 8; i++) h[i] = b[i] as number;
+  for (let i = 0; i < 8; i++) {
+    h[i] = b[i] as number;
+  }
   h[8] = 1;
   return h;
 }
@@ -369,7 +402,9 @@ export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: numb
       const sx = X / W;
       const sy = Y / W;
       // Fuera de la fuente: queda el blanco de fondo.
-      if (sx < 0 || sy < 0 || sx > an - 1 || sy > al - 1) continue;
+      if (sx < 0 || sy < 0 || sx > an - 1 || sy > al - 1) {
+        continue;
+      }
       const [r, g, b] = muestrearBilinear(ent, an, al, sx, sy);
       fuera[o] = r;
       fuera[o + 1] = g;
@@ -435,9 +470,13 @@ export function masaComponente(
     for (const [dx, dy] of VECINOS) {
       const nx = x + dx;
       const ny = y + dy;
-      if (!dentro(nx, ny, w, h)) continue;
+      if (!dentro(nx, ny, w, h)) {
+        continue;
+      }
       const ni = ny * w + nx;
-      if (!vecinoAceptable(visitados, heat, base, ni, umbral)) continue;
+      if (!vecinoAceptable(visitados, heat, base, ni, umbral)) {
+        continue;
+      }
       visitados[ni] = 1;
       pila[cima++] = ni;
     }
@@ -464,8 +503,12 @@ export function mejorComponente(
   const plano = w * h;
   for (let ini = 0; ini < plano; ini++) {
     const v = heat[base + ini] ?? 0;
-    if (v > pico) pico = v;
-    if (v < umbral || (visitados[ini] ?? 0) === 1) continue;
+    if (v > pico) {
+      pico = v;
+    }
+    if (v < umbral || (visitados[ini] ?? 0) === 1) {
+      continue;
+    }
     const { masa, sumaX, sumaY } = masaComponente(heat, base, w, h, umbral, ini, visitados, pila);
     if (masa > mejorMasa) {
       mejorMasa = masa;
@@ -473,7 +516,9 @@ export function mejorComponente(
       mejorY = sumaY / masa;
     }
   }
-  if (mejorMasa === 0) return { punto: null, pico };
+  if (mejorMasa === 0) {
+    return { punto: null, pico };
+  }
   // +0.5 centra la muestra en su celda antes de escalar.
   return { punto: { x: ((mejorX + 0.5) / w) * ancho, y: ((mejorY + 0.5) / h) * alto }, pico };
 }
@@ -488,7 +533,9 @@ export function decodificarHeatmap(
   const h = dims[2] ?? 0;
   const w = dims[3] ?? 0;
   const plano = h * w;
-  if (plano < 1) return { quad: null, confianzas: [] };
+  if (plano < 1) {
+    return { quad: null, confianzas: [] };
+  }
   const visitados = new Uint8Array(plano);
   const pila = new Int32Array(plano);
   const puntos: Punto[] = [];
@@ -507,12 +554,18 @@ export function decodificarHeatmap(
     );
     visitados.fill(0);
     confianzas.push(pico);
-    if (punto === null) continue;
+    if (punto === null) {
+      continue;
+    }
     puntos.push(punto);
   }
-  if (puntos.length !== 4) return { quad: null, confianzas };
+  if (puntos.length !== 4) {
+    return { quad: null, confianzas };
+  }
   const quad = ordenarQuad(puntos);
-  if (!esConvexo(quad)) return { quad: null, confianzas };
+  if (!esConvexo(quad)) {
+    return { quad: null, confianzas };
+  }
   return { quad, confianzas };
 }
 
@@ -532,7 +585,9 @@ export function bitmapATensor(bmp: FuenteDibujable, crear: CrearLienzo = crearRe
   lienzo.width = LADO_MODELO;
   lienzo.height = LADO_MODELO;
   const ctx = lienzo.getContext("2d");
-  if (!ctx) throw new Error("tensor: sin contexto 2d");
+  if (!ctx) {
+    throw new Error("tensor: sin contexto 2d");
+  }
   ctx.drawImage(bmp, 0, 0, LADO_MODELO, LADO_MODELO);
   const { data } = ctx.getImageData(0, 0, LADO_MODELO, LADO_MODELO);
   const plano = LADO_MODELO * LADO_MODELO;
@@ -569,7 +624,9 @@ export async function rectificar(
   lienzo.width = bmp.width;
   lienzo.height = bmp.height;
   const ctx = lienzo.getContext("2d");
-  if (!ctx) throw new Error("rectificar: sin contexto 2d");
+  if (!ctx) {
+    throw new Error("rectificar: sin contexto 2d");
+  }
   ctx.drawImage(bmp, 0, 0);
   const pix = ctx.getImageData(0, 0, bmp.width, bmp.height);
   const { width, height } = tamanoSalida(quad);
@@ -582,14 +639,18 @@ export async function rectificar(
   lienzo.width = width;
   lienzo.height = height;
   const ctx2 = lienzo.getContext("2d");
-  if (!ctx2) throw new Error("rectificar: sin contexto 2d");
+  if (!ctx2) {
+    throw new Error("rectificar: sin contexto 2d");
+  }
   ctx2.putImageData(new ImageData(fuera.datos, width, height), 0, 0);
   // ponytail: el warp deja cuñas blancas si el quad se salió de la foto; el mismo recorte las quita.
   const limpio = recortarMargenesBlancos(lienzo, crear);
   const blob = await new Promise<Blob | null>((res) =>
     limpio.toBlob(res, "image/webp", CALIDAD_WEBP),
   );
-  if (!blob) throw new Error("rectificar: sin blob");
+  if (!blob) {
+    throw new Error("rectificar: sin blob");
+  }
   return blob;
 }
 
@@ -638,7 +699,9 @@ let avisoIaActivo = false;
 export function falloIa(e: unknown, contexto: string): void {
   const msj = e instanceof Error && e.message !== "" ? e.message : contexto;
   console.error(`${contexto}: IA no disponible (${msj})`);
-  if (avisoIaActivo) return;
+  if (avisoIaActivo) {
+    return;
+  }
   avisoIaActivo = true;
   mostrarToasts(
     esImportDinamicoMuerto(msj)
@@ -713,7 +776,9 @@ export async function iniciarSesion<T>(
 ): Promise<T> {
   let ultimoError: unknown = null;
   for (const ep of eps) {
-    if (epCaidos.has(ep)) continue;
+    if (epCaidos.has(ep)) {
+      continue;
+    }
     try {
       return await conTimeout(intentar(ep), timeoutMs);
     } catch (error: unknown) {
@@ -741,7 +806,9 @@ const frioHasta = new Map<string, number>();
 /** Cache "modelos" o undefined si el almacenamiento está bloqueado (modo
     privado, quota, políticas): degrada a red directa en vez de tumbar la IA. */
 async function abrirModelos(): Promise<Cache | undefined> {
-  if (typeof caches === "undefined") return undefined;
+  if (typeof caches === "undefined") {
+    return undefined;
+  }
   try {
     return await caches.open("modelos");
   } catch {
@@ -752,10 +819,14 @@ async function abrirModelos(): Promise<Cache | undefined> {
 /** Baja las claves de la era sin versión (y de versiones de modelos pasadas):
     ocupan quota y ya no matcherían ninguna clave nueva. */
 async function limpiarLegacy(cache: Cache | undefined): Promise<void> {
-  if (!cache) return;
+  if (!cache) {
+    return;
+  }
   try {
     for (const peticion of await cache.keys()) {
-      if (!peticion.url.includes(`modelos_v=${MODELOS_VERSION}`)) await cache.delete(peticion.url);
+      if (!peticion.url.includes(`modelos_v=${MODELOS_VERSION}`)) {
+        await cache.delete(peticion.url);
+      }
     }
   } catch {
     /* best-effort: sin limpieza sigue funcionando */
@@ -774,7 +845,9 @@ export async function descargarConCache(
   minBytes = 0,
 ): Promise<ArrayBuffer> {
   const enCurso = enVuelo.get(clave);
-  if (enCurso) return enCurso;
+  if (enCurso) {
+    return enCurso;
+  }
   const tarea = intentoDeDescarga(clave, timeoutMs, minBytes);
   enVuelo.set(clave, tarea);
   try {
@@ -791,9 +864,13 @@ async function pesoGuardado(
   minBytes: number,
 ): Promise<ArrayBuffer | null> {
   const guardada = await cache?.match(clave);
-  if (!guardada) return null;
+  if (!guardada) {
+    return null;
+  }
   const buf = await guardada.arrayBuffer();
-  if (buf.byteLength >= minBytes) return buf;
+  if (buf.byteLength >= minBytes) {
+    return buf;
+  }
   // ponytail: guardada no-null implica cache vivo; el delete fallido solo cuesta un re-hit.
   await (cache as Cache).delete(clave).catch(() => false);
   return null;
@@ -809,7 +886,9 @@ async function intentoDeDescarga(
   const llave = claveCache(clave);
   const cache = await abrirModelos();
   const local = await pesoGuardado(cache, llave, minBytes);
-  if (local) return local;
+  if (local) {
+    return local;
+  }
   const frio = frioHasta.get(clave) ?? 0;
   if (Date.now() < frio) {
     throw new Error(`la descarga de ${clave} recién falló: esperá ~1 minuto y reintentá`);
@@ -818,7 +897,9 @@ async function intentoDeDescarga(
   // ponytail: la descarga comparte presupuesto EP — un stall no envenena el singleton.
   try {
     const res = await fetch(clave, { signal: AbortSignal.timeout(timeoutMs) });
-    if (!res.ok) throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
+    if (!res.ok) {
+      throw new Error(`modelo: HTTP ${res.status} en ${clave}`);
+    }
     const pesos = await res.arrayBuffer();
     if (pesos.byteLength < minBytes) {
       throw new Error(`modelo corrupto o incompleto en ${clave} (${pesos.byteLength}B)`);
@@ -838,7 +919,9 @@ async function guardarEnCache(
   clave: string,
   pesos: ArrayBuffer,
 ): Promise<void> {
-  if (!cache) return;
+  if (!cache) {
+    return;
+  }
   try {
     await cache.put(
       clave,
@@ -871,7 +954,9 @@ export async function tamanoModelos(): Promise<number> {
     el fallo: "no se pudo borrar" es mentible en Ajustes, nunca tragado. */
 // oxlint-disable-next-line eslint/require-await -- conserva async: un throw síncrono de caches.delete llega como rechazo
 export async function borrarModelos(): Promise<boolean> {
-  if (typeof caches === "undefined") return false;
+  if (typeof caches === "undefined") {
+    return false;
+  }
   return caches.delete("modelos");
 }
 
@@ -900,7 +985,9 @@ async function crearSesion(): Promise<SesionDetectora> {
           const t = new ort.Tensor("float32", tensor, [1, 3, LADO_MODELO, LADO_MODELO]);
           const sal = await s.run({ [entrada]: t });
           const o = sal[salida];
-          if (!o) throw new Error("modelo sin salida heatmap");
+          if (!o) {
+            throw new Error("modelo sin salida heatmap");
+          }
           return { datos: o.data as Float32Array, dims: [...o.dims] };
         },
       };
@@ -928,7 +1015,9 @@ export function conBorde(
   lienzo.width = bmp.width + pad * 2;
   lienzo.height = bmp.height + pad * 2;
   const ctx = lienzo.getContext("2d");
-  if (!ctx) throw new Error("borde: sin contexto 2d");
+  if (!ctx) {
+    throw new Error("borde: sin contexto 2d");
+  }
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, lienzo.width, lienzo.height);
   ctx.drawImage(bmp, pad, pad);
@@ -964,7 +1053,9 @@ export async function detectarYRecortar(blob: Blob, deps?: DepsRecorte): Promise
     const base = conBorde(bmp, crear);
     const sesion = await fabrica();
     const quad = await detectarEsquinas(base, sesion, crear);
-    if (!quad) return blob;
+    if (!quad) {
+      return blob;
+    }
     return await rectificar(bmp, quitarBorde(quad), crear);
   } catch (error: unknown) {
     console.error(

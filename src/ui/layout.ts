@@ -134,6 +134,8 @@ export function isLayoutId(id: string): id is LayoutId {
 }
 
 export function layoutDe(id: string): Plantilla {
-  if (isLayoutId(id)) return PLANTILLAS[id];
+  if (isLayoutId(id)) {
+    return PLANTILLAS[id];
+  }
   return PLANTILLAS.u4x2;
 }

@@ -42,7 +42,9 @@ async function pintarModelos(): Promise<void> {
 let modelosOcupado = false;
 
 function ocuparModelos(): boolean {
-  if (modelosOcupado) return false;
+  if (modelosOcupado) {
+    return false;
+  }
   modelosOcupado = true;
   btnProbarIa.disabled = true;
   btnDescargarModelos.disabled = true;
@@ -74,7 +76,9 @@ export function initSettings(): void {
     renderHojas();
   });
   btnProbarIa.addEventListener("click", () => {
-    if (!ocuparModelos()) return;
+    if (!ocuparModelos()) {
+      return;
+    }
     reactivarIa(); // sin enfriamiento ni latch de EPs: la prueba nace fresca
     estadoModelos.textContent = "IA: probando (descarga y sesiones GPU)…";
     void (async (): Promise<void> => {
@@ -93,7 +97,9 @@ export function initSettings(): void {
     })();
   });
   btnDescargarModelos.addEventListener("click", () => {
-    if (!ocuparModelos()) return;
+    if (!ocuparModelos()) {
+      return;
+    }
     estadoModelos.textContent = "Modelos: descargando…";
     void (async (): Promise<void> => {
       try {
@@ -109,7 +115,9 @@ export function initSettings(): void {
     })();
   });
   btnBorrarModelos.addEventListener("click", () => {
-    if (!ocuparModelos()) return;
+    if (!ocuparModelos()) {
+      return;
+    }
     void (async (): Promise<void> => {
       try {
         const habia = await borrarModelos();

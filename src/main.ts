@@ -32,9 +32,15 @@ export function resolverTema(
   luz: boolean,
   oscuridad: boolean,
 ): "claro" | "oscuro" {
-  if (guardado === "claro" || guardado === "oscuro") return guardado;
-  if (luz) return "claro";
-  if (oscuridad) return "oscuro";
+  if (guardado === "claro" || guardado === "oscuro") {
+    return guardado;
+  }
+  if (luz) {
+    return "claro";
+  }
+  if (oscuridad) {
+    return "oscuro";
+  }
   // Sin matchMedia o sin coincidencia (modo desconocido) el default es claro.
   return "claro";
 }
@@ -63,7 +69,9 @@ function initTema(): void {
 
 cargar();
 initTema();
-if (state.hojas.length === 0) state.hojas.push(crearHoja());
+if (state.hojas.length === 0) {
+  state.hojas.push(crearHoja());
+}
 initSheets({ agregarArchivos, pedirArchivos: elegirArchivos, pegarEnCelda });
 initSidebar();
 initOcrMode();

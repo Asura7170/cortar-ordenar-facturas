@@ -74,7 +74,9 @@ function bitmapFalso(w: number, h: number): ImageBitmap {
 function mapaUnaLinea(): { data: Float32Array; dims: number[] } {
   const data = new Float32Array(16 * 8).fill(0.01);
   for (let y = 2; y <= 5; y += 1) {
-    for (let x = 2; x <= 5; x += 1) data[y * 16 + x] = 0.9;
+    for (let x = 2; x <= 5; x += 1) {
+      data[y * 16 + x] = 0.9;
+    }
   }
   return { data, dims: [1, 1, 8, 16] };
 }
@@ -625,7 +627,9 @@ describe("reconocerLote", () => {
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
         const { formas } = feeds["x"] as { formas: number[] };
         llamadas.push(formas);
-        if ((formas[0] ?? 0) > 1) return Promise.reject(new Error("sin batch"));
+        if ((formas[0] ?? 0) > 1) {
+          return Promise.reject(new Error("sin batch"));
+        }
         return Promise.resolve({ fetch_name_0: logitsAA() });
       },
     };
@@ -653,7 +657,9 @@ describe("reconocerLote", () => {
         const { formas } = feeds["x"] as { formas: number[] };
         llamadas.push(formas);
         n += 1;
-        if (n === 2) return Promise.reject(new Error("chunk caído"));
+        if (n === 2) {
+          return Promise.reject(new Error("chunk caído"));
+        }
         const b = formas[0] ?? 0;
         const data = new Float32Array(b * 3 * clases);
         for (let k = 0; k < b; k += 1) {
@@ -860,7 +866,9 @@ describe("enderezar (decisión rec)", () => {
           recLlamadas.push(ri);
           const n = ri;
           ri += 1;
-          if (n === fallaRecEn) return Promise.reject(new Error("rec roto"));
+          if (n === fallaRecEn) {
+            return Promise.reject(new Error("rec roto"));
+          }
           return Promise.resolve({
             fetch_name_0: logitsConf("A", confs[Math.min(n, confs.length - 1)] ?? 0),
           });
@@ -1129,8 +1137,11 @@ describe("descargarPesosOcr", () => {
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     }
   });
 
@@ -1153,7 +1164,9 @@ describe("descargarPesosOcr", () => {
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches !== undefined) g["caches"] = real.caches;
+      if (real.caches !== undefined) {
+        g["caches"] = real.caches;
+      }
     }
   });
 });

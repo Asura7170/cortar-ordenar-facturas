@@ -151,9 +151,13 @@ function pintarBase(foto: ImageBitmap): boolean {
 }
 
 export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
-  if (modal.open || aperturaEnCurso) return;
+  if (modal.open || aperturaEnCurso) {
+    return;
+  }
   const item = obtenerComprobante(id);
-  if (!item || item.estado !== "ok") return;
+  if (!item || item.estado !== "ok") {
+    return;
+  }
   aperturaEnCurso = true;
   let foto: ImageBitmap | null = null;
   try {
@@ -161,7 +165,9 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   } finally {
     aperturaEnCurso = false;
   }
-  if (!foto) return;
+  if (!foto) {
+    return;
+  }
   if (esFotoInsuficiente(foto)) {
     foto.close();
     return;
@@ -178,7 +184,9 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   depsVigentes = deps;
   modal.showModal();
   dimensionarCanvases(foto);
-  if (!pintarBase(foto)) return;
+  if (!pintarBase(foto)) {
+    return;
+  }
   restablecer();
 }
 
@@ -202,7 +210,9 @@ function cerrarAnterior(): void {
 }
 
 function pedirGuia(): void {
-  if (raf !== null) return;
+  if (raf !== null) {
+    return;
+  }
   raf = requestAnimationFrame(() => {
     raf = null;
     dibujarGuia();
@@ -211,9 +221,13 @@ function pedirGuia(): void {
 
 /** Solo overlay (la base es estática): velo fuera del rect + 8 tiradores. */
 function dibujarGuia(): void {
-  if (!bmp) return;
+  if (!bmp) {
+    return;
+  }
   const ctx = guia.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) {
+    return;
+  }
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cw + MARGEN * 2, ch + MARGEN * 2);
@@ -249,7 +263,9 @@ function tiradorEn(p: { x: number; y: number }): number {
     const radio = t.fx !== 0.5 && t.fy !== 0.5 ? RADIO_ESQUINA : RADIO_LADO;
     const hx = rect.x + rect.w * t.fx;
     const hy = rect.y + rect.h * t.fy;
-    if (Math.hypot(p.x - hx, p.y - hy) <= radio) return i;
+    if (Math.hypot(p.x - hx, p.y - hy) <= radio) {
+      return i;
+    }
   }
   return -1;
 }
@@ -279,11 +295,19 @@ function bandaGanadora(
   const dO = Math.abs(p.x - izq);
   const dE = Math.abs(p.x - der);
   const d = Math.min(dN, dS, dO, dE);
-  if (d > BANDA_BORDE) return null;
+  if (d > BANDA_BORDE) {
+    return null;
+  }
   // Cerca de un vértice manda la esquina (coherente con el radio generoso).
-  if (d === dN) return conVertice(p.x, izq, der, "no", "ne", "n");
-  if (d === dS) return conVertice(p.x, izq, der, "so", "se", "s");
-  if (d === dO) return conVertice(p.y, arr, aba, "no", "so", "o");
+  if (d === dN) {
+    return conVertice(p.x, izq, der, "no", "ne", "n");
+  }
+  if (d === dS) {
+    return conVertice(p.x, izq, der, "so", "se", "s");
+  }
+  if (d === dO) {
+    return conVertice(p.y, arr, aba, "no", "so", "o");
+  }
   return conVertice(p.y, arr, aba, "ne", "se", "e");
 }
 
@@ -291,7 +315,9 @@ function bandaGanadora(
 function bordeEn(p: { x: number; y: number }): Borde | null {
   const i = tiradorEn(p);
   // ponytail: i viene de tiradorEn (índice válido de la tabla); sin fallback.
-  if (i >= 0) return (TIRADORES[i] as Tirador).b;
+  if (i >= 0) {
+    return (TIRADORES[i] as Tirador).b;
+  }
   const izq = rect.x;
   const arr = rect.y;
   const der = rect.x + rect.w;
@@ -301,8 +327,9 @@ function bordeEn(p: { x: number; y: number }): Borde | null {
     p.x > der + BANDA_BORDE ||
     p.y < arr - BANDA_BORDE ||
     p.y > aba + BANDA_BORDE
-  )
+  ) {
     return null;
+  }
   return bandaGanadora(p, izq, arr, der, aba);
 }
 
@@ -348,10 +375,18 @@ function moverA(b: Borde, p: { x: number; y: number }): void {
   let aba = aba0;
   // ponytail: mínimo en ambas unidades (con upscale, 24 display < 8 naturales).
   const minLado = Math.max(MIN_LADO, Math.ceil(MIN_NATURAL / escala));
-  if (tocaArriba(b)) arr = Math.min(Math.max(p.y, MARGEN), aba0 - minLado);
-  if (tocaAbajo(b)) aba = Math.max(Math.min(p.y, abaMax), arr + minLado);
-  if (tocaIzquierda(b)) izq = Math.min(Math.max(p.x, MARGEN), der0 - minLado);
-  if (tocaDerecha(b)) der = Math.max(Math.min(p.x, derMax), izq + minLado);
+  if (tocaArriba(b)) {
+    arr = Math.min(Math.max(p.y, MARGEN), aba0 - minLado);
+  }
+  if (tocaAbajo(b)) {
+    aba = Math.max(Math.min(p.y, abaMax), arr + minLado);
+  }
+  if (tocaIzquierda(b)) {
+    izq = Math.min(Math.max(p.x, MARGEN), der0 - minLado);
+  }
+  if (tocaDerecha(b)) {
+    der = Math.max(Math.min(p.x, derMax), izq + minLado);
+  }
   rect = { x: izq, y: arr, w: der - izq, h: aba - arr };
   pedirGuia();
 }
@@ -376,12 +411,16 @@ async function recortarBlobDe(foto: ImageBitmap, crear: typeof crearReal): Promi
   lienzo.width = w;
   lienzo.height = h;
   const ctx = lienzo.getContext("2d");
-  if (!ctx) throw new Error("sin contexto 2d");
+  if (!ctx) {
+    throw new Error("sin contexto 2d");
+  }
   ctx.drawImage(foto, sx, sy, w, h, 0, 0, w, h);
   const recortado = await new Promise<Blob | null>((res) =>
     lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
   );
-  if (!recortado) throw new Error("sin blob recortado");
+  if (!recortado) {
+    throw new Error("sin blob recortado");
+  }
   return recortado;
 }
 
@@ -395,7 +434,9 @@ async function commitearYReleer(
 ): Promise<boolean> {
   // ponytail: sesión cruzada (cerrar+reabrir en vuelo): la confirmación vieja
   // no commitea y no toca el diálogo nuevo (sin close: ya no es suyo).
-  if (sesion !== miSesion) return false;
+  if (sesion !== miSesion) {
+    return false;
+  }
   // ponytail: commit tras los awaits (igual que la cola: sin dueño no se
   // guarda). Sin dueño o descarte en vuelo se cierra (el evento close limpia
   // el bitmap rancio).
@@ -411,7 +452,9 @@ async function commitearYReleer(
   // ponytail: import antes del close (si falla, el catch dice la verdad:
   // nada se commiteó todavía). Sesión cruzada: el diálogo nuevo sigue abierto.
   const { renderHojas } = await import("./sheets");
-  if (sesion !== miSesion) return false;
+  if (sesion !== miSesion) {
+    return false;
+  }
   modal.close();
   renderHojas();
   // ponytail: el giro programa su relectura con debounce (si el recorte
@@ -427,14 +470,20 @@ async function confirmar(): Promise<void> {
   const id = idAbierto;
   const foto = bmp;
   const miSesion = sesion;
-  if (id === null || !foto || confirmando) return;
+  if (id === null || !foto || confirmando) {
+    return;
+  }
   const item = obtenerComprobante(id);
-  if (!item || item.estado !== "ok") return;
+  if (!item || item.estado !== "ok") {
+    return;
+  }
   const crear = crearVigente();
   confirmando = true;
   try {
     const recortado = await recortarBlobDe(foto, crear);
-    if (!recortado) return;
+    if (!recortado) {
+      return;
+    }
     await commitearYReleer(item, recortado, id, miSesion);
   } catch {
     avisar("No se pudo recortar la imagen.");
@@ -449,7 +498,9 @@ function cablearBotonesModal(): void {
     void confirmar();
   });
   btnReset.addEventListener("click", () => {
-    if (bmp) restablecer();
+    if (bmp) {
+      restablecer();
+    }
   });
   modal.addEventListener("close", () => {
     state.cierreRecorte = Date.now();
@@ -458,21 +509,29 @@ function cablearBotonesModal(): void {
   // ponytail: descarte explícito (sin depender de closedby): el clic en el
   // velo tiene como target el propio dialog; el de la foto/barra, a sus hijos.
   modal.addEventListener("click", (e) => {
-    if (e.target === modal && modal.open) modal.close();
+    if (e.target === modal && modal.open) {
+      modal.close();
+    }
   });
 }
 
 /** Arranque de arrastre: tirador o interior; captura el puntero. */
 function cablearPunteroAbajo(): void {
   guia.addEventListener("pointerdown", (e) => {
-    if (!bmp || !e.isPrimary) return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (!bmp || !e.isPrimary) {
+      return;
+    }
+    if (e.pointerType === "mouse" && e.button !== 0) {
+      return;
+    }
     const p = punto(e);
     const b = bordeEn(p);
     e.preventDefault();
     if (!b) {
       // Interior sin borde cerca: se mueve el área completa.
-      if (!dentroDe(p)) return;
+      if (!dentroDe(p)) {
+        return;
+      }
       moviendoEntero = true;
       agarreX = p.x - rect.x;
       agarreY = p.y - rect.y;
@@ -506,7 +565,9 @@ function cursorDeGuia(p: { x: number; y: number }): string {
 /** Arrastre y cursor de la zona bajo el puntero. */
 function cablearPunteroGuia(): void {
   guia.addEventListener("pointermove", (e) => {
-    if (!bmp) return;
+    if (!bmp) {
+      return;
+    }
     const p = punto(e);
     if (enArrastre) {
       moverA(borde, p);
@@ -529,7 +590,9 @@ function cablearPunteroGuia(): void {
 
 /** [ ] rotan el tirador activo (y su borde); false si la tecla no es esa. */
 function rotarTirador(e: KeyboardEvent): boolean {
-  if (e.key !== "[" && e.key !== "]") return false;
+  if (e.key !== "[" && e.key !== "]") {
+    return false;
+  }
   e.preventDefault();
   activo = (activo + (e.key === "[" ? TIRADORES.length - 1 : 1)) % TIRADORES.length;
   // ponytail: activo se mantiene módulo TIRADORES.length; índice válido.
@@ -558,8 +621,12 @@ function destinoTecla(e: KeyboardEvent, t: Tirador): { x: number; y: number } | 
 /** Teclado: [ ] rotan el tirador activo, flechas lo mueven, Enter confirma. */
 function cablearTecladoGuia(): void {
   guia.addEventListener("keydown", (e) => {
-    if (!bmp) return;
-    if (rotarTirador(e)) return;
+    if (!bmp) {
+      return;
+    }
+    if (rotarTirador(e)) {
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       void confirmar();
@@ -568,7 +635,9 @@ function cablearTecladoGuia(): void {
     // ponytail: activo se mantiene módulo TIRADORES.length; índice válido.
     const t = TIRADORES[activo] as Tirador;
     const d = destinoTecla(e, t);
-    if (!d) return;
+    if (!d) {
+      return;
+    }
     e.preventDefault();
     moverA(t.b, d);
   });
@@ -576,7 +645,9 @@ function cablearTecladoGuia(): void {
 
 export function initRecorte(): void {
   // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
-  if (modal.dataset["init"] === "1") return;
+  if (modal.dataset["init"] === "1") {
+    return;
+  }
   modal.dataset["init"] = "1";
   cablearBotonesModal();
   cablearPunteroAbajo();

@@ -75,7 +75,9 @@ describe("canal #aviso (pila de toasts)", () => {
     expect(toasts[0]?.classList.contains("toast-error")).toBe(true);
     expect(toasts[1]?.classList.contains("toast-error")).toBe(true);
     // Cada error anuncia por sí (assertivo), sin relatar la historia completa.
-    for (const t of toasts) expect(t.getAttribute("role")).toBe("alert");
+    for (const t of toasts) {
+      expect(t.getAttribute("role")).toBe("alert");
+    }
   });
 
   it("estructura: título, detalle con archivo el último, y title completo", () => {

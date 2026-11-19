@@ -124,8 +124,11 @@ describe("Modelos", () => {
     return () => {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     };
   }
 
@@ -138,7 +141,9 @@ describe("Modelos", () => {
       await pausa();
       expect(estadoModelos.textContent).toBe("Modelos: no descargados");
     } finally {
-      if (realCaches !== undefined) g["caches"] = realCaches;
+      if (realCaches !== undefined) {
+        g["caches"] = realCaches;
+      }
       modalAjustes.close();
     }
   });
@@ -201,8 +206,11 @@ describe("Modelos", () => {
       // La IA degrada a red directa sin caché; aquí solo se ve "no hay nada".
       expect(estadoModelos.textContent).toContain("Modelos: no descargados");
     } finally {
-      if (realCaches === undefined) delete g["caches"];
-      else g["caches"] = realCaches;
+      if (realCaches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = realCaches;
+      }
       modalAjustes.close();
     }
   });
@@ -222,8 +230,11 @@ describe("Modelos", () => {
       expect(estadoModelos.textContent).toContain("no se pudo borrar");
       expect(estadoModelos.textContent).not.toContain("denegado");
     } finally {
-      if (realCaches === undefined) delete g["caches"];
-      else g["caches"] = realCaches;
+      if (realCaches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = realCaches;
+      }
     }
   });
 });

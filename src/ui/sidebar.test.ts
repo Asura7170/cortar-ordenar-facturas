@@ -30,8 +30,12 @@ vi.mock("../pipeline/imagen", async (importOriginal) => {
     ...real,
     normalizarImagen: async (f: File): Promise<Blob> => {
       const motivo = fallosImagen.get(f.name);
-      if (motivo) throw new Error(motivo);
-      if (esperaNormalizar) await esperaNormalizar;
+      if (motivo) {
+        throw new Error(motivo);
+      }
+      if (esperaNormalizar) {
+        await esperaNormalizar;
+      }
       return new Blob(["x"], { type: "image/jpeg" });
     },
   };
@@ -571,7 +575,9 @@ describe("código de pedido", () => {
 
   function radio(valor: string): HTMLInputElement {
     const r = document.querySelector<HTMLInputElement>(`input[name="posCodigo"][value="${valor}"]`);
-    if (!r) throw new Error(`sin radio ${valor}`);
+    if (!r) {
+      throw new Error(`sin radio ${valor}`);
+    }
     return r;
   }
 
@@ -853,7 +859,9 @@ describe("pegarEnCelda (clic en vacía)", () => {
     h.slots[0] = comprobante();
     state.hojas.push(h);
     const pendiente = pegarEnCelda(HOJA_FANTASMA, 0);
-    for (let i = 0; i < 50; i++) await Promise.resolve();
+    for (let i = 0; i < 50; i++) {
+      await Promise.resolve();
+    }
     expect(state.hojas).toHaveLength(1); // aún no materializada: normalizando
     state.hojas = [crearHoja("u4x2")]; // barrido en el ínterin
     abrir();

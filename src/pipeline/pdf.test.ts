@@ -200,7 +200,9 @@ describe("expandirPdf", () => {
     const abrir = async (): Promise<DocumentoPdf> => ({
       total: opc.total ?? 3,
       renderizar: async (i: number): Promise<HTMLCanvasElement | null> => {
-        if (opc.rotas?.includes(i)) throw new Error("rota");
+        if (opc.rotas?.includes(i)) {
+          throw new Error("rota");
+        }
         const nula = opc.nulas?.includes(i) ?? false;
         const negra = opc.negras?.includes(i) ?? false;
         const t = tin(opc.blancas?.includes(i) ?? false, negra);
@@ -231,7 +233,9 @@ describe("expandirPdf", () => {
         } as unknown as HTMLCanvasElement;
       },
       cerrar: async (): Promise<void> => {
-        if (opc.cerrarRota) throw new Error("destroy caído");
+        if (opc.cerrarRota) {
+          throw new Error("destroy caído");
+        }
         cerrado = true;
       },
     });

@@ -46,7 +46,9 @@ HTMLDialogElement.prototype.close = function close(
   this: HTMLDialogElement,
   returnValue?: string,
 ): void {
-  if (returnValue !== undefined) this.returnValue = returnValue;
+  if (returnValue !== undefined) {
+    this.returnValue = returnValue;
+  }
   this.removeAttribute("open");
   this.dispatchEvent(new Event("close"));
 };

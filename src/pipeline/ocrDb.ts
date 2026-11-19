@@ -61,7 +61,9 @@ function empujarVecinos(
 ): void {
   for (let dy = -1; dy <= 1; dy += 1) {
     for (let dx = -1; dx <= 1; dx += 1) {
-      if (dx === 0 && dy === 0) continue;
+      if (dx === 0 && dy === 0) {
+        continue;
+      }
       const q = (y + dy) * ancho + (x + dx);
       // ponytail: marca[q] sin ?? (si q es OOB, bin[q] ya cortó a la izquierda).
       if ((bin[q] ?? 0) === 1 && marca[q] === 0) {
@@ -127,7 +129,9 @@ function cadenaCasco(unicos: readonly PuntoDb[], delReves: boolean): PuntoDb[] {
 export function cascoConvexo(puntos: readonly PuntoDb[]): PuntoDb[] {
   const pts = [...puntos].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const unicos = sinDuplicados(pts);
-  if (unicos.length < 3) return unicos;
+  if (unicos.length < 3) {
+    return unicos;
+  }
   return [...cadenaCasco(unicos, false), ...cadenaCasco(unicos, true)];
 }
 
@@ -155,10 +159,18 @@ export function proyectarCasco(
   for (const p of casco) {
     const u = p[0] * ux + p[1] * uy;
     const v = -p[0] * uy + p[1] * ux;
-    if (u < minU) minU = u;
-    if (u > maxU) maxU = u;
-    if (v < minV) minV = v;
-    if (v > maxV) maxV = v;
+    if (u < minU) {
+      minU = u;
+    }
+    if (u > maxU) {
+      maxU = u;
+    }
+    if (v < minV) {
+      minV = v;
+    }
+    if (v > maxV) {
+      maxV = v;
+    }
   }
   return { minU, maxU, minV, maxV };
 }
@@ -168,7 +180,9 @@ export function proyectarCasco(
  * Devuelve null si es degenerado (<3 puntos de casco).
  */
 export function rectanguloMinimo(casco: readonly PuntoDb[]): CajaDb["poli"] | null {
-  if (casco.length < 3) return null;
+  if (casco.length < 3) {
+    return null;
+  }
   let mejor: CajaDb["poli"] | null = null;
   let mejorArea = Infinity;
   const n = casco.length;
@@ -178,7 +192,9 @@ export function rectanguloMinimo(casco: readonly PuntoDb[]): CajaDb["poli"] | nu
     const dx = b[0] - a[0];
     const dy = b[1] - a[1];
     const mod = Math.hypot(dx, dy);
-    if (mod === 0) continue;
+    if (mod === 0) {
+      continue;
+    }
     const ux = dx / mod;
     const uy = dy / mod;
     const { minU, maxU, minV, maxV } = proyectarCasco(casco, ux, uy);
@@ -207,7 +223,9 @@ export function puntoEnQuad(poli: CajaDb["poli"], x: number, y: number, horario:
     const a = poli[i] ?? [0, 0];
     const b = poli[(i + 1) % 4] ?? [0, 0];
     const c = cruz(a, b, [x, y]);
-    if (horario ? c > 0 : c < 0) return false;
+    if (horario ? c > 0 : c < 0) {
+      return false;
+    }
   }
   return true;
 }
@@ -264,7 +282,9 @@ export function rectaDesplazada(
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const mod = Math.hypot(dx, dy);
-  if (mod === 0) return null;
+  if (mod === 0) {
+    return null;
+  }
   let nx = dy / mod;
   let ny = -dx / mod;
   const mx = (a[0] + b[0]) / 2 - gx;
@@ -282,7 +302,9 @@ export function rectaDesplazada(
 /** Intersección de dos rectas offset (null si paralelas). */
 export function interseccionRectas(r1: RectaOffset, r2: RectaOffset): PuntoDb | null {
   const det = r1.nx * r2.ny - r2.nx * r1.ny;
-  if (Math.abs(det) < 1e-9) return null;
+  if (Math.abs(det) < 1e-9) {
+    return null;
+  }
   return [(r1.c * r2.ny - r2.c * r1.ny) / det, (r1.nx * r2.c - r2.nx * r1.c) / det];
 }
 
@@ -300,21 +322,27 @@ export function expandirQuad(
   const gy = (poli[0][1] + poli[1][1] + poli[2][1] + poli[3][1]) / 4;
   const area = Math.abs(areaDoble(poli)) / 2;
   const per = perimetro(poli);
-  if (per <= 0 || area <= 0) return null;
+  if (per <= 0 || area <= 0) {
+    return null;
+  }
   const d = (area * ratio) / per;
   const rectas = poli.map((a, i) => {
     // ponytail: poli es tupla de 4.
     const b = poli[(i + 1) % 4] as PuntoDb;
     return rectaDesplazada(a, b, gx, gy, d);
   });
-  if (rectas.some((r) => r === null)) return null;
+  if (rectas.some((r) => r === null)) {
+    return null;
+  }
   const fuera: PuntoDb[] = [];
   for (let i = 0; i < 4; i += 1) {
     // ponytail: map de 4.
     const r1 = rectas[(i + 3) % 4] as RectaOffset;
     const r2 = rectas[i] as RectaOffset;
     const p = interseccionRectas(r1, r2);
-    if (!p) return null;
+    if (!p) {
+      return null;
+    }
     fuera.push(p);
   }
   // ponytail: 4 intersecciones (la única salida es el return).
@@ -333,8 +361,12 @@ export function cajasDesdeMapa(
 ): CajaDb[] {
   const cajas: CajaDb[] = [];
   try {
-    if (anchoMapa < 1 || altoMapa < 1 || origen.ancho < 1 || origen.alto < 1) return cajas;
-    if (mapa.length < anchoMapa * altoMapa) return cajas;
+    if (anchoMapa < 1 || altoMapa < 1 || origen.ancho < 1 || origen.alto < 1) {
+      return cajas;
+    }
+    if (mapa.length < anchoMapa * altoMapa) {
+      return cajas;
+    }
     const w = anchoMapa + 2;
     const h = altoMapa + 2;
     const bin = binarizarMapa(mapa, anchoMapa, altoMapa);
@@ -361,13 +393,21 @@ function cajaEnCelda(
   origen: TamanoDb,
 ): CajaDb | null {
   const pixeles = inundar(bin, w, marca, x, y, etiqueta);
-  if (pixeles.length < 3) return null; // puntito sin área
+  if (pixeles.length < 3) {
+    return null;
+  } // puntito sin área
   const mini = rectanguloMinimo(cascoConvexo(pixeles));
-  if (!mini) return null;
+  if (!mini) {
+    return null;
+  }
   const puntaje = puntuarCaja(mapa, anchoMapa, mini);
-  if (puntaje < DB_UMBRAL_CAJA) return null;
+  if (puntaje < DB_UMBRAL_CAJA) {
+    return null;
+  }
   const grande = expandirQuad(ordenarQuad(mini));
-  if (!grande) return null;
+  if (!grande) {
+    return null;
+  }
   const escX = origen.ancho / anchoMapa;
   const escY = origen.alto / altoMapa;
   const esc = grande.map(
@@ -386,7 +426,9 @@ function cajaEnCelda(
     esc[3] as PuntoDb,
   ];
   // ponytail: shoelace (la fórmula anterior daba 0 en quads rotados).
-  if (Math.abs(areaDoble(poli)) / 2 < AREA_MINIMA_CAJA) return null;
+  if (Math.abs(areaDoble(poli)) / 2 < AREA_MINIMA_CAJA) {
+    return null;
+  }
   return { poli, puntaje };
 }
 
@@ -405,10 +447,14 @@ function barrerMapa(
   for (let y = 1; y <= altoMapa && cajas.length < DB_MAX_CAJAS; y += 1) {
     for (let x = 1; x <= anchoMapa && cajas.length < DB_MAX_CAJAS; x += 1) {
       const p = y * w + x;
-      if (bin[p] !== 1 || marca[p] !== 0) continue;
+      if (bin[p] !== 1 || marca[p] !== 0) {
+        continue;
+      }
       etiqueta += 1;
       const caja = cajaEnCelda(bin, w, marca, x, y, mapa, anchoMapa, altoMapa, etiqueta, origen);
-      if (caja) cajas.push(caja);
+      if (caja) {
+        cajas.push(caja);
+      }
     }
   }
 }

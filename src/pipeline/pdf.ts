@@ -66,8 +66,12 @@ function esPassword(e: unknown): boolean {
 /** Gate completo: tamaño (sync) y luego páginas (async). Nunca lanza.
     El contador se inyecta (el llamador pasa el real; los tests, un stub). */
 export async function admitirPdf(f: File, contar: ContadorPaginas): Promise<VeredictoPdf> {
-  if (f.size === 0) return { admite: false, motivo: "ilegible" };
-  if (!admiteTamanoPdf(f)) return { admite: false, motivo: "tamano" };
+  if (f.size === 0) {
+    return { admite: false, motivo: "ilegible" };
+  }
+  if (!admiteTamanoPdf(f)) {
+    return { admite: false, motivo: "tamano" };
+  }
   let paginas: number;
   try {
     paginas = await contar(f);
@@ -119,15 +123,21 @@ async function abrirPdfReal(f: File): Promise<DocumentoPdf> {
     renderizar: async (indice: number): Promise<HTMLCanvasElement | null> => {
       const pagina = await doc.getPage(indice);
       const base = pagina.getViewport({ scale: 1 });
-      if (!vistaSegura(base.width, base.height)) return null;
+      if (!vistaSegura(base.width, base.height)) {
+        return null;
+      }
       const escala = ANCHO_MINI_PDF / base.width;
       const vista = pagina.getViewport({ scale: escala });
-      if (!vistaSegura(vista.width, vista.height)) return null;
+      if (!vistaSegura(vista.width, vista.height)) {
+        return null;
+      }
       const lienzo = document.createElement("canvas");
       lienzo.width = Math.max(1, Math.round(vista.width));
       lienzo.height = Math.max(1, Math.round(vista.height));
       const ctx = lienzo.getContext("2d");
-      if (!ctx) return null;
+      if (!ctx) {
+        return null;
+      }
       await pagina.render({ canvasContext: ctx, canvas: lienzo, viewport: vista }).promise;
       return lienzo;
     },
@@ -156,14 +166,20 @@ export async function expandirPdf(
   const utiles: PaginaPdf[] = [];
   let doc: DocumentoPdf | null = null;
   try {
-    if (!admiteTamanoPdf(f)) return utiles;
+    if (!admiteTamanoPdf(f)) {
+      return utiles;
+    }
     doc = await abrir(f);
     const { total } = doc;
-    if (total < 1 || total > PDF_MAX_PAGINAS) return utiles;
+    if (total < 1 || total > PDF_MAX_PAGINAS) {
+      return utiles;
+    }
     // ponytail: secuencial a propósito; N renders en paralelo saturan memoria.
     for (let i = 1; i <= total; i++) {
       const pagina = await paginaUtil(doc, total, i, crear);
-      if (pagina) utiles.push(pagina);
+      if (pagina) {
+        utiles.push(pagina);
+      }
     }
   } catch {
     return utiles;
@@ -186,9 +202,13 @@ async function paginaUtil(
 ): Promise<PaginaPdf | null> {
   try {
     const original = await doc.renderizar(i);
-    if (!original) return null;
+    if (!original) {
+      return null;
+    }
     const lienzo = recortarMargenesBlancos(original, crear);
-    if (esPaginaBlanca(lienzo) || esPaginaNegra(lienzo)) return null;
+    if (esPaginaBlanca(lienzo) || esPaginaNegra(lienzo)) {
+      return null;
+    }
     const blob = await new Promise<Blob | null>((res) =>
       lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
     );

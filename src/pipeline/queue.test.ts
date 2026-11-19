@@ -136,7 +136,9 @@ describe("procesarCola", () => {
     // aquí): el re-escaneo del for levanta lo aterrizado a mitad de cola.
     let entrada = false;
     vi.mocked(renderHojas).mockImplementation((): void => {
-      if (entrada) return;
+      if (entrada) {
+        return;
+      }
       entrada = true;
       const h = crearHoja();
       h.slots[0] = comprobante({ nombre: "tardio.png" });
@@ -384,7 +386,9 @@ describe("precalentarModelos", () => {
       expect(vi.mocked(obtenerSesion)).toHaveBeenCalledOnce();
       expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledOnce();
     } finally {
-      if (previa !== undefined) w["requestIdleCallback"] = previa;
+      if (previa !== undefined) {
+        w["requestIdleCallback"] = previa;
+      }
     }
   });
 
@@ -407,8 +411,11 @@ describe("precalentarModelos", () => {
       expect(vi.mocked(obtenerSesion)).toHaveBeenCalledOnce();
       expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledOnce();
     } finally {
-      if (previa === undefined) delete w["requestIdleCallback"];
-      else w["requestIdleCallback"] = previa;
+      if (previa === undefined) {
+        delete w["requestIdleCallback"];
+      } else {
+        w["requestIdleCallback"] = previa;
+      }
     }
   });
 });

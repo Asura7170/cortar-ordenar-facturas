@@ -79,7 +79,9 @@ export function montarFixture(): void {
 /** Atajo getEl para tests (falla fuerte como el de la app). */
 export function el<T extends HTMLElement>(id: string): T {
   const n = document.getElementById(id);
-  if (!n) throw new Error(`sin #${id} en el fixture`);
+  if (!n) {
+    throw new Error(`sin #${id} en el fixture`);
+  }
   return n as T;
 }
 

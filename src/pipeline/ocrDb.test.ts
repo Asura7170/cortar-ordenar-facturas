@@ -21,7 +21,9 @@ import type { CajaDb } from "./ocrDb";
 /** Máscara binaria con borde (como la de binarizarMapa) desde set de píxeles. */
 function mascara(w: number, h: number, pixeles: (readonly [number, number])[]): Uint8Array {
   const bin = new Uint8Array((w + 2) * (h + 2));
-  for (const [x, y] of pixeles) bin[(y + 1) * (w + 2) + x + 1] = 1;
+  for (const [x, y] of pixeles) {
+    bin[(y + 1) * (w + 2) + x + 1] = 1;
+  }
   return bin;
 }
 
@@ -37,7 +39,9 @@ function mapaConRect(
 ): Float32Array {
   const mapa = new Float32Array(w * h).fill(0.05);
   for (let y = y0; y <= y1; y += 1) {
-    for (let x = x0; x <= x1; x += 1) mapa[y * w + x] = v;
+    for (let x = x0; x <= x1; x += 1) {
+      mapa[y * w + x] = v;
+    }
   }
   return mapa;
 }
@@ -406,7 +410,9 @@ describe("cajasDesdeMapa", () => {
   it("barra ancha 100x10 → bbox completo (regresión: el trazado la partía)", () => {
     const mapa = new Float32Array(120 * 30).fill(0.05);
     for (let y = 5; y <= 14; y += 1) {
-      for (let x = 10; x <= 109; x += 1) mapa[y * 120 + x] = 0.9;
+      for (let x = 10; x <= 109; x += 1) {
+        mapa[y * 120 + x] = 0.9;
+      }
     }
     const cajas = cajasDesdeMapa(mapa, 120, 30, { ancho: 120, alto: 30 });
     expect(cajas).toHaveLength(1);
@@ -436,14 +442,18 @@ describe("cajasDesdeMapa", () => {
       [5, 5],
       [4, 6],
     ];
-    for (const [x, y] of pixeles) mapa[y * 9 + x] = 1;
+    for (const [x, y] of pixeles) {
+      mapa[y * 9 + x] = 1;
+    }
     expect(cajasDesdeMapa(mapa, 9, 9, { ancho: 9, alto: 9 })).toHaveLength(1);
   });
 
   it("borde irregular en escalera → bbox completo", () => {
     const mapa = new Float32Array(120 * 30).fill(0.05);
     for (let y = 5; y <= 14; y += 1) {
-      for (let x = 10 + (y % 3) * 4; x <= 109; x += 1) mapa[y * 120 + x] = 0.9;
+      for (let x = 10 + (y % 3) * 4; x <= 109; x += 1) {
+        mapa[y * 120 + x] = 0.9;
+      }
     }
     const cajas = cajasDesdeMapa(mapa, 120, 30, { ancho: 120, alto: 30 });
     expect(cajas).toHaveLength(1);
