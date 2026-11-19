@@ -50,8 +50,8 @@ export interface SalidaOcr {
 
 /** Subsesión (det o rec): crear tensores + ejecutar. */
 export interface SubsesionOcr {
-  tensor(datos: Float32Array, formas: readonly number[]): unknown;
-  run(feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>>;
+  tensor: (datos: Float32Array, formas: readonly number[]) => unknown;
+  run: (feeds: Record<string, unknown>) => Promise<Record<string, SalidaOcr>>;
 }
 
 /** Núcleo OCR: ambas sesiones listas. */

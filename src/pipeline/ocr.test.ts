@@ -525,8 +525,14 @@ describe("reconocerCaja", () => {
     let h = 0;
     const crear = (): HTMLCanvasElement =>
       ({
+        get width(): number {
+          return w;
+        },
         set width(v: number) {
           w = v;
+        },
+        get height(): number {
+          return h;
         },
         set height(v: number) {
           h = v;

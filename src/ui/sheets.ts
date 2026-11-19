@@ -1620,8 +1620,12 @@ function pegarDesdeBoton(btn: HTMLElement): void {
 const ACCIONES_CLIC: Readonly<Record<string, (btn: HTMLElement, id: number) => void>> = {
   "copiar-ocr": (btn, id) => copiarOcrAlPortapapeles(id, btn),
   quitar: (_btn, id) => quitarComprobante(id),
-  "girar-izq": (_btn, id) => void girarYReleer(id, 270),
-  "girar-der": (_btn, id) => void girarYReleer(id, 90),
+  "girar-izq": (_btn, id) => {
+    void girarYReleer(id, 270);
+  },
+  "girar-der": (_btn, id) => {
+    void girarYReleer(id, 90);
+  },
   recortar: (_btn, id) => abrirRecorteSiHaceFalta(id),
   "corregir-monto": (_btn, id) => abrirCorreccionMonto(id),
   layout: (btn) => cambiarLayoutHoja(btn.dataset["hoja"] ?? "", btn.dataset["layout"] ?? ""),

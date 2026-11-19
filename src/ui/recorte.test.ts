@@ -449,8 +449,10 @@ describe("abrirRecorte", () => {
         width: 0,
         height: 0,
         getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
-        // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
-        toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
+        toBlob: (cb: (b: Blob | null) => void) => {
+          // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
+          void promise.then(cb);
+        },
       }));
       const c = sembrar();
       const antes = c.file;
@@ -485,8 +487,10 @@ describe("abrirRecorte", () => {
         width: 0,
         height: 0,
         getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
-        // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
-        toBlob: (cb: (b: Blob | null) => void) => void promise.then(cb),
+        toBlob: (cb: (b: Blob | null) => void) => {
+          // oxlint-disable-next-line promise/no-callback-in-promise -- mock del callback de toBlob
+          void promise.then(cb);
+        },
       }));
       const c = sembrar();
       const antes = c.file;

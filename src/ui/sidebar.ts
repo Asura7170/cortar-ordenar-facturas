@@ -69,6 +69,9 @@ function textoMotivo(m: MotivoRechazo): string {
     case "ilegible": {
       return "no se pudo leer: puede estar corrupta, probá con otra foto";
     }
+    default: {
+      return "no se pudo procesar el archivo";
+    }
   }
 }
 
@@ -86,6 +89,9 @@ function tituloDeMotivo(m: MotivoRechazo): string {
     }
     case "ilegible": {
       return "No se pudo leer";
+    }
+    default: {
+      return "Archivo rechazado";
     }
   }
 }
@@ -312,7 +318,7 @@ export async function agregarArchivos(
 /** Item del portapapeles con al menos una imagen (shape mínimo de ClipboardItem). */
 interface ItemConImagen {
   readonly types: readonly string[];
-  getType(tipo: string): Promise<Blob>;
+  getType: (tipo: string) => Promise<Blob>;
 }
 
 // Sin bytes de imagen el clic no puede pegar: el Ctrl+C al ARCHIVO en el
