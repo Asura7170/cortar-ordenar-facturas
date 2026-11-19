@@ -891,7 +891,7 @@ function iniciarGhost(d: DragState, x: number, y: number): void {
   ghost.className = "drag-ghost";
   ghost.style.width = `${base.width}px`;
   ghost.style.height = `${base.height}px`;
-  document.body.appendChild(ghost);
+  document.body.append(ghost);
   d.ghost = ghost;
   d.gw = base.width / 2;
   d.gh = base.height / 2;

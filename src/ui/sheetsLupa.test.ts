@@ -57,7 +57,7 @@ describe("dibujarLupa", () => {
     // luego rojo (el fondo se resuelve en el propio nodo).
     const panel = document.createElement("div");
     panel.style.backgroundColor = "transparent";
-    document.body.appendChild(panel);
+    document.body.append(panel);
     Object.defineProperty(document, "elementFromPoint", {
       value: vi.fn<Document["elementFromPoint"]>(() => panel),
       configurable: true,

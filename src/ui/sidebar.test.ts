@@ -287,8 +287,8 @@ describe("cableado global (window/document)", () => {
     const sheet = document.createElement("div");
     sheet.className = "sheet";
     const objetivo = document.createElement("span");
-    sheet.appendChild(objetivo);
-    canvas.appendChild(sheet);
+    sheet.append(objetivo);
+    canvas.append(sheet);
     try {
       const e = eventoDrop([archivo("s.png", "image/png")]);
       objetivo.dispatchEvent(e);
