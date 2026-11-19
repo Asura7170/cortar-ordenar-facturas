@@ -395,7 +395,8 @@ function cajaEnCelda(
   const pixeles = inundar(bin, w, marca, x, y, etiqueta);
   if (pixeles.length < 3) {
     return null;
-  } // puntito sin área
+    // puntito sin área
+  }
   const mini = rectanguloMinimo(cascoConvexo(pixeles));
   if (!mini) {
     return null;

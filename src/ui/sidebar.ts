@@ -295,14 +295,17 @@ export async function agregarArchivos(
     intakesActivos--;
     state.loteEnCurso = intakesActivos > 0;
   }
-  despejarToasts("intake"); // siempre: los rechazos viejos de otro lote salen con fade
-  avisar(avisos); // y los del lote actual, uno por archivo, entran abajo
+  // siempre: los rechazos viejos de otro lote salen con fade
+  despejarToasts("intake");
+  // y los del lote actual, uno por archivo, entran abajo
+  avisar(avisos);
   if (colocados === 0) {
     return;
   }
 
   renderHojas();
-  precalentarModelos(); // warm-up tras el intake: sin competir con los decodes
+  // warm-up tras el intake: sin competir con los decodes
+  precalentarModelos();
   void procesarCola();
 }
 
@@ -372,7 +375,8 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
     }
     const cruda = subtipoImagen(tipo);
     if (!MIME_IMAGEN.test(`image/${cruda}`)) {
-      formatoNoSoportado = true; // mismo mensaje que Ctrl+V para esos bytes
+      // mismo mensaje que Ctrl+V para esos bytes
+      formatoNoSoportado = true;
       continue;
     }
     try {
@@ -458,13 +462,15 @@ function colocarEnVigente(
     return h;
   }
   if (h && h.slots.includes(null)) {
-    h.slots[h.slots.indexOf(null)] = comp; // ponytail: includes acaba de verificar: indexOf no da -1
+    // ponytail: includes acaba de verificar: indexOf no da -1
+    h.slots[h.slots.indexOf(null)] = comp;
     return h;
   }
   // Hoja llena o barrida en el ínterin: flujo normal (última con hueco o
   // nueva heredando layout).
   const actual = huecoOAnueva(layoutRespaldo, h?.layout);
-  actual.slots[actual.slots.indexOf(null)] = comp; // ponytail: huecoOAnueva solo devuelve hojas con hueco
+  // ponytail: huecoOAnueva solo devuelve hojas con hueco
+  actual.slots[actual.slots.indexOf(null)] = comp;
   return actual;
 }
 
@@ -516,7 +522,8 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
       await agregarArchivos(resto, hojaFinal.id);
     } else {
       despejarToasts("intake");
-    } // éxito: los rechazos viejos de otro intento salen con fade
+      // éxito: los rechazos viejos de otro intento salen con fade
+    }
     precalentarModelos();
     void procesarCola();
   } finally {
@@ -642,7 +649,8 @@ function cablearSoltar(): void {
   document.addEventListener("dragleave", (e) => {
     if (e.relatedTarget === null) {
       marcarArrastre(0);
-    } // el arrastre salió de la ventana
+      // el arrastre salió de la ventana
+    }
   });
 }
 
@@ -720,7 +728,8 @@ function cablearModalLimpiar(): void {
     if (modalLimpiar.returnValue !== "ok") {
       return;
     }
-    hojaPedida = null; // la hoja destino pudo dejar de existir
+    // la hoja destino pudo dejar de existir
+    hojaPedida = null;
     for (const h of state.hojas) {
       for (const c of itemsDe(h)) {
         URL.revokeObjectURL(c.imgUrl);

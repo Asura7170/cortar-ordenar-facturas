@@ -78,7 +78,8 @@ describe("normalizarImagen", () => {
   it("bmp chico se empaqueta a webp 0.85", async () => {
     const falso = lienzoFalso(conTinta);
     const blob = await normalizarImagen(img("a.bmp", "image/bmp"), cargar(100, 80), falso.crear);
-    expect(blob.type).toBe("image/webp"); // el falso hace eco del tipo pedido; lo que importa:
+    // el falso hace eco del tipo pedido; lo que importa:
+    expect(blob.type).toBe("image/webp");
     expect(falso.tipo()).toBe("image/webp");
     expect(falso.calidad()).toBe(CALIDAD_WEBP);
     // Guard de regresión: sin from-image el EXIF no se endereza.
@@ -90,7 +91,8 @@ describe("normalizarImagen", () => {
     const f = img("a.jpg", "image/jpeg");
     const blob = await normalizarImagen(f, cargar(100, 80), falso.crear);
     expect(blob).toBe(f);
-    expect(falso.tipo()).toBeNull(); // ni siquiera se pidió empaquetar
+    // ni siquiera se pidió empaquetar
+    expect(falso.tipo()).toBeNull();
   });
 
   it("grande se acota al tope manteniendo proporción", async () => {
@@ -552,11 +554,16 @@ describe("esFondoBlanco/esFondoNegro", () => {
 
   it("blanco: transparencia o 3 canales sobre 245; gris medio no", () => {
     expect(esFondoBlanco(pix(255, 255, 255, 255), 0)).toBe(true);
-    expect(esFondoBlanco(pix(0, 0, 0, 0), 0)).toBe(true); // alfa 0
-    expect(esFondoBlanco(pix(0, 0, 0, 127), 0)).toBe(true); // alfa 127 cuenta fondo
-    expect(esFondoBlanco(pix(250, 250, 250, 128), 0)).toBe(true); // alfa 128 + canales
-    expect(esFondoBlanco(pix(255, 99, 99, 255), 0)).toBe(false); // un canal bajo
-    expect(esFondoBlanco(pix(245, 245, 245, 255), 0)).toBe(false); // umbral es >
+    // alfa 0
+    expect(esFondoBlanco(pix(0, 0, 0, 0), 0)).toBe(true);
+    // alfa 127 cuenta fondo
+    expect(esFondoBlanco(pix(0, 0, 0, 127), 0)).toBe(true);
+    // alfa 128 + canales
+    expect(esFondoBlanco(pix(250, 250, 250, 128), 0)).toBe(true);
+    // un canal bajo
+    expect(esFondoBlanco(pix(255, 99, 99, 255), 0)).toBe(false);
+    // umbral es >
+    expect(esFondoBlanco(pix(245, 245, 245, 255), 0)).toBe(false);
   });
 
   it("negro: transparencia o 3 canales bajo 20; el gris oscuro no", () => {
@@ -564,7 +571,8 @@ describe("esFondoBlanco/esFondoNegro", () => {
     expect(esFondoNegro(pix(0, 0, 0, 0), 0)).toBe(true);
     expect(esFondoNegro(pix(0, 0, 0, 127), 0)).toBe(true);
     expect(esFondoNegro(pix(19, 19, 19, 128), 0)).toBe(true);
-    expect(esFondoNegro(pix(20, 20, 20, 255), 0)).toBe(false); // 20 no entra (es <)
+    // 20 no entra (es <)
+    expect(esFondoNegro(pix(20, 20, 20, 255), 0)).toBe(false);
     expect(esFondoNegro(pix(0, 0, 99, 255), 0)).toBe(false);
   });
 });
@@ -572,14 +580,16 @@ describe("esFondoBlanco/esFondoNegro", () => {
 describe("medianaCanal/medianaBorde", () => {
   it("mediana: central del ordenado, vacío → 0", () => {
     expect(medianaCanal([3, 1, 2])).toBe(2);
-    expect(medianaCanal([9, 1])).toBe(9); // par: central superior (comportamiento original)
+    // par: central superior (comportamiento original)
+    expect(medianaCanal([9, 1])).toBe(9);
     expect(medianaCanal([])).toBe(0);
   });
 
   it("medianaBorde salta transparentes y usa los índices de toma", () => {
     const datos = new Uint8ClampedArray([0, 0, 0, 0, 1, 2, 3, 255]);
     expect(medianaBorde(datos, (k) => k * 4, 2)).toStrictEqual([1, 2, 3]);
-    expect(medianaBorde(datos, () => 0, 4)).toStrictEqual([0, 0, 0]); // todo transparente
+    // todo transparente
+    expect(medianaBorde(datos, () => 0, 4)).toStrictEqual([0, 0, 0]);
   });
 });
 
@@ -605,7 +615,8 @@ describe("tramoFondo", () => {
     // Fila toda-fondo: el scan izquierdo termina en `largo` y el derecho queda corto
     // ([largo, largo-1] degenerado, como el original con rango interior vacío).
     expect(tramoFondo(datos, 3, toma, blanco, blanco, blanco)).toStrictEqual([3, 2]);
-    datos[2 * 4] = 128; // gris en la posición central
+    // gris en la posición central
+    datos[2 * 4] = 128;
     expect(tramoFondo(datos, 3, toma, blanco, blanco, blanco)).toBeNull();
   });
 });

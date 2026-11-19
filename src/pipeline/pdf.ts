@@ -214,6 +214,7 @@ async function paginaUtil(
     );
     return blob ? { indice: i, total, blob } : null;
   } catch {
-    return null; // ponytail: página mala no tumba a las hermanas
+    // ponytail: página mala no tumba a las hermanas
+    return null;
   }
 }

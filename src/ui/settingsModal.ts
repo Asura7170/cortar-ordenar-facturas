@@ -79,12 +79,15 @@ export function initSettings(): void {
     if (!ocuparModelos()) {
       return;
     }
-    reactivarIa(); // sin enfriamiento ni latch de EPs: la prueba nace fresca
+    // sin enfriamiento ni latch de EPs: la prueba nace fresca
+    reactivarIa();
     estadoModelos.textContent = "IA: probando (descarga y sesiones GPU)…";
     void (async (): Promise<void> => {
       try {
-        await obtenerSesion(); // recorte: fastvit
-        await obtenerNucleo(); // OCR: det+rec (en serie: la GPU no compite)
+        // recorte: fastvit
+        await obtenerSesion();
+        // OCR: det+rec (en serie: la GPU no compite)
+        await obtenerNucleo();
         estadoModelos.textContent = "IA: sesiones listas — recorte y OCR van bien";
       } catch (error: unknown) {
         const msj = error instanceof Error ? error.message : String(error);

@@ -254,7 +254,8 @@ describe("extraerTexto", () => {
     expect(espia.det).toStrictEqual([[[1, 3, 32, 64]]]);
     expect(espia.rec).toHaveLength(1);
     expect((espia.rec[0] as number[][])?.[0]?.slice(0, 3)).toStrictEqual([1, 3, 48]);
-    expect(transforms).toHaveLength(1); // warp afín aplicado
+    // warp afín aplicado
+    expect(transforms).toHaveLength(1);
     expect(diag).toStrictEqual({ cajas: 1, lote: 1, anchoMax: 320, fallback: false, recRuns: 1 });
   });
 
@@ -294,7 +295,8 @@ describe("extraerTexto", () => {
   it("reuse del enderezado: no repite el det (L1)", async () => {
     const { deps, espia } = base();
     const { lienzo } = lienzoFalso(BLANCO32);
-    lienzo.width = 32; // en prod ver() siempre fija dims (mínimo 32)
+    // en prod ver() siempre fija dims (mínimo 32)
+    lienzo.width = 32;
     lienzo.height = 32;
     const texto = await extraerTexto(new Blob(["x"]), deps, {
       cajas: [
@@ -354,7 +356,8 @@ describe("extraerTexto", () => {
     const { deps } = base();
     const texto = await extraerTexto(new Blob(["x"]), {
       ...deps,
-      crear: () => document.createElement("canvas"), // jsdom: getContext null
+      // jsdom: getContext null
+      crear: () => document.createElement("canvas"),
     });
     expect(texto).toBe("");
   });
@@ -392,7 +395,8 @@ describe("extraerTexto", () => {
   it("reuse del enderezado: sin lienzo temporal, solo el del recorte (hilo #4)", async () => {
     const { deps } = base();
     const { lienzo } = lienzoFalso(BLANCO32);
-    lienzo.width = 32; // en prod ver() siempre fija dims (mínimo 32)
+    // en prod ver() siempre fija dims (mínimo 32)
+    lienzo.width = 32;
     lienzo.height = 32;
     let creados = 0;
     let decodes = 0;
@@ -422,8 +426,10 @@ describe("extraerTexto", () => {
       base: lienzo,
     });
     expect(texto).toBe("AA");
-    expect(creados).toBe(1); // solo recorteCaja; antes eran 2 (base temporal + recorte)
-    expect(decodes).toBe(0); // Fase 2: en reuse no se decodifica el blob
+    // solo recorteCaja; antes eran 2 (base temporal + recorte)
+    expect(creados).toBe(1);
+    // Fase 2: en reuse no se decodifica el blob
+    expect(decodes).toBe(0);
   });
 });
 
@@ -637,7 +643,8 @@ describe("reconocerLote", () => {
     const diag = diagVacio();
     const rs = await reconocerLote(rec, lienzo, [caja10(0.9), caja10(0.8)], () => lienzo, diag);
     expect(rs.map((r) => r.texto)).toStrictEqual(["AA", "AA"]);
-    expect(llamadas).toHaveLength(3); // 1 lote + 2 individuales
+    // 1 lote + 2 individuales
+    expect(llamadas).toHaveLength(3);
     expect(llamadas[0]?.[0]).toBe(2);
     // Hilo #3: el lote fallido también es un run (antes se omitía).
     expect(diag).toStrictEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 3 });
@@ -1021,7 +1028,8 @@ describe("enderezar (decisión rec)", () => {
     const blob = new Blob(["foto"]);
     const r = await enderezar(blob, {
       cargar: () => Promise.resolve(bitmapFalso(64, 32)),
-      crear: () => document.createElement("canvas"), // jsdom: getContext null
+      // jsdom: getContext null
+      crear: () => document.createElement("canvas"),
       nucleo: () => Promise.resolve(nucleoGiros([mapaUnaLinea()], [0.95], [], [])),
     });
     expect(r.blob).toBe(blob);
@@ -1106,7 +1114,8 @@ describe("descargarPesosOcr", () => {
     const g = globalThis as Record<string, unknown>;
     const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
     const tienda = new Map<unknown, unknown>();
-    const bytes = new ArrayBuffer(12_000_000); // pasa los mínimos det/rec
+    // pasa los mínimos det/rec
+    const bytes = new ArrayBuffer(12_000_000);
     const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,

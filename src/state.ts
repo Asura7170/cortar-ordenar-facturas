@@ -144,11 +144,13 @@ function limpiarClavesIa(): void {
 function retirarSobrantes(r: Record<string, unknown>): void {
   let cambio = false;
   if ("configIA" in r) {
-    delete r["configIA"]; // era IA
+    // era IA
+    delete r["configIA"];
     cambio = true;
   }
   if ("codigoLongitud" in r) {
-    delete r["codigoLongitud"]; // era del switch de longitud (ya retirada)
+    // era del switch de longitud (ya retirada)
+    delete r["codigoLongitud"];
     cambio = true;
   }
   if (!cambio) {
@@ -182,11 +184,13 @@ export function cargar(): void {
     retirarSobrantes(r);
     if (!isPersistedState(r)) {
       return;
-    } // estado corrupto o de otra versión: ignorar
+      // estado corrupto o de otra versión: ignorar
+    }
     aplicarCodigo(r);
     if (isMoneda(r["moneda"])) {
       state.moneda = r["moneda"];
-    } // ausente en blobs legacy: se conserva
+      // ausente en blobs legacy: se conserva
+    }
   } catch {
     /* estado corrupto: ignorar */
   }

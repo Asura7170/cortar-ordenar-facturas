@@ -42,27 +42,37 @@ interface Rect {
   h: number;
 }
 
-const RADIO_ESQUINA = 32; // esquinas generosas (manos mayores, táctil)
+// esquinas generosas (manos mayores, táctil)
+const RADIO_ESQUINA = 32;
 const RADIO_LADO = 26;
-const BANDA_BORDE = 14; // agarre en plena línea, lejos de tiradores
+// agarre en plena línea, lejos de tiradores
+const BANDA_BORDE = 14;
 const LADO_VISUAL = 10;
-const MIN_LADO = 24; // lado mínimo en px display (el natural se valida al confirmar)
-const MIN_NATURAL = 8; // lado mínimo en px naturales al confirmar
+// lado mínimo en px display (el natural se valida al confirmar)
+const MIN_LADO = 24;
+// lado mínimo en px naturales al confirmar
+const MIN_NATURAL = 8;
 const PASO_TECLA = 2;
 /** Marco alrededor de la foto: aire para los tiradores del borde. */
 const MARGEN = 6;
 
 let idAbierto: number | null = null;
-let sesion = 0; // token anti sesión cruzada: cerrar+reabrir invalida confirms en vuelo
+// token anti sesión cruzada: cerrar+reabrir invalida confirms en vuelo
+let sesion = 0;
 let bmp: ImageBitmap | null = null;
-let escala = 1; // px naturales por px display
+// px naturales por px display
+let escala = 1;
 let cw = 0;
 let ch = 0;
 let rect: Rect = { x: 0, y: 0, w: 0, h: 0 };
-let activo = 7; // índice del tirador activo (empieza en "se")
-let borde: Borde = "se"; // borde en arrastre (el agarre puede empezar en plena línea)
-let moviendoEntero = false; // arrastre del área completa por su interior
-let agarreX = 0; // offset puntero−origen al agarrar el interior
+// índice del tirador activo (empieza en "se")
+let activo = 7;
+// borde en arrastre (el agarre puede empezar en plena línea)
+let borde: Borde = "se";
+// arrastre del área completa por su interior
+let moviendoEntero = false;
+// offset puntero−origen al agarrar el interior
+let agarreX = 0;
 let agarreY = 0;
 let enArrastre = false;
 let raf: number | null = null;
@@ -197,7 +207,8 @@ function restablecer(): void {
 }
 
 function cerrarAnterior(): void {
-  sesion++; // invalida la confirmación en vuelo (ya no es su diálogo)
+  // invalida la confirmación en vuelo (ya no es su diálogo)
+  sesion++;
   if (raf !== null) {
     cancelAnimationFrame(raf);
     raf = null;
@@ -465,7 +476,8 @@ async function commitearYReleer(
 }
 
 /** Confirma: recorta en píxeles naturales, commitea y relee el OCR. Nunca lanza. */
-let confirmando = false; // anti doble-clic/Enter (dos commits solapados revocaban URLs vivas)
+// anti doble-clic/Enter (dos commits solapados revocaban URLs vivas)
+let confirmando = false;
 async function confirmar(): Promise<void> {
   const id = idAbierto;
   const foto = bmp;

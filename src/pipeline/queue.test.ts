@@ -81,8 +81,10 @@ describe("procesarCola", () => {
     const nuevo = comprobante({ nombre: "nuevo.png" });
     nh.slots[0] = nuevo;
     state.hojas = [nh];
-    await vi.advanceTimersByTimeAsync(1000); // termina el sleep del viejo (descartado)
-    await vi.advanceTimersByTimeAsync(1000); // procesa el nuevo
+    // termina el sleep del viejo (descartado)
+    await vi.advanceTimersByTimeAsync(1000);
+    // procesa el nuevo
+    await vi.advanceTimersByTimeAsync(1000);
     await p;
     expect(buscarSlot(viejo.id)).toBeNull();
     expect(nuevo.estado).toBe("ok");
@@ -176,9 +178,11 @@ describe("procesarCola", () => {
   it("throw a mitad del drenaje: el ítem falla en error y los hermanos siguen", async () => {
     const { aplicarTotales } = await import("./extract");
     vi.mocked(aplicarTotales).mockImplementationOnce((): number => {
-      throw new Error("veneno"); // explota el fast-path dentro de completarItem
+      // explota el fast-path dentro de completarItem
+      throw new Error("veneno");
     });
-    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 12.50"); // fuerza el fast-path del 1º
+    // fuerza el fast-path del 1º
+    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 12.50");
     const h = crearHoja();
     const malo = comprobante({ nombre: "malo.png", file: new Blob(["x"]) });
     h.slots[0] = malo;
@@ -189,8 +193,10 @@ describe("procesarCola", () => {
     const p = procesarCola();
     await vi.advanceTimersByTimeAsync(5000);
     await p;
-    expect(malo.estado).toBe("error"); // el catch del drenado lo cierra, no "procesando" eterno
-    expect(bueno.estado).toBe("ok"); // los hermanos siguen después del veneno
+    // el catch del drenado lo cierra, no "procesando" eterno
+    expect(malo.estado).toBe("error");
+    // los hermanos siguen después del veneno
+    expect(bueno.estado).toBe("ok");
     expect(state.colaEnProceso).toBe(false);
   });
 
@@ -286,8 +292,10 @@ describe("procesarCola", () => {
     const p = procesarCola();
     await vi.advanceTimersByTimeAsync(2000);
     await p;
-    expect(c.file).toBe(intake); // el giro no se commiteó
-    expect(c.textoOcr).toBe("TOTAL 30"); // el OCR corrió sobre el blob sin girar (reuse undefined)
+    // el giro no se commiteó
+    expect(c.file).toBe(intake);
+    // el OCR corrió sobre el blob sin girar (reuse undefined)
+    expect(c.textoOcr).toBe("TOTAL 30");
     expect(c.estado).toBe("ok");
   });
 

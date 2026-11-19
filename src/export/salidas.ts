@@ -126,7 +126,8 @@ async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
     if (!ctx) {
       throw new Error("sin contexto 2d");
     }
-    ctx.fillStyle = "#fff"; // JPEG sin alfa: sin fondo el transparente sale negro
+    // JPEG sin alfa: sin fondo el transparente sale negro
+    ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, lienzo.width, lienzo.height);
     ctx.drawImage(bmp, 0, 0);
     const jpg = await new Promise<Blob | null>((res) =>

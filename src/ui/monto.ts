@@ -85,7 +85,8 @@ function pintarBarraBoton(): void {
   const cuenta = progreso ? `${hechos}/${total}` : "";
   const textos = btn.querySelectorAll(".calculo-txt");
   if (textos.length === 0) {
-    btn.textContent = etiqueta + cuenta; // fixture: botón sin spans
+    // fixture: botón sin spans
+    btn.textContent = etiqueta + cuenta;
   } else {
     textos.forEach((txt) => {
       txt.textContent = etiqueta;
@@ -128,11 +129,16 @@ let textoRegla: string | null = null;
 let monedaRegla: Moneda | null = null;
 let rafId: number | null = null;
 
-const VUELTAS = 1; // barridos extra por rueda (p26 usa 3 con botón manual)
-const DURACION = 700; // ms por posición (p26: 1400, un giro por clic)
-const ESCALON = 60; // retardo izq→der (p26: 90)
-const BLUR_MAXIMO = 3; // p26 usa 3
-const FILTROS = 14; // 12 enteros + 2 decimales máx de parsearMonto: sin compartir ranura
+// barridos extra por rueda (p26 usa 3 con botón manual)
+const VUELTAS = 1;
+// ms por posición (p26: 1400, un giro por clic)
+const DURACION = 700;
+// retardo izq→der (p26: 90)
+const ESCALON = 60;
+// p26 usa 3
+const BLUR_MAXIMO = 3;
+// 12 enteros + 2 decimales máx de parsearMonto: sin compartir ranura
+const FILTROS = 14;
 
 /** Desplazamiento en células de una rueda d1→d2 (positivo sube, negativo baja). */
 export function pasos(d1: number, d2: number, sube: boolean): number {
@@ -290,7 +296,8 @@ export function renderMonto(): void {
   const sube = total > previoTotal;
   previoTotal = total;
   monedaRegla = state.moneda;
-  const viejo = textoRegla as string; // texto distinto ⇒ no null: una rueda/plano previo lo fijó
+  // texto distinto ⇒ no null: una rueda/plano previo lo fijó
+  const viejo = textoRegla as string;
   textoRegla = texto;
   montoEl.setAttribute("aria-label", texto);
   // Prefijo común quieto; el resto se alinea a la derecha por valor posicional.
@@ -327,7 +334,8 @@ export function renderMonto(): void {
     // ponytail: alinearSufijos SIEMPRE retorna sufN.length ⇒ j in-bounds.
     const v = alineado[j] as string;
     if (!esDigito(ch)) {
-      hijos.push(spanFijo(ch)); // separador que aparece (coma) o marca de moneda
+      // separador que aparece (coma) o marca de moneda
+      hijos.push(spanFijo(ch));
       return;
     }
     let arranque = esDigito(v) ? +v : 0;
@@ -340,7 +348,8 @@ export function renderMonto(): void {
       const kk = celdaDesdeMatriz(previa.matriz, previa.base, cell);
       if (kk !== null) {
         arranque = kk;
-        fin = arranque + pasoDesde(arranque, +ch, sube); // 0 ⇒ ya está en el objetivo (estática)
+        // 0 ⇒ ya está en el objetivo (estática)
+        fin = arranque + pasoDesde(arranque, +ch, sube);
       }
     }
     const col = crearCola(arranque, fin);
@@ -377,7 +386,8 @@ export function renderMonto(): void {
   if (colas.every((c) => c.fin === c.inicio)) {
     return;
   }
-  void montoEl.offsetWidth; // reflow: clava el punto de partida
+  // reflow: clava el punto de partida
+  void montoEl.offsetWidth;
   colas.forEach((c, i) => {
     if (c.fin === c.inicio) {
       return;

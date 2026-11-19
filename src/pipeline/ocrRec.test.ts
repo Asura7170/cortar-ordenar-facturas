@@ -23,8 +23,10 @@ describe("normalizarLinea", () => {
     const t = lin?.tensor as Float32Array;
     expect(t).toHaveLength(3 * REC_ALTO * 320);
     expect(t[0]).toBeCloseTo(1, 5);
-    expect(t[2 * REC_ALTO * 320]).toBeCloseTo(1, 5); // plano R también
-    expect(t[100]).toBeCloseTo(0, 6); // pad derecho
+    // plano R también
+    expect(t[2 * REC_ALTO * 320]).toBeCloseTo(1, 5);
+    // pad derecho
+    expect(t[100]).toBeCloseTo(0, 6);
   });
 
   it("negro → −1", () => {

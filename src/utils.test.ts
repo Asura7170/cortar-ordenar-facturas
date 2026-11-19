@@ -142,7 +142,8 @@ describe("canal #aviso (pila de toasts)", () => {
     await vi.advanceTimersByTimeAsync(7900);
     expect(toast?.classList.contains("saliendo")).toBe(false);
     toast?.dispatchEvent(new MouseEvent("mouseleave"));
-    await vi.advanceTimersByTimeAsync(7900); // 8s de vida desde que retomó = 8.7 total
+    // 8s de vida desde que retomó = 8.7 total
+    await vi.advanceTimersByTimeAsync(7900);
     expect(toast?.classList.contains("saliendo")).toBe(false);
     await vi.advanceTimersByTimeAsync(300);
     expect(toast?.classList.contains("saliendo")).toBe(true);

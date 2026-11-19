@@ -94,7 +94,8 @@ describe("girarYReleer", () => {
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.textoOcr).toBe("TOTAL LEÍDO");
     expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
-    expect(c.montoCents).toBeNull(); // el lote lo relee (mock: queda manual)
+    // el lote lo relee (mock: queda manual)
+    expect(c.montoCents).toBeNull();
     expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
     // giro + procesando + ok + reapertura (el null se pinta aunque el lote sea no-op)
     expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(4);
@@ -163,8 +164,10 @@ describe("girarYReleer", () => {
     await girarYReleer(c.id, 90, deps);
     vi.mocked(extraerTexto).mockRejectedValueOnce(new Error("ocr caído"));
     await vi.advanceTimersByTimeAsync(1500);
-    expect(c.estado).toBe("ok"); // no queda atascada en procesando
-    expect(c.textoOcr).toBe(""); // el viejo es de otra orientación: no vale
+    // no queda atascada en procesando
+    expect(c.estado).toBe("ok");
+    // el viejo es de otra orientación: no vale
+    expect(c.textoOcr).toBe("");
     expect(c.montoCents).toBeNull();
     expect(document.getElementById("aviso")?.textContent).toBe(
       "No se pudo releer el texto girado.",
@@ -191,7 +194,8 @@ describe("girarYReleer", () => {
     const p1 = girarYReleer(c.id, 90, deps);
     const p2 = girarYReleer(c.id, 90, deps);
     await Promise.all([p1, p2]);
-    expect(creados).toHaveLength(2); // ambos giros aplicados en cadena
+    // ambos giros aplicados en cadena
+    expect(creados).toHaveLength(2);
     expect(c.textoOcr).toBe("VIEJO");
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.textoOcr).toBe("TOTAL LEÍDO");
@@ -234,7 +238,8 @@ describe("girarYReleer", () => {
     });
     await girarYReleer(c.id, 90, deps);
     await vi.advanceTimersByTimeAsync(1500);
-    expect(c.montoCents).toBe(999); // antes: quedaba en null (procesando la excluía)
+    // antes: quedaba en null (procesando la excluía)
+    expect(c.montoCents).toBe(999);
   });
 
   it("celda manual: conserva el total y no llama al lote", async () => {
@@ -280,10 +285,12 @@ describe("girarYReleer", () => {
     }
     soltar?.(bmp as unknown as ImageBitmap);
     const urlAntes = c.imgUrl;
-    state.hojas = [crearHoja()]; // Limpiar reemplaza el array a mitad del giro
+    // Limpiar reemplaza el array a mitad del giro
+    state.hojas = [crearHoja()];
     await p;
     expect(buscarSlot(c.id)).toBeNull();
-    expect(c.imgUrl).toBe(urlAntes); // el giro huérfano se descarta
+    // el giro huérfano se descarta
+    expect(c.imgUrl).toBe(urlAntes);
   });
 
   it("giro huérfano revoca el imgUrl nuevo (sin fuga)", async () => {
@@ -312,7 +319,8 @@ describe("girarYReleer", () => {
         await Promise.resolve();
       }
       soltar?.(bmp as unknown as ImageBitmap);
-      state.hojas = [crearHoja()]; // Limpiar durante el await.
+      // Limpiar durante el await.
+      state.hojas = [crearHoja()];
       await p;
       expect(revocar).toHaveBeenCalledWith("blob:nuevo");
       expect(c.imgUrl).toBe(urlAntes);
@@ -355,9 +363,11 @@ describe("girarYReleer", () => {
     try {
       const { deps } = depsGiro();
       const c = sembrar();
-      await girarYReleer(c.id, 90, deps); // programa el timer diferido
+      // programa el timer diferido
+      await girarYReleer(c.id, 90, deps);
       expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
-      c.file = new Blob(["otro"]); // un recorte commitió después del giro
+      // un recorte commitió después del giro
+      c.file = new Blob(["otro"]);
       await vi.advanceTimersByTimeAsync(2000);
       expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
       expect(c.textoOcr).toBe("VIEJO");
@@ -439,12 +449,14 @@ describe("girarYReleer", () => {
         await Promise.resolve();
       }
       document.getElementById("btnRecorteOk")?.click();
-      await new Promise((r) => setTimeout(r, 200)); // confirmar entero (C gana píxeles)
+      // confirmar entero (C gana píxeles)
+      await new Promise((r) => setTimeout(r, 200));
       await expect((c.file as Blob).text()).resolves.toBe("recorte");
       soltarPrevio?.(bmpGiro as unknown as ImageBitmap);
       await pg;
       await new Promise((r) => setTimeout(r, 100));
-      cancelarRelecturaProgramada(c.id); // el timer del giro no fuga al resto
+      // el timer del giro no fuga al resto
+      cancelarRelecturaProgramada(c.id);
       // El giro terminó último: todo G ("girado" 6B), nada de C ("recorte" 7B).
       await expect((c.file as Blob).text()).resolves.toBe("girado");
       expect(c.imgUrl).toBe("blob:6");
@@ -464,7 +476,8 @@ describe("ramas de cubrimiento (lote 10)", () => {
     vi.useFakeTimers();
     const { deps } = depsGiro();
     const h = crearHoja();
-    const c = comprobante({ estado: "ok", montoCents: 123, textoOcr: "VIEJO" }); // sin file
+    // sin file
+    const c = comprobante({ estado: "ok", montoCents: 123, textoOcr: "VIEJO" });
     h.slots[0] = c;
     state.hojas.push(h);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
@@ -498,7 +511,8 @@ describe("ramas de cubrimiento (lote 10)", () => {
       ),
     });
     expect(c.file).toBe(antes);
-    expect(c.imgUrl).toBe("blob:mock-1"); // el giro abortó: ni file ni url nuevos
+    // el giro abortó: ni file ni url nuevos
+    expect(c.imgUrl).toBe("blob:mock-1");
     expect(document.getElementById("aviso")?.textContent).toBe("No se pudo girar la imagen.");
   });
 
@@ -553,8 +567,10 @@ describe("ramas de cubrimiento (lote 10)", () => {
     state.colaEnProceso = true;
     try {
       const p = releerTrasEdicion(c.id, new Blob(["x"]));
-      await vi.advanceTimersByTimeAsync(250); // la relectura espera su turno (cola activa)
-      state.hojas = [crearHoja()]; // el item murió mientras la cola trabajaba
+      // la relectura espera su turno (cola activa)
+      await vi.advanceTimersByTimeAsync(250);
+      // el item murió mientras la cola trabajaba
+      state.hojas = [crearHoja()];
       state.colaEnProceso = false;
       await vi.advanceTimersByTimeAsync(1000);
       await p;

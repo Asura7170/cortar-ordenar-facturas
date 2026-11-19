@@ -104,18 +104,22 @@ export function aplicarTotales(
     }
     if (montoEnEdicion(it.id)) {
       continue;
-    } // el borrador en curso gana
+      // el borrador en curso gana
+    }
     const slot = buscarSlot(it.id);
     if (!slot) {
       continue;
-    } // limpiado/quitado en el ínterin: no resucita
+      // limpiado/quitado en el ínterin: no resucita
+    }
     const actual = slot.hoja.slots[slot.idx];
     if (!actual || actual.montoCents !== null) {
       continue;
-    } // manual ganó en el ínterin
+      // manual ganó en el ínterin
+    }
     if (limpiarTextoCompleto(actual.textoOcr) !== it.texto) {
       continue;
-    } // girado: rancio
+      // girado: rancio
+    }
     actual.montoCents = cents;
     aplicados++;
   }
@@ -179,7 +183,8 @@ function avisoVacio(
       esError: true,
     };
   }
-  return null; // sin-texto: silencioso aunque sea forzado
+  // sin-texto: silencioso aunque sea forzado
+  return null;
 }
 
 /** Mensaje final del lote (puro): éxito total con aviso previo lo restaura. */
@@ -242,7 +247,8 @@ export function extraerPendientes(opciones?: { forzado?: boolean; desdeCola?: bo
   parchearCeldas(lote.items, lote.mapa);
   if (ok > 0) {
     try {
-      renderHojas(); // badges + #montoTotal con suma local exacta
+      // badges + #montoTotal con suma local exacta
+      renderHojas();
     } catch {
       /* el parche nunca aborta el lote */
     }
