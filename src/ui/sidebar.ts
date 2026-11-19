@@ -485,7 +485,7 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
   if (!archivos) {
     return;
   }
-  const primero = archivos[0];
+  const [primero] = archivos;
   if (!primero) {
     return;
   }

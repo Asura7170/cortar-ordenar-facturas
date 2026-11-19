@@ -183,7 +183,7 @@ function apilarToast(el: HTMLElement, m: ToastMensaje): void {
   }
   const vivos = (): NodeListOf<HTMLElement> => el.querySelectorAll(".toast:not(.saliendo)");
   while (vivos().length >= MAX_TOASTS) {
-    const primero = vivos()[0];
+    const [primero] = vivos();
     if (!primero) {
       break;
     }

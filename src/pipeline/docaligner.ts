@@ -64,10 +64,7 @@ function cuatroPuntosDe(puntos: readonly Punto[]): [Punto, Punto, Punto, Punto] 
   if (puntos.length !== 4) {
     throw new Error(`ordenarQuad espera 4 puntos, llegan ${puntos.length}`);
   }
-  const a = puntos[0];
-  const b = puntos[1];
-  const c = puntos[2];
-  const d = puntos[3];
+  const [a, b, c, d] = puntos;
   if (!a || !b || !c || !d) {
     throw new Error("ordenarQuad: puntos ausentes");
   }

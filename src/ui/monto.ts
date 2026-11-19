@@ -266,7 +266,7 @@ function mostrarPlano(texto: string): void {
     }
   }
   montoEl.replaceChildren(...hijos);
-  const primera = colas[0];
+  const [primera] = colas;
   const cell = primera ? primera.col.offsetHeight || 24 : 0;
   for (const c of colas) {
     c.col.dataset["muestra"] = String(c.inicio);

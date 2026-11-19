@@ -88,7 +88,7 @@ export function envolver(
 ): SubsesionOcr {
   if (nombre === "rec") {
     // ponytail: ValueMetadata de ort-web 1.29 expone shape (nunca dimensions).
-    const meta = sesion.outputMetadata[0];
+    const [meta] = sesion.outputMetadata;
     const forma = meta && meta.isTensor ? meta.shape : undefined;
     const clases = forma?.[forma.length - 1];
     // ponytail: fallo fuerte en init si el modelo no casa con el dict (no basura silenciosa).
