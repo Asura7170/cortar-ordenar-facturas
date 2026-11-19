@@ -203,7 +203,7 @@ export function crearHoja(layoutId: LayoutId = "u4x2"): Hoja {
   return {
     id: nextHojaId(),
     layout: layoutId,
-    slots: Array<Hoja["slots"][number]>(l.total).fill(null),
+    slots: Array.from({ length: l.total }, () => null),
   };
 }
 
@@ -252,7 +252,7 @@ export function redistribuir(layoutNuevas?: LayoutId): void {
   };
   for (const h of state.hojas) {
     const cap = layoutDe(h.layout).total;
-    h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
+    h.slots = Array.from({ length: cap }, () => null);
     for (let i = 0; i < cap && pos < items.length; i += 1) {
       h.slots[i] = tomar();
     }
@@ -262,7 +262,7 @@ export function redistribuir(layoutNuevas?: LayoutId): void {
     // es de la hoja; "aplicar a todas" pisa vía layoutNuevas.
     const h = crearHoja(layoutNuevas);
     const cap = layoutDe(h.layout).total;
-    h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
+    h.slots = Array.from({ length: cap }, () => null);
     for (let i = 0; i < cap && pos < items.length; i += 1) {
       h.slots[i] = tomar();
     }
