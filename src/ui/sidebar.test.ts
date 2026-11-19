@@ -791,7 +791,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
   it("hoja inexistente no hace nada", async () => {
     aviso.textContent = "";
     mockRead(async () => [itemPng()]);
-    await pegarEnCelda(999999, 0);
+    await pegarEnCelda(999_999, 0);
     expect(items().filter(Boolean)).toHaveLength(0);
     expect(aviso.textContent).toBe("");
   });

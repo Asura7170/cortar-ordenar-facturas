@@ -34,7 +34,7 @@ function hojaCon(montos: (number | null)[]): Hoja {
 describe("formatearMoneda", () => {
   it("formato en-US con 2 decimales y miles", () => {
     state.moneda = "USD";
-    expect(formatearMoneda(123456)).toBe("US$ 1,234.56");
+    expect(formatearMoneda(123_456)).toBe("US$ 1,234.56");
     expect(formatearMoneda(0)).toBe("US$ 0.00");
   });
 
@@ -130,7 +130,7 @@ describe("renderMonto", () => {
 
   it("total legible en aria-label; plano: cada dígito clavado en su número", () => {
     state.moneda = "USD";
-    hojaCon([123456]);
+    hojaCon([123_456]);
     renderMonto(); // primera vez: plano
     const montoEl = document.getElementById("montoTotal");
     if (!montoEl) throw new Error("sin #montoTotal");
@@ -152,14 +152,14 @@ describe("renderMonto", () => {
 
   it("aumento: lo que cambia rueda hacia arriba, incluidas las posiciones nuevas", () => {
     state.moneda = "USD";
-    hojaCon([99999]);
+    hojaCon([99_999]);
     // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
     state.moneda = "BOB";
     renderMonto();
     state.moneda = "USD";
     renderMonto();
     state.hojas.pop();
-    hojaCon([100099]); // US$ 1,000.99 → crece una cifra
+    hojaCon([100_099]); // US$ 1,000.99 → crece una cifra
     renderMonto();
     // sufN "1,000.99" alineado con "  999.99": 1 nace y sube (fin 11 > 0),
     // los 9→0 suben (fin 20 > 9); los 9 finales quedan fijos. El bug del
@@ -187,14 +187,14 @@ describe("renderMonto", () => {
 
   it("disminución: la rueda baja (fin negativo = descendió por el ciclo)", () => {
     state.moneda = "USD";
-    hojaCon([35000]);
+    hojaCon([35_000]);
     // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
     state.moneda = "BOB";
     renderMonto();
     state.moneda = "USD";
     renderMonto();
     state.hojas.pop();
-    hojaCon([10000]); // US$ 100.00
+    hojaCon([10_000]); // US$ 100.00
     renderMonto();
     // sufV= sufN "350.00"→"100.00": 3→1 baja -12 (fin -9), 5→0 baja -15 (fin -10)
     expect(cols().map((c) => c.dataset["muestra"])).toStrictEqual(["-9", "-10", "0", "0", "0"]);
@@ -202,14 +202,14 @@ describe("renderMonto", () => {
 
   it("dígito sin cambio queda fijo: transition none y clavado en su dígito", () => {
     state.moneda = "USD";
-    hojaCon([35000]);
+    hojaCon([35_000]);
     // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
     state.moneda = "BOB";
     renderMonto();
     state.moneda = "USD";
     renderMonto();
     state.hojas.pop();
-    hojaCon([35100]); // US$ 351.00: solo el 0→1 del sufijo rueda
+    hojaCon([35_100]); // US$ 351.00: solo el 0→1 del sufijo rueda
     renderMonto();
     const colas = cols();
     expect(colas.map((c) => c.dataset["muestra"])).toStrictEqual(["11", "0", "0"]);
@@ -219,7 +219,7 @@ describe("renderMonto", () => {
 
   it("cambio de moneda reescribe plano, sin rueda", () => {
     state.moneda = "USD";
-    hojaCon([35100]);
+    hojaCon([35_100]);
     renderMonto(); // sincroniza
     state.moneda = "ARS"; // mismos cents, otro texto
     renderMonto();
@@ -229,7 +229,7 @@ describe("renderMonto", () => {
 
   it("llamada duplicada no toca el DOM", () => {
     state.moneda = "USD";
-    hojaCon([123456]);
+    hojaCon([123_456]);
     renderMonto();
     const antes = document.getElementById("montoTotal")?.innerHTML ?? "";
     renderMonto();
@@ -238,10 +238,10 @@ describe("renderMonto", () => {
 
   it("vuelo a mitad (retarget): la dirección sigue la del delta total", () => {
     state.moneda = "USD";
-    hojaCon([99999]);
+    hojaCon([99_999]);
     renderMonto(); // agenda rAF ⇒ el siguiente render corre EN VUELO
     state.hojas.pop();
-    hojaCon([100099]); // sube: US$ 1,000.99
+    hojaCon([100_099]); // sube: US$ 1,000.99
     renderMonto();
     // aterriza en el dígito correcto (sea barrido limpio o continuación)
     const normal = (nn: number): number => ((nn % 10) + 10) % 10;
@@ -257,10 +257,10 @@ describe("renderMonto", () => {
 
   it("vuelo a mitad condelta invertido: el cambio de sentido también respeta el delta", () => {
     state.moneda = "USD";
-    hojaCon([100099]); // dejamos una rueda agendada del vuelo previo
+    hojaCon([100_099]); // dejamos una rueda agendada del vuelo previo
     renderMonto();
     state.hojas.pop();
-    hojaCon([35000]); // baja: US$ 350.00
+    hojaCon([35_000]); // baja: US$ 350.00
     renderMonto();
     const normal = (nn: number): number => ((nn % 10) + 10) % 10;
     const esperados = [3, 5, 0, 0, 0];
@@ -361,12 +361,12 @@ describe("barraBoton", () => {
 
 describe("parsearMonto", () => {
   it("US: miles con coma, decimal con punto, plano", () => {
-    expect(parsearMonto("1,234.56")).toBe(123456);
-    expect(parsearMonto("1234.56")).toBe(123456);
-    expect(parsearMonto("1,234,567.89")).toBe(123456789);
-    expect(parsearMonto("500")).toBe(50000);
+    expect(parsearMonto("1,234.56")).toBe(123_456);
+    expect(parsearMonto("1234.56")).toBe(123_456);
+    expect(parsearMonto("1,234,567.89")).toBe(123_456_789);
+    expect(parsearMonto("500")).toBe(50_000);
     expect(parsearMonto("12.5")).toBe(1250);
-    expect(parsearMonto("  $ 1,234.56 ")).toBe(123456);
+    expect(parsearMonto("  $ 1,234.56 ")).toBe(123_456);
   });
 
   it("inválidos → null", () => {

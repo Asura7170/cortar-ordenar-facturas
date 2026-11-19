@@ -122,7 +122,7 @@ describe("abrirRecorte", () => {
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
     try {
       const { deps } = depsRecorte();
-      await abrirRecorte(999999, deps as never);
+      await abrirRecorte(999_999, deps as never);
       const c = sembrar();
       c.estado = "pendiente";
       await abrirRecorte(c.id, deps as never);

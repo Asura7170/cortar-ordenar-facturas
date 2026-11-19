@@ -40,7 +40,7 @@ const BANDA_CODIGO = 0.3;
 /** Calle entre imágenes vecinas (el rect de cada casilla se encoge GUTTER/2 por lado). */
 export const GUTTER = 0.15;
 /** 1" = 914400 EMU (offsets); transformation en px @96dpi → 1px = 9525 EMU. */
-const EMU_POR_PULGADA = 914400;
+const EMU_POR_PULGADA = 914_400;
 const EMU_POR_PX = 9525;
 
 export function codigoValido(): boolean {

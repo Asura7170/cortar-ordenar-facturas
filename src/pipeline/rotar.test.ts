@@ -69,7 +69,7 @@ function sembrar(): ReturnType<typeof comprobante> {
 
 describe("girarYReleer", () => {
   it("no-op sin item o sin estado ok", async () => {
-    await expect(girarYReleer(999999, 90)).resolves.toBeUndefined();
+    await expect(girarYReleer(999_999, 90)).resolves.toBeUndefined();
     const c = sembrar();
     c.estado = "pendiente";
     await girarYReleer(c.id, 90);
@@ -511,7 +511,7 @@ describe("ramas de cubrimiento (lote 10)", () => {
   it("relectura con id ausente: no-op silenciosa", async () => {
     const aviso = document.getElementById("aviso");
     if (aviso) aviso.textContent = "";
-    await expect(releerTrasEdicion(999999, new Blob(["x"]))).resolves.toBeUndefined();
+    await expect(releerTrasEdicion(999_999, new Blob(["x"]))).resolves.toBeUndefined();
     expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
     expect(vi.mocked(renderHojas)).not.toHaveBeenCalled();
     expect(document.getElementById("aviso")?.textContent).toBe("");

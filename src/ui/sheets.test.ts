@@ -311,7 +311,7 @@ describe("celdas", () => {
 
   it("badge con el monto formateado", () => {
     state.moneda = "USD";
-    sembrar("u4x2", [123456]);
+    sembrar("u4x2", [123_456]);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,234.56");
   });
 
@@ -374,11 +374,11 @@ describe("celdas", () => {
   it("actualizarMontoCelda early-returns: modoOcr, id inexistente y monto null", () => {
     state.modoOcr = true;
     try {
-      expect(actualizarMontoCelda(999999)).toBe(false);
+      expect(actualizarMontoCelda(999_999)).toBe(false);
     } finally {
       state.modoOcr = false;
     }
-    expect(actualizarMontoCelda(999999)).toBe(false);
+    expect(actualizarMontoCelda(999_999)).toBe(false);
     const h = crearHoja("u1");
     const c = comprobante({ estado: "ok", montoCents: null });
     h.slots[0] = c;
@@ -444,7 +444,7 @@ describe("monto manual", () => {
     const input = inputMonto();
     input.value = "1234.56";
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(123456);
+    expect(c.montoCents).toBe(123_456);
     expect(c.montoManual).toBe(true);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,234.56");
     expect(document.querySelector("input.cell-monto")).toBeNull();
@@ -545,10 +545,10 @@ describe("monto manual", () => {
     const input = inputMonto();
     input.value = "500";
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     // ponytail: apertura no destructiva (el null al abrir era el bug del Escape).
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     const deNuevo = document.querySelector<HTMLInputElement>("input.cell-monto");
     expect(deNuevo?.value).toBe("500.00");
     expect(document.activeElement).toBe(deNuevo);
@@ -565,7 +565,7 @@ describe("monto manual", () => {
     inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     inputMonto().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 500.00");
     expect(document.querySelector("input.cell-monto")).toBeNull();
   });
@@ -578,7 +578,7 @@ describe("monto manual", () => {
     const editando = inputMonto();
     editando.value = "510.5";
     editando.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     expect(editando.isConnected).toBe(false);
   });
 
@@ -599,12 +599,12 @@ describe("monto manual", () => {
     const c = sembrarOk();
     inputMonto().value = "1111";
     inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(111100);
+    expect(c.montoCents).toBe(111_100);
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     // ponytail: el prefill con coma de miles debe hacer roundtrip por parsearMonto.
     expect(inputMonto().value).toBe("1,111.00");
     inputMonto().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(c.montoCents).toBe(111100);
+    expect(c.montoCents).toBe(111_100);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,111.00");
   });
 
@@ -617,7 +617,7 @@ describe("monto manual", () => {
     const editando = inputMonto();
     editando.value = "510.5";
     editando.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(c.montoCents).toBe(51050);
+    expect(c.montoCents).toBe(51_050);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 510.50");
     expect(document.activeElement).toBe(document.querySelector(".cell-badge"));
   });
@@ -631,7 +631,7 @@ describe("monto manual", () => {
     editando.value = "abc";
     editando.blur(); // el foco ya salió (clic fuera): el change no lo trae de vuelta
     editando.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     const deNuevo = inputMonto();
     expect(deNuevo.value).toBe("abc");
     expect(document.activeElement).toBe(document.body);
@@ -798,7 +798,7 @@ describe("monto manual", () => {
     const input = inputMonto();
     input.value = "500";
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 500.00");
   });
 });

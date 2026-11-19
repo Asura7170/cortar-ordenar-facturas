@@ -77,7 +77,7 @@ describe("regex", () => {
 
   it("rápido: 1 distinto resuelve, repetido vale, 2 distintos = manual", () => {
     expect(extraerRapidoCents("TOTAL 12.50")).toBe(1250);
-    expect(extraerRapidoCents("TOTAL 1,234.56 ... total 1234.56")).toBe(123456);
+    expect(extraerRapidoCents("TOTAL 1,234.56 ... total 1234.56")).toBe(123_456);
     expect(extraerRapidoCents("TOTAL 12.50 PROPINA 1.00")).toBeNull();
     expect(extraerRapidoCents("sin montos")).toBeNull();
   });

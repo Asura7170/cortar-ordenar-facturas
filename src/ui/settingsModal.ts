@@ -25,7 +25,7 @@ const btnBorrarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarM
 
 function textoModelos(bytes: number): string {
   return bytes > 0
-    ? `Modelos: ~${Math.round(bytes / 1048576)} MB en este navegador`
+    ? `Modelos: ~${Math.round(bytes / 1_048_576)} MB en este navegador`
     : "Modelos: no descargados";
 }
 

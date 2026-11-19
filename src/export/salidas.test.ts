@@ -98,7 +98,7 @@ const { __apuntados: registrados } = (await import("docx")) as unknown as {
   __apuntados: Registro[];
 };
 
-const EMU = 914400;
+const EMU = 914_400;
 const POSICIONES: readonly PosicionCodigo[] = ["sup-izq", "sup-der", "inf-izq", "inf-der"];
 
 beforeEach(() => {
@@ -111,7 +111,7 @@ afterEach(() => {
   globalThis.createImageBitmap = bitmapFalso;
 });
 
-function sembrar(monto: number | null = 123456): void {
+function sembrar(monto: number | null = 123_456): void {
   const h = crearHoja();
   h.slots[0] = comprobante({ montoCents: monto, file: new Blob(["jpg"], { type: "image/jpeg" }) });
   state.hojas.push(h);
@@ -412,7 +412,7 @@ describe("descargarWord", () => {
     expect(a.href).toContain("blob:mock-");
     vi.advanceTimersByTime(2000);
     expect(revoke).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(28000);
+    vi.advanceTimersByTime(28_000);
     expect(revoke).toHaveBeenCalledTimes(1);
   });
 

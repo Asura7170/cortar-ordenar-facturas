@@ -203,7 +203,7 @@ describe("decodificarCtc", () => {
 
 describe("DICT_OCR", () => {
   it("18710 clases del rec + marcas", () => {
-    expect(DICT_OCR.length).toBe(18710);
+    expect(DICT_OCR.length).toBe(18_710);
     expect(DICT_OCR[0]).toBe("blank");
     expect(DICT_OCR[1]).toBe("!");
     expect(DICT_OCR[4]).toBe("$");
