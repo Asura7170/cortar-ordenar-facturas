@@ -260,7 +260,8 @@ export function pivotar(a: number[][], b: number[], col: number, n: number): voi
   for (let k = col; k < n; k += 1) {
     fila[k] = celda(a, col, k) / div;
   }
-  b[col] = (b[col] as number) / div;
+  const bCol = b[col] as number;
+  b[col] = bCol / div;
 }
 
 /** Anula la columna col en las demás filas (muta a/b). */
@@ -278,7 +279,8 @@ export function eliminar(a: number[][], b: number[], col: number, n: number): vo
       fr[k] = celda(a, fil, k) - factor * celda(a, col, k);
     }
     // ponytail: b denso (ver pivotar).
-    b[fil] = (b[fil] as number) - factor * (b[col] as number);
+    const bFil = b[fil] as number;
+    b[fil] = bFil - factor * (b[col] as number);
   }
 }
 
