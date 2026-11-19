@@ -211,7 +211,12 @@ export function celdaDesdeMatriz(matrix: string, base: number, cell: number): nu
   if (m === null || !Number.isFinite(cell) || cell <= 0) {
     return null;
   }
-  const y = Number((m[1] ?? "").split(",").at(-1) ?? "");
+  // Number("") es 0: un último parámetro vacío no parsea (antes devolvía `base`).
+  const ultimo = (m.groups?.["params"] ?? "").split(",").at(-1)?.trim() ?? "";
+  if (ultimo === "") {
+    return null;
+  }
+  const y = Number(ultimo);
   return Number.isFinite(y) ? base + Math.round(-y / cell) : null;
 }
 

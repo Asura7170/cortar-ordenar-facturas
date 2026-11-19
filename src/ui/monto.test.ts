@@ -122,6 +122,9 @@ describe("desplazamiento y aterrizaje", () => {
     expect(celdaDesdeMatriz("matrix(1, 0, 0, 1, 0, -96)", -2, 24)).toBe(2);
     expect(celdaDesdeMatriz("none", -2, 24)).toBeNull();
     expect(celdaDesdeMatriz("", 0, 24)).toBeNull();
+    // regresión: Number("") es 0 y devolvía `base` en vez de null
+    expect(celdaDesdeMatriz("matrix()", 0, 24)).toBeNull();
+    expect(celdaDesdeMatriz("matrix( )", 0, 24)).toBeNull();
   });
 });
 
