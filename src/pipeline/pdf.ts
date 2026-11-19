@@ -71,8 +71,8 @@ export async function admitirPdf(f: File, contar: ContadorPaginas): Promise<Vere
   let paginas: number;
   try {
     paginas = await contar(f);
-  } catch (e: unknown) {
-    return { admite: false, motivo: esPassword(e) ? "cifrado" : "ilegible" };
+  } catch (error: unknown) {
+    return { admite: false, motivo: esPassword(error) ? "cifrado" : "ilegible" };
   }
   return paginas <= PDF_MAX_PAGINAS ? { admite: true } : { admite: false, motivo: "paginas" };
 }
@@ -158,7 +158,7 @@ export async function expandirPdf(
   try {
     if (!admiteTamanoPdf(f)) return utiles;
     doc = await abrir(f);
-    const total = doc.total;
+    const { total } = doc;
     if (total < 1 || total > PDF_MAX_PAGINAS) return utiles;
     // ponytail: secuencial a propósito; N renders en paralelo saturan memoria.
     for (let i = 1; i <= total; i++) {

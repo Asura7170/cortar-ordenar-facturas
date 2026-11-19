@@ -184,8 +184,8 @@ async function procesarItem(sig: Comprobante): Promise<boolean> {
   await faseRecorte(sig);
   if (!buscarSlot(sig.id)) return false; // limpiado durante la espera: no resucita
   // ponytail: un solo import dinámico + blob reutilizado (en PDF evita refetch).
-  const ocr = await import("./ocr").catch((e: unknown): null => {
-    falloIa(e, "OCR");
+  const ocr = await import("./ocr").catch((error: unknown): null => {
+    falloIa(error, "OCR");
     return null;
   });
   const blob: Blob | null = await blobActual(sig);

@@ -98,7 +98,7 @@ const { __apuntados: registrados } = (await import("docx")) as unknown as {
   __apuntados: Registro[];
 };
 
-const EMU = 914400;
+const EMU = 914_400;
 const POSICIONES: readonly PosicionCodigo[] = ["sup-izq", "sup-der", "inf-izq", "inf-der"];
 
 beforeEach(() => {
@@ -111,7 +111,7 @@ afterEach(() => {
   globalThis.createImageBitmap = bitmapFalso;
 });
 
-function sembrar(monto: number | null = 123456): void {
+function sembrar(monto: number | null = 123_456): void {
   const h = crearHoja();
   h.slots[0] = comprobante({ montoCents: monto, file: new Blob(["jpg"], { type: "image/jpeg" }) });
   state.hojas.push(h);
@@ -307,12 +307,11 @@ describe("construirDocumento (docx mockeado)", () => {
       fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
       drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
     } as unknown as CanvasRenderingContext2D);
-    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
-      this: HTMLCanvasElement,
-      cb: BlobCallback,
-    ): void {
-      cb(new Blob([jpg], { type: "image/jpeg" }));
-    });
+    const toBlob = vi
+      .spyOn(HTMLCanvasElement.prototype, "toBlob")
+      .mockImplementation(function toBlob(this: HTMLCanvasElement, cb: BlobCallback): void {
+        cb(new Blob([jpg], { type: "image/jpeg" }));
+      });
     try {
       const h = crearHoja();
       h.slots[0] = comprobante({ file: new Blob(["webp"], { type: "image/webp" }) });
@@ -322,7 +321,7 @@ describe("construirDocumento (docx mockeado)", () => {
       expect(imgs).toHaveLength(1);
       const img = imgs[0];
       if (!img) throw new Error("imagen ausente");
-      const data = (img.opc as { data: ArrayBuffer }).data;
+      const { data } = img.opc as { data: ArrayBuffer };
       const bytes = new Uint8Array(data).slice(0, 3);
       expect(bytes).toStrictEqual(new Uint8Array([0xff, 0xd8, 0xff]));
       expect(toBlob).toHaveBeenCalledWith(expect.any(Function), "image/jpeg", expect.any(Number));
@@ -406,14 +405,14 @@ describe("descargarWord", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     await descargarWord();
-    expect(click).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledOnce();
     const a = click.mock.instances[0] as HTMLAnchorElement;
     expect(a.download).toBe("sincodigo-comprobante.docx");
     expect(a.href).toContain("blob:mock-");
     vi.advanceTimersByTime(2000);
     expect(revoke).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(28000);
-    expect(revoke).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(28_000);
+    expect(revoke).toHaveBeenCalledOnce();
   });
 
   it("fallo de generación: avisa y no descarga", async () => {
@@ -438,7 +437,7 @@ describe("initExport", () => {
     initExport();
     document.getElementById("btnWord")?.click();
     // descargarWord es async (mide + empaca): el clic del anchor llega después.
-    await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledOnce());
   });
 
   it("idempotente: recablear no duplica el print", async () => {
@@ -451,7 +450,7 @@ describe("initExport", () => {
       initExport();
       initExport();
       document.getElementById("btnImprimir")?.click();
-      await vi.waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(print).toHaveBeenCalledOnce());
     } finally {
       vi.unstubAllGlobals();
       window.dispatchEvent(new Event("afterprint"));

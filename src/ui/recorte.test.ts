@@ -122,7 +122,7 @@ describe("abrirRecorte", () => {
       .mockReturnValue(ctxFalso() as unknown as CanvasRenderingContext2D);
     try {
       const { deps } = depsRecorte();
-      await abrirRecorte(999999, deps as never);
+      await abrirRecorte(999_999, deps as never);
       const c = sembrar();
       c.estado = "pendiente";
       await abrirRecorte(c.id, deps as never);
@@ -153,7 +153,7 @@ describe("abrirRecorte", () => {
       expect(c.file).not.toBe(antes);
       expect(c.file).toBeInstanceOf(Blob);
       expect(c.textoOcr).toBe("TOTAL LEÍDO");
-      expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
       expect(modal.open).toBe(false);
       expect(vi.mocked(renderHojas)).toHaveBeenCalled();
     } finally {
@@ -364,7 +364,7 @@ describe("abrirRecorte", () => {
       btnOk.click();
       await vi.advanceTimersByTimeAsync(2000); // vence el debounce del giro
       // Solo la relectura inmediata del recorte (sin fix serían 2).
-      expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
       expect(c.textoOcr).toBe("TOTAL LEÍDO");
     } finally {
       ctx.mockRestore();
@@ -400,7 +400,7 @@ describe("abrirRecorte", () => {
       const p1 = abrirRecorte(c.id, deps as never);
       const p2 = abrirRecorte(c.id, deps as never);
       await Promise.all([p1, p2]);
-      expect(deps.cargar).toHaveBeenCalledTimes(1);
+      expect(deps.cargar).toHaveBeenCalledOnce();
       expect(modal.open).toBe(true);
     } finally {
       ctx.mockRestore();
@@ -1058,7 +1058,7 @@ describe("editor: filas de borde, teclado y extremos del commit", () => {
 
   it("sin crear en deps usa el lienzo real y avisa sin commitear", async () => {
     // Los lienzos del fixture tienen id; el creado por crearReal, no.
-    const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function (
+    const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(function ctx(
       this: HTMLCanvasElement,
     ) {
       return (this.id ? ctxFalso() : null) as unknown as CanvasRenderingContext2D;

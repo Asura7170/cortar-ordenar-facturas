@@ -69,7 +69,7 @@ function sembrar(): ReturnType<typeof comprobante> {
 
 describe("girarYReleer", () => {
   it("no-op sin item o sin estado ok", async () => {
-    await expect(girarYReleer(999999, 90)).resolves.toBeUndefined();
+    await expect(girarYReleer(999_999, 90)).resolves.toBeUndefined();
     const c = sembrar();
     c.estado = "pendiente";
     await girarYReleer(c.id, 90);
@@ -93,9 +93,9 @@ describe("girarYReleer", () => {
     expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.textoOcr).toBe("TOTAL LEÍDO");
-    expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
     expect(c.montoCents).toBeNull(); // el lote lo relee (mock: queda manual)
-    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
     // giro + procesando + ok + reapertura (el null se pinta aunque el lote sea no-op)
     expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(4);
   });
@@ -147,8 +147,8 @@ describe("girarYReleer", () => {
       state.colaEnProceso = false;
       await vi.advanceTimersByTimeAsync(1000);
       await p;
-      expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
+      expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
       expect(c.estado).toBe("ok");
     } finally {
       state.colaEnProceso = false;
@@ -195,8 +195,8 @@ describe("girarYReleer", () => {
     expect(c.textoOcr).toBe("VIEJO");
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.textoOcr).toBe("TOTAL LEÍDO");
-    expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
   });
 
   it("giros separados por la quietud: un OCR por giro", async () => {
@@ -284,7 +284,7 @@ describe("girarYReleer", () => {
 
   it("giro huérfano revoca el imgUrl nuevo (sin fuga)", async () => {
     const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const crearUrl = vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:nuevo");
+    const crearUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:nuevo");
     try {
       let soltar: ((b: ImageBitmap) => void) | undefined;
       const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
@@ -428,13 +428,13 @@ describe("girarYReleer", () => {
       for (let i = 0; i < 200 && !soltarPrevio; i++) await Promise.resolve();
       document.getElementById("btnRecorteOk")?.click();
       await new Promise((r) => setTimeout(r, 200)); // confirmar entero (C gana píxeles)
-      expect(await (c.file as Blob).text()).toBe("recorte");
+      await expect((c.file as Blob).text()).resolves.toBe("recorte");
       soltarPrevio?.(bmpGiro as unknown as ImageBitmap);
       await pg;
       await new Promise((r) => setTimeout(r, 100));
       cancelarRelecturaProgramada(c.id); // el timer del giro no fuga al resto
       // El giro terminó último: todo G ("girado" 6B), nada de C ("recorte" 7B).
-      expect(await (c.file as Blob).text()).toBe("girado");
+      await expect((c.file as Blob).text()).resolves.toBe("girado");
       expect(c.imgUrl).toBe("blob:6");
       const modal = document.getElementById("modalRecorte") as HTMLDialogElement | null;
       if (modal?.open) modal.close();
@@ -461,7 +461,7 @@ describe("ramas de cubrimiento (lote 10)", () => {
       await girarYReleer(c.id, 90, deps);
       expect(fetchSpy).toHaveBeenCalledWith(urlOrigen);
       expect(c.file).toBeInstanceOf(Blob);
-      expect(await (c.file as Blob).text()).toBe("girado");
+      await expect((c.file as Blob).text()).resolves.toBe("girado");
     } finally {
       fetchSpy.mockRestore();
     }
@@ -511,7 +511,7 @@ describe("ramas de cubrimiento (lote 10)", () => {
   it("relectura con id ausente: no-op silenciosa", async () => {
     const aviso = document.getElementById("aviso");
     if (aviso) aviso.textContent = "";
-    await expect(releerTrasEdicion(999999, new Blob(["x"]))).resolves.toBeUndefined();
+    await expect(releerTrasEdicion(999_999, new Blob(["x"]))).resolves.toBeUndefined();
     expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
     expect(vi.mocked(renderHojas)).not.toHaveBeenCalled();
     expect(document.getElementById("aviso")?.textContent).toBe("");

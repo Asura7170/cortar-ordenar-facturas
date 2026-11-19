@@ -383,7 +383,7 @@ export function warpear(src: BuferPixeles, quad: Quad, ancho: number, alto: numb
 /** Decodifica un heatmap (1,4,H,W) a esquinas en píxeles: por canal, centroide ponderado del blob mayor. */
 // ponytail: búfers locales por llamada (plano ~4K, barato); evita estado global mutable entre disparos.
 /** Cruces 4-vecinos dentro del mapa. */
-const VECINOS: ReadonlyArray<readonly [number, number]> = [
+const VECINOS: readonly (readonly [number, number])[] = [
   [-1, 0],
   [1, 0],
   [0, -1],
@@ -605,9 +605,9 @@ let sesionEnCurso: Promise<SesionDetectora> | null = null;
 /** Singleton lazy de la sesión ORT (import dinámico: onnx solo se descarga con el primer comprobante). */
 export function obtenerSesion(): Promise<SesionDetectora> {
   if (!sesionEnCurso) {
-    sesionEnCurso = crearSesion().catch((e: unknown) => {
+    sesionEnCurso = crearSesion().catch((error: unknown) => {
       sesionEnCurso = null; // el siguiente comprobante reintenta
-      throw e;
+      throw error;
     });
   }
   return sesionEnCurso;
@@ -694,9 +694,9 @@ export function conTimeout<T>(promesa: Promise<T>, ms: number): Promise<T> {
         clearTimeout(id);
         resuelve(v);
       },
-      (e: unknown) => {
+      (error: unknown) => {
         clearTimeout(id);
-        rechaza(e);
+        rechaza(error);
       },
     );
   });
@@ -716,11 +716,11 @@ export async function iniciarSesion<T>(
     if (epCaidos.has(ep)) continue;
     try {
       return await conTimeout(intentar(ep), timeoutMs);
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       epCaidos.add(ep);
-      ultimoError = e;
+      ultimoError = error;
       console.warn(
-        `DocAligner: EP ${ep} no disponible, se omite (${e instanceof Error ? e.message : e})`,
+        `DocAligner: EP ${ep} no disponible, se omite (${error instanceof Error ? error.message : error})`,
       );
     }
   }
@@ -826,9 +826,9 @@ async function intentoDeDescarga(
     await guardarEnCache(cache, llave, pesos);
     frioHasta.delete(clave); // el éxito reseca el enfriamiento
     return pesos;
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     frioHasta.set(clave, Date.now() + ENFRIAMIENTO_MS);
-    throw e;
+    throw error;
   }
 }
 
@@ -846,8 +846,8 @@ async function guardarEnCache(
         headers: { "Content-Length": String(pesos.byteLength) },
       }),
     );
-  } catch (e: unknown) {
-    console.warn("modelos: caché put falló", e);
+  } catch (error: unknown) {
+    console.warn("modelos: caché put falló", error);
   }
 }
 
@@ -909,12 +909,12 @@ async function crearSesion(): Promise<SesionDetectora> {
     notarSesionOk(RUTA_MODELO);
     iaOk();
     return sesion;
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     // Strikes: 2 fallos seguidos expulsan el peso cacheado (cualquier motivo,
     // no solo integridad); el 1º ya soltó el latch de EPs. Sin regex de mensajes.
     await olvidarSesionFallida(RUTA_MODELO);
-    falloIa(e, "recorte");
-    throw e;
+    falloIa(error, "recorte");
+    throw error;
   }
 }
 
@@ -966,8 +966,10 @@ export async function detectarYRecortar(blob: Blob, deps?: DepsRecorte): Promise
     const quad = await detectarEsquinas(base, sesion, crear);
     if (!quad) return blob;
     return await rectificar(bmp, quitarBorde(quad), crear);
-  } catch (e: unknown) {
-    console.error(`DocAligner: recorte omitido (${e instanceof Error ? e.message : String(e)})`);
+  } catch (error: unknown) {
+    console.error(
+      `DocAligner: recorte omitido (${error instanceof Error ? error.message : String(error)})`,
+    );
     return blob;
   } finally {
     bmp?.close();

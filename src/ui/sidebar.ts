@@ -57,28 +57,36 @@ function avisar(rechazos: readonly AvisoRechazo[]): void {
 
 function textoMotivo(m: MotivoRechazo): string {
   switch (m) {
-    case "tamano":
+    case "tamano": {
       return "pesa más de 5 MB, comprimila y probá de nuevo";
-    case "paginas":
+    }
+    case "paginas": {
       return "tiene más de 10 páginas, partila en dos PDF";
-    case "cifrado":
+    }
+    case "cifrado": {
       return "protegido con contraseña, quitásela y volvé a subir";
-    case "ilegible":
+    }
+    case "ilegible": {
       return "no se pudo leer: puede estar corrupta, probá con otra foto";
+    }
   }
 }
 
 /** Título corto y escaneable del rechazo, pareja de textoMotivo. */
 function tituloDeMotivo(m: MotivoRechazo): string {
   switch (m) {
-    case "tamano":
+    case "tamano": {
       return "Archivo demasiado pesado";
-    case "paginas":
+    }
+    case "paginas": {
       return "PDF demasiado largo";
-    case "cifrado":
+    }
+    case "cifrado": {
       return "PDF protegido con contraseña";
-    case "ilegible":
+    }
+    case "ilegible": {
       return "No se pudo leer";
+    }
   }
 }
 
@@ -626,7 +634,7 @@ function cablearSwitchCodigo(): void {
     renderCodigo();
   });
   inputCodigo.addEventListener("input", () => {
-    state.codigoValor = inputCodigo.value.replace(/\D/g, "");
+    state.codigoValor = inputCodigo.value.replaceAll(/\D/g, "");
     inputCodigo.value = state.codigoValor;
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
     inputCodigo.classList.remove("codigo-error", "sacudir");

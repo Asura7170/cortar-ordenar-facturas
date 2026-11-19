@@ -167,13 +167,15 @@ describe("tensorDet", () => {
 });
 
 describe("envolver", () => {
-  const sesion = (shape: ReadonlyArray<number | string>) =>
+  const sesion = (shape: readonly (number | string)[]) =>
     ({
       outputMetadata: [{ name: "x", isTensor: true, type: 1, shape }],
     }) as unknown as import("onnxruntime-web").InferenceSession;
+
   it("rec con clases distintas al dict lanza en init", () => {
     expect(() => envolver({} as never, sesion([100, 80, 999]), "rec")).toThrow(/999 clases/);
   });
+
   it("rec compatible no lanza", () => {
     expect(() => envolver({} as never, sesion([100, 80, DICT_OCR.length]), "rec")).not.toThrow();
   });
@@ -257,14 +259,14 @@ describe("extraerTexto", () => {
   it("mapa vacío → sin texto y sin rec", async () => {
     const vacio = { data: new Float32Array(16 * 8).fill(0.01), dims: [1, 1, 8, 16] };
     const { deps, espia } = base(vacio, logitsAA());
-    expect(await extraerTexto(new Blob(["x"]), deps)).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps)).resolves.toBe("");
     expect(espia.rec).toHaveLength(0);
   });
 
   it("rec todo blank → línea vacía filtrada", async () => {
     const n = DICT_OCR.length;
     const { deps } = base(mapaUnaLinea(), { data: new Float32Array(n), dims: [1, 1, n] });
-    expect(await extraerTexto(new Blob(["x"]), deps)).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps)).resolves.toBe("");
   });
 
   it("núcleo caído → sin lanzar", async () => {
@@ -313,12 +315,16 @@ describe("extraerTexto", () => {
 
   it("reuse sin base ni cajas → decode fresca", async () => {
     const { deps, espia } = base();
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas: [], base: null })).toBe("AA");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas: [], base: null })).resolves.toBe(
+      "AA",
+    );
     expect(espia.det).toHaveLength(1);
     const { lienzo } = lienzoFalso(BLANCO32);
     lienzo.width = 32;
     lienzo.height = 32;
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas: [], base: lienzo })).toBe("AA");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas: [], base: lienzo })).resolves.toBe(
+      "AA",
+    );
   });
 
   it("reuse chico → vacío directo sin decode", async () => {
@@ -337,7 +343,7 @@ describe("extraerTexto", () => {
         puntaje: 0.9,
       },
     ];
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas, base: lienzo })).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas, base: lienzo })).resolves.toBe("");
     expect(espia.det).toHaveLength(0);
     expect(espia.rec).toHaveLength(0);
   });
@@ -617,7 +623,7 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         llamadas.push(formas);
         if ((formas[0] ?? 0) > 1) return Promise.reject(new Error("sin batch"));
         return Promise.resolve({ fetch_name_0: logitsAA() });
@@ -644,7 +650,7 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         llamadas.push(formas);
         n += 1;
         if (n === 2) return Promise.reject(new Error("chunk caído"));
@@ -685,7 +691,7 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         formasRun.push(formas);
         const b = formas[0] ?? 0;
         const data = new Float32Array(b * 3 * n);
@@ -741,7 +747,7 @@ describe("reconocerLote", () => {
     const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
     const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
     const { lienzo } = lienzoFalso(BLANCO32);
-    expect(await reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).toStrictEqual([]);
+    await expect(reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).resolves.toStrictEqual([]);
     expect(espia.rec).toHaveLength(0);
   });
 
@@ -758,7 +764,7 @@ describe("reconocerLote", () => {
       ] as const,
       puntaje: 0.9,
     };
-    expect(await reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).toStrictEqual([
+    await expect(reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).resolves.toStrictEqual([
       { texto: "", puntaje: 0 },
     ]);
     expect(espia.rec).toHaveLength(0);
@@ -823,7 +829,7 @@ describe("enderezar (decisión rec)", () => {
 
   /** Núcleo falso: det por nº de llamada det, rec con conf por nº de llamada rec. */
   function nucleoGiros(
-    mapas: Array<{ data: Float32Array; dims: number[] }>,
+    mapas: { data: Float32Array; dims: number[] }[],
     confs: number[],
     detLlamadas: number[],
     recLlamadas: number[],
@@ -864,7 +870,7 @@ describe("enderezar (decisión rec)", () => {
   }
 
   function base(
-    mapas: Array<{ data: Float32Array; dims: number[] }>,
+    mapas: { data: Float32Array; dims: number[] }[],
     confs: number[],
     fallaRecEn?: number,
   ): {
@@ -965,7 +971,7 @@ describe("enderezar (decisión rec)", () => {
   it("lote rec falla en 270 → reintenta individual y gana 270 (L2)", async () => {
     const { deps, detLlamadas, recLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
-      [0.3, 0.0, 0.95],
+      [0.3, 0, 0.95],
       1,
     );
     const r = await enderezar(new Blob(["foto"]), deps);
@@ -1071,7 +1077,7 @@ describe("enderezar (decisión rec)", () => {
   it("rec blank → conf 0 y gana 0°", async () => {
     const { blob, deps, detLlamadas, recLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
-      [0.0, 0.0, 0.0, 0.0],
+      [0, 0, 0, 0],
     );
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);

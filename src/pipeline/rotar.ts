@@ -172,8 +172,8 @@ async function drenarSiLaColaTrabaja(): Promise<void> {
 
 /** OCR del blob girado; "" si el módulo cargó roto (mejor vacío que rancio). */
 async function textoDeOcr(blob: Blob, deps?: DepsOcr): Promise<string> {
-  const ocr = await import("./ocr").catch((e: unknown): null => {
-    falloIa(e, "OCR");
+  const ocr = await import("./ocr").catch((error: unknown): null => {
+    falloIa(error, "OCR");
     return null;
   });
   return ocr ? await ocr.extraerTexto(blob, deps) : "";

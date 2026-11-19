@@ -58,7 +58,7 @@ export function candidatos(): Comprobante[] {
 
 /** Normalizado sin tope: el monto se clasifica sobre el texto completo. */
 export function limpiarTextoCompleto(s: string): string {
-  return sanear(s).replace(/\s+/g, " ").trim();
+  return sanear(s).replaceAll(/\s+/g, " ").trim();
 }
 
 export interface ItemLote {

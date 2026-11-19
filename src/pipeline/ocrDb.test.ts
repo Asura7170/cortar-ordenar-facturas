@@ -19,7 +19,7 @@ import {
 import type { CajaDb } from "./ocrDb";
 
 /** Máscara binaria con borde (como la de binarizarMapa) desde set de píxeles. */
-function mascara(w: number, h: number, pixeles: Array<readonly [number, number]>): Uint8Array {
+function mascara(w: number, h: number, pixeles: (readonly [number, number])[]): Uint8Array {
   const bin = new Uint8Array((w + 2) * (h + 2));
   for (const [x, y] of pixeles) bin[(y + 1) * (w + 2) + x + 1] = 1;
   return bin;
@@ -46,7 +46,7 @@ describe("binarizarMapa", () => {
   it("umbral 0.2 y borde cero", () => {
     // 0.19 bajo el umbral (0.2f en Float32 queda apenas sobre 0.2: se evita el borde).
     const bin = binarizarMapa(new Float32Array([0.1, 0.3, 0.19, 0.9]), 2, 2);
-    expect(bin.length).toBe(16);
+    expect(bin).toHaveLength(16);
     // Interior 2x2 en máscara 4x4 con borde.
     expect([bin[5], bin[6], bin[9], bin[10]]).toStrictEqual([0, 1, 0, 1]);
     expect(bin[0]).toBe(0);
@@ -421,7 +421,7 @@ describe("cajasDesdeMapa", () => {
 
   it("diamante rotado 45° no se descarta (área real 8, no 0)", () => {
     const mapa = new Float32Array(9 * 9).fill(0.05);
-    const pixeles: Array<readonly [number, number]> = [
+    const pixeles: (readonly [number, number])[] = [
       [4, 2],
       [3, 3],
       [4, 3],

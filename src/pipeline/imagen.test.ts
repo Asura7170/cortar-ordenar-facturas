@@ -155,24 +155,24 @@ describe("normalizarImagen", () => {
 
 describe("esFormatoDirecto", () => {
   it("mime jpg/png/webp pasa, bmp no", async () => {
-    expect(await esFormatoDirecto(img("a.jpg", "image/jpeg"))).toBe(true);
-    expect(await esFormatoDirecto(img("a.png", "image/png"))).toBe(true);
-    expect(await esFormatoDirecto(img("a.webp", "image/webp"))).toBe(true);
-    expect(await esFormatoDirecto(img("a.bmp", "image/bmp"))).toBe(false);
+    await expect(esFormatoDirecto(img("a.jpg", "image/jpeg"))).resolves.toBe(true);
+    await expect(esFormatoDirecto(img("a.png", "image/png"))).resolves.toBe(true);
+    await expect(esFormatoDirecto(img("a.webp", "image/webp"))).resolves.toBe(true);
+    await expect(esFormatoDirecto(img("a.bmp", "image/bmp"))).resolves.toBe(false);
   });
 
   it("type vacío se olfatea por firma mágica", async () => {
     const sinTipo = (bytes: number[]): Blob => new Blob([new Uint8Array(bytes)]);
-    expect(await esFormatoDirecto(sinTipo([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]))).toBe(
-      true,
-    );
-    expect(
-      await esFormatoDirecto(sinTipo([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])),
-    ).toBe(true);
-    expect(
-      await esFormatoDirecto(sinTipo([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])),
-    ).toBe(true);
-    expect(await esFormatoDirecto(sinTipo([0, 1, 2, 3]))).toBe(false);
+    await expect(
+      esFormatoDirecto(sinTipo([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])),
+    ).resolves.toBe(true);
+    await expect(
+      esFormatoDirecto(sinTipo([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])),
+    ).resolves.toBe(true);
+    await expect(
+      esFormatoDirecto(sinTipo([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50])),
+    ).resolves.toBe(true);
+    await expect(esFormatoDirecto(sinTipo([0, 1, 2, 3]))).resolves.toBe(false);
   });
 
   it("slice que falla o head < 4 bytes → false sin lanzar", async () => {
@@ -181,8 +181,8 @@ describe("esFormatoDirecto", () => {
         arrayBuffer: () => Promise.reject(new Error("red")),
       }),
     } as unknown as Blob;
-    expect(await esFormatoDirecto(roto)).toBe(false);
-    expect(await esFormatoDirecto(new Blob([new Uint8Array([0xff, 0xd8])]))).toBe(false);
+    await expect(esFormatoDirecto(roto)).resolves.toBe(false);
+    await expect(esFormatoDirecto(new Blob([new Uint8Array([0xff, 0xd8])]))).resolves.toBe(false);
   });
 });
 

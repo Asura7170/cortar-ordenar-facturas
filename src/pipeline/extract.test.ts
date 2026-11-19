@@ -23,6 +23,7 @@ const {
   mensajeLote,
 } = await import("./extract");
 import type { ItemLote } from "./extract";
+
 const { mostrarToasts } = await import("../utils");
 
 const aviso = el("aviso");
@@ -77,7 +78,7 @@ describe("regex", () => {
 
   it("rápido: 1 distinto resuelve, repetido vale, 2 distintos = manual", () => {
     expect(extraerRapidoCents("TOTAL 12.50")).toBe(1250);
-    expect(extraerRapidoCents("TOTAL 1,234.56 ... total 1234.56")).toBe(123456);
+    expect(extraerRapidoCents("TOTAL 1,234.56 ... total 1234.56")).toBe(123_456);
     expect(extraerRapidoCents("TOTAL 12.50 PROPINA 1.00")).toBeNull();
     expect(extraerRapidoCents("sin montos")).toBeNull();
   });
@@ -252,7 +253,7 @@ describe("extraerPendientes", () => {
     extraerPendientes();
     expect(c1.montoCents).toBe(1250);
     expect(c2.montoCents).toBe(700);
-    expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(renderHojas)).toHaveBeenCalledOnce();
     expect(aviso.textContent).toBe("Local: 2/2 totales.");
   });
 

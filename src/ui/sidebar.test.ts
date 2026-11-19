@@ -167,7 +167,7 @@ describe("agregarArchivos", () => {
     const antes = state.hojas.flatMap((h) => h.slots).filter(Boolean).length;
     await agregarArchivos([archivo("f.png", "image/png"), archivo("g.png", "image/png")]);
     expect(state.loteEnCurso).toBe(false);
-    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean).length).toBe(antes + 2);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(antes + 2);
   });
 
   it("dos intakes solapados no sueltan el flag a medias", async () => {
@@ -287,8 +287,8 @@ describe("cableado global (window/document)", () => {
     const sheet = document.createElement("div");
     sheet.className = "sheet";
     const objetivo = document.createElement("span");
-    sheet.appendChild(objetivo);
-    canvas.appendChild(sheet);
+    sheet.append(objetivo);
+    canvas.append(sheet);
     try {
       const e = eventoDrop([archivo("s.png", "image/png")]);
       objetivo.dispatchEvent(e);
@@ -791,7 +791,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
   it("hoja inexistente no hace nada", async () => {
     aviso.textContent = "";
     mockRead(async () => [itemPng()]);
-    await pegarEnCelda(999999, 0);
+    await pegarEnCelda(999_999, 0);
     expect(items().filter(Boolean)).toHaveLength(0);
     expect(aviso.textContent).toBe("");
   });

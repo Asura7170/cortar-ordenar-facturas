@@ -107,7 +107,7 @@ describe("Modelos", () => {
           return tienda.get(url) ?? undefined;
         },
         put: async (k: unknown, v: unknown): Promise<void> => {
-          const cuerpo = (v as { cuerpo?: ArrayBuffer }).cuerpo;
+          const { cuerpo } = v as { cuerpo?: ArrayBuffer };
           tienda.set(k, {
             arrayBuffer: async () => bytes,
             headers: { get: () => String(cuerpo?.byteLength ?? 0) },
@@ -247,7 +247,7 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
     expect(estadoModelos.textContent).toContain("IA: sesiones listas");
     expect(btnProbarIa.disabled).toBe(false);
     expect(btnDescargarModelos.disabled).toBe(false);
-    expect(iaFalsa.reactiva).toHaveBeenCalledTimes(1);
+    expect(iaFalsa.reactiva).toHaveBeenCalledOnce();
   });
 
   it("sesiones caídas: motivo visible y botón repuesto (no queda bloqueado)", async () => {
@@ -280,7 +280,7 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
     expect(btnProbarIa.disabled).toBe(true);
     expect(btnDescargarModelos.disabled).toBe(true);
     expect(btnBorrarModelos.disabled).toBe(true);
-    expect(iaFalsa.reactiva).toHaveBeenCalledTimes(1); // el 2º Probar no repite
+    expect(iaFalsa.reactiva).toHaveBeenCalledOnce(); // el 2º Probar no repite
     suelta({});
     await pausa();
     expect(estadoModelos.textContent).toContain("IA: sesiones listas");
