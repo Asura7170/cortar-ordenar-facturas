@@ -308,7 +308,7 @@ describe("barraBoton", () => {
   function botonCalcular(): HTMLButtonElement {
     const b = document.getElementById("btnCalcular");
     if (!(b instanceof HTMLButtonElement)) {
-      throw new Error("sin #btnCalcular");
+      throw new TypeError("sin #btnCalcular");
     }
     return b;
   }
@@ -370,7 +370,7 @@ describe("barraBoton", () => {
   it("btnLimpiar deshabilitado con lote vacío, habilitado con items", () => {
     const limpiar = document.getElementById("btnLimpiar");
     if (!(limpiar instanceof HTMLButtonElement)) {
-      throw new Error("sin #btnLimpiar");
+      throw new TypeError("sin #btnLimpiar");
     }
     // sin hojas
     renderMonto();
@@ -386,7 +386,7 @@ describe("barraBoton", () => {
     const botones = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLimpiar"].map((id) => {
       const b = document.getElementById(id);
       if (!(b instanceof HTMLButtonElement)) {
-        throw new Error(`sin #${id}`);
+        throw new TypeError(`sin #${id}`);
       }
       return b;
     });

@@ -375,11 +375,11 @@ describe("celdas", () => {
     const celdas = document.querySelectorAll(".sheet:not(.sheet-fantasma) .cell");
     const cell = celdas.item(celdas.length - 1);
     if (!(cell instanceof HTMLElement)) {
-      throw new Error("sin celda propia");
+      throw new TypeError("sin celda propia");
     }
     const input = cell.querySelector("input.cell-monto");
     if (!(input instanceof HTMLInputElement)) {
-      throw new Error("sin input de monto");
+      throw new TypeError("sin input de monto");
     }
     // borrador inválido tras blur, sin foco
     input.value = "abc";
@@ -780,7 +780,7 @@ describe("monto manual", () => {
     renderHojas();
     const cell = document.querySelector(".cell");
     if (!(cell instanceof HTMLElement)) {
-      throw new Error("sin celda");
+      throw new TypeError("sin celda");
     }
     cell.querySelector("input.cell-monto")?.remove();
     c.montoCents = 1250;
@@ -958,7 +958,7 @@ describe("drop de archivos sobre hojas", () => {
     sembrar("u1", [10]);
     const sheet = document.querySelector(".sheet");
     if (!(sheet instanceof HTMLElement)) {
-      throw new Error("sin .sheet");
+      throw new TypeError("sin .sheet");
     }
     sheet.dispatchEvent(
       Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
@@ -1601,7 +1601,7 @@ describe("drag entre celdas (swap)", () => {
   function pressCelda(idx: number, x: number, y: number): void {
     const img = document.querySelectorAll(".cell img").item(idx);
     if (!(img instanceof Element)) {
-      throw new Error("sin imagen");
+      throw new TypeError("sin imagen");
     }
     img.dispatchEvent(
       Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {

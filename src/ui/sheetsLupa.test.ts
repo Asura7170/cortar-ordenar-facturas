@@ -96,7 +96,7 @@ describe("dibujarLupa", () => {
     const cell = document.querySelector(".cell");
     const img = cell?.querySelector("img");
     if (!(cell instanceof HTMLElement) || !(img instanceof HTMLImageElement)) {
-      throw new Error("sin celda con imagen");
+      throw new TypeError("sin celda con imagen");
     }
     Object.defineProperty(img, "naturalWidth", { value: 100, configurable: true });
     Object.defineProperty(img, "naturalHeight", { value: 100, configurable: true });
