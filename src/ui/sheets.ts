@@ -918,8 +918,8 @@ function cancelarDragVisual(): void {
 
 function autoScroll(x: number, y: number): void {
   const r = canvasEl.getBoundingClientRect();
-  const margen = 70,
-    vel = 14;
+  const margen = 70;
+  const vel = 14;
   if (y < r.top + margen) {
     scrollDir = -vel;
   } else {
