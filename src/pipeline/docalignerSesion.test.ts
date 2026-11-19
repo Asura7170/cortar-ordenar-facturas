@@ -4,10 +4,12 @@
    crearSesion cierra sobre el descargarPesos local, no sobre el export). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-const { crearFalso } = vi.hoisted(() => ({ crearFalso: vi.fn() }));
+const { crearFalso } = vi.hoisted(() => ({
+  crearFalso: vi.fn<typeof import("onnxruntime-web/webgpu").InferenceSession.create>(),
+}));
 vi.mock("onnxruntime-web/webgpu", () => ({
   env: { wasm: { wasmPaths: "", numThreads: 0 } },
-  Tensor: vi.fn(),
+  Tensor: vi.fn<typeof import("onnxruntime-web/webgpu").Tensor>(),
   InferenceSession: { create: crearFalso },
 }));
 
@@ -24,8 +26,10 @@ beforeEach(() => {
     arrayBuffer: async () => PESOS,
   } as Response);
   reintentarEps();
-  notarSesionOk(); // el historial de strikes no cruza tests
-  iaOk(); // ni el estado del uno-solo-toast
+  // el historial de strikes no cruza tests
+  notarSesionOk();
+  // ni el estado del uno-solo-toast
+  iaOk();
   crearFalso.mockReset();
 });
 
@@ -45,7 +49,8 @@ describe("crearSesion (ORT falso, resto real)", () => {
     // intento siguiente repite create; si el hardware sigue muerto, falla igual.
     crearFalso.mockClear();
     await expect(obtenerSesion()).rejects.toThrow("GPU muerta");
-    expect(crearFalso).toHaveBeenCalledTimes(2); // webgpu + wasm otra vez
+    // webgpu + wasm otra vez
+    expect(crearFalso).toHaveBeenCalledTimes(2);
   });
 
   it("peso corrupto expulsa el peso y reintenta", async () => {
@@ -54,12 +59,12 @@ describe("crearSesion (ORT falso, resto real)", () => {
   });
 
   it("crea sesión e infiere con nombres por defecto", async () => {
-    const runFalso = vi.fn(async (): Promise<unknown> => ({
+    const runFalso = vi.fn<() => Promise<unknown>>(async (): Promise<unknown> => ({
       heatmap: { data: new Float32Array([1]), dims: [1, 1] },
     }));
     crearFalso.mockResolvedValue(sesionFalsa(runFalso) as never);
     const sesion = await obtenerSesion();
-    await expect(sesion.inferir(new Float32Array([1, 2, 3]))).resolves.toEqual({
+    await expect(sesion.inferir(new Float32Array([1, 2, 3]))).resolves.toStrictEqual({
       datos: new Float32Array([1]),
       dims: [1, 1],
     });

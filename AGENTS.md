@@ -7,14 +7,15 @@ Frontend-only, sin backend. TypeScript + Vite+ (toolchain VoidZero: Vite 8, Vite
 ```bash
 vp install      # instalar (delega a pnpm 12, fijado en devEngines)
 pnpm dev        # vp dev --open: dev server, abre Chrome solo (server.open)
-pnpm test       # vp test run (~560 tests, ~20s)
+pnpm test       # vp test run (~740 tests, ~7s)
 pnpm typecheck  # tsc --noEmit
 vp check        # lint + formato + tipos (válido para loops de validación)
+pnpm check      # ultracite check: lint + formato del preset (0 errores desde 2026-11)
 pnpm build      # vp build: build prod → dist/
 pnpm preview    # vp preview: previsualizar el build
 ```
 
-Hay CI (GitHub Actions: `vp check` + typecheck + test + build en cada PR, job `check` requerido por el ruleset). Verificar con `vp check`, `pnpm test` y `pnpm typecheck` (y `pnpm build` si toca config de Vite).
+Hay CI (GitHub Actions: `vp check` + typecheck + test + build en cada PR, job `check` requerido por el ruleset). Verificar con `vp check`, `pnpm check`, `pnpm test` y `pnpm typecheck` (y `pnpm build` si toca config de Vite).
 
 - Tests viajan solo por `vp` (sin `vitest` standalone: `vite-plus` lo embutea y `vp test`/`test:coverage` usan esa copia). `@vitest/coverage-v8` + `jsdom` sí quedan en devDeps porque vp los resuelve desde la raíz; NO quitarlos. Llamar siempre vía `pnpm exec vp` o scripts (un `vp` global aparte daría otra versión).
 - `vite`/`vite-plus`/`@vitest/coverage-v8` se resuelven vía `catalog:` en `pnpm-workspace.yaml` (no tocar los alias; pnpm los necesita para que el override aplique). Bump de vite-plus **manual**: las dos entradas del catálogo deben ir en la misma versión o `vp build` aborta, y dependabot solo bumpea una. `overrides.vitest@*` apunta al catálogo y lo mantiene lockstep con el vitest embuteado (ver el comentario en el archivo); `@vitest/coverage-v8` también va lockstep porque el guard de coverage de vp exige la versión exacta.
@@ -22,6 +23,14 @@ Hay CI (GitHub Actions: `vp check` + typecheck + test + build en cada PR, job `c
 - `MODELOS_VERSION` en `docaligner.ts`: al cambiar `public/models/ocr/*.onnx` o re-subir los pesos HF, subirla +1 en el mismo PR — la caché de navegadores (Cache Storage "modelos") se invalida por el marcador `?modelos_v=N` de la clave en la **query** (el matching de Cache Storage excluye los fragmentos `#`: verificado en Chrome, `#v1` y `#v2` colapsan); sin bump, los usuarios viejos sirven pesos viejos para siempre. La IA muerta se recupera sola: 2 fallos de sesión seguidos = expulsión de la clave + latch suelto, y la red fallida entra en enfriamiento de 60s (botón "Probar IA" en Ajustes lo resetea).
 - Imports: `vite-plus` en config, `vite-plus/test` en tests. Regla `vite-plus/prefer-vite-plus-imports` lo exige (`vp check` falla si importas de `vite`/`vitest`).
 - `.vite-hooks/` (pre-commit `vp staged`) se commitea; `prepare: vp config` lo activa tras instalar.
+
+## Lint del preset (Ultracite / Oxlint)
+
+`pnpm check` dio 0 el 2026-11-19 y es gate de lint junto a `vp check`. La política es global en `oxlint.config.mts`: cada regla fuera del preset lleva un `ponytail:` al lado. Las excepciones puntuales van por línea (`oxlint-disable-next-line` con su razón); prohibidos `-A` global y los silencios por archivo.
+
+- **Configuradas con opción:** `eqeqeq` (`null: "ignore"`; `no-eq-null` off), `no-use-before-define` (`functions: false, variables: false`; las clases siguen protegidas), `consistent-type-imports` (`disallowTypeAnnotations: false`), `no-array-sort` (`allowAfterSpread`), `no-warning-comments` (`fixme`, `xxx`), `complexity` (30). `require-await` y `max-classes-per-file` van off solo en `**/*.test.ts`.
+- **Rechazadas:** `func-style` (hoisting, recursión mutua, `isolatedDeclarations`), `prefer-to-be-truthy`/`prefer-to-be-falsy` (debilitan `toBe(true/false)`), `prefer-query-selector` (contrato `getEl`/`getElementById`), `filename-case` (camelCase español), `promise/avoid-new`/`prefer-await-to-callbacks`/`param-names` (APIs DOM con callbacks), `no-await-in-loop` (cola OCR secuencial), `consistent-function-scoping` (closures), `max-expects`/`require-top-level-describe` (tests de integración por archivo), `no-empty-function` (mocks y no-ops), `prefer-spread` (rompe `ArrayBuffer`), `prefer-dom-node-dataset` (rompe tipos), `prefer-spy-on` (stubs no restaurables), `prefer-describe-function-title`/`prefer-import-in-mock`/`prefer-called-with` (rompen tipos o cambian/debilitan aserciones).
+- **Allowlist de autofix** (solo fixes neutros, por regla y nunca `--fix` global): `catch-error-name`, `numeric-separators-style`, `array-type`, `prefer-at`, `prefer-number-properties`, `switch-case-braces`, `no-zero-fractions`, `prefer-string-replace-all`, `consistent-existence-index-check`, `no-useless-undefined` (`checkArguments: false`), `require-array-join-separator`, `new-for-builtins`, `prefer-dom-node-append`, `import/newline-after-import`, `vitest/padding-around-test-blocks`, `vitest/consistent-test-it`, `vitest/prefer-mock-return-shorthand`, `one-var` (`never`), `operator-assignment`, `func-names`, `vitest/prefer-expect-resolves`, `vitest/prefer-called-once`, `vitest/prefer-to-have-length`. Vetadas: `prefer-spread`, `prefer-dom-node-dataset`, `prefer-query-selector`, `no-array-sort`, `require-await`, `prefer-spy-on`, `prefer-called-with`, `prefer-describe-function-title`.
 
 ## CRAP local (crapper: solo local, sin job de CI)
 
@@ -215,4 +224,4 @@ Oxlint + Oxfmt will catch most mechanical issues automatically. Focus your atten
 
 ---
 
-En este repo el formato lo aplica `vp check --fix`; no corras `ultracite fix` a ciegas: sus autofixes de lint rompieron tipos y tests (ver `oxlint.config.mts`). El gate es `vp check`; `pnpm check` mide la deuda del preset.
+En este repo el formato lo aplica `vp check --fix`; no corras `ultracite fix` a ciegas: sus autofixes de lint rompieron tipos y tests (ver `oxlint.config.mts`). `vp check` es el gate de formato+tipos y `pnpm check` también es gate: el CI corre ambos en el job requerido.

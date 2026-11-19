@@ -3,14 +3,22 @@
 /** getElementById que falla fuerte si falta el id (el HTML es contrato). */
 export function getEl<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
-  if (!el) throw new Error(`Falta #${id} en index.html`);
+  if (!el) {
+    throw new Error(`Falta #${id} en index.html`);
+  }
   return el as T;
 }
 
 /** Sanea entrada del usuario (nombres de archivo, texto OCR) antes del DOM. */
 export function sanear(s: unknown): string {
   // ponytail: solo string/number llegan al DOM; objetos → "" (nunca "[object Object]").
-  return (typeof s === "string" ? s : typeof s === "number" ? String(s) : "").toWellFormed();
+  if (typeof s === "string") {
+    return s.toWellFormed();
+  }
+  if (typeof s === "number") {
+    return String(s).toWellFormed();
+  }
+  return "";
 }
 
 /* Canal global de avisos (#aviso): pila de toasts fijos abajo-derecha. Cada
@@ -50,7 +58,9 @@ function cerrarToast(toast: HTMLElement, instantaneo = false): void {
     cierreEn.delete(toast);
   }
   if (toast.classList.contains("saliendo")) {
-    if (instantaneo) toast.remove();
+    if (instantaneo) {
+      toast.remove();
+    }
     return;
   }
   if (instantaneo) {
@@ -64,7 +74,9 @@ function cerrarToast(toast: HTMLElement, instantaneo = false): void {
 /** Programa el auto-cierre según el tipo del toast (el hover lo pausa). */
 function programar(toast: HTMLElement): void {
   const previo = cierreEn.get(toast);
-  if (previo !== undefined) clearTimeout(previo);
+  if (previo !== undefined) {
+    clearTimeout(previo);
+  }
   const dur = toast.dataset.tipo === "error" ? DURACION_AUTO.error : DURACION_AUTO.aviso;
   cierreEn.set(
     toast,
@@ -74,7 +86,9 @@ function programar(toast: HTMLElement): void {
 
 /** Cierra (con fade) todos los toasts que matcheen el selector. */
 function cerrarPorSelector(el: ParentNode, selector: string): void {
-  for (const toast of el.querySelectorAll<HTMLElement>(selector)) cerrarToast(toast);
+  for (const toast of el.querySelectorAll<HTMLElement>(selector)) {
+    cerrarToast(toast);
+  }
 }
 
 /** Singleton (conteos, fallos sueltos sin archivo): reemplaza al general
@@ -89,14 +103,18 @@ function despejarGenerales(el: HTMLElement): void {
     que no se confundan con el nuevo intento. */
 export function despejarToasts(grupo: "intake"): void {
   const el = document.getElementById("aviso");
-  if (!el) return;
+  if (!el) {
+    return;
+  }
   cerrarPorSelector(el, `.toast[data-grupo="${grupo}"]:not(.saliendo)`);
 }
 
 /** Cap por write: 3 toasts de archivo + 1 resumen «…y N más descartados»
     (puro, sin sobre-textuar: no desglosa motivos). Puro. */
 export function planificarToasts(items: readonly ToastMensaje[]): readonly ToastMensaje[] {
-  if (items.length <= MAX_TOASTS) return items;
+  if (items.length <= MAX_TOASTS) {
+    return items;
+  }
   const resumen: ToastMensaje =
     items[0]?.grupo === "intake"
       ? { tipo: "error", titulo: `…y ${items.length - 3} más descartados`, grupo: "intake" }
@@ -122,7 +140,9 @@ function crearToast(m: ToastMensaje): HTMLDivElement {
   toast.className = `toast toast-${m.tipo}`;
   toast.setAttribute("role", m.tipo === "error" ? "alert" : "status");
   toast.dataset.tipo = m.tipo;
-  if (m.grupo) toast.dataset.grupo = m.grupo;
+  if (m.grupo) {
+    toast.dataset.grupo = m.grupo;
+  }
 
   const cuerpo = document.createElement("div");
   cuerpo.className = "toast-cuerpo";
@@ -133,13 +153,18 @@ function crearToast(m: ToastMensaje): HTMLDivElement {
   if (m.detalle !== undefined || m.archivo !== undefined) {
     const detalle = document.createElement("p");
     detalle.className = "toast-detalle";
-    if (m.detalle) detalle.append(document.createTextNode(sanear(m.detalle)));
+    if (m.detalle) {
+      detalle.append(document.createTextNode(sanear(m.detalle)));
+    }
     if (m.archivo) {
-      if (m.detalle) detalle.append(document.createTextNode(" · "));
+      if (m.detalle) {
+        detalle.append(document.createTextNode(" · "));
+      }
       const archivo = document.createElement("span");
       archivo.className = "toast-archivo";
       archivo.textContent = sanear(m.archivo);
-      archivo.title = sanear(m.archivo); // completo: el ellipsis nunca esconde el valor
+      // completo: el ellipsis nunca esconde el valor
+      archivo.title = sanear(m.archivo);
       detalle.append(archivo);
     }
     cuerpo.append(detalle);
@@ -149,7 +174,9 @@ function crearToast(m: ToastMensaje): HTMLDivElement {
   // mientras se lee no se lee.
   toast.addEventListener("mouseenter", () => {
     const timer = cierreEn.get(toast);
-    if (timer !== undefined) clearTimeout(timer);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
   });
   toast.addEventListener("mouseleave", (): void => programar(toast));
   return toast;
@@ -157,23 +184,33 @@ function crearToast(m: ToastMensaje): HTMLDivElement {
 
 /** Apila un toast: singleton si no lleva grupo; respeta el cap del stack. */
 function apilarToast(el: HTMLElement, m: ToastMensaje): void {
-  if (m.grupo === undefined) despejarGenerales(el);
+  if (m.grupo === undefined) {
+    despejarGenerales(el);
+  }
   const vivos = (): NodeListOf<HTMLElement> => el.querySelectorAll(".toast:not(.saliendo)");
   while (vivos().length >= MAX_TOASTS) {
-    const primero = vivos()[0];
-    if (!primero) break;
-    cerrarToast(primero); // el más viejo hace lugar (con fade)
+    const [primero] = vivos();
+    if (!primero) {
+      break;
+    }
+    // el más viejo hace lugar (con fade)
+    cerrarToast(primero);
   }
   const toast = crearToast(m);
   programar(toast);
-  el.append(toast); // al final: el nuevo queda pegado a la esquina (abajo)
+  // al final: el nuevo queda pegado a la esquina (abajo)
+  el.append(toast);
 }
 
 /** Apila un lote de mensajos (respeta el cap: el más viejo sale primero). */
 export function mostrarToasts(items: readonly ToastMensaje[]): void {
   const el = document.getElementById("aviso");
-  if (!el) return;
-  for (const m of planificarToasts(items)) apilarToast(el, m);
+  if (!el) {
+    return;
+  }
+  for (const m of planificarToasts(items)) {
+    apilarToast(el, m);
+  }
 }
 
 /** Toast de error (rojo, alert). Sin #aviso, no-op. */
@@ -191,5 +228,5 @@ export function avisar(texto: string): void {
     "Failed to fetch dynamically imported module: <url>" y viejo
     "Importing a module script failed". */
 export function esImportDinamicoMuerto(mensaje: string): boolean {
-  return /dynamically imported|importing a module|dynamic import/i.test(mensaje);
+  return /dynamically imported|importing a module|dynamic import/iu.test(mensaje);
 }

@@ -29,7 +29,10 @@ if (typeof localStorage === "undefined") {
 }
 // jsdom no implementa blob URLs: mock monótono para asertar creación/revoke.
 let blobSeq = 0;
-URL.createObjectURL = (_obj: Blob | MediaSource): string => `blob:mock-${++blobSeq}`;
+URL.createObjectURL = (_obj: Blob | MediaSource): string => {
+  blobSeq += 1;
+  return `blob:mock-${blobSeq}`;
+};
 URL.revokeObjectURL = (_url: string): void => {};
 
 // jsdom no implementa navigator.clipboard.
@@ -39,11 +42,16 @@ Object.defineProperty(navigator, "clipboard", {
 });
 
 // jsdom no implementa <dialog> modal: emula open/returnValue + evento close.
-HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement): void {
+HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
   this.setAttribute("open", "");
 };
-HTMLDialogElement.prototype.close = function (this: HTMLDialogElement, returnValue?: string): void {
-  if (returnValue !== undefined) this.returnValue = returnValue;
+HTMLDialogElement.prototype.close = function close(
+  this: HTMLDialogElement,
+  returnValue?: string,
+): void {
+  if (returnValue !== undefined) {
+    this.returnValue = returnValue;
+  }
   this.removeAttribute("open");
   this.dispatchEvent(new Event("close"));
 };

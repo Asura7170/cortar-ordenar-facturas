@@ -6,8 +6,7 @@ import { initGithub } from "./ui/github";
 import { initOcrMode, renderOcrToggle } from "./ui/ocrMode";
 import { initRecorte } from "./ui/recorte";
 import { initSettings } from "./ui/settingsModal";
-import { initSheets } from "./ui/sheets";
-import { renderHojas } from "./ui/sheets";
+import { initSheets, renderHojas } from "./ui/sheets";
 import {
   agregarArchivos,
   elegirArchivos,
@@ -33,9 +32,15 @@ export function resolverTema(
   luz: boolean,
   oscuridad: boolean,
 ): "claro" | "oscuro" {
-  if (guardado === "claro" || guardado === "oscuro") return guardado;
-  if (luz) return "claro";
-  if (oscuridad) return "oscuro";
+  if (guardado === "claro" || guardado === "oscuro") {
+    return guardado;
+  }
+  if (luz) {
+    return "claro";
+  }
+  if (oscuridad) {
+    return "oscuro";
+  }
   // Sin matchMedia o sin coincidencia (modo desconocido) el default es claro.
   return "claro";
 }
@@ -44,7 +49,8 @@ function leerTemaGuardado(): string | null {
   try {
     return localStorage.getItem(TEMA_KEY);
   } catch {
-    return null; // almacenamiento bloqueado: cae al SO/default, nunca aborta el boot
+    // almacenamiento bloqueado: cae al SO/default, nunca aborta el boot
+    return null;
   }
 }
 
@@ -64,7 +70,9 @@ function initTema(): void {
 
 cargar();
 initTema();
-if (state.hojas.length === 0) state.hojas.push(crearHoja());
+if (state.hojas.length === 0) {
+  state.hojas.push(crearHoja());
+}
 initSheets({ agregarArchivos, pedirArchivos: elegirArchivos, pegarEnCelda });
 initSidebar();
 initOcrMode();

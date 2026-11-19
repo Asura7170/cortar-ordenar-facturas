@@ -75,7 +75,9 @@ describe("canal #aviso (pila de toasts)", () => {
     expect(toasts[0]?.classList.contains("toast-error")).toBe(true);
     expect(toasts[1]?.classList.contains("toast-error")).toBe(true);
     // Cada error anuncia por sí (assertivo), sin relatar la historia completa.
-    for (const t of toasts) expect(t.getAttribute("role")).toBe("alert");
+    for (const t of toasts) {
+      expect(t.getAttribute("role")).toBe("alert");
+    }
   });
 
   it("estructura: título, detalle con archivo el último, y title completo", () => {
@@ -140,7 +142,8 @@ describe("canal #aviso (pila de toasts)", () => {
     await vi.advanceTimersByTimeAsync(7900);
     expect(toast?.classList.contains("saliendo")).toBe(false);
     toast?.dispatchEvent(new MouseEvent("mouseleave"));
-    await vi.advanceTimersByTimeAsync(7900); // 8s de vida desde que retomó = 8.7 total
+    // 8s de vida desde que retomó = 8.7 total
+    await vi.advanceTimersByTimeAsync(7900);
     expect(toast?.classList.contains("saliendo")).toBe(false);
     await vi.advanceTimersByTimeAsync(300);
     expect(toast?.classList.contains("saliendo")).toBe(true);
@@ -202,7 +205,7 @@ describe("planificarToasts (cap del lote, puro)", () => {
 
   it("≤4 no colapsa y lote singleton no hereda grupo", () => {
     const tres: ToastMensaje[] = [{ tipo: "aviso", titulo: "conteo" }];
-    expect(planificarToasts(tres)).toEqual(tres);
+    expect(planificarToasts(tres)).toStrictEqual(tres);
     const cinco: ToastMensaje[] = Array.from({ length: 5 }, (_v, i): ToastMensaje => {
       const n = String(i);
       return { tipo: "error", titulo: `t${n}` };

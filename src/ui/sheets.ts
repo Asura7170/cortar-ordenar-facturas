@@ -34,24 +34,25 @@ const tarjetaVacia: HTMLElement = getEl("dropzone");
 function btnPegarVacio(): HTMLButtonElement | null {
   return document.querySelector<HTMLButtonElement>("#btnPegar");
 }
-const canvasEl: HTMLElement = getEl("canvas"); // <main class="canvas" id="canvas"> (fallo fuerte al boot)
+// <main class="canvas" id="canvas"> (fallo fuerte al boot)
+const canvasEl: HTMLElement = getEl("canvas");
 
 /* ---------- Render de casillas (sin innerHTML para datos del usuario) ---------- */
 
 /* X de quitar (Lucide, marcado estático confiable: sin datos de usuario). */
-const X_SVG: string =
+const X_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
 
 /* Rotor de giro (marcado estático confiable: sin datos de usuario). */
-const GIRAR_SVG: string =
+const GIRAR_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="girar-nucleo"><path d="M15 4.55a8 8 0 0 0 -6 14.9"/><polyline class="girar-aleta" points="9 15 9 20 4 20"/><circle class="punto punto-1" cx="18.37" cy="7.16" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-2" cx="19.94" cy="11" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-3" cx="19.37" cy="15.1" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-4" cx="16.84" cy="18.37" r="1" fill="currentColor" stroke="none"/><circle class="punto punto-5" cx="13" cy="19.94" r="1" fill="currentColor" stroke="none"/></g></svg>';
 
 /* Encuadre de recorte (marcado estático confiable: sin datos de usuario). */
-const CROP_SVG: string =
+const CROP_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="encuadre"><g class="tercios" stroke-width="0.9" opacity="0"><line x1="10" y1="6" x2="10" y2="18" stroke-dasharray="1.2 1.2"/><line x1="14" y1="6" x2="14" y2="18" stroke-dasharray="1.2 1.2"/><line x1="6" y1="10" x2="18" y2="10" stroke-dasharray="1.2 1.2"/><line x1="6" y1="14" x2="18" y2="14" stroke-dasharray="1.2 1.2"/></g><path class="escuadra-inf" d="M6 2v14a2 2 0 0 0 2 2h14"/><path class="escuadra-sup" d="M18 22V8a2 2 0 0 0-2-2H2"/></g></svg>';
 
 /* Copiar OCR (marcado estático confiable: sin datos de usuario). */
-const COPY_SVG: string =
+const COPY_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="hoja-atras" d="M4 7v13a1 1 0 0 0 1 1h10"/><g class="hoja-frente"><rect x="8" y="3" width="11" height="14" rx="1"/><g class="lineas-doc" stroke-width="1.5"><line x1="11" y1="7" x2="16" y2="7"/><line x1="11" y1="10" x2="16" y2="10"/><line x1="11" y1="13" x2="14" y2="13"/></g><line class="rayo-scan" x1="9.5" y1="4.5" x2="17.5" y2="4.5" stroke-width="1.5"/><polyline class="check-ok" points="10.5 10.5 12.5 12.5 16 8.5"/></g></svg>';
 
 function celda(
@@ -105,9 +106,12 @@ function pintarCelda(
   btn.title = "Quitar";
   btn.setAttribute("aria-label", "Quitar comprobante");
   btn.innerHTML = X_SVG;
-  if (item.estado === "ok") pintarBotonesDeOk(div);
+  if (item.estado === "ok") {
+    pintarBotonesDeOk(div);
+  }
   const img = document.createElement("img");
-  img.src = item.imgUrl; // full-res con lazy, sin miniaturas
+  // full-res con lazy, sin miniaturas
+  img.src = item.imgUrl;
   img.alt = sanear(item.nombre);
   img.draggable = false;
   img.loading = "lazy";
@@ -148,14 +152,13 @@ function pintarCeldaOcr(div: HTMLElement, item: Comprobante): void {
   div.classList.add("cell-ocr");
   const pre = document.createElement("pre");
   pre.className = "cell-ocr-text";
-  pre.textContent = sanear(
-    item.textoOcr ||
-      (item.estado === "procesando"
-        ? "Procesando…"
-        : item.estado === "pendiente"
-          ? "Pendiente"
-          : "Sin texto OCR"),
-  );
+  let marcador = "Sin texto OCR";
+  if (item.estado === "procesando") {
+    marcador = "Procesando…";
+  } else if (item.estado === "pendiente") {
+    marcador = "Pendiente";
+  }
+  pre.textContent = sanear(item.textoOcr || marcador);
   const btn = document.createElement("button");
   btn.className = "cell-remove";
   btn.dataset["accion"] = "copiar-ocr";
@@ -266,7 +269,9 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "sheet-grid";
   grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
-  l.pos.forEach((p, i) => grid.append(celda(hoja.slots[i] ?? null, p, i, hoja.id)));
+  for (const [i, p] of l.pos.entries()) {
+    grid.append(celda(hoja.slots[i] ?? null, p, i, hoja.id));
+  }
   const tag = document.createElement("span");
   tag.className = "sheet-tag";
   tag.textContent = `HOJA ${idx + 1}`;
@@ -276,12 +281,14 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
   row.className = "sheet-row";
   row.dataset["hoja"] = String(hoja.id);
   row.innerHTML = panelHoja(hoja, idx);
-  row.insertBefore(sheet, row.firstChild);
+  row.prepend(sheet);
   // Columna derecha: panel arriba, botón de agregar debajo (misma columna).
   const lado = document.createElement("div");
   lado.className = "sheet-side";
   const panel = row.querySelector(".sheet-panel");
-  if (panel) lado.append(panel);
+  if (panel) {
+    lado.append(panel);
+  }
   const mas = document.createElement("button");
   mas.type = "button";
   mas.className = "btn-sumar";
@@ -301,7 +308,7 @@ function armarFilaHoja(hoja: Hoja, idx: number): HTMLElement {
 
 /** Fila fantasma de hoja nueva (solo visual; hereda el layout de la última). */
 function armarFilaFantasma(): HTMLElement {
-  const ultima = state.hojas[state.hojas.length - 1];
+  const ultima = state.hojas.at(-1);
   const l = layoutDe(ultima?.layout ?? "u4x2");
   const fila = document.createElement("div");
   fila.className = "sheet-row";
@@ -312,7 +319,9 @@ function armarFilaFantasma(): HTMLElement {
   const grid = document.createElement("div");
   grid.className = "sheet-grid";
   grid.style.cssText = `grid-template-columns: repeat(${l.cols}, 1fr); grid-template-rows: repeat(${l.filas}, 1fr)`;
-  l.pos.forEach((p, i) => grid.append(celda(null, p, i, HOJA_FANTASMA)));
+  for (const [i, p] of l.pos.entries()) {
+    grid.append(celda(null, p, i, HOJA_FANTASMA));
+  }
   const tag = document.createElement("span");
   tag.className = "sheet-tag";
   tag.textContent = `HOJA ${state.hojas.length + 1} · nueva`;
@@ -340,7 +349,8 @@ function setStats(hojas: number, comps: number): void {
     for (const el of [statHojas, statComp]) {
       el.classList.remove("bump");
     }
-    void statHojas.offsetWidth; // reinicia el pop one-shot si estaba en vuelo
+    // reinicia el pop one-shot si estaba en vuelo
+    void statHojas.offsetWidth;
     statHojas.classList.add("bump");
     statComp.classList.add("bump");
   }
@@ -362,34 +372,50 @@ function renderCuerpo(borrador: BorradorMonto | null): void {
   if (n === 0) {
     tarjetaVacia.hidden = false;
     const pegar = btnPegarVacio();
-    if (pegar) pegar.hidden = false;
+    if (pegar) {
+      pegar.hidden = false;
+    }
     renderMonto();
     return;
   }
 
-  state.hojas.forEach((hoja, idx) => sheetsEl.append(armarFilaHoja(hoja, idx)));
+  for (const [idx, hoja] of state.hojas.entries()) {
+    sheetsEl.append(armarFilaHoja(hoja, idx));
+  }
   // Hoja fantasma: solo visual (nunca entra a state.hojas, así no se
   // exporta ni se cuenta). Hereda el layout de la última; al pegar en
   // ella se materializa como hoja real. Va en .sheet-row con la columna
   // vacía para alinear el borde izquierdo con las hojas reales.
-  if (!state.modoOcr && todasLlenas()) sheetsEl.append(armarFilaFantasma());
+  if (!state.modoOcr && todasLlenas()) {
+    sheetsEl.append(armarFilaFantasma());
+  }
   tarjetaVacia.hidden = true;
   const pegar = btnPegarVacio();
-  if (pegar) pegar.hidden = true;
+  if (pegar) {
+    pegar.hidden = true;
+  }
   renderMonto();
-  if (borrador) restaurarBorrador(borrador);
+  if (borrador) {
+    restaurarBorrador(borrador);
+  }
 }
 
 /** ¿El render puede ir en ViewTransition? (sin borrador/foco/movimiento/cola). */
 function usaViewTransition(borrador: BorradorMonto | null): boolean {
-  if (borrador) return false;
+  if (borrador) {
+    return false;
+  }
   // ponytail: con foco dentro de las hojas el render es síncrono (el swap
   // async pierde el foco y rompe la edición en curso).
-  if (sheetsEl.contains(document.activeElement)) return false;
+  if (sheetsEl.contains(document.activeElement)) {
+    return false;
+  }
   // ponytail: sin ViewTransition con reduced-motion, durante la cola ni durante
   // el intake (los snapshots compiten con el drag/scroll); es solo un adorno.
   const reduceMovimiento = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-  if (reduceMovimiento || state.colaEnProceso || state.loteEnCurso) return false;
+  if (reduceMovimiento || state.colaEnProceso || state.loteEnCurso) {
+    return false;
+  }
   return !!document.startViewTransition;
 }
 
@@ -416,11 +442,15 @@ export function renderHojas(): void {
     const t = document.startViewTransition(render);
     t.ready?.catch(() => {});
     t.finished?.catch(() => {});
-  } else render();
+  } else {
+    render();
+  }
 }
 
 export function soltarRenderPendiente(): void {
-  if (!renderPendiente) return;
+  if (!renderPendiente) {
+    return;
+  }
   renderPendiente = false;
   renderHojas();
 }
@@ -429,7 +459,9 @@ export function soltarRenderPendiente(): void {
 
 export function cambiarLayoutHoja(hojaId: string | number, layoutId: string): void {
   const h = hojaPorId(hojaId);
-  if (!h || !isLayoutId(layoutId)) return;
+  if (!h || !isLayoutId(layoutId)) {
+    return;
+  }
   h.layout = layoutId;
   redistribuir();
   renderHojas();
@@ -437,19 +469,22 @@ export function cambiarLayoutHoja(hojaId: string | number, layoutId: string): vo
 
 export function aplicarATodas(hojaId: string | number): void {
   const h = hojaPorId(hojaId);
-  if (!h) return;
+  if (!h) {
+    return;
+  }
   const layoutId = h.layout;
-  state.hojas.forEach((x) => {
+  for (const x of state.hojas) {
     x.layout = layoutId;
-  });
-  redistribuir(layoutId); // las nuevas también reciben la plantilla propagada
+  }
+  // las nuevas también reciben la plantilla propagada
+  redistribuir(layoutId);
   renderHojas();
 }
 
 export function quitarComprobante(id: number): void {
   for (const h of state.hojas) {
     const idx = h.slots.findIndex((c) => c?.id === id);
-    if (idx >= 0) {
+    if (idx !== -1) {
       const c = h.slots[idx];
       if (c) {
         URL.revokeObjectURL(c.imgUrl);
@@ -487,12 +522,18 @@ interface BorradorMonto {
 
 /** Borrador en curso (input de monto con foco): sobrevive a los renders de fondo. */
 function borradorEnEdicion(): BorradorMonto | null {
-  if (descartarBorrador) return null;
+  if (descartarBorrador) {
+    return null;
+  }
   const a = document.activeElement;
-  if (!(a instanceof HTMLInputElement) || a.dataset["accion"] !== "monto") return null;
+  if (!(a instanceof HTMLInputElement) || a.dataset["accion"] !== "monto") {
+    return null;
+  }
   const cell = a.closest(".cell");
-  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
-  if (!Number.isInteger(id)) return null;
+  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
+  if (!Number.isInteger(id)) {
+    return null;
+  }
   return {
     id,
     valor: a.value,
@@ -511,50 +552,65 @@ interface BorradorSucio {
 function borradoresVisibles(): Map<number, BorradorSucio> {
   const sucios = new Map<number, BorradorSucio>();
   const a = document.activeElement;
-  sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto").forEach((input) => {
-    if (input === a || input.value === "") return;
+  for (const input of sheetsEl.querySelectorAll<HTMLInputElement>("input.cell-monto")) {
+    if (input === a || input.value === "") {
+      continue;
+    }
     const cell = input.closest(".cell");
-    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
     if (Number.isInteger(id)) {
       sucios.set(id, {
         valor: input.value,
         error: input.classList.contains("monto-error"),
       });
     }
-  });
+  }
   return sucios;
 }
 
 /** Restaura borradores sin foco tras el render (valor y error, nunca foco: B2). */
 function restaurarSucios(sucios: Map<number, BorradorSucio>): void {
-  sucios.forEach(({ valor, error }, id) => {
+  for (const [id, { valor, error }] of sucios) {
     const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
     if (input && document.activeElement !== input) {
       input.value = valor;
       input.classList.toggle("monto-error", error);
-      if (error) input.setAttribute("aria-invalid", "true");
+      if (error) {
+        input.setAttribute("aria-invalid", "true");
+      }
     }
-  });
+  }
 }
 
 /** Restaura un borrador tras el render (la celda puede haber cambiado a badge). */
 function restaurarBorrador(b: BorradorMonto): void {
   const input = cellById(b.id)?.querySelector<HTMLInputElement>("input.cell-monto");
-  if (!input) return;
+  if (!input) {
+    return;
+  }
   input.value = b.valor;
   input.classList.toggle("monto-error", b.error);
-  if (b.error) input.setAttribute("aria-invalid", "true");
+  if (b.error) {
+    input.setAttribute("aria-invalid", "true");
+  }
   input.focus();
-  if (b.inicio !== null && b.fin !== null) input.setSelectionRange(b.inicio, b.fin);
+  if (b.inicio !== null && b.fin !== null) {
+    input.setSelectionRange(b.inicio, b.fin);
+  }
 }
 
 // ponytail: foco al input de monto (select-all al abrir corrección, caret al final si no).
 function enfocarMonto(id: number, seleccionar = false): void {
   const input = cellById(id)?.querySelector<HTMLInputElement>("input.cell-monto");
-  if (!input) return;
+  if (!input) {
+    return;
+  }
   input.focus();
-  if (seleccionar) input.select();
-  else input.setSelectionRange(input.value.length, input.value.length);
+  if (seleccionar) {
+    input.select();
+  } else {
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
 }
 
 /** cents → texto editable con redondez exacta por parsearMonto ("500" → "500.00"). */
@@ -568,9 +624,11 @@ function textoEditable(cents: Cents): string {
 /** Valida y guarda el input (change o Enter). Id del comprobante o null si no hubo monto. */
 function commitearMonto(input: HTMLInputElement, reenfocar = false): number | null {
   const cell = input.closest(".cell");
-  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+  const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
   const item = obtenerComprobante(id);
-  if (!item) return null;
+  if (!item) {
+    return null;
+  }
   const cents = parsearMonto(input.value);
   // Inválido → se conserva el borrador para corregirlo (el title muestra el formato).
   // ponytail: el blur (change) no roba el foco: solo Enter reenfoca.
@@ -584,7 +642,9 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
       input.setAttribute("aria-invalid", "true");
     }
     renderHojas();
-    if (reenfocar) enfocarMonto(id);
+    if (reenfocar) {
+      enfocarMonto(id);
+    }
     return null;
   }
   // change en text input = escribió + blur/enter: el total pasa a manual.
@@ -599,9 +659,14 @@ function commitearMonto(input: HTMLInputElement, reenfocar = false): number | nu
 
 /** ¿La celda es apta para repintar el badge? (modo, nodo, ítem y monto). */
 function celdaRepintable(id: number): boolean {
-  if (state.modoOcr) return false; // en modo OCR la celda no lleva badge
+  // en modo OCR la celda no lleva badge
+  if (state.modoOcr) {
+    return false;
+  }
   const cell = cellById(id);
-  if (!cell) return false;
+  if (!cell) {
+    return false;
+  }
   const item = obtenerComprobante(id);
   return !!item && item.montoCents != null && item.id !== editandoMonto;
 }
@@ -609,19 +674,29 @@ function celdaRepintable(id: number): boolean {
 /** ¿El parche no pisaría una edición? (foco en el input o borrador sin foco). */
 function celdaSinEdicion(cell: HTMLElement): boolean {
   const activo = document.activeElement;
-  if (activo instanceof HTMLInputElement && cell.contains(activo)) return false; // edición en curso: no pisar
+  // edición en curso: no pisar
+  if (activo instanceof HTMLInputElement && cell.contains(activo)) {
+    return false;
+  }
   const borrador = cell.querySelector("input.cell-monto");
-  return !(borrador instanceof HTMLInputElement && borrador.value !== ""); // borrador sin foco: no pisar
+  // borrador sin foco: no pisar
+  return !(borrador instanceof HTMLInputElement && borrador.value !== "");
 }
 
 // Repinta SOLO el monto de una celda (tick del re-chequeo) sin reconstruir la
 // grilla ni tocar la imagen: O(1 nodo) en vez de O(N imágenes + snapshot VT).
 // Nunca lanza (best-effort): false = lo cubre el render completo del final.
 export function actualizarMontoCelda(id: number): boolean {
-  if (!celdaRepintable(id)) return false;
-  const cell = cellById(id) as HTMLElement; // celdaRepintable garantiza el nodo
-  if (!celdaSinEdicion(cell)) return false;
-  const item = obtenerComprobante(id) as Comprobante; // garantizado arriba
+  if (!celdaRepintable(id)) {
+    return false;
+  }
+  // celdaRepintable garantiza el nodo
+  const cell = cellById(id) as HTMLElement;
+  if (!celdaSinEdicion(cell)) {
+    return false;
+  }
+  // garantizado arriba
+  const item = obtenerComprobante(id) as Comprobante;
   const viejo = cell.querySelector(".cell-badge, input.cell-monto");
   const badge = document.createElement("button");
   badge.type = "button";
@@ -631,10 +706,14 @@ export function actualizarMontoCelda(id: number): boolean {
   // ponytail: montoCents != null garantizado por celdaRepintable (guard original).
   badge.textContent = formatearMoneda(item.montoCents as Cents);
   bajoMutandoHojas(() => {
-    if (viejo) viejo.replaceWith(badge);
-    else cell.append(badge);
+    if (viejo) {
+      viejo.replaceWith(badge);
+    } else {
+      cell.append(badge);
+    }
   });
-  renderMonto(); // total general con suma local exacta
+  // total general con suma local exacta
+  renderMonto();
   return true;
 }
 
@@ -654,7 +733,8 @@ interface DragState {
 
 let pointerDrag: DragState | null = null;
 let scrollRaf: number | null = null;
-let scrollDir = 0; // dirección vigente del loop; autoScroll la actualiza
+// dirección vigente del loop; autoScroll la actualiza
+let scrollDir = 0;
 let moveRaf: number | null = null;
 let celdaResaltada: HTMLElement | null = null;
 let rectsCache: Map<Element, DOMRect> | null = null;
@@ -668,15 +748,22 @@ const ZOOM_MAX = 4;
 
 function aplicarZoom(): void {
   rectsCache = null;
-  if (zoomEscala === 1) sheetsEl.style.removeProperty("zoom");
-  else sheetsEl.style.setProperty("zoom", String(zoomEscala));
+  if (zoomEscala === 1) {
+    sheetsEl.style.removeProperty("zoom");
+  } else {
+    sheetsEl.style.setProperty("zoom", String(zoomEscala));
+  }
   btnZoom.hidden = zoomEscala === 1;
-  if (!btnZoom.hidden) btnZoom.textContent = `${Math.round(zoomEscala * 100)}%`;
+  if (!btnZoom.hidden) {
+    btnZoom.textContent = `${Math.round(zoomEscala * 100)}%`;
+  }
 }
 
 function zoomEn(clientX: number, clientY: number, factor: number): void {
   const nueva = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoomEscala * factor));
-  if (nueva === zoomEscala) return;
+  if (nueva === zoomEscala) {
+    return;
+  }
   // Punto bajo el puntero antes del cambio; tras el zoom ese punto está a
   // dx*k del borde: se compensa con scroll (siempre dentro de [0, max]).
   const stage = sheetsEl.getBoundingClientRect();
@@ -757,16 +844,22 @@ function intentarMuestraLupa(x: number, y: number, ctx: CanvasRenderingContext2D
 
 function dibujarLupa(): void {
   lupaRaf = null;
-  if (!lupaActiva || !lupaTieneMuestra) return;
+  if (!lupaActiva || !lupaTieneMuestra) {
+    return;
+  }
   // Solo transform/opacity: el cuadrado reemplaza al puntero (centrado), sin layout.
   const pad = 16;
   const centra = (p: number, max: number): number =>
     Math.min(Math.max(pad, p - LUPA_L / 2), Math.max(pad, max - LUPA_L - pad));
   lupaEl.style.transform = `translate(${centra(lupaX, window.innerWidth)}px, ${centra(lupaY, window.innerHeight)}px)`;
   const ctx = lupaCtx;
-  if (!ctx) return;
+  if (!ctx) {
+    return;
+  }
   ctx.clearRect(0, 0, LUPA_L, LUPA_L);
-  if (intentarMuestraLupa(lupaX, lupaY, ctx)) return;
+  if (intentarMuestraLupa(lupaX, lupaY, ctx)) {
+    return;
+  }
   // Fuera de foto: la lente amplía el fondo plano bajo el puntero (mesa, panel…).
   ctx.fillStyle = fondoBajoPunto(lupaX, lupaY);
   ctx.fillRect(0, 0, LUPA_L, LUPA_L);
@@ -777,7 +870,9 @@ function fondoBajoPunto(x: number, y: number): string {
   let el = document.elementFromPoint(x, y);
   while (el && el !== document.documentElement) {
     const bg = getComputedStyle(el).backgroundColor;
-    if (bg && !/^rgba\(0,\s*0,\s*0,\s*0\)$/.test(bg)) return bg;
+    if (bg && !/^rgba\(0,\s*0,\s*0,\s*0\)$/u.test(bg)) {
+      return bg;
+    }
     el = el.parentElement;
   }
   return "#000";
@@ -792,11 +887,21 @@ function detenerScroll(): void {
 }
 
 function cancelarDragVisual(): void {
-  sheetsEl.querySelectorAll(".drop-target").forEach((c) => c.classList.remove("drop-target"));
-  sheetsEl.querySelectorAll(".sheet-grid.dragging").forEach((g) => g.classList.remove("dragging"));
-  sheetsEl.querySelectorAll(".sheet.file-drop").forEach((s) => s.classList.remove("file-drop"));
-  sheetsEl.querySelectorAll(".cell.pickup").forEach((c) => c.classList.remove("pickup"));
-  document.querySelectorAll(".drag-ghost").forEach((g) => g.remove());
+  for (const c of sheetsEl.querySelectorAll(".drop-target")) {
+    c.classList.remove("drop-target");
+  }
+  for (const g of sheetsEl.querySelectorAll(".sheet-grid.dragging")) {
+    g.classList.remove("dragging");
+  }
+  for (const s of sheetsEl.querySelectorAll(".sheet.file-drop")) {
+    s.classList.remove("file-drop");
+  }
+  for (const c of sheetsEl.querySelectorAll(".cell.pickup")) {
+    c.classList.remove("pickup");
+  }
+  for (const g of document.querySelectorAll(".drag-ghost")) {
+    g.remove();
+  }
   document.body.classList.remove("is-dragging");
   celdaResaltada = null;
   rectsCache = null;
@@ -806,19 +911,26 @@ function cancelarDragVisual(): void {
   }
   detenerScroll();
   const sel = window.getSelection();
-  if (sel?.rangeCount) sel.removeAllRanges();
+  if (sel?.rangeCount) {
+    sel.removeAllRanges();
+  }
 }
 
 function autoScroll(x: number, y: number): void {
   const r = canvasEl.getBoundingClientRect();
-  const margen = 70,
-    vel = 14;
-  scrollDir = y < r.top + margen ? -vel : y > r.bottom - margen ? vel : 0;
+  const margen = 70;
+  const vel = 14;
+  if (y < r.top + margen) {
+    scrollDir = -vel;
+  } else {
+    scrollDir = y > r.bottom - margen ? vel : 0;
+  }
   if (scrollDir && scrollRaf === null) {
     const paso = (): void => {
       // ponytail: paso solo corre con scrollDir ≠ 0 (detenerScroll cancela el
       // rAF pendiente) y scrollRaf ≠ null (solo se anula al cancelar este paso).
-      canvasEl.scrollBy?.({ top: scrollDir }); // ?. : jsdom no implementa scrollBy; en Chrome siempre existe.
+      // ?. : jsdom no implementa scrollBy; en Chrome siempre existe.
+      canvasEl.scrollBy?.({ top: scrollDir });
       scrollRaf = requestAnimationFrame(paso);
     };
     scrollRaf = requestAnimationFrame(paso);
@@ -835,8 +947,9 @@ export function esDragDeArchivos(e: DragEvent): boolean {
 function celdaRect(c: Element): DOMRect {
   if (!rectsCache) {
     rectsCache = new Map();
-    for (const el of sheetsEl.querySelectorAll(".cell"))
+    for (const el of sheetsEl.querySelectorAll(".cell")) {
       rectsCache.set(el, el.getBoundingClientRect());
+    }
   }
   let r = rectsCache.get(c);
   if (!r) {
@@ -866,7 +979,9 @@ function masCercanaEntre(celulas: Element[], x: number, y: number): HTMLElement 
 function celdaBajoPunto(x: number, y: number, excluir: Element | null): HTMLElement | null {
   const el = document.elementFromPoint(x, y);
   const directa = el?.closest?.(".cell");
-  if (directa instanceof HTMLElement && !directa.closest(".sheet-fantasma")) return directa;
+  if (directa instanceof HTMLElement && !directa.closest(".sheet-fantasma")) {
+    return directa;
+  }
   const hoja = el?.closest?.(".sheet");
   const scope: ParentNode = hoja ?? sheetsEl;
   // El fantasma no es destino de drag (clic-sí / drag-no): se excluye del
@@ -878,20 +993,26 @@ function celdaBajoPunto(x: number, y: number, excluir: Element | null): HTMLElem
 }
 
 function iniciarGhost(d: DragState, x: number, y: number): void {
-  if (d.ghost) return;
+  if (d.ghost) {
+    return;
+  }
   const celdaOrigen = cellById(d.id);
-  if (!celdaOrigen) return;
+  if (!celdaOrigen) {
+    return;
+  }
   // Sin <img> (celda vacía): fantasma desde la caja para no
   // dejar el drag muerto en lotes grandes.
   const img = celdaOrigen.querySelector("img");
   const fuente = img ?? celdaOrigen;
   const base = fuente.getBoundingClientRect();
-  if (base.width < 2) return;
+  if (base.width < 2) {
+    return;
+  }
   const ghost = fuente.cloneNode(img !== null) as HTMLElement;
   ghost.className = "drag-ghost";
   ghost.style.width = `${base.width}px`;
   ghost.style.height = `${base.height}px`;
-  document.body.appendChild(ghost);
+  document.body.append(ghost);
   d.ghost = ghost;
   d.gw = base.width / 2;
   d.gh = base.height / 2;
@@ -910,24 +1031,32 @@ function posicionarGhost(d: DragState, x: number, y: number): void {
 }
 
 function resaltarDestino(cell: HTMLElement | null): void {
-  if (cell && cell.dataset["id"] === String(pointerDrag?.id)) cell = null;
-  if (cell === celdaResaltada) return;
+  const destino = cell && cell.dataset["id"] === String(pointerDrag?.id) ? null : cell;
+  if (destino === celdaResaltada) {
+    return;
+  }
   celdaResaltada?.classList.remove("drop-target");
   celdaResaltada = null;
-  if (cell && sheetsEl.contains(cell)) {
-    cell.classList.add("drop-target");
-    celdaResaltada = cell;
+  if (destino && sheetsEl.contains(destino)) {
+    destino.classList.add("drop-target");
+    celdaResaltada = destino;
   }
 }
 
 // FLIP "Play": vuela `img` desde un centro aparente hasta su posición real.
 function animarFlipDesde(img: HTMLImageElement, cx: number, cy: number): void {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return;
+  }
   const r = img.getBoundingClientRect();
-  if (r.width < 2) return;
+  if (r.width < 2) {
+    return;
+  }
   const dx = cx - (r.left + r.width / 2);
   const dy = cy - (r.top + r.height / 2);
-  if (Math.hypot(dx, dy) < 2) return;
+  if (Math.hypot(dx, dy) < 2) {
+    return;
+  }
   void img.animate(
     [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }],
     { duration: 170, easing: "cubic-bezier(.2, .8, .2, 1)" },
@@ -936,7 +1065,9 @@ function animarFlipDesde(img: HTMLImageElement, cx: number, cy: number): void {
 
 function actualizarConteoPanel(hoja: Hoja): void {
   const span = sheetsEl.querySelector(`.sheet-row[data-hoja="${hoja.id}"] .sheet-panel-count`);
-  if (span) span.textContent = `${cuentaHoja(hoja)}/${layoutDe(hoja.layout).total}`;
+  if (span) {
+    span.textContent = `${cuentaHoja(hoja)}/${layoutDe(hoja.layout).total}`;
+  }
 }
 
 /** Nodo de una celda de la grilla por (hoja, slot). */
@@ -959,16 +1090,21 @@ function animarDobleFlip(
   rB: DOMRect | undefined,
 ): void {
   const imgA = nodoDestino.querySelector("img");
-  if (imgA) animarFlipDesde(imgA, centroA.x, centroA.y);
+  if (imgA) {
+    animarFlipDesde(imgA, centroA.x, centroA.y);
+  }
   const imgBDestino = nodoOrigen.querySelector("img");
-  if (imgBDestino && rB)
+  if (imgBDestino && rB) {
     animarFlipDesde(imgBDestino, rB.left + rB.width / 2, rB.top + rB.height / 2);
+  }
 }
 
 /** Conteos del panel tras el swap (dos hojas si cruzaron de hoja). */
 function refrescarConteos(origen: Hoja, hojaDestino: Hoja): void {
   actualizarConteoPanel(origen);
-  if (hojaDestino !== origen) actualizarConteoPanel(hojaDestino);
+  if (hojaDestino !== origen) {
+    actualizarConteoPanel(hojaDestino);
+  }
 }
 
 // Mueve (o intercambia) al slot pedido repintando solo 2 casillas + FLIP.
@@ -979,23 +1115,27 @@ function moverSlot(
   centroA: { x: number; y: number },
 ): void {
   const actual = buscarSlot(drag.id);
-  if (!actual) return;
+  if (!actual) {
+    return;
+  }
   const { hoja: origen, idx: idxOrigen } = actual;
-  if (origen === hojaDestino && idxOrigen === slotDestino) return;
+  if (origen === hojaDestino && idxOrigen === slotDestino) {
+    return;
+  }
 
   // ponytail: slots es array denso (celdas materializadas a null), sin undefined.
   const ocupante = hojaDestino.slots[slotDestino] as Comprobante | null;
   const imgOcupante = imagenDelOcupante(ocupante);
   const rB = imgOcupante?.getBoundingClientRect();
 
-  const idsHojasAntes = state.hojas.map((h) => h.id).join();
+  const idsHojasAntes = state.hojas.map((h) => h.id).join(",");
   const reemplazo = hojaDestino.slots[slotDestino] as Comprobante | null;
   const movida = origen.slots[idxOrigen] as Comprobante | null;
   hojaDestino.slots[slotDestino] = movida;
   origen.slots[idxOrigen] = reemplazo;
   limpiarHojas();
 
-  const estructural = state.hojas.map((h) => h.id).join() !== idsHojasAntes;
+  const estructural = state.hojas.map((h) => h.id).join(",") !== idsHojasAntes;
   const nodoOrigen = nodoCeldaHoja(origen.id, idxOrigen);
   const nodoDestino = nodoCeldaHoja(hojaDestino.id, slotDestino);
   if (estructural || !nodoOrigen || !nodoDestino) {
@@ -1028,7 +1168,7 @@ function centroDeCelda(cell: HTMLElement): { x: number; y: number } {
 /** Si un hueco existe en la hoja: índice; si está llena, null. */
 function primerHueco(h: Hoja): number | null {
   const hueco = h.slots.indexOf(null);
-  return hueco < 0 ? null : hueco;
+  return hueco === -1 ? null : hueco;
 }
 
 /** Vecino lineal del lote (hoja + slot), cruzando el borde de la hoja si toca;
@@ -1039,7 +1179,9 @@ function vecinoLineal(
   avanza: boolean,
 ): { hoja: Hoja; slot: number } | null {
   const destino = slot + (avanza ? 1 : -1);
-  if (destino >= 0 && destino < hoja.slots.length) return { hoja, slot: destino };
+  if (destino >= 0 && destino < hoja.slots.length) {
+    return { hoja, slot: destino };
+  }
   const otra = state.hojas[state.hojas.indexOf(hoja) + (avanza ? 1 : -1)];
   return otra ? { hoja: otra, slot: avanza ? 0 : otra.slots.length - 1 } : null;
 }
@@ -1050,33 +1192,52 @@ function vecinoLineal(
     fila destino es más corta. El re-enfoque sigue el patrón escaparMonto. */
 function cablearReordenTeclado(): void {
   sheetsEl.addEventListener("keydown", (e) => {
-    if (state.modoOcr || pointerDrag) return; // mismo bloqueo que el drag manual
-    if (esCampoTexto(e.target)) return; // las flechas editan texto (no mover)
+    // mismo bloqueo que el drag manual
+    if (state.modoOcr || pointerDrag) {
+      return;
+    }
+    // las flechas editan texto (no mover)
+    if (esCampoTexto(e.target)) {
+      return;
+    }
     const cell = e.target instanceof Element ? e.target.closest(".cell") : null;
-    if (!(cell instanceof HTMLElement) || !cell.dataset["id"]) return;
+    if (!(cell instanceof HTMLElement) || !cell.dataset["id"]) {
+      return;
+    }
     // El alias del Ctrl solo es horizontal (lo aprobado): Alt+vertical no actúa.
     const conMod =
       (e.ctrlKey || (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight"))) &&
       !e.metaKey &&
       !e.shiftKey;
-    if (!conMod || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+    if (!conMod || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+      return;
+    }
     e.preventDefault();
     const id = Number(cell.dataset["id"]);
     const actual = buscarSlot(id);
-    if (!actual) return;
+    if (!actual) {
+      return;
+    }
 
     let destino: { hoja: Hoja; slot: number };
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       const vecino = vecinoLineal(actual.hoja, actual.idx, e.key === "ArrowRight");
-      if (!vecino) return; // borde del lote: no hay vecino
+      // borde del lote: no hay vecino
+      if (!vecino) {
+        return;
+      }
       destino = vecino;
     } else {
       const otra = state.hojas[state.hojas.indexOf(actual.hoja) + (e.key === "ArrowDown" ? 1 : -1)];
       // ponytail: hoja inexistente (borde del lote) u hoja llena sin hueco:
       // silencio — la flecha se repite rápido y un #aviso sería ruido.
-      if (!otra) return;
+      if (!otra) {
+        return;
+      }
       const slot = actual.idx < otra.slots.length ? actual.idx : primerHueco(otra);
-      if (slot === null) return;
+      if (slot === null) {
+        return;
+      }
       destino = { hoja: otra, slot };
     }
     moverSlot({ id }, destino.hoja, destino.slot, centroDeCelda(cell));
@@ -1087,19 +1248,27 @@ function cablearReordenTeclado(): void {
 
 // Único camino de cierre del drag (pointerup + red de lostpointercapture).
 function finalizarDrag(x: number, y: number): void {
-  if (!pointerDrag) return;
+  if (!pointerDrag) {
+    return;
+  }
   const drag = pointerDrag;
   const fueActivo = drag.activo;
   const celdaOrigen = cellById(drag.id);
   pointerDrag = null;
   cancelarDragVisual();
   soltarRenderPendiente();
-  if (!fueActivo) return;
+  if (!fueActivo) {
+    return;
+  }
   const cell = celdaBajoPunto(x, y, celdaOrigen);
-  if (!cell?.closest) return;
+  if (!cell?.closest) {
+    return;
+  }
   const hojaDestino = hojaPorId(cell.closest(".sheet")?.getAttribute("data-hoja") ?? "");
   const slotDestino = Number(cell.dataset["slot"]);
-  if (!hojaDestino || !Number.isInteger(slotDestino)) return;
+  if (!hojaDestino || !Number.isInteger(slotDestino)) {
+    return;
+  }
   moverSlot(drag, hojaDestino, slotDestino, { x, y });
 }
 
@@ -1112,7 +1281,7 @@ export interface SheetsCallbacks {
 
 /** Id de la hoja fantasma (solo visual, nunca en state.hojas): los ids reales son ≥1.
     Clic-sí / drag-no (el drag la ignora); el drop la normaliza a null en el borde. */
-export const HOJA_FANTASMA: number = -1;
+export const HOJA_FANTASMA = -1;
 
 // ponytail: callbacks vigentes (initSheets los refresca aunque los listeners ya
 // existan: HMR/tests re-cablean sin duplicar).
@@ -1139,17 +1308,26 @@ export function esEcoDeRemocion(target: HTMLInputElement): boolean {
 
 /** Celda elegible para el arrastre manual (null en botones ligados, vacías y OCR). */
 function celulaArrastrable(e: PointerEvent): HTMLElement | null {
-  if (e.button !== 0 || !e.isPrimary) return null;
-  if (state.modoOcr) return null;
-  if (!(e.target instanceof Element)) return null;
+  if (e.button !== 0 || !e.isPrimary) {
+    return null;
+  }
+  if (state.modoOcr) {
+    return null;
+  }
+  if (!(e.target instanceof Element)) {
+    return null;
+  }
   const cell = e.target.closest(".cell");
-  if (!(cell instanceof HTMLElement) || cell.classList.contains("empty")) return null;
+  if (!(cell instanceof HTMLElement) || cell.classList.contains("empty")) {
+    return null;
+  }
   if (
     e.target.closest(
       '[data-accion="quitar"],[data-accion="girar-izq"],[data-accion="girar-der"],[data-accion="recortar"],[data-accion="monto"],[data-accion="corregir-monto"]',
     )
-  )
+  ) {
     return null;
+  }
   return cell;
 }
 
@@ -1157,7 +1335,9 @@ function celulaArrastrable(e: PointerEvent): HTMLElement | null {
 function cablearArrastreIniciar(): void {
   sheetsEl.addEventListener("pointerdown", (e) => {
     const cell = celulaArrastrable(e);
-    if (!cell) return;
+    if (!cell) {
+      return;
+    }
     e.preventDefault();
     if (pointerDrag) {
       pointerDrag = null;
@@ -1186,21 +1366,31 @@ function cablearArrastreIniciar(): void {
 /** ARRSTRE: pointermove activa el ghost a >5px y redibuja con rAF. */
 function cablearArrastreMover(): void {
   document.addEventListener("pointermove", (e) => {
-    if (!pointerDrag) return;
+    if (!pointerDrag) {
+      return;
+    }
     const drag: DragState = pointerDrag;
     if (!drag.activo) {
-      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) <= 5) return;
+      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) <= 5) {
+        return;
+      }
       iniciarGhost(drag, e.clientX, e.clientY);
-      if (!drag.activo) return;
+      if (!drag.activo) {
+        return;
+      }
     }
     drag.lastX = e.clientX;
     drag.lastY = e.clientY;
     posicionarGhost(drag, e.clientX, e.clientY);
-    if (moveRaf !== null) return;
+    if (moveRaf !== null) {
+      return;
+    }
     moveRaf = requestAnimationFrame(() => {
       moveRaf = null;
       const d = pointerDrag;
-      if (!d) return;
+      if (!d) {
+        return;
+      }
       autoScroll(d.lastX, d.lastY);
       resaltarDestino(celdaBajoPunto(d.lastX, d.lastY, cellById(d.id)));
     });
@@ -1211,11 +1401,15 @@ function cablearArrastreMover(): void {
 function cablearArrastreCierre(): void {
   document.addEventListener("pointerup", (e) => finalizarDrag(e.clientX, e.clientY));
   sheetsEl.addEventListener("lostpointercapture", (e) => {
-    if (!e.isPrimary || !pointerDrag) return;
+    if (!e.isPrimary || !pointerDrag) {
+      return;
+    }
     finalizarDrag(pointerDrag.lastX, pointerDrag.lastY);
   });
   document.addEventListener("pointercancel", () => {
-    if (!pointerDrag) return;
+    if (!pointerDrag) {
+      return;
+    }
     pointerDrag = null;
     cancelarDragVisual();
     soltarRenderPendiente();
@@ -1239,8 +1433,12 @@ function esCampoTexto(t: EventTarget | null): boolean {
 }
 
 function togglarLupaConM(e: KeyboardEvent): void {
-  if (!esPresionM(e)) return;
-  if (esCampoTexto(e.target)) return;
+  if (!esPresionM(e)) {
+    return;
+  }
+  if (esCampoTexto(e.target)) {
+    return;
+  }
   setLupa(!lupaActiva);
 }
 
@@ -1250,7 +1448,9 @@ function esAtajoZoom(e: KeyboardEvent): boolean {
 }
 
 function aplicarAtajoZoom(e: KeyboardEvent): void {
-  if (!esAtajoZoom(e)) return;
+  if (!esAtajoZoom(e)) {
+    return;
+  }
   e.preventDefault();
   if (e.key === "0") {
     zoomEscala = 1;
@@ -1281,20 +1481,28 @@ function cablearTeclasGlobales(): void {
 /** Anuncia el éxito del copiado: check del botón + live region + timer. */
 function anunciarCopiado(btn: HTMLElement): void {
   const previo = copiadoTimers.get(btn);
-  if (previo !== undefined) window.clearTimeout(previo);
+  if (previo !== undefined) {
+    window.clearTimeout(previo);
+  }
   btn.classList.add("copiado");
   btn.title = "Copiar OCR";
   btn.setAttribute("aria-label", "Copiado");
   const anuncio = document.getElementById("estadoCopiado");
-  if (anuncio) anuncio.textContent = "Copiado";
+  if (anuncio) {
+    anuncio.textContent = "Copiado";
+  }
   copiadoTimers.set(
     btn,
     window.setTimeout(() => {
-      if (!btn.isConnected) return;
+      if (!btn.isConnected) {
+        return;
+      }
       btn.classList.remove("copiado");
       btn.setAttribute("aria-label", "Copiar OCR");
       const aviso = document.getElementById("estadoCopiado");
-      if (aviso) aviso.textContent = "";
+      if (aviso) {
+        aviso.textContent = "";
+      }
     }, TIEMPO_COPIADO_MS),
   );
 }
@@ -1314,7 +1522,9 @@ function deshacerCopiado(btn: HTMLElement, fallo: string): void {
 /** Acción `copiar-ocr`: al portapapeles con check temporal en el botón. */
 function copiarOcrAlPortapapeles(id: number, btn: HTMLElement): void {
   const item = obtenerComprobante(id);
-  if (!item || !item.textoOcr) return;
+  if (!item || !item.textoOcr) {
+    return;
+  }
   // Sin Promise.try (ausente en Node 22 del CI): writeText ya devuelve promesa.
   // clipboard no existe fuera de contexto seguro (http): TypeError antes de la promesa.
   // El fallo avisa en el toast rojo de #aviso y también queda en el title del botón.
@@ -1340,7 +1550,9 @@ function abrirCorreccionMonto(id: number): void {
   // ponytail: apertura no destructiva (el valor previo se edita, no se
   // borra); fuera de ok no hay input que mostrar. Sin recálculo: solo
   // entra por subida/botón/giro.
-  if (!item || item.estado !== "ok") return;
+  if (!item || item.estado !== "ok") {
+    return;
+  }
   editandoMonto = id;
   renderHojas();
   enfocarMonto(id, true);
@@ -1350,35 +1562,47 @@ function abrirCorreccionMonto(id: number): void {
 function abrirRecorteSiHaceFalta(id: number): void {
   // ponytail: solo recortar se suprime tras el descarte (carrera
   // descarte→clic en la celda de abajo); el resto acciona siempre.
-  if (Date.now() - state.cierreRecorte < VENTANA_CIERRE_RECORTE_MS) return;
+  if (Date.now() - state.cierreRecorte < VENTANA_CIERRE_RECORTE_MS) {
+    return;
+  }
   // ponytail: dinámico (recorte importa la cola: estático sería ciclo). Único
   // chunk lazy real: tras un deploy el asset hashado viejo 404ea y el click
   // moriría callado; avisa por el canal del pipeline (si es chunk muerto,
   // sale el "recargá el navegador").
   void import("./recorte")
     .then((m) => m.abrirRecorte(id))
-    .catch((e: unknown) => falloIa(e, "recorte"));
+    .catch((error: unknown) => falloIa(error, "recorte"));
 }
 
 /** Acción `agregar`: pedir archivos para la hoja del botón. */
 function pedirAgregar(btn: HTMLElement): void {
   // El fantasma no tiene botón ＋ (su columna va vacía): -1 nunca llega acá.
   const destino = Number(btn.dataset["hoja"]);
-  if (Number.isInteger(destino)) callbacks?.pedirArchivos(destino);
+  if (Number.isInteger(destino)) {
+    callbacks?.pedirArchivos(destino);
+  }
 }
 
 /** Acción `pegar` en celda vacía: lock por botón (read() async) + callback. */
 function pegarDesdeBoton(btn: HTMLElement): void {
   // En modo OCR el pegado por clic está bloqueado (como el reordenamiento).
-  if (state.modoOcr) return;
-  if (!(btn instanceof HTMLButtonElement)) return;
+  if (state.modoOcr) {
+    return;
+  }
+  if (!(btn instanceof HTMLButtonElement)) {
+    return;
+  }
   // ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces).
-  if (btn.dataset["pegando"] === "1") return;
+  if (btn.dataset["pegando"] === "1") {
+    return;
+  }
   // ponytail: dataset SIEMPRE gravado por pintarCelda en .cell-pegar; el fallback
   // por dataset de la celda era rama muerta (el guard NaN cubre el faltante raro).
   const hoja = Number(btn.dataset["hoja"]);
   const slot = Number(btn.dataset["slot"]);
-  if (!Number.isInteger(hoja) || !Number.isInteger(slot)) return;
+  if (!Number.isInteger(hoja) || !Number.isInteger(slot)) {
+    return;
+  }
   const listo = callbacks?.pegarEnCelda?.(hoja, slot);
   if (listo instanceof Promise) {
     btn.dataset["pegando"] = "1";
@@ -1396,8 +1620,12 @@ function pegarDesdeBoton(btn: HTMLElement): void {
 const ACCIONES_CLIC: Readonly<Record<string, (btn: HTMLElement, id: number) => void>> = {
   "copiar-ocr": (btn, id) => copiarOcrAlPortapapeles(id, btn),
   quitar: (_btn, id) => quitarComprobante(id),
-  "girar-izq": (_btn, id) => void girarYReleer(id, 270),
-  "girar-der": (_btn, id) => void girarYReleer(id, 90),
+  "girar-izq": (_btn, id) => {
+    void girarYReleer(id, 270);
+  },
+  "girar-der": (_btn, id) => {
+    void girarYReleer(id, 90);
+  },
   recortar: (_btn, id) => abrirRecorteSiHaceFalta(id),
   "corregir-monto": (_btn, id) => abrirCorreccionMonto(id),
   layout: (btn) => cambiarLayoutHoja(btn.dataset["hoja"] ?? "", btn.dataset["layout"] ?? ""),
@@ -1409,15 +1637,21 @@ const ACCIONES_CLIC: Readonly<Record<string, (btn: HTMLElement, id: number) => v
 function cablearAcciones(): void {
   // Evento delegado: un solo listener, dispatch por data-accion.
   sheetsEl.addEventListener("click", (e) => {
-    if (!(e.target instanceof Element)) return;
+    if (!(e.target instanceof Element)) {
+      return;
+    }
     const btn = e.target.closest("[data-accion]");
-    if (!(btn instanceof HTMLElement)) return;
+    if (!(btn instanceof HTMLElement)) {
+      return;
+    }
     const cell = btn.closest(".cell");
-    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
     // ponytail: el selector garantiza data-accion presente; una acción fuera de
     // la tabla no existe hoy (el lookup undefined es guard, no flujo).
     const fn = ACCIONES_CLIC[btn.dataset["accion"] as string];
-    if (fn) fn(btn, id);
+    if (fn) {
+      fn(btn, id);
+    }
   });
 }
 
@@ -1425,9 +1659,13 @@ function cablearAcciones(): void {
 function cablearMontoCambio(): void {
   sheetsEl.addEventListener("change", (e) => {
     const target = e.target as HTMLElement | null;
-    if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") return;
+    if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") {
+      return;
+    }
     // ponytail: eco de remoción (el swap destruyó el input enfocado): nunca es edición.
-    if (esEcoDeRemocion(target)) return;
+    if (esEcoDeRemocion(target)) {
+      return;
+    }
     commitearMonto(target);
   });
 }
@@ -1448,7 +1686,8 @@ function escaparMonto(e: KeyboardEvent, id: number): void {
   editandoMonto = null;
   descartarBorrador = true;
   try {
-    renderHojas(); // descarta el borrador sin disparar change
+    // descarta el borrador sin disparar change
+    renderHojas();
   } finally {
     descartarBorrador = false;
   }
@@ -1460,10 +1699,14 @@ function escaparMonto(e: KeyboardEvent, id: number): void {
 function cablearMontoTeclado(): void {
   sheetsEl.addEventListener("keydown", (e) => {
     const target = e.target as HTMLElement | null;
-    if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") return;
+    if (!(target instanceof HTMLInputElement) || target.dataset["accion"] !== "monto") {
+      return;
+    }
     const cell = target.closest(".cell");
-    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : NaN);
-    if (!Number.isInteger(id)) return;
+    const id = Number(cell instanceof HTMLElement ? cell.dataset["id"] : Number.NaN);
+    if (!Number.isInteger(id)) {
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       // ponytail: commit directo (sin blur): el foco sigue en el input y el
@@ -1475,7 +1718,9 @@ function cablearMontoTeclado(): void {
       }
       return;
     }
-    if (e.key === "Escape") escaparMonto(e, id);
+    if (e.key === "Escape") {
+      escaparMonto(e, id);
+    }
   });
 }
 
@@ -1483,29 +1728,37 @@ function cablearMontoTeclado(): void {
 function cablearArchivosEntrada(): void {
   // La entrada nunca se bloquea por el modo OCR (solo el reordenamiento).
   sheetsEl.addEventListener("dragover", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     e.preventDefault();
     autoScroll(e.clientX, e.clientY);
     const target = e.target as HTMLElement | null;
     const sheet = target?.closest?.(".sheet");
-    sheetsEl.querySelectorAll(".sheet.file-drop").forEach((s) => {
-      if (s !== sheet) s.classList.remove("file-drop");
-    });
-    if (sheet instanceof HTMLElement && sheet.dataset["hoja"] !== String(HOJA_FANTASMA))
+    for (const s of sheetsEl.querySelectorAll(".sheet.file-drop")) {
+      if (s !== sheet) {
+        s.classList.remove("file-drop");
+      }
+    }
+    if (sheet instanceof HTMLElement && sheet.dataset["hoja"] !== String(HOJA_FANTASMA)) {
       sheet.classList.add("file-drop");
+    }
   });
 }
 
 /** Al salir del drag de archivos: limpia el highlight y para el auto-scroll. */
 function cablearArchivosFuera(): void {
   sheetsEl.addEventListener("dragleave", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     const target = e.target as HTMLElement | null;
     const related = e.relatedTarget as Node | null;
     const sheet = target?.closest?.(".sheet");
     if (sheet instanceof HTMLElement && !sheet.contains(related)) {
       sheet.classList.remove("file-drop");
-      detenerScroll(); // el arrastre salió: sin esto el loop rAF seguía scrolleando.
+      // el arrastre salió: sin esto el loop rAF seguía scrolleando.
+      detenerScroll();
     }
   });
 }
@@ -1513,9 +1766,14 @@ function cablearArchivosFuera(): void {
 /** Drop de archivos: el fantasma va por el flujo normal (su crudo es -1 → null). */
 function cablearArchivosSoltar(): void {
   sheetsEl.addEventListener("drop", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     e.preventDefault();
-    if (!(e.target instanceof Element)) return; // drop no-Elemento: nada que hacer (mismo guard que cablearAcciones)
+    // drop no-Elemento: nada que hacer (mismo guard que cablearAcciones)
+    if (!(e.target instanceof Element)) {
+      return;
+    }
     const sheet = e.target.closest(".sheet");
     cancelarDragVisual();
     if (sheet instanceof HTMLElement) {
@@ -1543,7 +1801,9 @@ function cablearZoom(): void {
   (canvasEl ?? sheetsEl).addEventListener(
     "wheel",
     (e) => {
-      if (!e.ctrlKey && !e.metaKey) return;
+      if (!e.ctrlKey && !e.metaKey) {
+        return;
+      }
       e.preventDefault();
       const delta = e.deltaMode === 0 ? e.deltaY : e.deltaY * 16;
       zoomEn(e.clientX, e.clientY, Math.exp(-delta * 0.0015));
@@ -1570,12 +1830,19 @@ function cablearLupaApagar(): void {
     "pointerdown",
     (e) => {
       if (!lupaActiva) {
-        lupaSuprimirClic = false; // clic en vuelo que nunca llegó: no envenenar el próximo
+        // clic en vuelo que nunca llegó: no envenenar el próximo
+        lupaSuprimirClic = false;
         return;
       }
-      if (!e.isPrimary) return;
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      if ((e.target as HTMLElement | null)?.closest?.("#btnLupa, .zoom-grupo")) return;
+      if (!e.isPrimary) {
+        return;
+      }
+      if (e.pointerType === "mouse" && e.button !== 0) {
+        return;
+      }
+      if ((e.target as HTMLElement | null)?.closest?.("#btnLupa, .zoom-grupo")) {
+        return;
+      }
       e.stopPropagation();
       setLupa(false);
       lupaSuprimirClic = true;
@@ -1585,7 +1852,9 @@ function cablearLupaApagar(): void {
   document.addEventListener(
     "click",
     (e) => {
-      if (!lupaSuprimirClic) return;
+      if (!lupaSuprimirClic) {
+        return;
+      }
       lupaSuprimirClic = false;
       e.stopPropagation();
       e.preventDefault();
@@ -1609,12 +1878,16 @@ function cablearLupaApagar(): void {
 
 /** Feed compartido de pointermove/enter: muestra la lente y agenda el rAF. */
 function alimentarLupa(e: PointerEvent): void {
-  if (!lupaActiva) return;
+  if (!lupaActiva) {
+    return;
+  }
   lupaX = e.clientX;
   lupaY = e.clientY;
   lupaTieneMuestra = true;
   lupaEl.style.opacity = "1";
-  if (lupaRaf === null) lupaRaf = requestAnimationFrame(dibujarLupa);
+  if (lupaRaf === null) {
+    lupaRaf = requestAnimationFrame(dibujarLupa);
+  }
 }
 
 /** Lente viva sobre la zona de hojas (no consume wheel ni clics). */
@@ -1634,7 +1907,9 @@ export function initSheets(cb: SheetsCallbacks): void {
   // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
   // Todo el estado que los listeners comparten vive en el módulo, así que solo
   // se reparten en 13 cablear* (una por bloque) sin atravesar cierres.
-  if (sheetsEl.dataset["init"] === "1") return;
+  if (sheetsEl.dataset["init"] === "1") {
+    return;
+  }
   sheetsEl.dataset["init"] = "1";
   cablearArrastreIniciar();
   cablearArrastreMover();

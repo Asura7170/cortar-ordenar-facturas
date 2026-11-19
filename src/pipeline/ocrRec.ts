@@ -8,11 +8,11 @@ import type { CajaDb } from "./ocrDb";
 import { DICT_OCR } from "./ocrDict";
 
 /** Alto fijo de entrada del rec (image_shape [3,48,320]). */
-export const REC_ALTO: number = 48;
+export const REC_ALTO = 48;
 /** Ancho base (crece con el aspecto: resize_norm_img_chinese no trunca). */
-export const REC_ANCHO_BASE: number = 320;
+export const REC_ANCHO_BASE = 320;
 /** Tope del aspecto (una línea de texto nunca es una hebra: guarda memoria/CPU). */
-export const REC_RATIO_MAXIMA: number = 32;
+export const REC_RATIO_MAXIMA = 32;
 
 /** Línea lista para el tensor [1,3,48,anchoTotal] (CHW aplanado). */
 export interface LineaNorm {
@@ -50,7 +50,9 @@ function bilineal(
  * Null si es degenerado.
  */
 export function normalizarLinea(bgr: Uint8Array, w: number, h: number): LineaNorm | null {
-  if (w < 1 || h < 1 || bgr.length < w * h * 3) return null;
+  if (w < 1 || h < 1 || bgr.length < w * h * 3) {
+    return null;
+  }
   const ratio = Math.min(w / h, REC_RATIO_MAXIMA);
   // ponytail: sin truncar a 320 (resize_norm_img_chinese ensancha imgW con el aspecto).
   const anchoTotal = Math.max(
@@ -92,14 +94,18 @@ export interface LoteNorm {
  * mayor del grupo. Núcleo de normalizarLote (y de los chunks en ocr.ts).
  */
 export function apilarLineas(norms: readonly LineaNorm[]): LoteNorm | null {
-  if (norms.length === 0) return null;
+  if (norms.length === 0) {
+    return null;
+  }
   let anchoMax = 0;
   for (const n of norms) {
-    if (n.anchoTotal > anchoMax) anchoMax = n.anchoTotal;
+    if (n.anchoTotal > anchoMax) {
+      anchoMax = n.anchoTotal;
+    }
   }
   const plano = REC_ALTO * anchoMax;
   const tensor = new Float32Array(norms.length * 3 * plano);
-  norms.forEach((n, b) => {
+  for (const [b, n] of norms.entries()) {
     const planoLin = REC_ALTO * n.anchoTotal;
     for (let c = 0; c < 3; c += 1) {
       for (let y = 0; y < REC_ALTO; y += 1) {
@@ -109,7 +115,7 @@ export function apilarLineas(norms: readonly LineaNorm[]): LoteNorm | null {
         );
       }
     }
-  });
+  }
   return { tensor, lote: norms.length, anchoMax };
 }
 
@@ -119,11 +125,15 @@ export function apilarLineas(norms: readonly LineaNorm[]): LoteNorm | null {
  * Null si vacío o alguna degenerada.
  */
 export function normalizarLote(lineas: readonly LineaBgr[]): LoteNorm | null {
-  if (lineas.length === 0) return null;
+  if (lineas.length === 0) {
+    return null;
+  }
   const norms: LineaNorm[] = [];
   for (const l of lineas) {
     const n = normalizarLinea(l.bgr, l.w, l.h);
-    if (!n) return null;
+    if (!n) {
+      return null;
+    }
     norms.push(n);
   }
   return apilarLineas(norms);
@@ -153,7 +163,9 @@ export function matrizAfin(poli: CajaDb["poli"], w: number, h: number): MatrizAf
 export function matrizInversa(m: MatrizAfin): MatrizAfin | null {
   const [a, b, c, d, e, f] = m;
   const det = a * d - b * c;
-  if (Math.abs(det) < 1e-12) return null;
+  if (Math.abs(det) < 1e-12) {
+    return null;
+  }
   return [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det];
 }
 
@@ -191,9 +203,13 @@ export function decodificarCtc(
   pasos: number,
   dict: readonly string[] = DICT_OCR,
 ): TextoRec {
-  if (pasos < 1 || logits.length % pasos !== 0) return { texto: "", puntaje: 0 };
+  if (pasos < 1 || logits.length % pasos !== 0) {
+    return { texto: "", puntaje: 0 };
+  }
   const clases = logits.length / pasos;
-  if (clases !== dict.length) return { texto: "", puntaje: 0 };
+  if (clases !== dict.length) {
+    return { texto: "", puntaje: 0 };
+  }
   let texto = "";
   let suma = 0;
   let n = 0;

@@ -41,17 +41,21 @@ let seq = 0;
 let seqHoja = 0;
 
 export function nextComprobanteId(): number {
-  return ++seq;
+  seq += 1;
+  return seq;
 }
 
 export function nextHojaId(): number {
-  return ++seqHoja;
+  seqHoja += 1;
+  return seqHoja;
 }
 
 function leerBlob(): Record<string, unknown> {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return {};
+    if (!raw) {
+      return {};
+    }
     const p: unknown = JSON.parse(raw);
     return typeof p === "object" && p !== null ? (p as Record<string, unknown>) : {};
   } catch {
@@ -89,8 +93,11 @@ export function borrarCodigo(): void {
   delete blob["codigoActivo"];
   delete blob["codigoValor"];
   delete blob["codigoPosicion"];
-  if (Object.keys(blob).length === 0) localStorage.removeItem(LS_KEY);
-  else localStorage.setItem(LS_KEY, JSON.stringify(blob));
+  if (Object.keys(blob).length === 0) {
+    localStorage.removeItem(LS_KEY);
+  } else {
+    localStorage.setItem(LS_KEY, JSON.stringify(blob));
+  }
 }
 
 export function isMoneda(v: unknown): v is Moneda {
@@ -108,11 +115,15 @@ export function isPosicionCodigo(v: unknown): v is PosicionCodigo {
 }
 
 function isPersistedState(v: unknown): v is PersistedState {
-  if (typeof v !== "object" || v === null) return false;
+  if (typeof v !== "object" || v === null) {
+    return false;
+  }
   const p = v as Record<string, unknown>;
   // Cada ventana guarda lo suyo: moneda es opcional (blobs legacy solo-código
   // de guardarCodigo() sin moneda). Si viene, debe ser válida.
-  if ("moneda" in p && !isMoneda(p["moneda"])) return false;
+  if ("moneda" in p && !isMoneda(p["moneda"])) {
+    return false;
+  }
   return (
     typeof p["codigoActivo"] === "boolean" ||
     typeof p["codigoValor"] === "string" ||
@@ -135,16 +146,23 @@ function limpiarClavesIa(): void {
 function retirarSobrantes(r: Record<string, unknown>): void {
   let cambio = false;
   if ("configIA" in r) {
-    delete r["configIA"]; // era IA
+    // era IA
+    delete r["configIA"];
     cambio = true;
   }
   if ("codigoLongitud" in r) {
-    delete r["codigoLongitud"]; // era del switch de longitud (ya retirada)
+    // era del switch de longitud (ya retirada)
+    delete r["codigoLongitud"];
     cambio = true;
   }
-  if (!cambio) return;
-  if (Object.keys(r).length === 0) localStorage.removeItem(LS_KEY);
-  else localStorage.setItem(LS_KEY, JSON.stringify(r));
+  if (!cambio) {
+    return;
+  }
+  if (Object.keys(r).length === 0) {
+    localStorage.removeItem(LS_KEY);
+  } else {
+    localStorage.setItem(LS_KEY, JSON.stringify(r));
+  }
 }
 
 /** Ventana Código: booleans y números con clamps (blobs legacy caen al default). */
@@ -166,9 +184,15 @@ export function cargar(): void {
     // el re-parseo propio era un duplicado de leerBlob().
     const r = leerBlob();
     retirarSobrantes(r);
-    if (!isPersistedState(r)) return; // estado corrupto o de otra versión: ignorar
+    // estado corrupto o de otra versión: ignorar
+    if (!isPersistedState(r)) {
+      return;
+    }
     aplicarCodigo(r);
-    if (isMoneda(r["moneda"])) state.moneda = r["moneda"]; // ausente en blobs legacy: se conserva
+    // ausente en blobs legacy: se conserva
+    if (isMoneda(r["moneda"])) {
+      state.moneda = r["moneda"];
+    }
   } catch {
     /* estado corrupto: ignorar */
   }
@@ -179,7 +203,7 @@ export function crearHoja(layoutId: LayoutId = "u4x2"): Hoja {
   return {
     id: nextHojaId(),
     layout: layoutId,
-    slots: Array<Hoja["slots"][number]>(l.total).fill(null),
+    slots: Array.from({ length: l.total }, () => null),
   };
 }
 
@@ -190,7 +214,9 @@ export function hojaPorId(id: string | number): Hoja | undefined {
 export function buscarSlot(id: number): { hoja: Hoja; idx: number } | null {
   for (const h of state.hojas) {
     const idx = h.slots.findIndex((c) => c?.id === id);
-    if (idx >= 0) return { hoja: h, idx };
+    if (idx !== -1) {
+      return { hoja: h, idx };
+    }
   }
   return null;
 }
@@ -205,7 +231,9 @@ export function limpiarHojas(): void {
   state.hojas = Iterator.from(state.hojas)
     .filter((h) => h.slots.some(Boolean))
     .toArray();
-  if (state.hojas.length === 0) state.hojas.push(crearHoja());
+  if (state.hojas.length === 0) {
+    state.hojas.push(crearHoja());
+  }
 }
 
 // Reparte los comprobantes en orden visual respetando la capacidad de cada
@@ -219,21 +247,25 @@ export function redistribuir(layoutNuevas?: LayoutId): void {
   // ponytail: cada llamada ocurre con pos < items.length ⇒ el índice es válido.
   const tomar = (): Comprobante => {
     const item = items[pos] as Comprobante;
-    pos++;
+    pos += 1;
     return item;
   };
   for (const h of state.hojas) {
     const cap = layoutDe(h.layout).total;
-    h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
-    for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();
+    h.slots = Array.from({ length: cap }, () => null);
+    for (let i = 0; i < cap && pos < items.length; i += 1) {
+      h.slots[i] = tomar();
+    }
   }
   while (pos < items.length) {
     // Las nuevas usan el default (el intake desborda igual): el layout elegido
     // es de la hoja; "aplicar a todas" pisa vía layoutNuevas.
     const h = crearHoja(layoutNuevas);
     const cap = layoutDe(h.layout).total;
-    h.slots = Array<Hoja["slots"][number]>(cap).fill(null);
-    for (let i = 0; i < cap && pos < items.length; i++) h.slots[i] = tomar();
+    h.slots = Array.from({ length: cap }, () => null);
+    for (let i = 0; i < cap && pos < items.length; i += 1) {
+      h.slots[i] = tomar();
+    }
     state.hojas.push(h);
   }
   limpiarHojas();

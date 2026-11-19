@@ -98,7 +98,7 @@ const { __apuntados: registrados } = (await import("docx")) as unknown as {
   __apuntados: Registro[];
 };
 
-const EMU = 914400;
+const EMU = 914_400;
 const POSICIONES: readonly PosicionCodigo[] = ["sup-izq", "sup-der", "inf-izq", "inf-der"];
 
 beforeEach(() => {
@@ -111,7 +111,7 @@ afterEach(() => {
   globalThis.createImageBitmap = bitmapFalso;
 });
 
-function sembrar(monto: number | null = 123456): void {
+function sembrar(monto: number | null = 123_456): void {
   const h = crearHoja();
   h.slots[0] = comprobante({ montoCents: monto, file: new Blob(["jpg"], { type: "image/jpeg" }) });
   state.hojas.push(h);
@@ -135,33 +135,41 @@ function dentroDeCarta(rects: readonly Rect[]): void {
 }
 
 function sinSolapes(rects: readonly Rect[]): void {
-  for (let i = 0; i < rects.length; i++)
-    for (let j = i + 1; j < rects.length; j++) {
+  for (let i = 0; i < rects.length; i += 1) {
+    for (let j = i + 1; j < rects.length; j += 1) {
       const a = rects[i];
       const b = rects[j];
-      if (!a || !b) throw new Error("rect ausente");
+      if (!a || !b) {
+        throw new Error("rect ausente");
+      }
       expect(seSolapan(a, b)).toBe(false);
     }
+  }
 }
 
 /** Vecinas del mismo eje separadas por al menos la calle (el hueco visible). */
 function conCalle(rects: readonly Rect[], calle: number): void {
-  for (let i = 0; i < rects.length; i++)
-    for (let j = i + 1; j < rects.length; j++) {
+  for (let i = 0; i < rects.length; i += 1) {
+    for (let j = i + 1; j < rects.length; j += 1) {
       const a = rects[i];
       const b = rects[j];
-      if (!a || !b) throw new Error("rect ausente");
+      if (!a || !b) {
+        throw new Error("rect ausente");
+      }
       const huecoX = Math.max(a.x, b.x) - Math.min(a.x + a.w, b.x + b.w);
       const huecoY = Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h);
       // En el eje que comparten hay calle; en el otro pueden solaparse (grilla).
       expect(huecoX >= calle || huecoY >= calle).toBe(true);
     }
+  }
 }
 
 function seccionDe(doc: Registro): Record<string, unknown> {
   const secs = (doc.opc as { sections: Record<string, unknown>[] }).sections;
-  const sec = secs[0];
-  if (!sec) throw new Error("sección ausente");
+  const [sec] = secs;
+  if (!sec) {
+    throw new Error("sección ausente");
+  }
   return sec;
 }
 
@@ -218,8 +226,10 @@ describe("geometria", () => {
   it("u1 sup-izq: 1 rect con banda superior libre", () => {
     const rects = geometria("u1", "sup-izq");
     expect(rects).toHaveLength(1);
-    const r = rects[0];
-    if (!r) throw new Error("rect ausente");
+    const [r] = rects;
+    if (!r) {
+      throw new Error("rect ausente");
+    }
     expect(r.y).toBeGreaterThanOrEqual(Math.round(0.6 * EMU));
     expect(r.y + r.h).toBeLessThanOrEqual(Math.round((11 - 0.3) * EMU));
   });
@@ -245,23 +255,24 @@ describe("encajar", () => {
   const rect: Rect = { x: 0, y: 0, w: 800 * 9525, h: 600 * 9525 };
 
   it("apaisada llena el ancho", () => {
-    expect(encajar(1600, 600, rect)).toEqual({ w: 800, h: 300 });
+    expect(encajar(1600, 600, rect)).toStrictEqual({ w: 800, h: 300 });
   });
 
   it("vertical llena el alto", () => {
-    expect(encajar(600, 1200, rect)).toEqual({ w: 300, h: 600 });
+    expect(encajar(600, 1200, rect)).toStrictEqual({ w: 300, h: 600 });
   });
 
   it("sin dimensiones usa el rect entero", () => {
-    expect(encajar(0, 0, rect)).toEqual({ w: 800, h: 600 });
+    expect(encajar(0, 0, rect)).toStrictEqual({ w: 800, h: 600 });
   });
 });
 
 describe("construirDocumento (docx mockeado)", () => {
   function hojaCon(n: number): void {
     const h = crearHoja();
-    for (let i = 0; i < n; i++)
+    for (let i = 0; i < n; i += 1) {
       h.slots[i] = comprobante({ file: new Blob([`jpg${i}`], { type: "image/jpeg" }) });
+    }
     state.hojas.push(h);
   }
 
@@ -292,8 +303,10 @@ describe("construirDocumento (docx mockeado)", () => {
     }
     const docs = deTipo("Document");
     expect(docs).toHaveLength(1);
-    const doc = docs[0];
-    if (!doc) throw new Error("documento ausente");
+    const [doc] = docs;
+    if (!doc) {
+      throw new Error("documento ausente");
+    }
     const sec = seccionDe(doc);
     expect(sec["footers"]).toBeDefined();
     expect(sec["headers"]).toBeUndefined();
@@ -304,15 +317,14 @@ describe("construirDocumento (docx mockeado)", () => {
     state.hojas = [];
     const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
     const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      fillRect: vi.fn(),
-      drawImage: vi.fn(),
+      fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
+      drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
     } as unknown as CanvasRenderingContext2D);
-    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(function (
-      this: HTMLCanvasElement,
-      cb: BlobCallback,
-    ): void {
-      cb(new Blob([jpg], { type: "image/jpeg" }));
-    });
+    const toBlob = vi
+      .spyOn(HTMLCanvasElement.prototype, "toBlob")
+      .mockImplementation((cb: BlobCallback): void => {
+        cb(new Blob([jpg], { type: "image/jpeg" }));
+      });
     try {
       const h = crearHoja();
       h.slots[0] = comprobante({ file: new Blob(["webp"], { type: "image/webp" }) });
@@ -320,9 +332,13 @@ describe("construirDocumento (docx mockeado)", () => {
       await construirDocumento(state.hojas, "", "inf-der");
       const imgs = deTipo("ImageRun");
       expect(imgs).toHaveLength(1);
-      const data = (imgs[0]?.opc as { data: ArrayBuffer }).data;
+      const [img] = imgs;
+      if (!img) {
+        throw new Error("imagen ausente");
+      }
+      const { data } = img.opc as { data: ArrayBuffer };
       const bytes = new Uint8Array(data).slice(0, 3);
-      expect(bytes).toEqual(new Uint8Array([0xff, 0xd8, 0xff]));
+      expect(bytes).toStrictEqual(new Uint8Array([0xff, 0xd8, 0xff]));
       expect(toBlob).toHaveBeenCalledWith(expect.any(Function), "image/jpeg", expect.any(Number));
     } finally {
       ctx.mockRestore();
@@ -334,8 +350,10 @@ describe("construirDocumento (docx mockeado)", () => {
     hojaCon(1);
     await construirDocumento(state.hojas, "123456", "sup-izq");
     const docs = deTipo("Document");
-    const doc = docs[0];
-    if (!doc) throw new Error("documento ausente");
+    const [doc] = docs;
+    if (!doc) {
+      throw new Error("documento ausente");
+    }
     const sec = seccionDe(doc);
     expect(sec["headers"]).toBeDefined();
     expect(sec["footers"]).toBeUndefined();
@@ -357,8 +375,10 @@ describe("construirDocumento (docx mockeado)", () => {
     hojaCon(1);
     await construirDocumento(state.hojas, "", "inf-der");
     const docs = deTipo("Document");
-    const doc = docs[0];
-    if (!doc) throw new Error("documento ausente");
+    const [doc] = docs;
+    if (!doc) {
+      throw new Error("documento ausente");
+    }
     const sec = seccionDe(doc);
     expect(sec["headers"]).toBeUndefined();
     expect(sec["footers"]).toBeUndefined();
@@ -404,14 +424,14 @@ describe("descargarWord", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
     await descargarWord();
-    expect(click).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledOnce();
     const a = click.mock.instances[0] as HTMLAnchorElement;
     expect(a.download).toBe("sincodigo-comprobante.docx");
     expect(a.href).toContain("blob:mock-");
     vi.advanceTimersByTime(2000);
     expect(revoke).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(28000);
-    expect(revoke).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(28_000);
+    expect(revoke).toHaveBeenCalledOnce();
   });
 
   it("fallo de generación: avisa y no descarga", async () => {
@@ -436,20 +456,20 @@ describe("initExport", () => {
     initExport();
     document.getElementById("btnWord")?.click();
     // descargarWord es async (mide + empaca): el clic del anchor llega después.
-    await vi.waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(click).toHaveBeenCalledOnce());
   });
 
   it("idempotente: recablear no duplica el print", async () => {
     state.hojas.length = 0;
     state.codigoActivo = false;
     sembrar();
-    const print = vi.fn();
+    const print = vi.fn<() => void>();
     vi.stubGlobal("print", print);
     try {
       initExport();
       initExport();
       document.getElementById("btnImprimir")?.click();
-      await vi.waitFor(() => expect(print).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(print).toHaveBeenCalledOnce());
     } finally {
       vi.unstubAllGlobals();
       window.dispatchEvent(new Event("afterprint"));
@@ -461,8 +481,10 @@ describe("initExport", () => {
     state.codigoActivo = false;
     sembrar();
     const aviso = document.getElementById("aviso");
-    if (aviso) aviso.textContent = "";
-    const print = vi.fn();
+    if (aviso) {
+      aviso.textContent = "";
+    }
+    const print = vi.fn<() => void>();
     vi.stubGlobal("print", print);
     try {
       initExport();
@@ -480,7 +502,9 @@ describe("initExport", () => {
 describe("hojaPrint", () => {
   function hojaLlena(n: number, layout: LayoutId = "u4x2") {
     const h = crearHoja(layout);
-    for (let i = 0; i < n; i++) h.slots[i] = comprobante();
+    for (let i = 0; i < n; i += 1) {
+      h.slots[i] = comprobante();
+    }
     return h;
   }
 
@@ -511,9 +535,10 @@ describe("hojaPrint", () => {
 
   it("u3h: casilla alta con row-span 2 (geometria + print)", () => {
     const rects = geometria("u3h", "inf-der");
-    const simple = rects[0];
-    const alta = rects[2];
-    if (!simple || !alta) throw new Error("rect ausente");
+    const [simple, , alta] = rects;
+    if (!simple || !alta) {
+      throw new Error("rect ausente");
+    }
     expect(alta.h).toBeGreaterThan(Math.round(simple.h * 1.9));
     const sec = hojaPrint(hojaLlena(3, "u3h"), "1", "inf-der");
     const celdas = sec.querySelectorAll(".celda-print");
@@ -538,7 +563,9 @@ describe("hojaPrint", () => {
 describe("descargarPdf / imprimir", () => {
   function zona(): HTMLElement {
     const z = document.getElementById("zonaPrint");
-    if (!z) throw new Error("zona ausente");
+    if (!z) {
+      throw new Error("zona ausente");
+    }
     return z;
   }
 

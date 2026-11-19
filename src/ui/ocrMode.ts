@@ -13,7 +13,9 @@ export function renderOcrToggle(): void {
 
 export function initOcrMode(): void {
   chkOcr.addEventListener("change", () => {
-    if (chkOcr.checked === state.modoOcr) return;
+    if (chkOcr.checked === state.modoOcr) {
+      return;
+    }
     state.modoOcr = !state.modoOcr;
     renderOcrToggle();
     renderHojas();

@@ -73,7 +73,7 @@ const esquinas = (w: number, h: number): Quad => [
 ];
 
 function bitmapFalso(w: number, h: number): ImageBitmap {
-  return { width: w, height: h, close: vi.fn() } as unknown as ImageBitmap;
+  return { width: w, height: h, close: vi.fn<() => void>() } as unknown as ImageBitmap;
 }
 
 // Lienzo falso: píxeles dados, captura tipo/calidad del toBlob y trazos de dibujo.
@@ -107,9 +107,13 @@ function lienzoFalso(pixeles: Uint8ClampedArray): {
     },
     getImageData: (_x: number, _y: number, w: number, h: number): { data: Uint8ClampedArray } => {
       // Tras un put (el warp de rectificar), se lee lo puesto si encaja en dims.
-      if (puesto && puesto.w === w && puesto.h === h) return { data: puesto.datos };
+      if (puesto && puesto.w === w && puesto.h === h) {
+        return { data: puesto.datos };
+      }
       // Si el lienzo pide más píxeles de los dados, se completa en negro (?? 0 del lector).
-      if (pixeles.length >= w * h * 4) return { data: pixeles };
+      if (pixeles.length >= w * h * 4) {
+        return { data: pixeles };
+      }
       const ext = new Uint8ClampedArray(w * h * 4);
       ext.set(pixeles);
       return { data: ext };
@@ -143,11 +147,11 @@ const blanco = (w: number, h: number): Uint8ClampedArray =>
   new Uint8ClampedArray(w * h * 4).fill(255);
 
 // Heatmap (1,4,L,L) con un pico por canal en las celdas dadas.
-function heatConPicos(L: number, celdas: Array<[number, number]>): Float32Array {
+function heatConPicos(L: number, celdas: [number, number][]): Float32Array {
   const heat = new Float32Array(4 * L * L);
-  celdas.forEach(([cx, cy], c) => {
+  for (const [c, [cx, cy]] of celdas.entries()) {
     heat[c * L * L + cy * L + cx] = 1;
-  });
+  }
   return heat;
 }
 
@@ -159,7 +163,7 @@ describe("ordenarQuad/esConvexo", () => {
       { x: 9, y: 0 },
       { x: 0, y: 9 },
     ]);
-    expect(q).toEqual([
+    expect(q).toStrictEqual([
       { x: 0, y: 0 },
       { x: 9, y: 0 },
       { x: 9, y: 9 },
@@ -218,7 +222,7 @@ describe("esQuadPlausible", () => {
 
 describe("tamanoSalida/areaQuad", () => {
   it("usa la media de aristas opuestas", () => {
-    expect(tamanoSalida(esquinas(101, 51))).toEqual({ width: 100, height: 50 });
+    expect(tamanoSalida(esquinas(101, 51))).toStrictEqual({ width: 100, height: 50 });
     expect(areaQuad(esquinas(101, 51))).toBe(100 * 50);
   });
 });
@@ -231,7 +235,7 @@ describe("calcularHomografia", () => {
       { x: 2, y: 2 },
       { x: 3, y: 3 },
     ];
-    expect(() => calcularHomografia(linea, linea)).toThrow();
+    expect(() => calcularHomografia(linea, linea)).toThrow("degenerada");
   });
 
   it("lanza con menos de 4 pares", () => {
@@ -251,7 +255,9 @@ describe("calcularHomografia", () => {
     expect(h[0] ?? 0).toBeCloseTo(1, 9);
     expect(h[4] ?? 0).toBeCloseTo(1, 9);
     expect(h[8]).toBe(1);
-    for (const i of [1, 2, 3, 5, 6, 7]) expect(h[i] ?? 0).toBeCloseTo(0, 9);
+    for (const i of [1, 2, 3, 5, 6, 7]) {
+      expect(h[i] ?? 0).toBeCloseTo(0, 9);
+    }
   });
 
   it("sistemaDLT arma 8×8 de 4 pares", () => {
@@ -264,7 +270,7 @@ describe("calcularHomografia", () => {
     const { a, b } = sistemaDLT(src, src);
     expect(a).toHaveLength(8);
     expect(a.every((f) => f.length === 8)).toBe(true);
-    expect(b).toEqual([0, 0, 1, 0, 1, 1, 0, 1]);
+    expect(b).toStrictEqual([0, 0, 1, 0, 1, 1, 0, 1]);
   });
 });
 
@@ -276,13 +282,14 @@ describe("pivotar/eliminar", () => {
     ];
     const b = [1, 2];
     pivotar(a, b, 0, 2);
-    expect(a).toEqual([
+    expect(a).toStrictEqual([
       [1, 0],
       [0, 1],
     ]);
-    expect(b).toEqual([2, 1]);
-    pivotar(a, b, 1, 2); // ya pivoteado: sin swap
-    expect(a).toEqual([
+    expect(b).toStrictEqual([2, 1]);
+    // ya pivoteado: sin swap
+    pivotar(a, b, 1, 2);
+    expect(a).toStrictEqual([
       [1, 0],
       [0, 1],
     ]);
@@ -294,20 +301,22 @@ describe("pivotar/eliminar", () => {
       [0, 1],
     ];
     const b = [5, 7];
-    eliminar(a, b, 0, 2); // factores 0: sin cambios
-    expect(a).toEqual([
+    // factores 0: sin cambios
+    eliminar(a, b, 0, 2);
+    expect(a).toStrictEqual([
       [1, 0],
       [0, 1],
     ]);
-    expect(b).toEqual([5, 7]);
+    expect(b).toStrictEqual([5, 7]);
     const c = [
       [1, 2],
       [3, 4],
     ];
     const d = [5, 11];
-    eliminar(c, d, 0, 2); // fil 1 con factor 3
-    expect(c[1]).toEqual([0, -2]);
-    expect(d).toEqual([5, -4]);
+    // fil 1 con factor 3
+    eliminar(c, d, 0, 2);
+    expect(c[1]).toStrictEqual([0, -2]);
+    expect(d).toStrictEqual([5, -4]);
   });
 });
 
@@ -315,7 +324,7 @@ describe("muestrearBilinear", () => {
   it("interpola el centro de 4 píxeles", () => {
     const ent = new Uint8ClampedArray([0, 0, 0, 255, 100, 0, 0, 255, 0, 0, 0, 255, 200, 0, 0, 255]);
     // (0.5, 0.5) en 2×2: promedio de los 4 rojos.
-    expect(muestrearBilinear(ent, 2, 2, 0.5, 0.5)).toEqual([75, 0, 0]);
+    expect(muestrearBilinear(ent, 2, 2, 0.5, 0.5)).toStrictEqual([75, 0, 0]);
   });
 });
 
@@ -333,9 +342,11 @@ describe("masaComponente/mejorComponente", () => {
     const visitados = new Uint8Array(4);
     const heat = new Float32Array([0.1, 0.9, 0, 0]);
     expect(vecinoAceptable(visitados, heat, 0, 1, 0.3)).toBe(true);
-    expect(vecinoAceptable(visitados, heat, 0, 0, 0.3)).toBe(false); // frío
+    // frío
+    expect(vecinoAceptable(visitados, heat, 0, 0, 0.3)).toBe(false);
     visitados[1] = 1;
-    expect(vecinoAceptable(visitados, heat, 0, 1, 0.3)).toBe(false); // visitado
+    // visitado
+    expect(vecinoAceptable(visitados, heat, 0, 1, 0.3)).toBe(false);
   });
 
   it("bloque 2×2 suma masa y centroide", () => {
@@ -345,7 +356,8 @@ describe("masaComponente/mejorComponente", () => {
     heat[5] = 1;
     heat[6] = 1;
     heat[9] = 1;
-    heat[10] = 1; // bloque (1,1)-(2,2)
+    // bloque (1,1)-(2,2)
+    heat[10] = 1;
     const visitados = new Uint8Array(w * h);
     const pila = new Int32Array(w * h);
     const { masa, sumaX, sumaY } = masaComponente(heat, 0, w, h, 0.3, 5, visitados, pila);
@@ -358,9 +370,11 @@ describe("masaComponente/mejorComponente", () => {
     const w = 4;
     const h = 4;
     const heat = new Float32Array(w * h).fill(0);
-    heat[0] = 0.5; // componente chica en (0,0)
+    // componente chica en (0,0)
+    heat[0] = 0.5;
     heat[10] = 1;
-    heat[11] = 1; // componente grande en (2,2)-(3,2)
+    // componente grande en (2,2)-(3,2)
+    heat[11] = 1;
     const visitados = new Uint8Array(w * h);
     const pila = new Int32Array(w * h);
     const { punto, pico } = mejorComponente(heat, 0, w, h, 0.3, 40, 40, visitados, pila);
@@ -374,9 +388,9 @@ describe("masaComponente/mejorComponente", () => {
     const h = 4;
     const visitados = new Uint8Array(w * h);
     const pila = new Int32Array(w * h);
-    expect(mejorComponente(new Float32Array(w * h), 0, w, h, 0.3, 40, 40, visitados, pila)).toEqual(
-      { punto: null, pico: 0 },
-    );
+    expect(
+      mejorComponente(new Float32Array(w * h), 0, w, h, 0.3, 40, 40, visitados, pila),
+    ).toStrictEqual({ punto: null, pico: 0 });
   });
 });
 
@@ -385,7 +399,7 @@ describe("warpear", () => {
     const w = 4;
     const h = 4;
     const datos = new Uint8ClampedArray(w * h * 4);
-    for (let i = 0; i < w * h; i++) {
+    for (let i = 0; i < w * h; i += 1) {
       datos[i * 4] = i * 10;
       datos[i * 4 + 1] = i * 5;
       datos[i * 4 + 2] = i;
@@ -393,7 +407,7 @@ describe("warpear", () => {
     }
     const fuera = warpear({ datos, ancho: w, alto: h }, esquinas(w, h), w, h);
     // La homografía se resuelve por Gauss: error ~1e-13 que el redondeo a u8 puede mover ±1.
-    for (let i = 0; i < fuera.datos.length; i++) {
+    for (let i = 0; i < fuera.datos.length; i += 1) {
       expect(Math.abs((fuera.datos[i] ?? 0) - (datos[i] ?? 0))).toBeLessThanOrEqual(1);
     }
   });
@@ -415,7 +429,7 @@ describe("warpear", () => {
     ];
     const grande = warpear(src, fueraMarco, 8, 8);
     // Esquina (0,0) de la salida mapea a (-2,-2), fuera de la fuente → blanco opaco.
-    expect([grande.datos[0], grande.datos[1], grande.datos[2], grande.datos[3]]).toEqual([
+    expect([grande.datos[0], grande.datos[1], grande.datos[2], grande.datos[3]]).toStrictEqual([
       255, 255, 255, 255,
     ]);
     // Centro mapea dentro → negro de la fuente.
@@ -425,7 +439,7 @@ describe("warpear", () => {
       grande.datos[c + 1],
       grande.datos[c + 2],
       grande.datos[c + 3],
-    ]).toEqual([0, 0, 0, 255]);
+    ]).toStrictEqual([0, 0, 0, 255]);
     // Todo fuera → todo blanco.
     const lejos: Quad = [
       { x: 20, y: 20 },
@@ -452,7 +466,7 @@ describe("decodificarHeatmap", () => {
       80,
       UMBRAL_HEATMAP,
     );
-    expect(confianzas).toEqual([1, 1, 1, 1]);
+    expect(confianzas).toStrictEqual([1, 1, 1, 1]);
     expect(quad).not.toBeNull();
     // Celda (1,1) → ((1.5)/8)*80 = 15.
     expect(quad?.[0].x).toBeCloseTo(15, 0);
@@ -467,7 +481,7 @@ describe("decodificarHeatmap", () => {
   it("plano degenerado → null sin lanzar", () => {
     const { quad, confianzas } = decodificarHeatmap(new Float32Array(0), [1, 4, 0, 0], 80, 80);
     expect(quad).toBeNull();
-    expect(confianzas).toEqual([]);
+    expect(confianzas).toStrictEqual([]);
   });
 
   it("expansión a vecinos cubre bordes del mapa (x=0, x=w-1, y=0, y=h-1)", () => {
@@ -482,7 +496,7 @@ describe("decodificarHeatmap", () => {
     heat[1] = 0.9;
     heat[L] = 0.9;
     const { quad, confianzas } = decodificarHeatmap(heat, [1, 4, L, L], 80, 80);
-    expect(confianzas).toEqual([1, 1, 1, 1]);
+    expect(confianzas).toStrictEqual([1, 1, 1, 1]);
     expect(quad).not.toBeNull();
   });
 });
@@ -491,13 +505,13 @@ describe("bitmapATensor/rectificar", () => {
   it("tensor CHW 0..1 con el rojo en el primer plano", () => {
     const n = LADO_MODELO * LADO_MODELO;
     const pix = new Uint8ClampedArray(n * 4);
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       pix[i * 4] = 255;
       pix[i * 4 + 3] = 255;
     }
     const falso = lienzoFalso(pix);
     const t = bitmapATensor(bitmapFalso(500, 500), falso.crear);
-    expect(t.length).toBe(3 * n);
+    expect(t).toHaveLength(3 * n);
     expect(t[0]).toBe(1);
     expect(t[n]).toBe(0);
   });
@@ -567,7 +581,7 @@ describe("detectarYRecortar", () => {
     const L = 8;
     const sesion: SesionDetectora = {
       inferir: async (): Promise<{ datos: Float32Array; dims: readonly number[] }> => ({
-        datos: heatConPicos(L, celdas as Array<[number, number]>),
+        datos: heatConPicos(L, celdas as [number, number][]),
         dims: [1, 4, L, L],
       }),
     };
@@ -595,12 +609,12 @@ describe("detectarYRecortar", () => {
       },
     };
     const falso = lienzoFalso(blanco(80, 80));
-    expect(
-      await detectarYRecortar(original, { cargar, crear: falso.crear, sesion: async () => vacia }),
-    ).toBe(original);
-    expect(
-      await detectarYRecortar(original, { cargar, crear: falso.crear, sesion: async () => rota }),
-    ).toBe(original);
+    await expect(
+      detectarYRecortar(original, { cargar, crear: falso.crear, sesion: async () => vacia }),
+    ).resolves.toBe(original);
+    await expect(
+      detectarYRecortar(original, { cargar, crear: falso.crear, sesion: async () => rota }),
+    ).resolves.toBe(original);
   });
 });
 
@@ -613,6 +627,7 @@ describe("conTimeout", () => {
     vi.useFakeTimers();
     try {
       const cuelga = new Promise<number>(() => {});
+      // oxlint-disable-next-line vitest/valid-expect -- diferido a propósito: await p (fake timers)
       const p = expect(conTimeout(cuelga, 1000)).rejects.toThrow("timeout tras 1000ms");
       await vi.advanceTimersByTimeAsync(1000);
       await p;
@@ -637,7 +652,7 @@ describe("iniciarSesion", () => {
       return buena;
     };
     await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 1000)).resolves.toBe(buena);
-    expect(vistos).toEqual(["webgpu"]);
+    expect(vistos).toStrictEqual(["webgpu"]);
     expect(console.warn).not.toHaveBeenCalled();
   });
 
@@ -645,11 +660,13 @@ describe("iniciarSesion", () => {
     const vistos: string[] = [];
     const intentar: IntentarEp = async (ep) => {
       vistos.push(ep);
-      if (ep === "webgpu") throw new Error("sin GPU");
+      if (ep === "webgpu") {
+        throw new Error("sin GPU");
+      }
       return buena;
     };
     await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 1000)).resolves.toBe(buena);
-    expect(vistos).toEqual(["webgpu", "wasm"]);
+    expect(vistos).toStrictEqual(["webgpu", "wasm"]);
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("webgpu"));
   });
 
@@ -662,10 +679,11 @@ describe("iniciarSesion", () => {
         vistos.push(ep);
         return ep === "webgpu" ? cuelga : Promise.resolve(buena);
       };
+      // oxlint-disable-next-line vitest/valid-expect -- diferido a propósito: await p (fake timers)
       const p = expect(iniciarSesion(intentar, ["webgpu", "wasm"], 5000)).resolves.toBe(buena);
       await vi.advanceTimersByTimeAsync(5000);
       await p;
-      expect(vistos).toEqual(["webgpu", "wasm"]);
+      expect(vistos).toStrictEqual(["webgpu", "wasm"]);
     } finally {
       vi.useRealTimers();
     }
@@ -677,8 +695,8 @@ describe("iniciarSesion", () => {
       intentos += 1;
       throw new Error("caído");
     };
-    await expect(iniciarSesion(intentar, ["webgpu"], 100)).rejects.toThrow();
-    await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 100)).rejects.toThrow();
+    await expect(iniciarSesion(intentar, ["webgpu"], 100)).rejects.toThrow("caído");
+    await expect(iniciarSesion(intentar, ["webgpu", "wasm"], 100)).rejects.toThrow("caído");
     // Solo el primer llamado intentó webgpu; el segundo lo saltó por el latch (wasm = intento 2).
     expect(intentos).toBe(2);
   });
@@ -698,7 +716,7 @@ describe("conBorde/quitarBorde", () => {
     expect(lienzo.width).toBe(10 + PAD_BORDE * 2);
     expect(lienzo.height).toBe(8 + PAD_BORDE * 2);
     expect(falso.relleno()).toBe("#000");
-    expect(falso.rect()).toEqual([0, 0, 10 + PAD_BORDE * 2, 8 + PAD_BORDE * 2]);
+    expect(falso.rect()).toStrictEqual([0, 0, 10 + PAD_BORDE * 2, 8 + PAD_BORDE * 2]);
     const dibujo = falso.dibujo() ?? [];
     expect(dibujo[1]).toBe(PAD_BORDE);
     expect(dibujo[2]).toBe(PAD_BORDE);
@@ -712,7 +730,7 @@ describe("conBorde/quitarBorde", () => {
         { x: 200, y: 200 },
         { x: 100, y: 200 },
       ]),
-    ).toEqual([
+    ).toStrictEqual([
       { x: 0, y: 0 },
       { x: 100, y: 0 },
       { x: 100, y: 100 },
@@ -768,13 +786,20 @@ describe("descargarPesos", () => {
     return () => {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     };
   }
 
   const redOk = (): ReturnType<typeof vi.fn> =>
-    vi.fn(async () => ({ ok: true, status: 200, arrayBuffer: async () => BYTES }));
+    vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => BYTES,
+    }));
 
   it("URL_MODELO_HF es el resolve estable de HF (no el CDN firmado)", () => {
     expect(URL_MODELO_HF).toBe(
@@ -788,9 +813,9 @@ describe("descargarPesos", () => {
     const restaurar = conRed(tienda, fetchFn);
     try {
       await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
       await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       restaurar();
     }
@@ -804,16 +829,18 @@ describe("descargarPesos", () => {
     g["fetch"] = fetchFn;
     try {
       await expect(descargarConCache("clave-test", 30_000, 2)).resolves.toBe(BYTES);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       g["fetch"] = real.fetch;
-      if (real.caches !== undefined) g["caches"] = real.caches;
+      if (real.caches !== undefined) {
+        g["caches"] = real.caches;
+      }
     }
   });
 
   it("HTTP no-ok lanza", async () => {
     const tienda: Tienda = new Map();
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: false,
       status: 404,
       arrayBuffer: async () => BYTES,
@@ -846,7 +873,9 @@ describe("descargarPesos", () => {
       await expect(tamanoModelos()).resolves.toBe(0);
       await expect(borrarModelos()).resolves.toBe(false);
     } finally {
-      if (realCaches !== undefined) g["caches"] = realCaches;
+      if (realCaches !== undefined) {
+        g["caches"] = realCaches;
+      }
     }
   });
 
@@ -866,7 +895,7 @@ describe("descargarPesos", () => {
 
   it("peso bajo el mínimo no se cachea y la re-descarga entra en enfriamiento", async () => {
     const tienda: Tienda = new Map();
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,
       arrayBuffer: async () => BYTES,
@@ -878,8 +907,9 @@ describe("descargarPesos", () => {
       // Enfriamiento: el reintento inmediato no va a red (la cola de fotos no
       // se estaca 300s por foto sin el backoff).
       await expect(descargarPesos()).rejects.toThrow("recién falló");
-      expect(fetchFn).toHaveBeenCalledTimes(1);
-      reactivarIa(); // como el botón "Probar IA": suelta el enfriamiento
+      expect(fetchFn).toHaveBeenCalledOnce();
+      // como el botón "Probar IA": suelta el enfriamiento
+      reactivarIa();
       await expect(descargarPesos()).rejects.toThrow("corrupto");
       expect(fetchFn).toHaveBeenCalledTimes(2);
     } finally {
@@ -898,7 +928,7 @@ describe("descargarPesos", () => {
       ]);
       expect(a).toBe(BYTES);
       expect(b).toBe(a);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       restaurar();
     }
@@ -911,7 +941,7 @@ describe("descargarPesos", () => {
     g["fetch"] = redOk();
     g["caches"] = {
       open: async (): Promise<unknown> => ({
-        match: async () => undefined,
+        match: async () => {},
         put: async (): Promise<void> => {
           throw new Error("quota");
         },
@@ -925,8 +955,11 @@ describe("descargarPesos", () => {
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     }
   });
 
@@ -945,13 +978,14 @@ describe("descargarPesos", () => {
         intentos += 1;
         throw new Error("create corrupto");
       };
-      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("create corrupto");
       expect(intentos).toBe(1);
       // El 1er strike suelta el latch sin borrar 79MB buenos.
       await olvidarSesionFallida();
       expect(tienda.size).toBe(1);
-      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
-      expect(intentos).toBe(2); // latch suelto: webgpu se reintenta
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("create corrupto");
+      // latch suelto: webgpu se reintenta
+      expect(intentos).toBe(2);
       // El 2º consecutivo es el "Borrar modelos" automático: los bytes muertos salen.
       await olvidarSesionFallida();
       expect(tienda.size).toBe(0);
@@ -972,12 +1006,16 @@ describe("descargarPesos", () => {
       const caido: IntentarEp = async (): Promise<never> => {
         throw new Error("GPU busy");
       };
-      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
-      await olvidarSesionFallida(); // strike 1
-      notarSesionOk(); // la sesión resolvió: el historial muere
-      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow();
-      await olvidarSesionFallida(); // strike 1 otra vez
-      expect(tienda.size).toBe(1); // nunca llegó al 2º consecutivo real
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("GPU busy");
+      // strike 1
+      await olvidarSesionFallida();
+      // la sesión resolvió: el historial muere
+      notarSesionOk();
+      await expect(iniciarSesion(caido, ["webgpu"], 50)).rejects.toThrow("GPU busy");
+      // strike 1 otra vez
+      await olvidarSesionFallida();
+      // nunca llegó al 2º consecutivo real
+      expect(tienda.size).toBe(1);
     } finally {
       restaurar();
     }
@@ -1021,14 +1059,17 @@ describe("descargarPesos", () => {
     };
     try {
       await expect(descargarConCache("k", 30_000, 2)).resolves.toBe(BYTES);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
       await expect(tamanoModelos()).resolves.toBe(0);
       await expect(borrarModelos()).resolves.toBe(false);
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     }
   });
 
@@ -1037,7 +1078,7 @@ describe("descargarPesos", () => {
       [claveCache("k"), { arrayBuffer: async () => BYTES, headers: { get: () => "3" } }],
     ]);
     const grande = new ArrayBuffer(60_000_000);
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,
       arrayBuffer: async () => grande,
@@ -1046,14 +1087,14 @@ describe("descargarPesos", () => {
     try {
       const r = await descargarConCache("k", 30_000, 50_000_000);
       expect(r).toBe(grande);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
       // el put falso guarda 3B: se siembra la buena a mano y el hit ya no refetchea.
       tienda.set(claveCache("k"), {
         arrayBuffer: async () => grande,
         headers: { get: () => "60000000" },
       });
       await expect(descargarConCache("k", 30_000, 50_000_000)).resolves.toBe(grande);
-      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(fetchFn).toHaveBeenCalledOnce();
     } finally {
       restaurar();
     }
@@ -1071,7 +1112,7 @@ describe("descargarPesos", () => {
     g["fetch"] = redOk();
     g["caches"] = {
       open: async (): Promise<unknown> => ({
-        match: async () => undefined,
+        match: async () => {},
         put: async (k: unknown): Promise<void> => {
           await puerta;
           tienda.set(k, { arrayBuffer: async () => BYTES });
@@ -1080,16 +1121,22 @@ describe("descargarPesos", () => {
     };
     try {
       const p = descargarConCache("k", 30_000, 2);
-      await new Promise((res) => setTimeout(res, 10));
-      expect(tienda.size).toBe(0); // fetch listo, put atascado
+      await new Promise((res) => {
+        setTimeout(res, 10);
+      });
+      // fetch listo, put atascado
+      expect(tienda.size).toBe(0);
       abrir();
       await expect(p).resolves.toBe(BYTES);
       expect(tienda.size).toBe(1);
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     }
   });
 });

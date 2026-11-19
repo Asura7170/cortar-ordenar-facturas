@@ -6,7 +6,7 @@ import type { SesionDetectora } from "./docaligner";
 import type { NucleoOcr } from "./ocr";
 
 // Fase 1: contar renders (el mock no pinta; los tests asertan estado, no DOM).
-vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
+vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn<() => void>() }));
 // El re-chequeo del drenado sale de este módulo: stub (cada test lo ajusta);
 // aplicarTotales se envuelve con vi.fn(implementación real): la rama rápida
 // la usa y los tests pueden envenenar una llamada (fail-path del drenaje).
@@ -14,8 +14,8 @@ vi.mock("./extract", async (importOriginal) => {
   const real = await importOriginal<typeof import("./extract")>();
   return {
     ...real,
-    extraerPendientes: vi.fn((): void => {}),
-    aplicarTotales: vi.fn(real.aplicarTotales),
+    extraerPendientes: vi.fn<typeof real.extraerPendientes>((): void => {}),
+    aplicarTotales: vi.fn<typeof real.aplicarTotales>(real.aplicarTotales),
   };
 });
 // OCR real necesita onnx: quieto + texto vacío por defecto (como el fallo en
@@ -25,10 +25,15 @@ vi.mock("./ocr", async (importOriginal) => {
   const nucleoFalso = {} as unknown as NucleoOcr;
   return {
     ...real,
-    enderezar: vi.fn(async (blob: Blob) => ({ blob, grados: 0, cajas: [], base: null })),
-    extraerTexto: vi.fn(async () => ""),
-    girarBlob: vi.fn(async () => null),
-    obtenerNucleo: vi.fn(async () => nucleoFalso),
+    enderezar: vi.fn<typeof real.enderezar>(async (blob: Blob) => ({
+      blob,
+      grados: 0,
+      cajas: [],
+      base: null,
+    })),
+    extraerTexto: vi.fn<typeof real.extraerTexto>(async () => ""),
+    girarBlob: vi.fn<typeof real.girarBlob>(async () => null),
+    obtenerNucleo: vi.fn<typeof real.obtenerNucleo>(async () => nucleoFalso),
   };
 });
 // DocAligner real necesita onnx: identidad por defecto (no-op); cada test simula el corte.
@@ -40,8 +45,8 @@ vi.mock("./docaligner", async (importOriginal) => {
   };
   return {
     ...real,
-    detectarYRecortar: vi.fn(async (b: Blob) => b),
-    obtenerSesion: vi.fn(async () => sesionFalsa),
+    detectarYRecortar: vi.fn<typeof real.detectarYRecortar>(async (b: Blob) => b),
+    obtenerSesion: vi.fn<typeof real.obtenerSesion>(async () => sesionFalsa),
   };
 });
 
@@ -76,8 +81,10 @@ describe("procesarCola", () => {
     const nuevo = comprobante({ nombre: "nuevo.png" });
     nh.slots[0] = nuevo;
     state.hojas = [nh];
-    await vi.advanceTimersByTimeAsync(1000); // termina el sleep del viejo (descartado)
-    await vi.advanceTimersByTimeAsync(1000); // procesa el nuevo
+    // termina el sleep del viejo (descartado)
+    await vi.advanceTimersByTimeAsync(1000);
+    // procesa el nuevo
+    await vi.advanceTimersByTimeAsync(1000);
     await p;
     expect(buscarSlot(viejo.id)).toBeNull();
     expect(nuevo.estado).toBe("ok");
@@ -131,7 +138,9 @@ describe("procesarCola", () => {
     // aquí): el re-escaneo del for levanta lo aterrizado a mitad de cola.
     let entrada = false;
     vi.mocked(renderHojas).mockImplementation((): void => {
-      if (entrada) return;
+      if (entrada) {
+        return;
+      }
       entrada = true;
       const h = crearHoja();
       h.slots[0] = comprobante({ nombre: "tardio.png" });
@@ -169,9 +178,11 @@ describe("procesarCola", () => {
   it("throw a mitad del drenaje: el ítem falla en error y los hermanos siguen", async () => {
     const { aplicarTotales } = await import("./extract");
     vi.mocked(aplicarTotales).mockImplementationOnce((): number => {
-      throw new Error("veneno"); // explota el fast-path dentro de completarItem
+      // explota el fast-path dentro de completarItem
+      throw new Error("veneno");
     });
-    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 12.50"); // fuerza el fast-path del 1º
+    // fuerza el fast-path del 1º
+    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 12.50");
     const h = crearHoja();
     const malo = comprobante({ nombre: "malo.png", file: new Blob(["x"]) });
     h.slots[0] = malo;
@@ -182,8 +193,10 @@ describe("procesarCola", () => {
     const p = procesarCola();
     await vi.advanceTimersByTimeAsync(5000);
     await p;
-    expect(malo.estado).toBe("error"); // el catch del drenado lo cierra, no "procesando" eterno
-    expect(bueno.estado).toBe("ok"); // los hermanos siguen después del veneno
+    // el catch del drenado lo cierra, no "procesando" eterno
+    expect(malo.estado).toBe("error");
+    // los hermanos siguen después del veneno
+    expect(bueno.estado).toBe("ok");
     expect(state.colaEnProceso).toBe(false);
   });
 
@@ -254,8 +267,8 @@ describe("procesarCola", () => {
   });
 
   it("fallo del OCR deja texto vacío sin abortar el ítem", async () => {
-    const { extraerTexto } = await import("./ocr");
-    vi.mocked(extraerTexto).mockRejectedValueOnce(new Error("ocr caído"));
+    const { extraerTexto: extraerTextoOcr } = await import("./ocr");
+    vi.mocked(extraerTextoOcr).mockRejectedValueOnce(new Error("ocr caído"));
     const h = crearHoja();
     const c = comprobante({ nombre: "t.png", file: new Blob(["foto"]) });
     h.slots[0] = c;
@@ -268,19 +281,21 @@ describe("procesarCola", () => {
   });
 
   it("enderezar que rechaza deja el blob sin girar y sigue a ok (catch de la fase)", async () => {
-    const { enderezar, extraerTexto } = await import("./ocr");
+    const { enderezar, extraerTexto: extraerTextoOcr } = await import("./ocr");
     const h = crearHoja();
     const intake = new Blob(["intake"]);
     const c = comprobante({ nombre: "t.png", file: intake });
     h.slots[0] = c;
     state.hojas.push(h);
     vi.mocked(enderezar).mockRejectedValueOnce(new Error("giro roto"));
-    vi.mocked(extraerTexto).mockResolvedValueOnce("TOTAL 30");
+    vi.mocked(extraerTextoOcr).mockResolvedValueOnce("TOTAL 30");
     const p = procesarCola();
     await vi.advanceTimersByTimeAsync(2000);
     await p;
-    expect(c.file).toBe(intake); // el giro no se commiteó
-    expect(c.textoOcr).toBe("TOTAL 30"); // el OCR corrió sobre el blob sin girar (reuse undefined)
+    // el giro no se commiteó
+    expect(c.file).toBe(intake);
+    // el OCR corrió sobre el blob sin girar (reuse undefined)
+    expect(c.textoOcr).toBe("TOTAL 30");
     expect(c.estado).toBe("ok");
   });
 
@@ -376,17 +391,19 @@ describe("precalentarModelos", () => {
       // El warmup avanzó hasta el núcleo (sesiones falsas, sin onnx).
       const { obtenerSesion } = await import("./docaligner");
       const { obtenerNucleo } = await import("./ocr");
-      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledOnce();
+      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledOnce();
     } finally {
-      if (previa !== undefined) w["requestIdleCallback"] = previa;
+      if (previa !== undefined) {
+        w["requestIdleCallback"] = previa;
+      }
     }
   });
 
   it("usa requestIdleCallback cuando existe", async () => {
     const w = window as unknown as Record<string, unknown>;
     const previa = w["requestIdleCallback"];
-    const ocioso = vi.fn((cb: () => void): number => {
+    const ocioso = vi.fn<(cb: () => void) => number>((cb: () => void): number => {
       cb();
       return 1;
     });
@@ -398,12 +415,15 @@ describe("precalentarModelos", () => {
       await vi.advanceTimersByTimeAsync(100);
       const { obtenerSesion } = await import("./docaligner");
       const { obtenerNucleo } = await import("./ocr");
-      expect(ocioso).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledTimes(1);
+      expect(ocioso).toHaveBeenCalledOnce();
+      expect(vi.mocked(obtenerSesion)).toHaveBeenCalledOnce();
+      expect(vi.mocked(obtenerNucleo)).toHaveBeenCalledOnce();
     } finally {
-      if (previa === undefined) delete w["requestIdleCallback"];
-      else w["requestIdleCallback"] = previa;
+      if (previa === undefined) {
+        delete w["requestIdleCallback"];
+      } else {
+        w["requestIdleCallback"] = previa;
+      }
     }
   });
 });

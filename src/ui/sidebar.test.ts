@@ -30,8 +30,12 @@ vi.mock("../pipeline/imagen", async (importOriginal) => {
     ...real,
     normalizarImagen: async (f: File): Promise<Blob> => {
       const motivo = fallosImagen.get(f.name);
-      if (motivo) throw new Error(motivo);
-      if (esperaNormalizar) await esperaNormalizar;
+      if (motivo) {
+        throw new Error(motivo);
+      }
+      if (esperaNormalizar) {
+        await esperaNormalizar;
+      }
       return new Blob(["x"], { type: "image/jpeg" });
     },
   };
@@ -45,7 +49,9 @@ vi.mock("../pipeline/pdf", async (importOriginal) => {
   };
 });
 // El recálculo manual no corre de verdad en tests del sidebar.
-vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn() }));
+vi.mock("../pipeline/extract", () => ({
+  extraerPendientes: vi.fn<typeof import("../pipeline/extract").extraerPendientes>(),
+}));
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -117,7 +123,7 @@ describe("agregarArchivos", () => {
       archivo("c.PDF", "application/pdf"),
     ]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["a.png", "c p.1/1", null, null]);
+    expect(nombres).toStrictEqual(["a.png", "c p.1/1", null, null]);
   });
 
   it("acepta pdf por extensión aunque el type sea genérico", async () => {
@@ -143,7 +149,7 @@ describe("agregarArchivos", () => {
     expect(state.hojas).toHaveLength(2);
     expect(state.hojas.every((x) => x.layout === "u2h")).toBe(true);
     const nombres = state.hojas.flatMap((x) => x.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["factura.png", "1.png", "2.png", "3.png"]);
+    expect(nombres).toStrictEqual(["factura.png", "1.png", "2.png", "3.png"]);
   });
 
   it("con hojaId rellena ESA hoja aunque otra tenga hueco", async () => {
@@ -165,7 +171,7 @@ describe("agregarArchivos", () => {
     const antes = state.hojas.flatMap((h) => h.slots).filter(Boolean).length;
     await agregarArchivos([archivo("f.png", "image/png"), archivo("g.png", "image/png")]);
     expect(state.loteEnCurso).toBe(false);
-    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean).length).toBe(antes + 2);
+    expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(antes + 2);
   });
 
   it("dos intakes solapados no sueltan el flag a medias", async () => {
@@ -187,14 +193,16 @@ describe("fileInput / canvas / paste", () => {
       configurable: true,
     });
     fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-    await vi.advanceTimersByTimeAsync(0); // el intake ahora es async
+    // el intake ahora es async
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
     expect(fileInput.value).toBe("");
   });
 
   it("dragenter con Files marca el canvas; dragleave limpia (contador)", () => {
     canvas.dispatchEvent(eventoDragenter());
-    canvas.dispatchEvent(eventoDragenter()); // anidado: sigue marcado
+    // anidado: sigue marcado
+    canvas.dispatchEvent(eventoDragenter());
     expect(canvas.classList.contains("arrastrando")).toBe(true);
     canvas.dispatchEvent(eventoDragleave());
     expect(canvas.classList.contains("arrastrando")).toBe(true);
@@ -226,14 +234,16 @@ describe("fileInput / canvas / paste", () => {
     canvas.classList.add("arrastrando");
     // La tarjeta burbujea al canvas (igual que el fondo del área).
     el("dropzone").dispatchEvent(eventoDrop([archivo("d.png", "image/png")]));
-    await vi.advanceTimersByTimeAsync(0); // el intake ahora es async
+    // el intake ahora es async
+    await vi.advanceTimersByTimeAsync(0);
     expect(canvas.classList.contains("arrastrando")).toBe(false);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
   });
 
   it("paste con archivo agrega; sin archivos no hace nada", async () => {
     document.dispatchEvent(eventoPaste([archivo("p.png", "image/png")]));
-    await vi.advanceTimersByTimeAsync(0); // el intake ahora es async
+    // el intake ahora es async
+    await vi.advanceTimersByTimeAsync(0);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
     document.dispatchEvent(new Event("paste", { bubbles: true }));
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
@@ -285,8 +295,8 @@ describe("cableado global (window/document)", () => {
     const sheet = document.createElement("div");
     sheet.className = "sheet";
     const objetivo = document.createElement("span");
-    sheet.appendChild(objetivo);
-    canvas.appendChild(sheet);
+    sheet.append(objetivo);
+    canvas.append(sheet);
     try {
       const e = eventoDrop([archivo("s.png", "image/png")]);
       objetivo.dispatchEvent(e);
@@ -302,7 +312,7 @@ describe("cableado global (window/document)", () => {
 
 describe("elegirArchivos (botón ＋ por hoja)", () => {
   it("usa showPicker si existe", () => {
-    const show = vi.fn();
+    const show = vi.fn<() => void>();
     Object.defineProperty(fileInput, "showPicker", { value: show, configurable: true });
     try {
       elegirArchivos(7);
@@ -314,7 +324,7 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
 
   it("Enter/Espacio en la tarjeta abren el picker (el label solo no lo hace)", () => {
     const dropzone = el("dropzone");
-    const show = vi.fn();
+    const show = vi.fn<() => void>();
     Object.defineProperty(fileInput, "showPicker", { value: show, configurable: true });
     try {
       dropzone.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
@@ -331,8 +341,12 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
-    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
-    elegirArchivos(b.id); // jsdom sin picker: noop simulado
+    Object.defineProperty(fileInput, "showPicker", {
+      value: vi.fn<() => void>(),
+      configurable: true,
+    });
+    // jsdom sin picker: noop simulado
+    elegirArchivos(b.id);
     Object.defineProperty(fileInput, "files", {
       value: [archivo("h.png", "image/png")],
       configurable: true,
@@ -355,7 +369,10 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
-    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
+    Object.defineProperty(fileInput, "showPicker", {
+      value: vi.fn<() => void>(),
+      configurable: true,
+    });
     elegirArchivos(b.id);
     fileInput.dispatchEvent(new Event("cancel", { bubbles: true }));
     Object.defineProperty(fileInput, "files", {
@@ -372,9 +389,13 @@ describe("elegirArchivos (botón ＋ por hoja)", () => {
     const a = crearHoja();
     const b = crearHoja();
     state.hojas.push(a, b);
-    Object.defineProperty(fileInput, "showPicker", { value: vi.fn(), configurable: true });
+    Object.defineProperty(fileInput, "showPicker", {
+      value: vi.fn<() => void>(),
+      configurable: true,
+    });
     elegirArchivos(b.id);
-    await agregarArchivos([archivo("d.png", "image/png")], a.id); // drop sobre A
+    // drop sobre A
+    await agregarArchivos([archivo("d.png", "image/png")], a.id);
     expect(a.slots.some((c) => c?.nombre === "d.png")).toBe(true);
     Object.defineProperty(fileInput, "files", {
       value: [archivo("e.png", "image/png")],
@@ -424,7 +445,7 @@ describe("gate PDF (tamaño + páginas)", () => {
       archivo("vale.pdf", "application/pdf"),
     ]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["ok.png", "vale p.1/1", null, null]);
+    expect(nombres).toStrictEqual(["ok.png", "vale p.1/1", null, null]);
     expect(aviso.textContent).toContain("gordo.pdf");
   });
 
@@ -444,7 +465,8 @@ describe("gate PDF (tamaño + páginas)", () => {
     expect(toasts[0]?.querySelector(".toast-detalle")?.textContent).toBe(
       "pesa más de 5 MB, comprimila y probá de nuevo · gordo.pdf",
     );
-    expect(toasts[0]?.querySelector(".toast-archivo")?.innerHTML).toBe("gordo.pdf"); // sin marcado inyectado
+    // sin marcado inyectado
+    expect(toasts[0]?.querySelector(".toast-archivo")?.innerHTML).toBe("gordo.pdf");
   });
 
   it("mezcla de válidos e inválidos: un toast por rechazo y el válido entra igual", async () => {
@@ -458,7 +480,7 @@ describe("gate PDF (tamaño + páginas)", () => {
     const toasts = aviso.querySelectorAll(".toast-error");
     expect(toasts).toHaveLength(3);
     const archivos = Array.from(toasts).map((t) => t.querySelector(".toast-archivo")?.textContent);
-    expect(archivos).toEqual(["nota.txt", "b.har", "gordo.pdf"]);
+    expect(archivos).toStrictEqual(["nota.txt", "b.har", "gordo.pdf"]);
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
   });
 
@@ -476,7 +498,7 @@ describe("gate PDF (tamaño + páginas)", () => {
     expansionSimulada = [paginaSimulada(1, 3), paginaSimulada(3, 3)];
     await agregarArchivos([archivo("fac.pdf", "application/pdf")]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["fac p.1/3", "fac p.3/3", null, null]);
+    expect(nombres).toStrictEqual(["fac p.1/3", "fac p.3/3", null, null]);
     const imgs = state.hojas.flatMap((h) => h.slots.map((c) => c?.imgUrl ?? null));
     expect(imgs.slice(0, 2).every((t) => t?.startsWith("blob:mock-") ?? false)).toBe(true);
     expect(aviso.textContent).toBe("");
@@ -495,7 +517,7 @@ describe("gate PDF (tamaño + páginas)", () => {
     fallosImagen.set("b.png", "blanca");
     await agregarArchivos([archivo("b.png", "image/png"), archivo("ok.png", "image/png")]);
     const nombres = state.hojas.flatMap((h) => h.slots.map((c) => c?.nombre ?? null));
-    expect(nombres).toEqual(["ok.png", null, null, null]);
+    expect(nombres).toStrictEqual(["ok.png", null, null, null]);
     expect(aviso.textContent).toContain("no se pudo leer");
   });
 
@@ -560,7 +582,9 @@ describe("código de pedido", () => {
 
   function radio(valor: string): HTMLInputElement {
     const r = document.querySelector<HTMLInputElement>(`input[name="posCodigo"][value="${valor}"]`);
-    if (!r) throw new Error(`sin radio ${valor}`);
+    if (!r) {
+      throw new Error(`sin radio ${valor}`);
+    }
     return r;
   }
 
@@ -570,11 +594,15 @@ describe("código de pedido", () => {
     renderCodigo();
     expect(radio("sup-izq").checked).toBe(true);
     expect(radio("inf-der").checked).toBe(false);
-    radios().forEach((r) => expect(r.disabled).toBe(false));
+    for (const r of radios()) {
+      expect(r.disabled).toBe(false);
+    }
 
     state.codigoActivo = false;
     renderCodigo();
-    radios().forEach((r) => expect(r.disabled).toBe(true));
+    for (const r of radios()) {
+      expect(r.disabled).toBe(true);
+    }
   });
 
   it("cambiar de esquina actualiza el estado y persiste solo armado", () => {
@@ -664,7 +692,7 @@ describe("modalLimpiar", () => {
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]).toBe(h);
     expect(state.codigoValor).toBe("123456");
-    expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toEqual(blob);
+    expect(JSON.parse(localStorage.getItem("libro-mayor-state") ?? "{}")).toStrictEqual(blob);
   });
 });
 
@@ -686,7 +714,8 @@ describe("pegarEnCelda (clic en vacía)", () => {
     await pegarEnCelda(h.id, 2);
     expect(h.slots[2]?.nombre).toBe("pegado.png");
     expect(h.slots[1]).toBeNull();
-    expect(aviso.textContent).toBe(""); // éxito limpio: sin avisos nuevos
+    // éxito limpio: sin avisos nuevos
+    expect(aviso.textContent).toBe("");
   });
 
   it("slot ocupado → primer hueco de la misma hoja", async () => {
@@ -780,7 +809,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
   it("hoja inexistente no hace nada", async () => {
     aviso.textContent = "";
     mockRead(async () => [itemPng()]);
-    await pegarEnCelda(999999, 0);
+    await pegarEnCelda(999_999, 0);
     expect(items().filter(Boolean)).toHaveLength(0);
     expect(aviso.textContent).toBe("");
   });
@@ -842,14 +871,19 @@ describe("pegarEnCelda (clic en vacía)", () => {
     h.slots[0] = comprobante();
     state.hojas.push(h);
     const pendiente = pegarEnCelda(HOJA_FANTASMA, 0);
-    for (let i = 0; i < 50; i++) await Promise.resolve();
-    expect(state.hojas).toHaveLength(1); // aún no materializada: normalizando
-    state.hojas = [crearHoja("u4x2")]; // barrido en el ínterin
+    for (let i = 0; i < 50; i += 1) {
+      await Promise.resolve();
+    }
+    // aún no materializada: normalizando
+    expect(state.hojas).toHaveLength(1);
+    // barrido en el ínterin
+    state.hojas = [crearHoja("u4x2")];
     abrir();
     await pendiente;
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
-    expect(h.slots.filter(Boolean)).toHaveLength(1); // la desvinculada intacta
+    // la desvinculada intacta
+    expect(h.slots.filter(Boolean)).toHaveLength(1);
   });
 
   it("fantasma + normalización que rechaza no deja hoja vacía", async () => {
@@ -866,7 +900,7 @@ describe("pegarEnCelda (clic en vacía)", () => {
   });
 
   it("en modo OCR no pega ni lee", async () => {
-    const leer = vi.fn(async () => [itemPng()]);
+    const leer = vi.fn<() => Promise<unknown>>(async () => [itemPng()]);
     mockRead(leer);
     state.modoOcr = true;
     try {
@@ -931,7 +965,8 @@ describe("pegarDelPortapapeles (lote vacío)", () => {
     await pegarDelPortapapeles();
     expect(state.hojas).toHaveLength(1);
     expect(state.hojas[0]?.slots[0]?.nombre).toBe("pegado.png");
-    expect(aviso.textContent).toBe(""); // éxito limpio: sin avisos nuevos
+    // éxito limpio: sin avisos nuevos
+    expect(aviso.textContent).toBe("");
   });
 
   it("sin imagen avisa sin crear hojas", async () => {

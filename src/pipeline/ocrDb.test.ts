@@ -19,9 +19,11 @@ import {
 import type { CajaDb } from "./ocrDb";
 
 /** Máscara binaria con borde (como la de binarizarMapa) desde set de píxeles. */
-function mascara(w: number, h: number, pixeles: Array<readonly [number, number]>): Uint8Array {
+function mascara(w: number, h: number, pixeles: (readonly [number, number])[]): Uint8Array {
   const bin = new Uint8Array((w + 2) * (h + 2));
-  for (const [x, y] of pixeles) bin[(y + 1) * (w + 2) + x + 1] = 1;
+  for (const [x, y] of pixeles) {
+    bin[(y + 1) * (w + 2) + x + 1] = 1;
+  }
   return bin;
 }
 
@@ -37,7 +39,9 @@ function mapaConRect(
 ): Float32Array {
   const mapa = new Float32Array(w * h).fill(0.05);
   for (let y = y0; y <= y1; y += 1) {
-    for (let x = x0; x <= x1; x += 1) mapa[y * w + x] = v;
+    for (let x = x0; x <= x1; x += 1) {
+      mapa[y * w + x] = v;
+    }
   }
   return mapa;
 }
@@ -46,9 +50,9 @@ describe("binarizarMapa", () => {
   it("umbral 0.2 y borde cero", () => {
     // 0.19 bajo el umbral (0.2f en Float32 queda apenas sobre 0.2: se evita el borde).
     const bin = binarizarMapa(new Float32Array([0.1, 0.3, 0.19, 0.9]), 2, 2);
-    expect(bin.length).toBe(16);
+    expect(bin).toHaveLength(16);
     // Interior 2x2 en máscara 4x4 con borde.
-    expect([bin[5], bin[6], bin[9], bin[10]]).toEqual([0, 1, 0, 1]);
+    expect([bin[5], bin[6], bin[9], bin[10]]).toStrictEqual([0, 1, 0, 1]);
     expect(bin[0]).toBe(0);
   });
 });
@@ -63,8 +67,8 @@ describe("inundar", () => {
     ]);
     const pts = inundar(bin, 6, new Uint32Array(36), 2, 2, 1)
       .map(([x, y]) => `${x},${y}`)
-      .sort();
-    expect(pts).toEqual(["1,1", "1,2", "2,1", "2,2"]);
+      .toSorted();
+    expect(pts).toStrictEqual(["1,1", "1,2", "2,1", "2,2"]);
   });
 
   it("contacto diagonal une (8-vecinos)", () => {
@@ -78,7 +82,7 @@ describe("inundar", () => {
   it("borde caliente no se sale del mapa (toleran vistas raras)", () => {
     // Sin borde de 1px a propósito: los vecinos OOB dan undefined.
     const bin = new Uint8Array([1, 0, 0, 0]);
-    expect(inundar(bin, 2, new Uint32Array(4), 0, 0, 1)).toEqual([[-1, -1]]);
+    expect(inundar(bin, 2, new Uint32Array(4), 0, 0, 1)).toStrictEqual([[-1, -1]]);
   });
 });
 
@@ -112,7 +116,7 @@ describe("cascoConvexo", () => {
         [0, 0],
         [1, 1],
       ]),
-    ).toEqual([
+    ).toStrictEqual([
       [0, 0],
       [1, 1],
     ]);
@@ -168,7 +172,7 @@ describe("proyectarCasco", () => {
         1,
         0,
       ),
-    ).toEqual({ minU: 0, maxU: 2, minV: 0, maxV: 2 });
+    ).toStrictEqual({ minU: 0, maxU: 2, minV: 0, maxV: 2 });
   });
 });
 
@@ -206,7 +210,7 @@ describe("ordenarQuad", () => {
       [0, 5],
       [10, 0],
     ]);
-    expect(q).toEqual([
+    expect(q).toStrictEqual([
       [0, 0],
       [10, 0],
       [10, 5],
@@ -356,7 +360,7 @@ describe("rectaDesplazada/interseccionRectas", () => {
 
   it("normal hacia dentro se invierte", () => {
     // Arista izq (0,0)->(0,10) con centroide a la derecha: la normal mira dentro.
-    expect(rectaDesplazada([0, 0], [0, 10], 5, 5, 0)).toEqual({ nx: -1, ny: 0, c: 0 });
+    expect(rectaDesplazada([0, 0], [0, 10], 5, 5, 0)).toStrictEqual({ nx: -1, ny: 0, c: 0 });
   });
 
   it("paralelas no se cortan", () => {
@@ -364,7 +368,9 @@ describe("rectaDesplazada/interseccionRectas", () => {
   });
 
   it("perpendiculares se cortan en el origen", () => {
-    expect(interseccionRectas({ nx: 1, ny: 0, c: 0 }, { nx: 0, ny: 1, c: 0 })).toEqual([0, 0]);
+    expect(interseccionRectas({ nx: 1, ny: 0, c: 0 }, { nx: 0, ny: 1, c: 0 })).toStrictEqual([
+      0, 0,
+    ]);
   });
 });
 
@@ -389,7 +395,7 @@ describe("cajasDesdeMapa", () => {
   it("mapa vacío → sin cajas", () => {
     expect(
       cajasDesdeMapa(new Float32Array(200).fill(0.01), 20, 10, { ancho: 40, alto: 20 }),
-    ).toEqual([]);
+    ).toStrictEqual([]);
   });
 
   it("rect tenue bajo el umbral de caja → sin cajas", () => {
@@ -398,13 +404,15 @@ describe("cajasDesdeMapa", () => {
         ancho: 40,
         alto: 20,
       }),
-    ).toEqual([]);
+    ).toStrictEqual([]);
   });
 
   it("barra ancha 100x10 → bbox completo (regresión: el trazado la partía)", () => {
     const mapa = new Float32Array(120 * 30).fill(0.05);
     for (let y = 5; y <= 14; y += 1) {
-      for (let x = 10; x <= 109; x += 1) mapa[y * 120 + x] = 0.9;
+      for (let x = 10; x <= 109; x += 1) {
+        mapa[y * 120 + x] = 0.9;
+      }
     }
     const cajas = cajasDesdeMapa(mapa, 120, 30, { ancho: 120, alto: 30 });
     expect(cajas).toHaveLength(1);
@@ -419,7 +427,7 @@ describe("cajasDesdeMapa", () => {
 
   it("diamante rotado 45° no se descarta (área real 8, no 0)", () => {
     const mapa = new Float32Array(9 * 9).fill(0.05);
-    const pixeles: Array<readonly [number, number]> = [
+    const pixeles: (readonly [number, number])[] = [
       [4, 2],
       [3, 3],
       [4, 3],
@@ -434,14 +442,18 @@ describe("cajasDesdeMapa", () => {
       [5, 5],
       [4, 6],
     ];
-    for (const [x, y] of pixeles) mapa[y * 9 + x] = 1;
+    for (const [x, y] of pixeles) {
+      mapa[y * 9 + x] = 1;
+    }
     expect(cajasDesdeMapa(mapa, 9, 9, { ancho: 9, alto: 9 })).toHaveLength(1);
   });
 
   it("borde irregular en escalera → bbox completo", () => {
     const mapa = new Float32Array(120 * 30).fill(0.05);
     for (let y = 5; y <= 14; y += 1) {
-      for (let x = 10 + (y % 3) * 4; x <= 109; x += 1) mapa[y * 120 + x] = 0.9;
+      for (let x = 10 + (y % 3) * 4; x <= 109; x += 1) {
+        mapa[y * 120 + x] = 0.9;
+      }
     }
     const cajas = cajasDesdeMapa(mapa, 120, 30, { ancho: 120, alto: 30 });
     expect(cajas).toHaveLength(1);
@@ -451,24 +463,24 @@ describe("cajasDesdeMapa", () => {
   });
 
   it("entradas inválidas → sin cajas sin lanzar", () => {
-    expect(cajasDesdeMapa(new Float32Array(4), 10, 10, { ancho: 40, alto: 20 })).toEqual([]);
-    expect(cajasDesdeMapa(new Float32Array(100), 0, 10, { ancho: 40, alto: 20 })).toEqual([]);
-    expect(cajasDesdeMapa(new Float32Array(100), 10, 0, { ancho: 40, alto: 20 })).toEqual([]);
-    expect(cajasDesdeMapa(new Float32Array(100), 10, 10, { ancho: 0, alto: 20 })).toEqual([]);
-    expect(cajasDesdeMapa(new Float32Array(100), 10, 10, { ancho: 40, alto: 0 })).toEqual([]);
+    expect(cajasDesdeMapa(new Float32Array(4), 10, 10, { ancho: 40, alto: 20 })).toStrictEqual([]);
+    expect(cajasDesdeMapa(new Float32Array(100), 0, 10, { ancho: 40, alto: 20 })).toStrictEqual([]);
+    expect(cajasDesdeMapa(new Float32Array(100), 10, 0, { ancho: 40, alto: 20 })).toStrictEqual([]);
+    expect(cajasDesdeMapa(new Float32Array(100), 10, 10, { ancho: 0, alto: 20 })).toStrictEqual([]);
+    expect(cajasDesdeMapa(new Float32Array(100), 10, 10, { ancho: 40, alto: 0 })).toStrictEqual([]);
   });
 
   it("píxel suelto sin área se descarta", () => {
     const mapa = new Float32Array(100).fill(0.05);
     mapa[55] = 0.9;
-    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toEqual([]);
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toStrictEqual([]);
   });
 
   it("dúo sin rectángulo se descarta", () => {
     const mapa = new Float32Array(100).fill(0.05);
     mapa[55] = 0.9;
     mapa[56] = 0.9;
-    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toEqual([]);
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toStrictEqual([]);
   });
 
   it("triplete colineal sin expansión se descarta", () => {
@@ -476,12 +488,12 @@ describe("cajasDesdeMapa", () => {
     mapa[55] = 0.9;
     mapa[56] = 0.9;
     mapa[57] = 0.9;
-    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toEqual([]);
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toStrictEqual([]);
   });
 
   it("caja reescalada bajo el área mínima se descarta", () => {
     const mapa = mapaConRect(10, 10, 3, 3, 6, 6);
     expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 10, alto: 10 })).toHaveLength(1);
-    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 2, alto: 2 })).toEqual([]);
+    expect(cajasDesdeMapa(mapa, 10, 10, { ancho: 2, alto: 2 })).toStrictEqual([]);
   });
 });

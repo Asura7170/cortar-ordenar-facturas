@@ -33,7 +33,7 @@ const RUTA_REC = `${import.meta.env.BASE_URL}models/ocr/rec.onnx`;
  * oficial; el eval de entrenamiento usa 736/min pero eso reescala hacia
  * arriba los recortes de 720px sin ganar nada).
  */
-const LADO_DET_MAX: number = 960;
+const LADO_DET_MAX = 960;
 /** Normalización ImageNet del det (NormalizeImage del det.yml). */
 const DET_MEDIA: readonly number[] = [0.485, 0.456, 0.406];
 const DET_STD: readonly number[] = [0.229, 0.224, 0.225];
@@ -45,13 +45,13 @@ const DET_LADO_MIN = 8;
 /** Salida mínima de sesión (ort.Tensor la satisface con cast en el borde). */
 export interface SalidaOcr {
   readonly data: ArrayLike<number>;
-  readonly dims: ReadonlyArray<number | string>;
+  readonly dims: readonly (number | string)[];
 }
 
 /** Subsesión (det o rec): crear tensores + ejecutar. */
 export interface SubsesionOcr {
-  tensor(datos: Float32Array, formas: readonly number[]): unknown;
-  run(feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>>;
+  tensor: (datos: Float32Array, formas: readonly number[]) => unknown;
+  run: (feeds: Record<string, unknown>) => Promise<Record<string, SalidaOcr>>;
 }
 
 /** Núcleo OCR: ambas sesiones listas. */
@@ -70,7 +70,7 @@ export interface DepsOcr {
 type OrtModulo = typeof import("onnxruntime-web/webgpu");
 
 /** Presupuesto de descarga det+rec (30MB: el mismo enlace lento que motivó 300s en DocAligner). */
-export const TIMEOUT_OCR_MS: number = 120_000;
+export const TIMEOUT_OCR_MS = 120_000;
 
 /** Precarga det+rec en caché sin crear sesiones (para el botón "Descargar ahora"). */
 export async function descargarPesosOcr(timeoutMs: number = TIMEOUT_OCR_MS): Promise<void> {
@@ -88,9 +88,9 @@ export function envolver(
 ): SubsesionOcr {
   if (nombre === "rec") {
     // ponytail: ValueMetadata de ort-web 1.29 expone shape (nunca dimensions).
-    const meta = sesion.outputMetadata[0];
+    const [meta] = sesion.outputMetadata;
     const forma = meta && meta.isTensor ? meta.shape : undefined;
-    const clases = forma?.[forma.length - 1];
+    const clases = forma?.at(-1);
     // ponytail: fallo fuerte en init si el modelo no casa con el dict (no basura silenciosa).
     if (typeof clases === "number" && clases !== DICT_OCR.length) {
       throw new Error(`rec con ${clases} clases, dict con ${DICT_OCR.length}`);
@@ -117,6 +117,7 @@ async function nucleoReal(): Promise<NucleoOcr> {
     ort.env.wasm.numThreads = 1;
     const crearSesion =
       (pesos: ArrayBuffer) =>
+      // oxlint-disable-next-line eslint/require-await -- normaliza un throw síncrono de create en rechazo (contrato de sesión)
       async (ep: string): Promise<import("onnxruntime-web").InferenceSession> =>
         ort.InferenceSession.create(pesos, {
           executionProviders: [ep],
@@ -128,9 +129,9 @@ async function nucleoReal(): Promise<NucleoOcr> {
     // ponytail: los run() tampoco se solapan (la relectura espera a la cola en rotar).
     // bajar() etiqueta la clave caída: el catch escupe strikes solo a las de bajada.
     const bajar = (clave: string, minBytes: number): Promise<ArrayBuffer> =>
-      descargarConCache(clave, TIMEOUT_OCR_MS, minBytes).catch((e: unknown) => {
+      descargarConCache(clave, TIMEOUT_OCR_MS, minBytes).catch((error: unknown) => {
         clavesFallidas.push(clave);
-        throw e;
+        throw error;
       });
     const [detBuf, recBuf] = await Promise.all([
       bajar(RUTA_DET, 5_000_000),
@@ -142,15 +143,19 @@ async function nucleoReal(): Promise<NucleoOcr> {
     notarSesionOk(RUTA_REC);
     iaOk();
     return { det, rec };
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     // Strikes: 2 fallos seguidos expulsan la copia cacheada de la clave (pesos
     // muertos); el fallo avisa una vez (toast) y el siguiente comprobante reintenta.
     // Si la baja fue de descarga, solo esa clave recibe el golpe; si fue de
     // sesión (create/EP), no se sabe cuál corrompe → ambas, como siempre.
-    if (clavesFallidas.length === 0) clavesFallidas.push(RUTA_DET, RUTA_REC);
-    for (const clave of clavesFallidas) await olvidarSesionFallida(clave);
-    falloIa(e, "OCR");
-    throw e;
+    if (clavesFallidas.length === 0) {
+      clavesFallidas.push(RUTA_DET, RUTA_REC);
+    }
+    for (const clave of clavesFallidas) {
+      await olvidarSesionFallida(clave);
+    }
+    falloIa(error, "OCR");
+    throw error;
   }
 }
 
@@ -159,9 +164,9 @@ let nucleoEnCurso: Promise<NucleoOcr> | null = null;
 /** Singleton lazy del núcleo (falla y el siguiente comprobante reintenta). */
 export function obtenerNucleo(): Promise<NucleoOcr> {
   if (!nucleoEnCurso) {
-    nucleoEnCurso = nucleoReal().catch((e: unknown) => {
+    nucleoEnCurso = nucleoReal().catch((error: unknown) => {
       nucleoEnCurso = null;
-      throw e;
+      throw error;
     });
   }
   return nucleoEnCurso;
@@ -176,7 +181,9 @@ export function tamanoDet(
   h: number,
   max: number = LADO_DET_MAX,
 ): { w: number; h: number } {
-  if (w < 1 || h < 1) return { w: 0, h: 0 };
+  if (w < 1 || h < 1) {
+    return { w: 0, h: 0 };
+  }
   const ratio = Math.max(w, h) > max ? max / Math.max(w, h) : 1;
   const mult = (v: number): number =>
     Math.max(DET_MULTIPLO, Math.round((v * ratio) / DET_MULTIPLO) * DET_MULTIPLO);
@@ -241,11 +248,11 @@ const SALIDA_ONNX = "fetch_name_0";
 /** Giros candidatos (0 = tal cual). El orden es el fast-path: derecha, costados, revés. */
 export type Giro = 0 | 90 | 180 | 270;
 /** Masa mínima del mapa para intentar giros (bajo esto no hay texto). */
-export const UMBRAL_MAPA_VACIO: number = 0.0005;
+export const UMBRAL_MAPA_VACIO = 0.0005;
 /* Calibración Chrome (iriarte de costado; conf rec top-2 por giro):
    0° costado 0.24, 90° cabeza 0.61, 270° derecho 0.99, 180° costado 0.26.
    OK acepta al instante el pico; sin OK gana el más alto (sin suelo). */
-export const UMBRAL_REC_OK: number = 0.9;
+export const UMBRAL_REC_OK = 0.9;
 /** Cajas por orientación que puntúa el rec (más es más recs, no más señal). */
 export const TOP_CAJAS_GIRO = 2;
 /** Orden de prueba: lo común primero (bypass inmediato), el revés al final. */
@@ -263,7 +270,7 @@ export interface Enderezado {
 
 /** Mapa de probabilidad del det sobre un lienzo ya a tamaño det. Null sin salida válida. */
 /** Dimensión entera ≥ 1 (0 si ausente o inválida). */
-export function dimEntera(dims: ReadonlyArray<number | string> | undefined, i: number): number {
+export function dimEntera(dims: readonly (number | string)[] | undefined, i: number): number {
   const v = Number(dims?.[i] ?? 0);
   return Number.isInteger(v) && v >= 1 ? v : 0;
 }
@@ -273,11 +280,15 @@ function mapaDetValido(
   sal: Record<string, SalidaOcr>,
   mapa: Float32Array | null,
 ): { mapa: Float32Array; mw: number; mh: number } | null {
-  if (!mapa) return null;
+  if (!mapa) {
+    return null;
+  }
   const dims = sal[SALIDA_ONNX]?.dims;
   const mh = dimEntera(dims, 2);
   const mw = dimEntera(dims, 3);
-  if (mh < 1 || mw < 1) return null;
+  if (mh < 1 || mw < 1) {
+    return null;
+  }
   return { mapa, mw, mh };
 }
 
@@ -286,7 +297,9 @@ async function pasarDet(
   base: HTMLCanvasElement,
 ): Promise<{ mapa: Float32Array; mw: number; mh: number } | null> {
   const ctx = base.getContext("2d");
-  if (!ctx) return null;
+  if (!ctx) {
+    return null;
+  }
   const datos = ctx.getImageData(0, 0, base.width, base.height).data;
   const sal = await det.run({
     x: det.tensor(tensorDetDesdeRgba(datos, base.width, base.height), [
@@ -301,9 +314,13 @@ async function pasarDet(
 
 /** Media del mapa (presencia de texto); 0 si vacío. */
 function masaMapa(mapa: Float32Array): number {
-  if (mapa.length === 0) return 0;
+  if (mapa.length === 0) {
+    return 0;
+  }
   let suma = 0;
-  for (let i = 0; i < mapa.length; i += 1) suma += mapa[i] ?? 0;
+  for (const v of mapa) {
+    suma += v;
+  }
   return suma / mapa.length;
 }
 
@@ -318,14 +335,20 @@ export function lienzoGirado(
   lienzo.width = vertical ? bmp.height : bmp.width;
   lienzo.height = vertical ? bmp.width : bmp.height;
   const ctx = lienzo.getContext("2d");
-  if (!ctx) return null;
+  if (!ctx) {
+    return null;
+  }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   const w = lienzo.width;
   const h = lienzo.height;
-  if (grados === 180) ctx.setTransform(-1, 0, 0, -1, w, h);
-  else if (grados === 90) ctx.setTransform(0, 1, -1, 0, w, 0);
-  else if (grados === 270) ctx.setTransform(0, -1, 1, 0, 0, h);
+  if (grados === 180) {
+    ctx.setTransform(-1, 0, 0, -1, w, h);
+  } else if (grados === 90) {
+    ctx.setTransform(0, 1, -1, 0, w, 0);
+  } else if (grados === 270) {
+    ctx.setTransform(0, -1, 1, 0, 0, h);
+  }
   try {
     ctx.drawImage(bmp, 0, 0);
   } catch {
@@ -345,10 +368,12 @@ export async function girarBlob(
     const bmp = await cargar(fuente, { imageOrientation: "from-image" });
     try {
       const lienzo = lienzoGirado(bmp, grados, crear);
-      if (!lienzo) return null;
-      return await new Promise<Blob | null>((res) =>
-        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-      );
+      if (!lienzo) {
+        return null;
+      }
+      return await new Promise<Blob | null>((res) => {
+        lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+      });
     } finally {
       bmp.close();
     }
@@ -396,10 +421,14 @@ async function confiarRec(
   cajas: CajaDb[],
   crear: CrearLienzo,
 ): Promise<number> {
-  const top = [...cajas].sort((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
+  const top = cajas.toSorted((a, b) => b.puntaje - a.puntaje).slice(0, TOP_CAJAS_GIRO);
   const rs = await reconocerLote(rec, base, top, crear);
   const confs: number[] = [];
-  for (const r of rs) if (r.texto !== "") confs.push(r.puntaje);
+  for (const r of rs) {
+    if (r.texto !== "") {
+      confs.push(r.puntaje);
+    }
+  }
   return confs.length > 0 ? confs.reduce((a, b) => a + b, 0) / confs.length : 0;
 }
 
@@ -413,16 +442,22 @@ async function verOrientacion(
 ): Promise<{ c: number; masa: number; cajas: CajaDb[]; base: HTMLCanvasElement | null }> {
   const vacio = { c: 0, masa: 0, cajas: [], base: null };
   const rot = lienzoGirado(foto, grados, crear);
-  if (!rot) return vacio;
+  if (!rot) {
+    return vacio;
+  }
   const tam = tamanoDet(rot.width, rot.height);
   const base = crear();
   base.width = tam.w;
   base.height = tam.h;
   const ctx = base.getContext("2d");
-  if (!ctx) return vacio;
+  if (!ctx) {
+    return vacio;
+  }
   ctx.drawImage(rot, 0, 0, tam.w, tam.h);
   const sal = await pasarDet(det, base);
-  if (!sal) return vacio;
+  if (!sal) {
+    return vacio;
+  }
   const masa = masaMapa(sal.mapa);
   const cajas = cajasDesdeMapa(sal.mapa, sal.mw, sal.mh, { ancho: tam.w, alto: tam.h });
   return { c: await confiarRec(rec, base, cajas, crear), masa, cajas, base };
@@ -441,14 +476,24 @@ async function elegirGiro(
     try {
       r = await verOrientacion(det, foto, g, crear, rec);
     } catch {
-      continue; // giro fallido: se salta (el externo aún protege ver(0))
+      // giro fallido: se salta (el externo aún protege ver(0))
+      continue;
     }
     // P1: la telemetría de giros cumplió (ver lote denso); la consola queda limpia.
-    if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) return null; // sin texto: ni giros
-    if (!mejor || r.c > mejor.c) mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
-    if (r.c >= UMBRAL_REC_OK) break; // bypass: la primera que convence gana
+    // sin texto: ni giros
+    if (g === 0 && r.masa < UMBRAL_MAPA_VACIO) {
+      return null;
+    }
+    if (!mejor || r.c > mejor.c) {
+      mejor = { g, c: r.c, cajas: r.cajas, base: r.base };
+    }
+    // bypass: la primera que convence gana
+    if (r.c >= UMBRAL_REC_OK) {
+      break;
+    }
   }
-  return mejor; // null si todos fallaron
+  // null si todos fallaron
+  return mejor;
 }
 
 /** Materializa el giro ganador (blob rotado o el original si no se puede). */
@@ -458,10 +503,14 @@ async function materializarGiro(
   mejor: GiroGanador,
   crear: CrearLienzo,
 ): Promise<Enderezado> {
-  if (mejor.g === 0) return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
+  if (mejor.g === 0) {
+    return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
+  }
   const rot = lienzoGirado(foto, mejor.g, crear);
   const fuera = rot ? await blobDeLienzo(rot) : null;
-  if (!fuera) return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
+  if (!fuera) {
+    return { blob, grados: 0, cajas: mejor.cajas, base: mejor.base };
+  }
   return { blob: fuera, grados: mejor.g, cajas: mejor.cajas, base: mejor.base };
 }
 
@@ -476,11 +525,17 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
   let bmp: ImageBitmap | null = null;
   try {
     bmp = await cargar(blob, { imageOrientation: "from-image" });
-    if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return quieto;
-    const foto: ImageBitmap = bmp; // copia estrechada para los helpers
+    if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) {
+      return quieto;
+    }
+    // copia estrechada para los helpers
+    const foto: ImageBitmap = bmp;
     const { det, rec } = await fabrica();
     const mejor = await elegirGiro(det, rec, foto, crear);
-    if (!mejor) return quieto; // todos los giros fallaron
+    // todos los giros fallaron
+    if (!mejor) {
+      return quieto;
+    }
     // ponytail: sin OK gana el más alto (aunque sea bajo); solo el vacío no gira.
     return materializarGiro(blob, foto, mejor, crear);
   } catch {
@@ -492,7 +547,9 @@ export async function enderezar(blob: Blob, deps?: DepsOcr): Promise<Enderezado>
 
 /** Datos Float32 de una salida (sin copiar si ya lo es). */
 function datosSalida(sal: SalidaOcr | undefined): Float32Array | null {
-  if (!sal) return null;
+  if (!sal) {
+    return null;
+  }
   return sal.data instanceof Float32Array ? sal.data : Float32Array.from(sal.data);
 }
 
@@ -507,12 +564,16 @@ function recorteCaja(
   const cw = Math.max(1, Math.ceil(Math.hypot(q1[0] - q0[0], q1[1] - q0[1])));
   const ch = Math.max(1, Math.ceil(Math.hypot(q3[0] - q0[0], q3[1] - q0[1])));
   const inv = matrizInversa(matrizAfin(caja.poli, cw, ch));
-  if (!inv) return null;
+  if (!inv) {
+    return null;
+  }
   const lienzo = crear();
   lienzo.width = cw;
   lienzo.height = ch;
   const ctx = lienzo.getContext("2d");
-  if (!ctx) return null;
+  if (!ctx) {
+    return null;
+  }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.setTransform(inv[0], inv[1], inv[2], inv[3], inv[4], inv[5]);
@@ -536,7 +597,9 @@ async function ejecutarRec(
     const sal = await rec.run({ x: rec.tensor(tensor, [...formas]) });
     const t = datosSalida(sal[SALIDA_ONNX]);
     const pasos = Number(sal[SALIDA_ONNX]?.dims?.[1] ?? 0);
-    if (!t || !Number.isInteger(pasos) || pasos < 1) return vacio;
+    if (!t || !Number.isInteger(pasos) || pasos < 1) {
+      return vacio;
+    }
     return decodificarCtc(t, pasos);
   } catch {
     return vacio;
@@ -544,6 +607,7 @@ async function ejecutarRec(
 }
 
 /** Reconoce una caja: warp afín del quad a su bbox + rec + CTC. */
+// oxlint-disable-next-line eslint/require-await -- conserva async: normaliza un throw síncrono en rechazo
 export async function reconocerCaja(
   rec: SubsesionOcr,
   base: HTMLCanvasElement,
@@ -552,9 +616,13 @@ export async function reconocerCaja(
 ): Promise<{ texto: string; puntaje: number }> {
   const vacio = { texto: "", puntaje: 0 };
   const r = recorteCaja(base, caja, crear);
-  if (!r) return vacio;
+  if (!r) {
+    return vacio;
+  }
   const lin = normalizarLinea(r.bgr, r.w, r.h);
-  if (!lin) return vacio;
+  if (!lin) {
+    return vacio;
+  }
   return ejecutarRec(rec, lin.tensor, [1, 3, REC_ALTO, lin.anchoTotal]);
 }
 
@@ -579,7 +647,7 @@ export function chunkValido(
 /** Un chunk del lote: run + validación de formas (null si no cuadra). */
 async function correrChunk(
   rec: SubsesionOcr,
-  trozo: Array<{ lin: LineaNorm }>,
+  trozo: { lin: LineaNorm }[],
 ): Promise<{ datos: Float32Array; pasos: number; porLote: number; lote: LoteNorm } | null> {
   // ponytail: trozo no vacío ⇒ apilarLineas no falla.
   const lote = apilarLineas(trozo.map((t) => t.lin)) as LoteNorm;
@@ -589,20 +657,24 @@ async function correrChunk(
   const datos = sal ? datosSalida(sal[SALIDA_ONNX]) : null;
   const pasos = Number(sal?.[SALIDA_ONNX]?.dims?.[1] ?? 0);
   const porLote = datos ? datos.length / lote.lote : 0;
-  if (!chunkValido(datos, pasos, porLote)) return null;
+  if (!chunkValido(datos, pasos, porLote)) {
+    return null;
+  }
   return { datos, pasos, porLote, lote };
 }
 
 /** Reintento individual de las líneas sin resultado (muta fuera; devuelve runs). */
 async function reintentarIndividuales(
   rec: SubsesionOcr,
-  norms: Array<{ idx: number; lin: LineaNorm }>,
+  norms: { idx: number; lin: LineaNorm }[],
   hechos: ReadonlySet<number>,
   fuera: TextoRec[],
 ): Promise<number> {
   let runs = 0;
   for (const n of norms) {
-    if (hechos.has(n.idx)) continue;
+    if (hechos.has(n.idx)) {
+      continue;
+    }
     fuera[n.idx] = await ejecutarRec(rec, n.lin.tensor, [1, 3, REC_ALTO, n.lin.anchoTotal]);
     runs += 1;
   }
@@ -624,18 +696,22 @@ export async function reconocerLote(
 ): Promise<TextoRec[]> {
   const fuera: TextoRec[] = cajas.map(() => ({ texto: "", puntaje: 0 }));
   const validos: { idx: number; bgr: Uint8Array; w: number; h: number }[] = [];
-  cajas.forEach((caja, idx) => {
+  for (const [idx, caja] of cajas.entries()) {
     const r = recorteCaja(base, caja, crear);
-    if (r) validos.push({ idx, ...r });
-  });
-  if (validos.length === 0) return fuera;
+    if (r) {
+      validos.push({ idx, ...r });
+    }
+  }
+  if (validos.length === 0) {
+    return fuera;
+  }
   // P2: normalizar una vez (el fallback reutiliza, sin renormalizar).
   // ponytail: recorteCaja garantiza w,h ≥ 1 y bgr exacto ⇒ normalizarLinea no falla.
   const norms = validos.map((v) => ({
     idx: v.idx,
     lin: normalizarLinea(v.bgr, v.w, v.h) as LineaNorm,
   }));
-  const orden = [...norms].sort((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
+  const orden = norms.toSorted((a, b) => a.lin.anchoTotal - b.lin.anchoTotal);
   let anchoMax = 0;
   let chunks = 0;
   let ok = true;
@@ -643,13 +719,14 @@ export async function reconocerLote(
     const trozo = orden.slice(i, i + TAMANO_CHUNK_REC);
     const res = await correrChunk(rec, trozo);
     if (!res) {
-      ok = false; // el chunk no cuadra (EP sin batch, formas raras): individual abajo.
+      // el chunk no cuadra (EP sin batch, formas raras): individual abajo.
+      ok = false;
       break;
     }
     const { datos, pasos, porLote } = res;
-    trozo.forEach((t, b) => {
+    for (const [b, t] of trozo.entries()) {
       fuera[t.idx] = decodificarCtc(datos.subarray(b * porLote, (b + 1) * porLote), pasos);
-    });
+    }
     chunks += 1;
     anchoMax = Math.max(anchoMax, res.lote.anchoMax);
   }
@@ -658,14 +735,17 @@ export async function reconocerLote(
     diag.anchoMax = anchoMax;
     diag.recRuns = chunks;
   }
-  if (ok) return fuera;
+  if (ok) {
+    return fuera;
+  }
   // Hilo CodeRabbit #3: conserva lo ya decodificado (los chunks exitosos no
   // se re-ejecutan ni se pisan); solo las líneas sin resultado van a individual.
   const hechos = new Set(orden.slice(0, chunks * TAMANO_CHUNK_REC).map((t) => t.idx));
   const runs = chunks + (await reintentarIndividuales(rec, norms, hechos, fuera));
   if (diag) {
     diag.fallback = true;
-    diag.recRuns = runs + 1; // + el chunk que falló
+    // + el chunk que falló
+    diag.recRuns = runs + 1;
     diag.anchoMax = Math.max(...norms.map((n) => n.lin.anchoTotal));
   }
   return fuera;
@@ -678,9 +758,12 @@ export async function reconocerLote(
 function baseReutilizada(
   reuse: Pick<Enderezado, "cajas" | "base"> | undefined,
 ): { cajas: CajaDb[]; final: HTMLCanvasElement } | null {
-  if (!reuse?.base || reuse.cajas.length === 0) return null;
-  if (reuse.base.width < DET_LADO_MIN || reuse.base.height < DET_LADO_MIN)
+  if (!reuse?.base || reuse.cajas.length === 0) {
+    return null;
+  }
+  if (reuse.base.width < DET_LADO_MIN || reuse.base.height < DET_LADO_MIN) {
     return { cajas: [], final: reuse.base };
+  }
   return { cajas: [...reuse.cajas], final: reuse.base };
 }
 
@@ -693,18 +776,24 @@ async function baseDesdeBlob(
 ): Promise<{ cajas: CajaDb[]; final: HTMLCanvasElement } | null> {
   const bmp = await cargar(blob, { imageOrientation: "from-image" });
   try {
-    if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) return null;
+    if (bmp.width < DET_LADO_MIN || bmp.height < DET_LADO_MIN) {
+      return null;
+    }
     const tam = tamanoDet(bmp.width, bmp.height);
     const base = crear();
     base.width = tam.w;
     base.height = tam.h;
     const bctx = base.getContext("2d");
-    if (!bctx) return null;
+    if (!bctx) {
+      return null;
+    }
     bctx.imageSmoothingEnabled = true;
     bctx.imageSmoothingQuality = "high";
     bctx.drawImage(bmp, 0, 0, tam.w, tam.h);
     const salDet = await pasarDet(det, base);
-    if (!salDet) return null;
+    if (!salDet) {
+      return null;
+    }
     const { mapa, mw, mh } = salDet;
     return { cajas: cajasDesdeMapa(mapa, mw, mh, { ancho: tam.w, alto: tam.h }), final: base };
   } finally {
@@ -727,18 +816,24 @@ export async function extraerTexto(
     const { det, rec } = await fabrica();
     // L1: el enderezado ya calculó cajas/base del giro ganador; se reutilizan.
     const pre = baseReutilizada(reuse) ?? (await baseDesdeBlob(blob, cargar, crear, det));
-    if (!pre) return "";
+    if (!pre) {
+      return "";
+    }
     const { cajas, final } = pre;
     const lineas: string[] = [];
     // L2: un solo run para todas las cajas (con fallback individual dentro).
-    if (diag) diag.cajas = cajas.length;
+    if (diag) {
+      diag.cajas = cajas.length;
+    }
     for (const r of await reconocerLote(rec, final, cajas, crear, diag)) {
       // ponytail: líneas vacías fuera (el modal queda limpio).
-      if (r.texto !== "") lineas.push(r.texto);
+      if (r.texto !== "") {
+        lineas.push(r.texto);
+      }
     }
     return lineas.join("\n");
-  } catch (e: unknown) {
-    console.error(`OCR: texto omitido (${e instanceof Error ? e.message : String(e)})`);
+  } catch (error: unknown) {
+    console.error(`OCR: texto omitido (${error instanceof Error ? error.message : String(error)})`);
     return "";
   }
 }

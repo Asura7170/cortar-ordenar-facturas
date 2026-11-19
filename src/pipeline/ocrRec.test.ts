@@ -21,15 +21,19 @@ describe("normalizarLinea", () => {
     expect(lin?.anchoUtil).toBe(96);
     expect(lin?.anchoTotal).toBe(320);
     const t = lin?.tensor as Float32Array;
-    expect(t.length).toBe(3 * REC_ALTO * 320);
+    expect(t).toHaveLength(3 * REC_ALTO * 320);
     expect(t[0]).toBeCloseTo(1, 5);
-    expect(t[2 * REC_ALTO * 320]).toBeCloseTo(1, 5); // plano R también
-    expect(t[100]).toBeCloseTo(0, 6); // pad derecho
+    // plano R también
+    expect(t[2 * REC_ALTO * 320]).toBeCloseTo(1, 5);
+    // pad derecho
+    expect(t[100]).toBeCloseTo(0, 6);
   });
 
   it("negro → −1", () => {
     const lin = normalizarLinea(new Uint8Array(2 * 2 * 3), 2, 2);
-    if (!lin) throw new Error("sin línea");
+    if (!lin) {
+      throw new Error("sin línea");
+    }
     expect(lin.tensor[0]).toBeCloseTo(-1, 5);
   });
 
@@ -47,7 +51,9 @@ describe("normalizarLinea", () => {
   it("borde izquierdo replica (sin extrapolar fuera de [-1,1])", () => {
     // 2×1: px0 oscuro, px1 claro. La 1ª columna muestrea x<0 → réplica px0.
     const lin = normalizarLinea(new Uint8Array([10, 20, 30, 200, 210, 220]), 2, 1);
-    if (!lin) throw new Error("sin línea");
+    if (!lin) {
+      throw new Error("sin línea");
+    }
     expect(lin.tensor[0]).toBeCloseTo((10 / 255 - 0.5) / 0.5, 5);
   });
 
@@ -64,16 +70,20 @@ describe("normalizarLote", () => {
   it("apila con pad de ceros: la ancha intacta, la corta con ceros (L2)", () => {
     const a = normalizarLinea(bgrA, 100, 20);
     const b = normalizarLinea(bgrB, 640, 30);
-    if (!a || !b) throw new Error("sin líneas");
+    if (!a || !b) {
+      throw new Error("sin líneas");
+    }
     const lote = normalizarLote([
       { bgr: bgrA, w: 100, h: 20 },
       { bgr: bgrB, w: 640, h: 30 },
     ]);
-    if (!lote) throw new Error("sin lote");
+    if (!lote) {
+      throw new Error("sin lote");
+    }
     expect(lote.lote).toBe(2);
     const wMax = Math.max(a.anchoTotal, b.anchoTotal);
     expect(lote.anchoMax).toBe(wMax);
-    expect(lote.tensor.length).toBe(2 * 3 * REC_ALTO * wMax);
+    expect(lote.tensor).toHaveLength(2 * 3 * REC_ALTO * wMax);
     const plano = REC_ALTO * wMax;
     // La ancha (sin pad si es la mayor): bloque idéntico al individual.
     const ancha = b.anchoTotal >= a.anchoTotal ? { n: b, base: 3 } : { n: a, base: 0 };
@@ -85,7 +95,7 @@ describe("normalizarLote", () => {
             (ancha.base + c) * plano + y * wMax,
             (ancha.base + c) * plano + (y + 1) * wMax,
           ),
-        ).toEqual(
+        ).toStrictEqual(
           ancha.n.tensor.slice(
             c * planoAncha + y * ancha.n.anchoTotal,
             c * planoAncha + (y + 1) * ancha.n.anchoTotal,
@@ -125,7 +135,7 @@ describe("matrizAfin", () => {
         100,
         20,
       ),
-    ).toEqual([1, 0, 0, 1, 10, 10]);
+    ).toStrictEqual([1, 0, 0, 1, 10, 10]);
   });
 
   it("lleva (W,0)→p1 y (0,H)→p3", () => {
@@ -136,8 +146,8 @@ describe("matrizAfin", () => {
       [3, 15],
     ] as const;
     const [a, b, c, d, e, f] = matrizAfin([poli[0], poli[1], poli[2], poli[3]], 20, 10);
-    expect([a * 20 + e, b * 20 + f]).toEqual([25, 9]);
-    expect([c * 10 + e, d * 10 + f]).toEqual([3, 15]);
+    expect([a * 20 + e, b * 20 + f]).toStrictEqual([25, 9]);
+    expect([c * 10 + e, d * 10 + f]).toStrictEqual([3, 15]);
   });
 });
 
@@ -145,11 +155,11 @@ describe("decodificarCtc", () => {
   const dict = ["blank", "a", "b", " ", "c"];
 
   /** Logits de pasos×clases con argmax y prob dados por fila. */
-  function logits(filas: Array<readonly [number, number]>): Float32Array {
+  function logits(filas: (readonly [number, number])[]): Float32Array {
     const out = new Float32Array(filas.length * dict.length);
-    filas.forEach(([cls, p], t) => {
+    for (const [t, [cls, p]] of filas.entries()) {
       out[(t ?? 0) * dict.length + (cls ?? 0)] = p ?? 0;
-    });
+    }
     return out;
   }
 
@@ -185,16 +195,16 @@ describe("decodificarCtc", () => {
   });
 
   it("todo blank → vacío con puntaje 0", () => {
-    expect(decodificarCtc(logits([[0, 1]]), 1, dict)).toEqual({ texto: "", puntaje: 0 });
+    expect(decodificarCtc(logits([[0, 1]]), 1, dict)).toStrictEqual({ texto: "", puntaje: 0 });
   });
 
   it("formas que no cuadran → vacío sin lanzar", () => {
-    expect(decodificarCtc(new Float32Array(7), 3, dict)).toEqual({ texto: "", puntaje: 0 });
-    expect(decodificarCtc(new Float32Array(0), 0, dict)).toEqual({ texto: "", puntaje: 0 });
+    expect(decodificarCtc(new Float32Array(7), 3, dict)).toStrictEqual({ texto: "", puntaje: 0 });
+    expect(decodificarCtc(new Float32Array(0), 0, dict)).toStrictEqual({ texto: "", puntaje: 0 });
   });
 
   it("dict de otro tamaño → vacío sin lanzar", () => {
-    expect(decodificarCtc(new Float32Array(2 * 5).fill(0.1), 2, ["blank", "a"])).toEqual({
+    expect(decodificarCtc(new Float32Array(2 * 5).fill(0.1), 2, ["blank", "a"])).toStrictEqual({
       texto: "",
       puntaje: 0,
     });
@@ -203,11 +213,11 @@ describe("decodificarCtc", () => {
 
 describe("DICT_OCR", () => {
   it("18710 clases del rec + marcas", () => {
-    expect(DICT_OCR.length).toBe(18710);
+    expect(DICT_OCR).toHaveLength(18_710);
     expect(DICT_OCR[0]).toBe("blank");
     expect(DICT_OCR[1]).toBe("!");
     expect(DICT_OCR[4]).toBe("$");
-    expect(DICT_OCR[DICT_OCR.length - 1]).toBe(" ");
+    expect(DICT_OCR.at(-1)).toBe(" ");
     expect(DICT_OCR).toContain("€");
     expect(DICT_OCR).toContain("ñ");
     expect(DICT_OCR).toContain("T");

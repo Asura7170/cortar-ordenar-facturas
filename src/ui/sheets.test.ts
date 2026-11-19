@@ -1,4 +1,5 @@
 /* Tests P1: hojas — layouts, quitar, clic delegado, drop y celdas (DOM aislado). */
+
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {
@@ -9,13 +10,20 @@ import {
   eventoDragleave,
   puntoPorDefecto,
 } from "../test/fixture";
+import type { Comprobante, Hoja, LayoutId } from "../types";
 
 // El giro real toca canvas/blob: se aserta el cableado, no el pipeline.
-vi.mock("../pipeline/rotar", () => ({ girarYReleer: vi.fn(async () => {}) }));
+vi.mock("../pipeline/rotar", () => ({
+  girarYReleer: vi.fn<typeof import("../pipeline/rotar").girarYReleer>(async () => {}),
+}));
 // El editor real abre un modal: se aserta el cableado, no el canvas.
-vi.mock("./recorte", () => ({ abrirRecorte: vi.fn(async () => {}) }));
+vi.mock("./recorte", () => ({
+  abrirRecorte: vi.fn<typeof import("./recorte").abrirRecorte>(async () => {}),
+}));
 // El lote post-corregir no debe pegar a la red en tests.
-vi.mock("../pipeline/extract", () => ({ extraerPendientes: vi.fn((): void => {}) }));
+vi.mock("../pipeline/extract", () => ({
+  extraerPendientes: vi.fn<typeof import("../pipeline/extract").extraerPendientes>((): void => {}),
+}));
 
 montarFixture();
 const { state, crearHoja } = await import("../state");
@@ -34,11 +42,11 @@ const { archivo, comprobante } = await import("../test/factoria");
 const { girarYReleer } = await import("../pipeline/rotar");
 const { abrirRecorte } = await import("./recorte");
 const { extraerPendientes } = await import("../pipeline/extract");
-import type { Comprobante, Hoja, LayoutId } from "../types";
 
-const agregarArchivos = vi.fn();
-const pedirArchivos = vi.fn();
-const pegarEnCelda = vi.fn();
+const agregarArchivos =
+  vi.fn<(files: FileList | File[] | null | undefined, hojaId?: number | null) => void>();
+const pedirArchivos = vi.fn<(hojaId: number) => void>();
+const pegarEnCelda = vi.fn<(hojaId: number, slotIdx: number) => Promise<void> | void>();
 initSheets({ agregarArchivos, pedirArchivos, pegarEnCelda });
 
 afterEach(() => {
@@ -52,8 +60,12 @@ afterEach(() => {
 async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
   const t0 = Date.now();
   while (!cond()) {
-    if (Date.now() - t0 > ms) throw new Error("timeout esperando condición");
-    await new Promise((r) => setTimeout(r, 10));
+    if (Date.now() - t0 > ms) {
+      throw new Error("timeout esperando condición");
+    }
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
   }
 }
 
@@ -68,13 +80,19 @@ function sembrar(layout: LayoutId, montos: (number | null)[]): Hoja {
 
 function boton(accion: string): HTMLButtonElement {
   const b = document.querySelector<HTMLButtonElement>(`[data-accion="${accion}"]`);
-  if (!b) throw new Error(`sin botón ${accion}`);
+  if (!b) {
+    throw new Error(`sin botón ${accion}`);
+  }
   return b;
 }
 
 /** Espera a que el import dinámico (clic → abrirRecorte) termine. */
 async function vaciar(): Promise<void> {
-  for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 10; i += 1) {
+    await new Promise((r) => {
+      setTimeout(r, 0);
+    });
+  }
 }
 
 describe("cambiarLayoutHoja / aplicarATodas", () => {
@@ -124,9 +142,9 @@ describe("stats del lote (flanco de marca)", () => {
   it("hoja base sin comprobantes: cifra de hojas 0 (el fantasma no pinta)", () => {
     state.hojas = [crearHoja()];
     renderHojas();
-    expect(document.getElementById("statHojas")!.style.getPropertyValue("--n-hojas")).toBe("0");
-    expect(document.getElementById("statComp")!.style.getPropertyValue("--n-comp")).toBe("0");
-    expect(document.getElementById("metaHojas")!.hasAttribute("data-cero")).toBe(true);
+    expect(el("statHojas").style.getPropertyValue("--n-hojas")).toBe("0");
+    expect(el("statComp").style.getPropertyValue("--n-comp")).toBe("0");
+    expect(el("metaHojas").hasAttribute("data-cero")).toBe(true);
   });
 
   it("con un comprobante: 1 hoja · 1 comp y sale del estado vacío", () => {
@@ -134,9 +152,9 @@ describe("stats del lote (flanco de marca)", () => {
     h.slots[0] = comprobante({ nombre: "x.png" });
     state.hojas = [h];
     renderHojas();
-    expect(document.getElementById("statHojas")!.style.getPropertyValue("--n-hojas")).toBe("1");
-    expect(document.getElementById("statComp")!.style.getPropertyValue("--n-comp")).toBe("1");
-    expect(document.getElementById("metaHojas")!.hasAttribute("data-cero")).toBe(false);
+    expect(el("statHojas").style.getPropertyValue("--n-hojas")).toBe("1");
+    expect(el("statComp").style.getPropertyValue("--n-comp")).toBe("1");
+    expect(el("metaHojas").hasAttribute("data-cero")).toBe(false);
   });
 });
 
@@ -263,10 +281,12 @@ describe("clic delegado", () => {
       btn.click();
       await vi.advanceTimersByTimeAsync(0);
       expect(btn.getAttribute("aria-label")).toBe("Copiado");
-      await vi.advanceTimersByTimeAsync(600); // cruza el deadline del 1.º → sigue ✓ si rearma
+      // cruza el deadline del 1.º → sigue ✓ si rearma
+      await vi.advanceTimersByTimeAsync(600);
       expect(btn.getAttribute("aria-label")).toBe("Copiado");
       expect(btn.classList.contains("copiado")).toBe(true);
-      await vi.advanceTimersByTimeAsync(600); // deadline del 2.º → revierte
+      // deadline del 2.º → revierte
+      await vi.advanceTimersByTimeAsync(600);
       expect(btn.querySelector("svg")).not.toBeNull();
       expect(btn.classList.contains("copiado")).toBe(false);
       expect(btn.getAttribute("aria-label")).toBe("Copiar OCR");
@@ -299,12 +319,12 @@ describe("celdas", () => {
   it("ocupada tabindex 0, vacía -1", () => {
     sembrar("u4x2", [100, null, null, null]);
     const tabs = [...document.querySelectorAll(".cell")].map((c) => (c as HTMLElement).tabIndex);
-    expect(tabs).toEqual([0, -1, -1, -1]);
+    expect(tabs).toStrictEqual([0, -1, -1, -1]);
   });
 
   it("badge con el monto formateado", () => {
     state.moneda = "USD";
-    sembrar("u4x2", [123456]);
+    sembrar("u4x2", [123_456]);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,234.56");
   });
 
@@ -325,7 +345,8 @@ describe("celdas", () => {
     const cell = document.querySelector(".cell");
     const imgAntes = cell?.querySelector("img");
     expect(imgAntes).not.toBeNull();
-    c.montoCents = 1250; // como lo deja aplicarTotales
+    // como lo deja aplicarTotales
+    c.montoCents = 1250;
     expect(actualizarMontoCelda(c.id)).toBe(true);
     expect(document.querySelector(".cell-badge")?.textContent).toContain("12.50");
     expect(document.querySelector("input.cell-monto")).toBeNull();
@@ -354,11 +375,17 @@ describe("celdas", () => {
     // La celda propia es la última real (el fantasma va en .sheet-fantasma).
     const celdas = document.querySelectorAll(".sheet:not(.sheet-fantasma) .cell");
     const cell = celdas.item(celdas.length - 1);
-    if (!(cell instanceof HTMLElement)) throw new Error("sin celda propia");
+    if (!(cell instanceof HTMLElement)) {
+      throw new TypeError("sin celda propia");
+    }
     const input = cell.querySelector("input.cell-monto");
-    if (!(input instanceof HTMLInputElement)) throw new Error("sin input de monto");
-    input.value = "abc"; // borrador inválido tras blur, sin foco
-    c.montoCents = 1250; // como lo deja aplicarTotales
+    if (!(input instanceof HTMLInputElement)) {
+      throw new TypeError("sin input de monto");
+    }
+    // borrador inválido tras blur, sin foco
+    input.value = "abc";
+    // como lo deja aplicarTotales
+    c.montoCents = 1250;
     expect(actualizarMontoCelda(c.id)).toBe(false);
     expect(cell.querySelector("input.cell-monto")).not.toBeNull();
     expect(cell.querySelector(".cell-badge")).toBeNull();
@@ -367,11 +394,11 @@ describe("celdas", () => {
   it("actualizarMontoCelda early-returns: modoOcr, id inexistente y monto null", () => {
     state.modoOcr = true;
     try {
-      expect(actualizarMontoCelda(999999)).toBe(false);
+      expect(actualizarMontoCelda(999_999)).toBe(false);
     } finally {
       state.modoOcr = false;
     }
-    expect(actualizarMontoCelda(999999)).toBe(false);
+    expect(actualizarMontoCelda(999_999)).toBe(false);
     const h = crearHoja("u1");
     const c = comprobante({ estado: "ok", montoCents: null });
     h.slots[0] = c;
@@ -382,7 +409,7 @@ describe("celdas", () => {
 
   it("con loteEnCurso no usa ViewTransition (sin snapshots)", () => {
     const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
-    const spy = vi.fn((cb: () => void): Record<string, unknown> => {
+    const spy = vi.fn<(cb: () => void) => void>((cb: () => void): Record<string, unknown> => {
       cb();
       return {};
     });
@@ -395,11 +422,14 @@ describe("celdas", () => {
       expect(spy).not.toHaveBeenCalled();
       state.loteEnCurso = false;
       renderHojas();
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledOnce();
     } finally {
       state.loteEnCurso = false;
-      if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
-      else Reflect.deleteProperty(document, "startViewTransition");
+      if (descriptor) {
+        Object.defineProperty(document, "startViewTransition", descriptor);
+      } else {
+        Reflect.deleteProperty(document, "startViewTransition");
+      }
     }
   });
 });
@@ -417,7 +447,9 @@ describe("monto manual", () => {
 
   function inputMonto(): HTMLInputElement {
     const input = document.querySelector<HTMLInputElement>("input.cell-monto");
-    if (!input) throw new Error("sin input de monto");
+    if (!input) {
+      throw new Error("sin input de monto");
+    }
     return input;
   }
 
@@ -437,7 +469,7 @@ describe("monto manual", () => {
     const input = inputMonto();
     input.value = "1234.56";
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(123456);
+    expect(c.montoCents).toBe(123_456);
     expect(c.montoManual).toBe(true);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,234.56");
     expect(document.querySelector("input.cell-monto")).toBeNull();
@@ -459,11 +491,13 @@ describe("monto manual", () => {
   it("change inválido marca la celda (monto-error) y avisa en #aviso", () => {
     sembrarOk();
     const input = inputMonto();
-    input.value = "12,3"; // coma sin grupo de miles: parsearMonto la rechaza
+    // coma sin grupo de miles: parsearMonto la rechaza
+    input.value = "12,3";
     input.dispatchEvent(new Event("change", { bubbles: true }));
     const deNuevo = inputMonto();
     expect(deNuevo.classList.contains("monto-error")).toBe(true);
-    expect(deNuevo.value).toBe("12,3"); // borrador intacto
+    // borrador intacto
+    expect(deNuevo.value).toBe("12,3");
     expect(document.getElementById("aviso")?.textContent).toContain("Formato no válido");
     expect(document.querySelector("#aviso > .toast-error")).not.toBeNull();
   });
@@ -473,10 +507,11 @@ describe("monto manual", () => {
     const input = inputMonto();
     input.value = "12,3";
     const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
-    const diferidos: Array<() => void> = [];
+    const diferidos: (() => void)[] = [];
     Object.defineProperty(document, "startViewTransition", {
       value: (cb: () => void): object => {
-        diferidos.push(cb); // Chrome invoca el callback en la oportunidad de render
+        // Chrome invoca el callback en la oportunidad de render
+        diferidos.push(cb);
         return {};
       },
       configurable: true,
@@ -484,21 +519,30 @@ describe("monto manual", () => {
     try {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       expect(input.classList.contains("monto-error")).toBe(true);
-      diferidos.forEach((cb) => cb()); // el swap llega después
+      // el swap llega después
+      for (const diferido of diferidos) {
+        diferido();
+      }
       const deNuevo = inputMonto();
       expect(deNuevo.classList.contains("monto-error")).toBe(true);
       expect(deNuevo.getAttribute("aria-invalid")).toBe("true");
       expect(deNuevo.value).toBe("12,3");
     } finally {
-      if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
-      else Reflect.deleteProperty(document, "startViewTransition");
+      if (descriptor) {
+        Object.defineProperty(document, "startViewTransition", descriptor);
+      } else {
+        Reflect.deleteProperty(document, "startViewTransition");
+      }
     }
   });
 
   it("change con campo vacío no marca error ni avisa", () => {
     sembrarOk();
     // Limpio el aviso del test anterior (el fixture es un DOM compartido).
-    if (document.getElementById("aviso")) document.getElementById("aviso")!.textContent = "";
+    const aviso = document.getElementById("aviso");
+    if (aviso) {
+      aviso.textContent = "";
+    }
     const input = inputMonto();
     input.value = "";
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -537,10 +581,10 @@ describe("monto manual", () => {
     const input = inputMonto();
     input.value = "500";
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     // ponytail: apertura no destructiva (el null al abrir era el bug del Escape).
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     const deNuevo = document.querySelector<HTMLInputElement>("input.cell-monto");
     expect(deNuevo?.value).toBe("500.00");
     expect(document.activeElement).toBe(deNuevo);
@@ -557,7 +601,7 @@ describe("monto manual", () => {
     inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     inputMonto().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 500.00");
     expect(document.querySelector("input.cell-monto")).toBeNull();
   });
@@ -570,7 +614,7 @@ describe("monto manual", () => {
     const editando = inputMonto();
     editando.value = "510.5";
     editando.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     expect(editando.isConnected).toBe(false);
   });
 
@@ -580,7 +624,8 @@ describe("monto manual", () => {
     input.value = "abc";
     input.blur();
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    renderHojas(); // cola/mini pintando de fondo sin foco en el input
+    // cola/mini pintando de fondo sin foco en el input
+    renderHojas();
     expect(inputMonto().value).toBe("abc");
     expect(c.montoCents).toBeNull();
     expect(document.activeElement).not.toBe(inputMonto());
@@ -591,12 +636,12 @@ describe("monto manual", () => {
     const c = sembrarOk();
     inputMonto().value = "1111";
     inputMonto().dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(111100);
+    expect(c.montoCents).toBe(111_100);
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     // ponytail: el prefill con coma de miles debe hacer roundtrip por parsearMonto.
     expect(inputMonto().value).toBe("1,111.00");
     inputMonto().dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(c.montoCents).toBe(111100);
+    expect(c.montoCents).toBe(111_100);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 1,111.00");
   });
 
@@ -609,7 +654,7 @@ describe("monto manual", () => {
     const editando = inputMonto();
     editando.value = "510.5";
     editando.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    expect(c.montoCents).toBe(51050);
+    expect(c.montoCents).toBe(51_050);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 510.50");
     expect(document.activeElement).toBe(document.querySelector(".cell-badge"));
   });
@@ -621,9 +666,10 @@ describe("monto manual", () => {
     document.querySelector<HTMLElement>(".cell-badge")?.click();
     const editando = inputMonto();
     editando.value = "abc";
-    editando.blur(); // el foco ya salió (clic fuera): el change no lo trae de vuelta
+    // el foco ya salió (clic fuera): el change no lo trae de vuelta
+    editando.blur();
     editando.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     const deNuevo = inputMonto();
     expect(deNuevo.value).toBe("abc");
     expect(document.activeElement).toBe(document.body);
@@ -635,7 +681,8 @@ describe("monto manual", () => {
     input.value = "12.5";
     input.focus();
     input.setSelectionRange(2, 2);
-    renderHojas(); // p. ej. la cola pintando otro ítem
+    // p. ej. la cola pintando otro ítem
+    renderHojas();
     const deNuevo = inputMonto();
     expect(deNuevo.value).toBe("12.5");
     expect(document.activeElement).toBe(deNuevo);
@@ -704,7 +751,9 @@ describe("monto manual", () => {
   it("pointerdown en la imagen sí inicia drag (control)", () => {
     sembrarOk();
     const img = document.querySelector(".cell img");
-    if (!img) throw new Error("sin imagen");
+    if (!img) {
+      throw new Error("sin imagen");
+    }
     img.dispatchEvent(
       Object.assign(new Event("pointerdown", { bubbles: true }), {
         button: 0,
@@ -731,7 +780,9 @@ describe("monto manual", () => {
     const c = sembrarOk();
     renderHojas();
     const cell = document.querySelector(".cell");
-    if (!(cell instanceof HTMLElement)) throw new Error("sin celda");
+    if (!(cell instanceof HTMLElement)) {
+      throw new TypeError("sin celda");
+    }
     cell.querySelector("input.cell-monto")?.remove();
     c.montoCents = 1250;
     expect(actualizarMontoCelda(c.id)).toBe(true);
@@ -790,7 +841,7 @@ describe("monto manual", () => {
     const input = inputMonto();
     input.value = "500";
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(c.montoCents).toBe(50000);
+    expect(c.montoCents).toBe(50_000);
     expect(document.querySelector(".cell-badge")?.textContent).toBe("US$ 500.00");
   });
 });
@@ -813,7 +864,8 @@ describe("drop de archivos sobre hojas", () => {
   });
 
   it("drop sobre el fantasma va por el flujo normal (null)", () => {
-    sembrar("u1", [100]); // llena → fantasma
+    // llena → fantasma
+    sembrar("u1", [100]);
     const files = [new File(["x"], "d.png", { type: "image/png" })];
     agregarArchivos.mockClear();
     document.querySelector(".sheet-fantasma")?.dispatchEvent(eventoDrop(files));
@@ -830,9 +882,12 @@ describe("drop de archivos sobre hojas", () => {
   });
 
   it("dragover sobre el fantasma no resalta", () => {
-    sembrar("u1", [100]); // llena → fantasma
+    // llena → fantasma
+    sembrar("u1", [100]);
     const fantasma = document.querySelector(".sheet-fantasma");
-    if (!fantasma) throw new Error("sin fantasma");
+    if (!fantasma) {
+      throw new Error("sin fantasma");
+    }
     fantasma.dispatchEvent(eventoDragover());
     expect(fantasma.classList.contains("file-drop")).toBe(false);
   });
@@ -852,7 +907,9 @@ describe("drop de archivos sobre hojas", () => {
   it("dragover con Files resalta la hoja; sin Files no", () => {
     sembrar("u4x2", [100]);
     const sheet = document.querySelector(".sheet");
-    if (!sheet) throw new Error("sin .sheet");
+    if (!sheet) {
+      throw new Error("sin .sheet");
+    }
     sheet.dispatchEvent(eventoDragover());
     expect(sheet.classList.contains("file-drop")).toBe(true);
     sheet.classList.remove("file-drop");
@@ -901,7 +958,9 @@ describe("drop de archivos sobre hojas", () => {
   it("dragleave quita el resaltado y para el scroll", () => {
     sembrar("u1", [10]);
     const sheet = document.querySelector(".sheet");
-    if (!(sheet instanceof HTMLElement)) throw new Error("sin .sheet");
+    if (!(sheet instanceof HTMLElement)) {
+      throw new TypeError("sin .sheet");
+    }
     sheet.dispatchEvent(
       Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
         dataTransfer: { files: [], types: ["Files"] },
@@ -929,11 +988,13 @@ describe("drop de archivos sobre hojas", () => {
       toJSON: () => ({}),
     } as DOMRect);
     // jsdom no implementa scrollBy: se espía para asertar el loop (Chrome sí lo tiene).
-    const scrollBy = vi.fn();
+    const scrollBy = vi.fn<Element["scrollBy"]>();
     Object.defineProperty(canvas, "scrollBy", { value: scrollBy, configurable: true });
     const borde = (y: number): void => {
       const sheet = document.querySelector(".sheet");
-      if (!sheet) throw new Error("sin .sheet");
+      if (!sheet) {
+        throw new Error("sin .sheet");
+      }
       sheet.dispatchEvent(
         Object.assign(new Event("dragover", { bubbles: true, cancelable: true }), {
           dataTransfer: { files: [], types: ["Files"] },
@@ -943,13 +1004,20 @@ describe("drop de archivos sobre hojas", () => {
       );
     };
     try {
-      borde(790); // y > bottom−70 → scroll hacia abajo
-      await new Promise((r) => setTimeout(r, 60)); // paso corre en rAF reales
+      // y > bottom−70 → scroll hacia abajo
+      borde(790);
+      // paso corre en rAF reales
+      await new Promise((r) => {
+        setTimeout(r, 60);
+      });
       expect(scrollBy).toHaveBeenCalledWith({ top: 14 });
-      borde(400); // zona muerta → detenerScroll
+      // zona muerta → detenerScroll
+      borde(400);
       const n = scrollBy.mock.calls.length;
-      await new Promise((r) => setTimeout(r, 60));
-      expect(scrollBy.mock.calls.length).toBe(n);
+      await new Promise((r) => {
+        setTimeout(r, 60);
+      });
+      expect(scrollBy).toHaveBeenCalledTimes(n);
     } finally {
       rect.mockRestore();
       delete (canvas as unknown as Record<string, unknown>)["scrollBy"];
@@ -1044,7 +1112,9 @@ describe("lupa", () => {
   // Red ante asserts que fallen a mitad: cada test parte con la lupa apagada.
   afterEach(() => {
     const apagado = el<HTMLButtonElement>("btnLupa");
-    if (apagado.getAttribute("aria-pressed") === "true") apagado.click();
+    if (apagado.getAttribute("aria-pressed") === "true") {
+      apagado.click();
+    }
   });
 
   it("el botón alterna y Escape la cierra", () => {
@@ -1076,7 +1146,9 @@ describe("lupa", () => {
         clientY: 200,
       }),
     );
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => {
+      setTimeout(r, 50);
+    });
     expect(el("lupa").style.transform).toBe("translate(100px, 100px)");
     el<HTMLButtonElement>("btnLupa").click();
   });
@@ -1134,9 +1206,11 @@ describe("lupa", () => {
         }),
       );
     };
-    press(10); // apaga la lupa y arma la supresión…
+    // apaga la lupa y arma la supresión…
+    press(10);
     expect(btn.getAttribute("aria-pressed")).toBe("false");
-    press(20); // …pero el clic nunca llega (soltar fuera): se purga
+    // …pero el clic nunca llega (soltar fuera): se purga
+    press(20);
     const libre = new Event("click", { bubbles: true, cancelable: true });
     document.dispatchEvent(libre);
     expect(libre.defaultPrevented).toBe(false);
@@ -1199,7 +1273,8 @@ describe("lupa", () => {
         Object.assign(new Event(tipo, { bubbles: true }), { clientX: 200, clientY: 200 }),
       );
     };
-    mover("pointerenter"); // apagada: no hace nada
+    // apagada: no hace nada
+    mover("pointerenter");
     expect(el("lupa").style.opacity).toBe("0");
     btn.click();
     mover("pointermove");
@@ -1226,7 +1301,8 @@ describe("lupa", () => {
       return !c.defaultPrevented;
     };
     btn.click();
-    press(); // apaga y arma la supresión…
+    // apaga y arma la supresión…
+    press();
     expect(btn.getAttribute("aria-pressed")).toBe("false");
     // …pero un keydown (click de teclado en camino) la purga:
     document.dispatchEvent(
@@ -1234,9 +1310,11 @@ describe("lupa", () => {
     );
     expect(clicPasa()).toBe(true);
     btn.click();
-    press(); // rearma…
+    // rearma…
+    press();
     document.dispatchEvent(new Event("pointercancel", { bubbles: true }));
-    expect(clicPasa()).toBe(true); // …gesto abortado: nada que tragar
+    // …gesto abortado: nada que tragar
+    expect(clicPasa()).toBe(true);
   });
 });
 
@@ -1253,12 +1331,15 @@ describe("giro manual", () => {
 
   function botonGiro(accion: "girar-izq" | "girar-der"): HTMLButtonElement {
     const b = document.querySelector<HTMLButtonElement>(`[data-accion="${accion}"]`);
-    if (!b) throw new Error(`sin botón ${accion}`);
+    if (!b) {
+      throw new Error(`sin botón ${accion}`);
+    }
     return b;
   }
 
   it("botones ⟲⟳ solo en celda ok en modo imagen", () => {
-    sembrar("u1", [100]); // pendiente: sin botones
+    // pendiente: sin botones
+    sembrar("u1", [100]);
     expect(document.querySelector('[data-accion="girar-izq"]')).toBeNull();
     sembrarGirable();
     expect(botonGiro("girar-izq").getAttribute("aria-label")).toBe("Girar a la izquierda");
@@ -1266,7 +1347,8 @@ describe("giro manual", () => {
   });
 
   it("botón ✂ solo en celda ok en modo imagen", () => {
-    sembrar("u1", [100]); // pendiente: sin botón
+    // pendiente: sin botón
+    sembrar("u1", [100]);
     expect(document.querySelector('[data-accion="recortar"]')).toBeNull();
     sembrarGirable();
     const b = document.querySelector<HTMLButtonElement>('[data-accion="recortar"]');
@@ -1328,7 +1410,9 @@ describe("giro manual", () => {
     state.hojas.push(h);
     renderHojas();
     const badge = document.querySelector<HTMLButtonElement>('[data-accion="corregir-monto"]');
-    if (!badge) throw new Error("sin badge corregir-monto");
+    if (!badge) {
+      throw new Error("sin badge corregir-monto");
+    }
     badge.click();
     // ponytail: apertura no destructiva (el null al abrir era el bug del Escape).
     expect(c.montoCents).toBe(500);
@@ -1369,7 +1453,9 @@ describe("giro manual", () => {
 describe("drag: render pendiente y cancelaciones", () => {
   function pressImg(x = 10, y = 10): void {
     const img = document.querySelector(".cell img");
-    if (!img) throw new Error("sin imagen");
+    if (!img) {
+      throw new Error("sin imagen");
+    }
     img.dispatchEvent(
       Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
         button: 0,
@@ -1408,13 +1494,14 @@ describe("drag: render pendiente y cancelaciones", () => {
   it("pointerup sin drag previo no hace nada", () => {
     const h = sembrar("u4x2", [100, 200]);
     expect(() => soltarDoc(10, 10)).not.toThrow();
-    expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+    expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
   });
 
   it("render durante el drag se pospone hasta soltar", () => {
     sembrar("u4x2", [100]);
     pressImg();
-    renderHojas(); // pospuesto: la grilla no se reconstruye en arrastre
+    // pospuesto: la grilla no se reconstruye en arrastre
+    renderHojas();
     soltarDoc(10, 10);
     expect(document.querySelector(".sheet-grid.dragging")).toBeNull();
     expect(state.hojas.flatMap((h) => h.slots).filter(Boolean)).toHaveLength(1);
@@ -1434,7 +1521,7 @@ describe("drag: render pendiente y cancelaciones", () => {
     pressImg();
     moverDoc(11, 11);
     soltarDoc(11, 11);
-    expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+    expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
   });
 
   it("lostpointercapture cierra el drag", () => {
@@ -1460,47 +1547,52 @@ describe("drag entre celdas (swap)", () => {
   /** Geometría determinista: celdas en fila de 100px + matchMedia para saltar el FLIP. */
   function stubGeometria(flip = true, vuelos?: number[]): () => void {
     const mm = (window as unknown as Record<string, unknown>)["matchMedia"];
-    (window as unknown as Record<string, unknown>)["matchMedia"] = vi.fn(() => ({
+    (window as unknown as Record<string, unknown>)["matchMedia"] = vi.fn<
+      (query: string) => { matches: boolean }
+    >(() => ({
       matches: flip,
     }));
     // jsdom no trae Element.animate: se define por test (el FLIP la llama si el vuelo supera 2px).
     Object.defineProperty(Element.prototype, "animate", {
-      value: vi.fn(() => {
+      value: vi.fn<(...args: Parameters<Element["animate"]>) => void>(() => {
         vuelos?.push(1);
       }),
       configurable: true,
       writable: true,
     });
-    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (
-      this: Element,
-    ) {
-      const cells = [...document.querySelectorAll(".cell")];
-      const host = this.closest?.(".cell") ?? this;
-      const i = cells.indexOf(host as Element);
-      const left = i < 0 ? 0 : i * 120;
-      return {
-        left,
-        top: 0,
-        width: 100,
-        height: 100,
-        right: left + 100,
-        bottom: 100,
-        x: left,
-        y: 0,
-        toJSON: () => ({}),
-      } as DOMRect;
-    });
+    const rect = vi
+      .spyOn(Element.prototype, "getBoundingClientRect")
+      .mockImplementation(function rect(this: Element) {
+        const cells = [...document.querySelectorAll(".cell")];
+        const host = this.closest?.(".cell") ?? this;
+        const i = cells.indexOf(host as Element);
+        const left = i === -1 ? 0 : i * 120;
+        return {
+          left,
+          top: 0,
+          width: 100,
+          height: 100,
+          right: left + 100,
+          bottom: 100,
+          x: left,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
     return () => {
       rect.mockRestore();
       delete (Element.prototype as unknown as Record<string, unknown>)["animate"];
-      if (mm === undefined) delete (window as unknown as Record<string, unknown>)["matchMedia"];
-      else (window as unknown as Record<string, unknown>)["matchMedia"] = mm;
+      if (mm === undefined) {
+        delete (window as unknown as Record<string, unknown>)["matchMedia"];
+      } else {
+        (window as unknown as Record<string, unknown>)["matchMedia"] = mm;
+      }
     };
   }
 
   /** Espera N frames reales (los rAF pendientes van primero: moveRaf/paso corren antes de volver). */
   async function esperarRaf(n = 2): Promise<void> {
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < n; i += 1) {
       await new Promise<void>((r) => {
         requestAnimationFrame(() => r());
       });
@@ -1509,7 +1601,9 @@ describe("drag entre celdas (swap)", () => {
 
   function pressCelda(idx: number, x: number, y: number): void {
     const img = document.querySelectorAll(".cell img").item(idx);
-    if (!(img instanceof Element)) throw new Error("sin imagen");
+    if (!(img instanceof Element)) {
+      throw new TypeError("sin imagen");
+    }
     img.dispatchEvent(
       Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), {
         button: 0,
@@ -1548,7 +1642,7 @@ describe("drag entre celdas (swap)", () => {
   /** jsdom no trae elementFromPoint: se define por test y se restaura al salir. */
   function stubPunto(valor: Element | null): () => void {
     Object.defineProperty(document, "elementFromPoint", {
-      value: vi.fn(() => valor),
+      value: vi.fn<Document["elementFromPoint"]>(() => valor),
       configurable: true,
     });
     return () => {
@@ -1563,10 +1657,11 @@ describe("drag entre celdas (swap)", () => {
       const h = sembrar("u4x2", [100, 200]);
       pressCelda(0, 10, 10);
       moverDoc(170, 50);
-      await esperarRaf(); // moveRaf: resalta destino + autoscroll en vuelo
+      // moveRaf: resalta destino + autoscroll en vuelo
+      await esperarRaf();
       moverDoc(171, 51);
       soltarDoc(170, 50);
-      expect(h.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([200, 100]);
       expect(document.querySelector(".drag-ghost")).toBeNull();
     } finally {
       punto();
@@ -1584,9 +1679,10 @@ describe("drag entre celdas (swap)", () => {
       try {
         pressCelda(0, 10, 10);
         moverDoc(170, 50);
-        await esperarRaf(); // moveRaf: el destino propio se anula
+        // moveRaf: el destino propio se anula
+        await esperarRaf();
         soltarDoc(170, 50);
-        expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+        expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
       } finally {
         punto();
       }
@@ -1604,7 +1700,7 @@ describe("drag entre celdas (swap)", () => {
       pressCelda(0, 10, 10);
       moverDoc(170, 50);
       soltarDoc(9999, 9999);
-      expect(h.slots.map((c) => c?.montoCents)).toEqual([100, 200]);
+      expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([100, 200]);
     } finally {
       punto();
       restaurar();
@@ -1622,7 +1718,7 @@ describe("drag entre celdas (swap)", () => {
       moverDoc(170, 50);
       state.hojas = [b];
       soltarDoc(170, 50);
-      expect(b.slots.map((c) => c?.montoCents)).toEqual([200]);
+      expect(b.slots.map((c) => c?.montoCents)).toStrictEqual([200]);
       expect(
         state.hojas.flatMap((h) => h.slots).find((c) => c?.id === a.slots[0]?.id),
       ).toBeUndefined();
@@ -1643,7 +1739,7 @@ describe("drag entre celdas (swap)", () => {
       moverDoc(290, 50);
       soltarDoc(290, 50);
       expect(state.hojas).toHaveLength(1);
-      expect(b.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      expect(b.slots.map((c) => c?.montoCents)).toStrictEqual([200, 100]);
     } finally {
       punto();
       restaurar();
@@ -1660,8 +1756,9 @@ describe("drag entre celdas (swap)", () => {
       const h = sembrar("u4x2", [100, 200]);
       pressCelda(0, 10, 10);
       moverDoc(170, 50);
-      soltarDoc(170, 50); // centro exacto de la celda destino: dx=dy=0
-      expect(h.slots.map((c) => c?.montoCents)).toEqual([200, 100]);
+      // centro exacto de la celda destino: dx=dy=0
+      soltarDoc(170, 50);
+      expect(h.slots.map((c) => c?.montoCents)).toStrictEqual([200, 100]);
       // imgA salta por hypot<2 y solo imgB vuela: sin el guard serían 2.
       expect(vuelos).toHaveLength(1);
     } finally {
@@ -1675,7 +1772,9 @@ describe("drag entre celdas (swap)", () => {
 describe("pegar con clic en vacía", () => {
   function botonPegar(): HTMLButtonElement {
     const b = document.querySelector<HTMLButtonElement>('[data-accion="pegar"]');
-    if (!b) throw new Error("sin botón pegar");
+    if (!b) {
+      throw new Error("sin botón pegar");
+    }
     return b;
   }
 
@@ -1718,7 +1817,7 @@ describe("pegar con clic en vacía", () => {
     const btn = botonPegar();
     btn.click();
     btn.click();
-    expect(pegarEnCelda).toHaveBeenCalledTimes(1);
+    expect(pegarEnCelda).toHaveBeenCalledOnce();
     soltar();
     await Promise.resolve();
     btn.click();
@@ -1826,11 +1925,15 @@ describe("reorden por teclado (2.5.7)", () => {
   /** Ctrl/Alt+flecha desde la celda enfocada (foco previo como el uso real). */
   function tecla(idx: number, key: string, alt = false): void {
     const cell = ocupadas()[idx];
-    if (!cell) throw new Error(`sin celda ocupada ${idx}`);
+    if (!cell) {
+      throw new Error(`sin celda ocupada ${idx}`);
+    }
     /* jsdom no trae matchMedia (animarFlipDesde lo lee pelado): stub
        reduced-motion para apagar el FLIP, restaurado al salir. */
     const previo = window.matchMedia;
-    window.matchMedia = vi.fn(() => ({ matches: true })) as unknown as typeof window.matchMedia;
+    window.matchMedia = vi.fn<(query: string) => { matches: boolean }>(() => ({
+      matches: true,
+    })) as unknown as typeof window.matchMedia;
     try {
       cell.focus();
       cell.dispatchEvent(
@@ -1850,20 +1953,21 @@ describe("reorden por teclado (2.5.7)", () => {
   it("Ctrl+→ intercambia con el vecino", () => {
     const h = sembrar("u4x2", [100, 200]);
     tecla(0, "ArrowRight");
-    expect(montos(h)).toEqual([200, 100]);
+    expect(montos(h)).toStrictEqual([200, 100]);
   });
 
   it("Ctrl+← intercambia con el vecino anterior", () => {
     const h = sembrar("u4x2", [100, 200]);
     tecla(1, "ArrowLeft");
-    expect(montos(h)).toEqual([200, 100]);
+    expect(montos(h)).toStrictEqual([200, 100]);
   });
 
   it("Ctrl+→ cruza al borde de la siguiente hoja y enfoca la celda destino", () => {
     sembrar("u1", [100]);
     const b = sembrar("u4x2", [200, null]);
     tecla(0, "ArrowRight");
-    expect(state.hojas.map(montos)).toEqual([[200], [100, null]]); // swap 200↔100, nada se pierde
+    // swap 200↔100, nada se pierde
+    expect(state.hojas.map(montos)).toStrictEqual([[200], [100, null]]);
     const foco = document.activeElement;
     expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
     expect(foco?.getAttribute("data-slot")).toBe("0");
@@ -1872,15 +1976,16 @@ describe("reorden por teclado (2.5.7)", () => {
   it("Ctrl+→ en el último slot del lote no mueve", () => {
     sembrar("u1", [100]);
     tecla(0, "ArrowRight");
-    expect(state.hojas.map(montos)).toEqual([[100]]);
+    expect(state.hojas.map(montos)).toStrictEqual([[100]]);
   });
 
   it("Ctrl+↓ conserva el slot; fila corta cae al primer hueco y enfoca", () => {
     const a = sembrar("u4x2", [100, null, null, 300]);
     const b = sembrar("u2h", [200, null]);
-    tecla(1, "ArrowDown"); // slot 3 no existe en u2h: cae al hueco 1
-    expect(montos(b)).toEqual([200, 300]);
-    expect(montos(a)).toEqual([100, null, null, null]);
+    // slot 3 no existe en u2h: cae al hueco 1
+    tecla(1, "ArrowDown");
+    expect(montos(b)).toStrictEqual([200, 300]);
+    expect(montos(a)).toStrictEqual([100, null, null, null]);
     const foco = document.activeElement;
     expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
     expect(foco?.getAttribute("data-slot")).toBe("1");
@@ -1889,16 +1994,18 @@ describe("reorden por teclado (2.5.7)", () => {
   it("hoja destino llena sin hueco: silencio", () => {
     sembrar("u4x2", [null, null, null, 300]);
     sembrar("u1", [200]);
-    tecla(0, "ArrowDown"); // u1 no tiene slot 3 ni hueco
-    expect(state.hojas.map(montos)).toEqual([[null, null, null, 300], [200]]);
+    // u1 no tiene slot 3 ni hueco
+    tecla(0, "ArrowDown");
+    expect(state.hojas.map(montos)).toStrictEqual([[null, null, null, 300], [200]]);
   });
 
   it("Ctrl+→ a un hueco vacía la hoja original (render estructural) y enfoca", () => {
     sembrar("u1", [100]);
     const b = sembrar("u1", [null]);
     tecla(0, "ArrowRight");
-    expect(state.hojas).toHaveLength(1); // la primera quedó vacía: limpiarHojas
-    expect(state.hojas[0]?.slots.map((c) => (c ? c.montoCents : null))).toEqual([100]);
+    // la primera quedó vacía: limpiarHojas
+    expect(state.hojas).toHaveLength(1);
+    expect(state.hojas[0]?.slots.map((c) => (c ? c.montoCents : null))).toStrictEqual([100]);
     const foco = document.activeElement;
     expect(foco?.getAttribute("data-hoja")).toBe(String(b.id));
     expect(foco?.getAttribute("data-slot")).toBe("0");
@@ -1907,7 +2014,7 @@ describe("reorden por teclado (2.5.7)", () => {
   it("Alt+→ es alias del Ctrl horizontal", () => {
     const h = sembrar("u4x2", [100, 200]);
     tecla(0, "ArrowRight", true);
-    expect(montos(h)).toEqual([200, 100]);
+    expect(montos(h)).toStrictEqual([200, 100]);
   });
 
   it("input de monto no mueve (las flechas editan texto)", () => {
@@ -1917,7 +2024,9 @@ describe("reorden por teclado (2.5.7)", () => {
     state.hojas.push(h);
     renderHojas();
     const input = document.querySelector<HTMLInputElement>("input.cell-monto");
-    if (!input) throw new Error("sin input de monto");
+    if (!input) {
+      throw new Error("sin input de monto");
+    }
     input.focus();
     input.dispatchEvent(
       new KeyboardEvent("keydown", {
@@ -1928,7 +2037,7 @@ describe("reorden por teclado (2.5.7)", () => {
       }),
     );
     // Sin swap: el 200 sigue en el slot 1 y el foco sigue en el input.
-    expect(montos(h)).toEqual([null, 200]);
+    expect(montos(h)).toStrictEqual([null, 200]);
     expect(document.activeElement).toBe(input);
   });
 
@@ -1937,7 +2046,7 @@ describe("reorden por teclado (2.5.7)", () => {
     state.modoOcr = true;
     try {
       tecla(0, "ArrowRight");
-      expect(montos(h)).toEqual([100, 200]);
+      expect(montos(h)).toStrictEqual([100, 200]);
     } finally {
       state.modoOcr = false;
     }

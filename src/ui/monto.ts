@@ -16,13 +16,22 @@ export function formatearMoneda(cents: Cents): string {
  * Es el formato del fast-path regex (extract.ts).
  */
 export function parsearMonto(texto: string): Cents | null {
-  const s = texto.trim().replace(/[\s$€£]/g, "");
-  const m = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?$/.exec(s);
+  const s = texto.trim().replaceAll(/[\s$€£]/gu, "");
+  const m = /^(?<entera>\d{1,3}(?:,\d{3})+|\d+)(?:\.(?<decimales>\d{1,2}))?$/u.exec(s);
+  const g = m?.groups;
+  if (!g) {
+    return null;
+  }
+  const { entera = "", decimales } = g;
   // ponytail: miles con coma exigen decimal con punto ("1,234" solo → escribir 1234).
-  if (!m || ((m[1] ?? "").includes(",") && m[2] === undefined)) return null;
-  const entera = (m[1] ?? "").replace(/,/g, "");
-  if (!/^\d{1,12}$/.test(entera)) return null;
-  return Number(entera) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
+  if (entera.includes(",") && decimales === undefined) {
+    return null;
+  }
+  const digitos = entera.replaceAll(",", "");
+  if (!/^\d{1,12}$/u.test(digitos)) {
+    return null;
+  }
+  return Number(digitos) * 100 + Number((decimales ?? "").padEnd(2, "0"));
 }
 
 export function itemsDe(hoja: Hoja): Comprobante[] {
@@ -58,7 +67,9 @@ const BOTONES_LOTE = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLim
 // renderMonto lo sincroniza, sin importar qué camino mutó las hojas.
 function pintarBarraBoton(): void {
   const btn = document.getElementById("btnCalcular");
-  if (!(btn instanceof HTMLButtonElement)) return;
+  if (!(btn instanceof HTMLButtonElement)) {
+    return;
+  }
   const total = totalItems();
   const hechos = aplanar().filter((c) => c.montoCents !== null).length;
   btn.style.setProperty("--progreso", String(total > 0 ? hechos / total : 0));
@@ -67,7 +78,9 @@ function pintarBarraBoton(): void {
   // .disabled de estos ids en src/ (grep previo): el sync no pisa a nadie.
   for (const id of BOTONES_LOTE) {
     const boton = document.getElementById(id);
-    if (boton instanceof HTMLButtonElement) boton.disabled = total === 0;
+    if (boton instanceof HTMLButtonElement) {
+      boton.disabled = total === 0;
+    }
   }
   // ponytail: etiqueta y cuenta en spans separados (la etiqueta parte en 2
   // líneas y la caja de la cuenta queda fija; así el icono no se corre).
@@ -77,21 +90,24 @@ function pintarBarraBoton(): void {
   const cuenta = progreso ? `${hechos}/${total}` : "";
   const textos = btn.querySelectorAll(".calculo-txt");
   if (textos.length === 0) {
-    btn.textContent = etiqueta + cuenta; // fixture: botón sin spans
+    // fixture: botón sin spans
+    btn.textContent = etiqueta + cuenta;
   } else {
-    textos.forEach((txt) => {
+    for (const txt of textos) {
       txt.textContent = etiqueta;
-    });
-    btn.querySelectorAll(".calculo-cuenta").forEach((cta) => {
+    }
+    for (const cta of btn.querySelectorAll(".calculo-cuenta")) {
       cta.textContent = cuenta;
-    });
+    }
   }
 }
 
 /** Largo del prefijo común posicional de dos textos (la ruleta lo deja fijo). */
 export function prefijoComun(viejo: string, texto: string): number {
   let k = 0;
-  while (k < viejo.length && k < texto.length && viejo[k] === texto[k]) k += 1;
+  while (k < viejo.length && k < texto.length && viejo[k] === texto[k]) {
+    k += 1;
+  }
   return k;
 }
 
@@ -118,11 +134,16 @@ let textoRegla: string | null = null;
 let monedaRegla: Moneda | null = null;
 let rafId: number | null = null;
 
-const VUELTAS = 1; // barridos extra por rueda (p26 usa 3 con botón manual)
-const DURACION = 700; // ms por posición (p26: 1400, un giro por clic)
-const ESCALON = 60; // retardo izq→der (p26: 90)
-const BLUR_MAXIMO = 3; // p26 usa 3
-const FILTROS = 14; // 12 enteros + 2 decimales máx de parsearMonto: sin compartir ranura
+// barridos extra por rueda (p26 usa 3 con botón manual)
+const VUELTAS = 1;
+// ms por posición (p26: 1400, un giro por clic)
+const DURACION = 700;
+// retardo izq→der (p26: 90)
+const ESCALON = 60;
+// p26 usa 3
+const BLUR_MAXIMO = 3;
+// 12 enteros + 2 decimales máx de parsearMonto: sin compartir ranura
+const FILTROS = 14;
 
 /** Desplazamiento en células de una rueda d1→d2 (positivo sube, negativo baja). */
 export function pasos(d1: number, d2: number, sube: boolean): number {
@@ -143,7 +164,9 @@ function esDigito(ch: string): boolean {
 
 /** Defs con los filtros feGaussianBlur verticales (el blur de la referencia); 1× por página. */
 function garantizarDefs(): void {
-  if (document.getElementById("monto-blur-defs")) return;
+  if (document.getElementById("monto-blur-defs")) {
+    return;
+  }
   const NS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("id", "monto-blur-defs");
@@ -170,12 +193,16 @@ function garantizarDefs(): void {
 /** Blur vertical del filtro `i` mientras la tira gira (decae a 0 con rAF). */
 function blurEn(i: number, y: number): void {
   const fe = document.getElementById(`monto-blur-fe-${i}`);
-  if (fe) fe.setAttribute("stdDeviation", `0 ${y}`);
+  if (fe) {
+    fe.setAttribute("stdDeviation", `0 ${y}`);
+  }
 }
 
 /** blanquea las ranuras: sin residuo tras cancelar una rueda o armar plano. */
 function resetearBlur(): void {
-  for (let i = 0; i < FILTROS; i += 1) blurEn(i, 0);
+  for (let i = 0; i < FILTROS; i += 1) {
+    blurEn(i, 0);
+  }
 }
 
 /** translateY (px, negativo) que centra la célula `k` en la ventana; el origen de la tira es `base`. */
@@ -185,9 +212,16 @@ export function desplazamiento(base: number, k: number, cell: number): number {
 
 /** Índice absoluto de la célula visible según la matriz computada; null si no parsea (jsdom/plaino). */
 export function celdaDesdeMatriz(matrix: string, base: number, cell: number): number | null {
-  const m = /matrix\(([^)]*)\)/.exec(matrix);
-  if (m === null || !Number.isFinite(cell) || cell <= 0) return null;
-  const y = parseFloat((m[1] ?? "").split(",").at(-1) ?? "");
+  const m = /matrix\((?<params>[^)]*)\)/u.exec(matrix);
+  if (m === null || !Number.isFinite(cell) || cell <= 0) {
+    return null;
+  }
+  // Number("") es 0: un último parámetro vacío no parsea (antes devolvía `base`).
+  const ultimo = (m.groups?.["params"] ?? "").split(",").at(-1)?.trim() ?? "";
+  if (ultimo === "") {
+    return null;
+  }
+  const y = Number(ultimo);
   return Number.isFinite(y) ? base + Math.round(-y / cell) : null;
 }
 
@@ -242,7 +276,7 @@ function mostrarPlano(texto: string): void {
     }
   }
   montoEl.replaceChildren(...hijos);
-  const primera = colas[0];
+  const [primera] = colas;
   const cell = primera ? primera.col.offsetHeight || 24 : 0;
   for (const c of colas) {
     c.col.dataset["muestra"] = String(c.inicio);
@@ -272,7 +306,8 @@ export function renderMonto(): void {
   const sube = total > previoTotal;
   previoTotal = total;
   monedaRegla = state.moneda;
-  const viejo = textoRegla as string; // texto distinto ⇒ no null: una rueda/plano previo lo fijó
+  // texto distinto ⇒ no null: una rueda/plano previo lo fijó
+  const viejo = textoRegla as string;
   textoRegla = texto;
   montoEl.setAttribute("aria-label", texto);
   // Prefijo común quieto; el resto se alinea a la derecha por valor posicional.
@@ -282,7 +317,9 @@ export function renderMonto(): void {
   const alineado = alinearSufijos(sufV, sufN);
   let totalColas = 0;
   for (const ch of sufN) {
-    if (esDigito(ch)) totalColas += 1;
+    if (esDigito(ch)) {
+      totalColas += 1;
+    }
   }
   // Estado visual de las tiras viejas (derecha→izquierda empareja los dígitos
   // posicionalmente, como el odómetro) y el cell actual, medidos ANTES del rebuild.
@@ -290,7 +327,9 @@ export function renderMonto(): void {
   const previas: { matriz: string; base: number }[] = [];
   for (const t of montoEl.querySelectorAll<HTMLElement>(".monto-tira")) {
     const primeraTira = t.querySelector<HTMLElement>(".monto-digito");
-    if (primeraTira?.dataset["i"] === undefined) continue;
+    if (primeraTira?.dataset["i"] === undefined) {
+      continue;
+    }
     previas.push({ matriz: getComputedStyle(t).transform, base: +primeraTira.dataset["i"] });
   }
   const viejaCol = montoEl.querySelector<HTMLElement>(".monto-col");
@@ -301,12 +340,13 @@ export function renderMonto(): void {
     // ponytail: i < k ≤ texto.length ⇒ in-bounds (el ?? "" era rama muerta).
     hijos.push(spanFijo(texto[i] as string));
   }
-  sufN.split("").forEach((ch, j) => {
+  for (const [j, ch] of sufN.split("").entries()) {
     // ponytail: alinearSufijos SIEMPRE retorna sufN.length ⇒ j in-bounds.
     const v = alineado[j] as string;
     if (!esDigito(ch)) {
-      hijos.push(spanFijo(ch)); // separador que aparece (coma) o marca de moneda
-      return;
+      // separador que aparece (coma) o marca de moneda
+      hijos.push(spanFijo(ch));
+      continue;
     }
     let arranque = esDigito(v) ? +v : 0;
     // Sin vuelo: barrido de la referencia desde el dígito viejo. En vuelo: la ruleta
@@ -318,13 +358,14 @@ export function renderMonto(): void {
       const kk = celdaDesdeMatriz(previa.matriz, previa.base, cell);
       if (kk !== null) {
         arranque = kk;
-        fin = arranque + pasoDesde(arranque, +ch, sube); // 0 ⇒ ya está en el objetivo (estática)
+        // 0 ⇒ ya está en el objetivo (estática)
+        fin = arranque + pasoDesde(arranque, +ch, sube);
       }
     }
     const col = crearCola(arranque, fin);
     colas.push(col);
     hijos.push(col.col);
-  });
+  }
   montoEl.replaceChildren(...hijos);
   const reducir =
     typeof window.matchMedia === "function" &&
@@ -352,30 +393,41 @@ export function renderMonto(): void {
     c.tira.style.transition = "none";
     c.tira.style.transform = `translateY(${desplazamiento(c.base, c.inicio, cell)}px)`;
   }
-  if (colas.every((c) => c.fin === c.inicio)) return;
-  void montoEl.offsetWidth; // reflow: clava el punto de partida
-  colas.forEach((c, i) => {
-    if (c.fin === c.inicio) return;
+  if (colas.every((c) => c.fin === c.inicio)) {
+    return;
+  }
+  // reflow: clava el punto de partida
+  void montoEl.offsetWidth;
+  for (const [i, c] of colas.entries()) {
+    if (c.fin === c.inicio) {
+      continue;
+    }
     c.tira.style.transition = `transform ${DURACION}ms cubic-bezier(0.16, 1, 0.3, 1) ${i * ESCALON}ms`;
     c.tira.style.transform = `translateY(${desplazamiento(c.base, c.fin, cell)}px)`;
-  });
-  if (rafId !== null) cancelAnimationFrame(rafId);
+  }
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+  }
   resetearBlur();
   const t0 = performance.now();
   const maximo = (colas.length - 1) * ESCALON + DURACION;
   const tick = (): void => {
     const t = performance.now() - t0;
-    colas.forEach((c, i) => {
-      if (c.blurIdx < 0) return;
+    for (const [i, c] of colas.entries()) {
+      if (c.blurIdx < 0) {
+        continue;
+      }
       const local = Math.min(1, Math.max(0, (t - i * ESCALON) / DURACION));
       blurEn(c.blurIdx, +(BLUR_MAXIMO * (1 - local)).toFixed(2));
-    });
+    }
     if (t < maximo + 40) {
       rafId = requestAnimationFrame(tick);
     } else {
-      colas.forEach((c) => {
-        if (c.blurIdx >= 0) blurEn(c.blurIdx, 0);
-      });
+      for (const c of colas) {
+        if (c.blurIdx >= 0) {
+          blurEn(c.blurIdx, 0);
+        }
+      }
       rafId = null;
     }
   };
