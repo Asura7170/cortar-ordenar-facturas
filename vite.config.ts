@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import path from "node:path";
 
 import { defineConfig } from "vite-plus";
 
@@ -23,14 +23,14 @@ export default defineConfig({
           }
           const base = url.split("/").pop()?.split("?")[0] ?? "";
           // ponytail: basename estricto — ni `\` (separador Windows) ni query-trucos salen de public/ort.
-          if (!/^[\w.-]+\.mjs$/.test(base)) {
+          if (!/^[\w.-]+\.mjs$/u.test(base)) {
             sig();
             return;
           }
-          readFile(join(process.cwd(), "public", "ort", base))
+          readFile(path.join(process.cwd(), "public", "ort", base))
             .then((bytes) => {
               res.setHeader("Content-Type", "text/javascript");
-              res.end(bytes);
+              return res.end(bytes);
             })
             .catch(() => sig());
         });

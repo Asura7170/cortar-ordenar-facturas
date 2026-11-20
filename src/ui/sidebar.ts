@@ -55,31 +55,32 @@ function avisar(rechazos: readonly AvisoRechazo[]): void {
   mostrarToasts(items);
 }
 
+const MOTIVOS: Record<MotivoRechazo, { readonly titulo: string; readonly texto: string }> = {
+  tamano: {
+    titulo: "Archivo demasiado pesado",
+    texto: "pesa más de 5 MB, comprimila y probá de nuevo",
+  },
+  paginas: {
+    titulo: "PDF demasiado largo",
+    texto: "tiene más de 10 páginas, partila en dos PDF",
+  },
+  cifrado: {
+    titulo: "PDF protegido con contraseña",
+    texto: "protegido con contraseña, quitásela y volvé a subir",
+  },
+  ilegible: {
+    titulo: "No se pudo leer",
+    texto: "no se pudo leer: puede estar corrupta, probá con otra foto",
+  },
+};
+
 function textoMotivo(m: MotivoRechazo): string {
-  switch (m) {
-    case "tamano":
-      return "pesa más de 5 MB, comprimila y probá de nuevo";
-    case "paginas":
-      return "tiene más de 10 páginas, partila en dos PDF";
-    case "cifrado":
-      return "protegido con contraseña, quitásela y volvé a subir";
-    case "ilegible":
-      return "no se pudo leer: puede estar corrupta, probá con otra foto";
-  }
+  return MOTIVOS[m].texto;
 }
 
 /** Título corto y escaneable del rechazo, pareja de textoMotivo. */
 function tituloDeMotivo(m: MotivoRechazo): string {
-  switch (m) {
-    case "tamano":
-      return "Archivo demasiado pesado";
-    case "paginas":
-      return "PDF demasiado largo";
-    case "cifrado":
-      return "PDF protegido con contraseña";
-    case "ilegible":
-      return "No se pudo leer";
-  }
+  return MOTIVOS[m].titulo;
 }
 
 // Si hojaId se indica, rellena los huecos de ESA hoja (y crea al final si
@@ -89,7 +90,7 @@ function tituloDeMotivo(m: MotivoRechazo): string {
 let intakesActivos = 0;
 
 // Formatos de imagen del intake (clic / Ctrl+V / drop): un solo allowlist.
-const MIME_IMAGEN: RegExp = /^image\/(jpeg|png|webp|bmp|gif)$/i;
+const MIME_IMAGEN = /^image\/(?:jpeg|png|webp|bmp|gif)$/iu;
 
 /** Hoja destino del próximo picker (botón ＋ de la hoja); null = automático. */
 let hojaPedida: number | null = null;
@@ -137,8 +138,10 @@ function tieneHueco(h: Hoja): boolean {
 
 /** Despacha el resto en la fila de huecos. */
 function llenarHuecos(slots: (Comprobante | null)[], resto: Comprobante[]): void {
-  for (let j = 0; j < slots.length && resto.length; j++) {
-    if (!slots[j]) slots[j] = resto.shift() ?? null;
+  for (let j = 0; j < slots.length && resto.length; j += 1) {
+    if (!slots[j]) {
+      slots[j] = resto.shift() ?? null;
+    }
   }
 }
 
@@ -154,15 +157,17 @@ function crearColocacion(destino: number | null): (items: Comprobante[]) => void
   // Commit incremental: cada archivo se pinta antes del siguiente. Los gaps
   // async del decode/encode le dan al navegador ventanas de paint con DOM ya
   // comprometido (antes solo había un render al final del lote: freeze).
-  let hoja: Hoja | undefined = destino != null ? hojaPorId(destino) : undefined;
+  let hoja: Hoja | undefined = destino == null ? undefined : hojaPorId(destino);
   let colocados = 0;
   let ultimoRender = 0;
   return (items: Comprobante[]): void => {
     if (!hoja) {
       // Perezosa: el intake vacío o todo-rechazado no crea hojas (el test
       // "null o vacío" lo exige; antes el return temprano lo garantizaba).
-      hoja = state.hojas.find(tieneHueco) ?? state.hojas[state.hojas.length - 1] ?? crearHoja();
-      if (!state.hojas.includes(hoja)) state.hojas.push(hoja);
+      hoja = state.hojas.find(tieneHueco) ?? state.hojas.at(-1) ?? crearHoja();
+      if (!state.hojas.includes(hoja)) {
+        state.hojas.push(hoja);
+      }
     }
     llenarHuecos(hoja.slots, items);
     // Los desbordes continúan en la hoja recién creada (la próxima llamada
@@ -205,7 +210,7 @@ async function paginasUtiles(f: File, avisos: AvisoRechazo[]): Promise<Comproban
     });
     return null;
   }
-  const base = sanear(f.name).replace(/\.pdf$/i, "");
+  const base = sanear(f.name).replace(/\.pdf$/iu, "");
   return pags.map((p) => {
     const url = URL.createObjectURL(p.blob);
     return {
@@ -259,16 +264,20 @@ export async function agregarArchivos(
   let colocados = 0;
   // Sin VT ni rebuilds por archivo durante el intake (ver sheets.renderHojas):
   // el flag cubre todo el loop y el finally lo suelta aunque un PDF falle.
-  intakesActivos++;
+  intakesActivos += 1;
   state.loteEnCurso = true;
   try {
     for (const f of lista) {
       await cederTurno();
       if (esImagen(f)) {
-        if (await intakeImagen(f, colocar, avisos)) colocados += 1;
+        if (await intakeImagen(f, colocar, avisos)) {
+          colocados += 1;
+        }
         continue;
       }
-      if (!esPdf(f)) continue;
+      if (!esPdf(f)) {
+        continue;
+      }
       const pags = await paginasUtiles(f, avisos);
       if (pags) {
         colocar(pags);
@@ -276,29 +285,34 @@ export async function agregarArchivos(
       }
     }
   } finally {
-    intakesActivos--;
+    intakesActivos -= 1;
     state.loteEnCurso = intakesActivos > 0;
   }
-  despejarToasts("intake"); // siempre: los rechazos viejos de otro lote salen con fade
-  avisar(avisos); // y los del lote actual, uno por archivo, entran abajo
-  if (colocados === 0) return;
+  // siempre: los rechazos viejos de otro lote salen con fade
+  despejarToasts("intake");
+  // y los del lote actual, uno por archivo, entran abajo
+  avisar(avisos);
+  if (colocados === 0) {
+    return;
+  }
 
   renderHojas();
-  precalentarModelos(); // warm-up tras el intake: sin competir con los decodes
+  // warm-up tras el intake: sin competir con los decodes
+  precalentarModelos();
   void procesarCola();
 }
 
 /** Item del portapapeles con al menos una imagen (shape mínimo de ClipboardItem). */
 interface ItemConImagen {
   readonly types: readonly string[];
-  getType(tipo: string): Promise<Blob>;
+  getType: (tipo: string) => Promise<Blob>;
 }
 
 // Sin bytes de imagen el clic no puede pegar: el Ctrl+C al ARCHIVO en el
 // Explorador deja una referencia (no bytes) y el navegador no la entrega vía
 // read() — ese caso solo entra por Ctrl+V o la tarjeta. El mensaje cubre ambos.
-const MOTIVO_FORMATO: string = "formato no soportado: usá JPG, PNG, WEBP o PDF";
-const MOTIVO_SIN_IMAGEN: string =
+const MOTIVO_FORMATO = "formato no soportado: usá JPG, PNG, WEBP o PDF";
+const MOTIVO_SIN_IMAGEN =
   "no hay imagen para pegar: en WhatsApp usa clic derecho > Copiar imagen; si copiaste el archivo en el Explorador, pegá con Ctrl+V";
 
 /** Primer tipo image/* del item (null si no trae). */
@@ -308,8 +322,9 @@ function tipoImagenDe(item: ItemConImagen): string | null {
 
 /** Subtipo crudo de un tipo image/x (png, jpeg): sin parámetros ;. */
 function subtipoImagen(tipo: string): string {
-  // ponytail: split(";") siempre trae [0]; el tipo ya pasó el find image/.
-  return tipo.slice("image/".length).split(";")[0]!.toLowerCase();
+  // ponytail: split(";") siempre trae [0]; el default es inalcanzable.
+  const [subtipo = ""] = tipo.slice("image/".length).split(";");
+  return subtipo.toLowerCase();
 }
 
 /** Motivo del aviso final: el formato raro encontrado o el genérico. */
@@ -348,10 +363,13 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
   let formatoNoSoportado = false;
   for (const item of items) {
     const tipo = tipoImagenDe(item);
-    if (!tipo) continue;
+    if (!tipo) {
+      continue;
+    }
     const cruda = subtipoImagen(tipo);
     if (!MIME_IMAGEN.test(`image/${cruda}`)) {
-      formatoNoSoportado = true; // mismo mensaje que Ctrl+V para esos bytes
+      // mismo mensaje que Ctrl+V para esos bytes
+      formatoNoSoportado = true;
       continue;
     }
     try {
@@ -380,14 +398,16 @@ async function leerImagenesPortapapeles(): Promise<File[] | null> {
 /** La hoja del clic fantasma: la última si tiene huecos, o una nueva (aún
     sin apuntar a state) heredando su layout. */
 function destinoFantasma(): Hoja {
-  const ultima = state.hojas[state.hojas.length - 1];
+  const ultima = state.hojas.at(-1);
   return ultima && ultima.slots.includes(null) ? ultima : crearHoja(ultima?.layout ?? "u4x2");
 }
 
 /** Hoja real para el clic: la pedida, o la fantasma resuelta. */
 function destinoDelClic(hojaId: number): Hoja | null {
   let destino = hojaId === HOJA_FANTASMA ? undefined : hojaPorId(hojaId);
-  if (!destino && hojaId === HOJA_FANTASMA) destino = destinoFantasma();
+  if (!destino && hojaId === HOJA_FANTASMA) {
+    destino = destinoFantasma();
+  }
   return destino ?? null;
 }
 
@@ -414,7 +434,9 @@ function vigenteParaEscribir(destino: Hoja, hojaId: number): Hoja | null {
 /** Última hoja con hueco, o una nueva (ya en state) heredando el layout. */
 function huecoOAnueva(layoutRespaldo: LayoutId, vinculado: LayoutId | undefined): Hoja {
   const conHueco = state.hojas.find((x) => x.slots.includes(null));
-  if (conHueco) return conHueco;
+  if (conHueco) {
+    return conHueco;
+  }
   const nueva = crearHoja(vinculado ?? layoutRespaldo);
   state.hojas.push(nueva);
   return nueva;
@@ -433,32 +455,42 @@ function colocarEnVigente(
     return h;
   }
   if (h && h.slots.includes(null)) {
-    h.slots[h.slots.indexOf(null)] = comp; // ponytail: includes acaba de verificar: indexOf no da -1
+    // ponytail: includes acaba de verificar: indexOf no da -1
+    h.slots[h.slots.indexOf(null)] = comp;
     return h;
   }
   // Hoja llena o barrida en el ínterin: flujo normal (última con hueco o
   // nueva heredando layout).
   const actual = huecoOAnueva(layoutRespaldo, h?.layout);
-  actual.slots[actual.slots.indexOf(null)] = comp; // ponytail: huecoOAnueva solo devuelve hojas con hueco
+  // ponytail: huecoOAnueva solo devuelve hojas con hueco
+  actual.slots[actual.slots.indexOf(null)] = comp;
   return actual;
 }
 
 export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<void> {
-  if (state.modoOcr) return;
+  if (state.modoOcr) {
+    return;
+  }
   // Lee antes de mutar: si no hay imagen no se toca el estado (el fantasma
   // no se materializa ni se consume la hoja pedida). Sin await previo: el
   // gesto del clic autoriza el read() en Chrome.
   const archivos = await leerImagenesPortapapeles();
-  if (!archivos) return;
-  const primero = archivos[0];
-  if (!primero) return;
+  if (!archivos) {
+    return;
+  }
+  const [primero] = archivos;
+  if (!primero) {
+    return;
+  }
   const destino = destinoDelClic(hojaId);
-  if (!destino) return;
+  if (!destino) {
+    return;
+  }
   // Elección explícita de destino: consume la pendiente del picker (si no, el
   // próximo intake caería en una hoja abandonada).
   hojaPedida = null;
   const layoutRespaldo = destino.layout;
-  intakesActivos++;
+  intakesActivos += 1;
   state.loteEnCurso = true;
   try {
     let comp: Comprobante;
@@ -479,12 +511,16 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
     renderHojas();
     // Resto (raro desde WhatsApp): sigue a la hoja donde cayó `primero`.
     const resto = archivos.slice(1);
-    if (resto.length > 0) await agregarArchivos(resto, hojaFinal.id);
-    else despejarToasts("intake"); // éxito: los rechazos viejos de otro intento salen con fade
+    if (resto.length > 0) {
+      await agregarArchivos(resto, hojaFinal.id);
+    } else {
+      // éxito: los rechazos viejos de otro intento salen con fade
+      despejarToasts("intake");
+    }
     precalentarModelos();
     void procesarCola();
   } finally {
-    intakesActivos--;
+    intakesActivos -= 1;
     state.loteEnCurso = intakesActivos > 0;
   }
 }
@@ -493,7 +529,9 @@ export async function pegarEnCelda(hojaId: number, slotIdx: number): Promise<voi
 // por el flujo normal de entrada (crea la hoja sola).
 export async function pegarDelPortapapeles(): Promise<void> {
   const archivos = await leerImagenesPortapapeles();
-  if (!archivos) return;
+  if (!archivos) {
+    return;
+  }
   await agregarArchivos(archivos);
 }
 
@@ -505,10 +543,10 @@ export function renderCodigo(): void {
   // ponytail: el error visual vive hasta que el usuario corrige o se re-renderiza.
   inputCodigo.classList.remove("codigo-error", "sacudir");
   inputCodigo.removeAttribute("aria-invalid");
-  radiosPosicion().forEach((r) => {
+  for (const r of radiosPosicion()) {
     r.checked = r.value === state.codigoPosicion;
     r.disabled = !state.codigoActivo;
-  });
+  }
 }
 
 /** Abre el diálogo para subir directo a una hoja (la consume cualquier intake). */
@@ -530,7 +568,9 @@ function cablearPicker(): void {
   // El label solo reenvía clics: Enter/Espacio sobre él no abren el picker
   // (sin activation behavior propio), por eso el keydown es manual.
   dropzone.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
+    if (e.key !== "Enter" && e.key !== " ") {
+      return;
+    }
     e.preventDefault();
     fileInput.showPicker();
   });
@@ -553,16 +593,22 @@ function cablearArrastreCanvas(): void {
   // Head-start: entrar al canvas anticipa la intención (una sola vez).
   canvas.addEventListener("pointerenter", () => precalentarModelos(), { once: true });
   canvas.addEventListener("dragenter", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     e.preventDefault();
     marcarArrastre(arrastresCanvas + 1);
   });
   canvas.addEventListener("dragover", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     e.preventDefault();
   });
   canvas.addEventListener("dragleave", (e) => {
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     marcarArrastre(arrastresCanvas - 1);
   });
 }
@@ -573,20 +619,31 @@ function cablearArrastreCanvas(): void {
 function cablearSoltar(): void {
   canvas.addEventListener("drop", (e) => {
     marcarArrastre(0);
-    if (!esDragDeArchivos(e)) return;
+    if (!esDragDeArchivos(e)) {
+      return;
+    }
     e.preventDefault();
-    if ((e.target as HTMLElement | null)?.closest?.(".sheet")) return;
+    if ((e.target as HTMLElement | null)?.closest?.(".sheet")) {
+      return;
+    }
     void agregarArchivos(e.dataTransfer?.files);
   });
   window.addEventListener("dragover", (e) => {
-    if (esDragDeArchivos(e)) e.preventDefault();
+    if (esDragDeArchivos(e)) {
+      e.preventDefault();
+    }
   });
   window.addEventListener("drop", (e) => {
     marcarArrastre(0);
-    if (esDragDeArchivos(e)) e.preventDefault();
+    if (esDragDeArchivos(e)) {
+      e.preventDefault();
+    }
   });
   document.addEventListener("dragleave", (e) => {
-    if (e.relatedTarget === null) marcarArrastre(0); // el arrastre salió de la ventana
+    // el arrastre salió de la ventana
+    if (e.relatedTarget === null) {
+      marcarArrastre(0);
+    }
   });
 }
 
@@ -601,7 +658,9 @@ function archivosDePaste(e: ClipboardEvent): File[] {
 function cablearPaste(): void {
   document.addEventListener("paste", (e) => {
     const files = archivosDePaste(e);
-    if (files.length) void agregarArchivos(files);
+    if (files.length) {
+      void agregarArchivos(files);
+    }
   });
 }
 
@@ -609,7 +668,9 @@ function cablearPaste(): void {
     ponytail: lock por botón (el read() es async: sin esto el doble-clic pega dos veces). */
 function cablearBtnPegar(): void {
   btnPegar.addEventListener("click", () => {
-    if (btnPegar.dataset["pegando"] === "1") return;
+    if (btnPegar.dataset["pegando"] === "1") {
+      return;
+    }
     btnPegar.dataset["pegando"] = "1";
     void pegarDelPortapapeles().finally(() => {
       delete btnPegar.dataset["pegando"];
@@ -621,47 +682,61 @@ function cablearBtnPegar(): void {
 function cablearSwitchCodigo(): void {
   chkCodigo.addEventListener("change", () => {
     state.codigoActivo = chkCodigo.checked;
-    if (!chkCodigo.checked) borrarCodigo();
+    if (!chkCodigo.checked) {
+      borrarCodigo();
+    }
     renderCodigo();
   });
   inputCodigo.addEventListener("input", () => {
-    state.codigoValor = inputCodigo.value.replace(/\D/g, "");
+    state.codigoValor = inputCodigo.value.replaceAll(/\D/gu, "");
     inputCodigo.value = state.codigoValor;
     // ponytail: al teclear se levanta el error; el gate lo repone si sigue inválido.
     inputCodigo.classList.remove("codigo-error", "sacudir");
     inputCodigo.removeAttribute("aria-invalid");
-    if (chkCodigo.checked) guardarCodigo();
+    if (chkCodigo.checked) {
+      guardarCodigo();
+    }
   });
 }
 
 /** La esquina es otro dato de la ventana Código: cambiarla persiste igual. */
 function cablearRadiosPosicion(): void {
-  radiosPosicion().forEach((r) =>
+  for (const r of radiosPosicion()) {
     r.addEventListener("change", () => {
-      if (!r.checked || !isPosicionCodigo(r.value)) return;
+      if (!r.checked || !isPosicionCodigo(r.value)) {
+        return;
+      }
       state.codigoPosicion = r.value;
-      if (chkCodigo.checked) guardarCodigo();
-    }),
-  );
+      if (chkCodigo.checked) {
+        guardarCodigo();
+      }
+    });
+  }
 }
 
 /** El botón Limpiar abre el dialog vía commandfor (cero JS); acá solo se
     ejecuta el vaciado si se confirmó. Esc/backdrop/Cancelar → returnValue ''. */
 function cablearModalLimpiar(): void {
   modalLimpiar.addEventListener("close", () => {
-    if (modalLimpiar.returnValue !== "ok") return;
-    hojaPedida = null; // la hoja destino pudo dejar de existir
-    for (const h of state.hojas)
+    if (modalLimpiar.returnValue !== "ok") {
+      return;
+    }
+    // la hoja destino pudo dejar de existir
+    hojaPedida = null;
+    for (const h of state.hojas) {
       for (const c of itemsDe(h)) {
         URL.revokeObjectURL(c.imgUrl);
       }
+    }
     state.hojas = [crearHoja()];
     // ponytail: cada lote trae código distinto; solo el número, resto intacto.
     state.codigoValor = "";
     renderCodigo();
     renderHojas();
     // Último: si el storage falla, los renders ya corrieron.
-    if (state.codigoActivo) guardarCodigo();
+    if (state.codigoActivo) {
+      guardarCodigo();
+    }
   });
 }
 

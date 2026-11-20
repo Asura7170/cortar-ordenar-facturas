@@ -42,27 +42,37 @@ interface Rect {
   h: number;
 }
 
-const RADIO_ESQUINA = 32; // esquinas generosas (manos mayores, táctil)
+// esquinas generosas (manos mayores, táctil)
+const RADIO_ESQUINA = 32;
 const RADIO_LADO = 26;
-const BANDA_BORDE = 14; // agarre en plena línea, lejos de tiradores
+// agarre en plena línea, lejos de tiradores
+const BANDA_BORDE = 14;
 const LADO_VISUAL = 10;
-const MIN_LADO = 24; // lado mínimo en px display (el natural se valida al confirmar)
-const MIN_NATURAL = 8; // lado mínimo en px naturales al confirmar
+// lado mínimo en px display (el natural se valida al confirmar)
+const MIN_LADO = 24;
+// lado mínimo en px naturales al confirmar
+const MIN_NATURAL = 8;
 const PASO_TECLA = 2;
 /** Marco alrededor de la foto: aire para los tiradores del borde. */
 const MARGEN = 6;
 
 let idAbierto: number | null = null;
-let sesion = 0; // token anti sesión cruzada: cerrar+reabrir invalida confirms en vuelo
+// token anti sesión cruzada: cerrar+reabrir invalida confirms en vuelo
+let sesion = 0;
 let bmp: ImageBitmap | null = null;
-let escala = 1; // px naturales por px display
+// px naturales por px display
+let escala = 1;
 let cw = 0;
 let ch = 0;
 let rect: Rect = { x: 0, y: 0, w: 0, h: 0 };
-let activo = 7; // índice del tirador activo (empieza en "se")
-let borde: Borde = "se"; // borde en arrastre (el agarre puede empezar en plena línea)
-let moviendoEntero = false; // arrastre del área completa por su interior
-let agarreX = 0; // offset puntero−origen al agarrar el interior
+// índice del tirador activo (empieza en "se")
+let activo = 7;
+// borde en arrastre (el agarre puede empezar en plena línea)
+let borde: Borde = "se";
+// arrastre del área completa por su interior
+let moviendoEntero = false;
+// offset puntero−origen al agarrar el interior
+let agarreX = 0;
 let agarreY = 0;
 let enArrastre = false;
 let raf: number | null = null;
@@ -92,7 +102,11 @@ async function fotoComprobante(
   try {
     // ponytail: el editor abre el intake pre-warp (recupera lo cortado de más);
     // sin previo (DocAligner no-op), la imagen actual.
-    const fuente = item.previoDocAligner ?? item.file ?? (await (await fetch(item.imgUrl)).blob());
+    let fuente = item.previoDocAligner ?? item.file;
+    if (!fuente) {
+      const respuesta = await fetch(item.imgUrl);
+      fuente = await respuesta.blob();
+    }
     return await cargar(fuente, { imageOrientation: "from-image" });
   } catch {
     avisar("No se pudo abrir el recorte.");
@@ -151,9 +165,13 @@ function pintarBase(foto: ImageBitmap): boolean {
 }
 
 export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
-  if (modal.open || aperturaEnCurso) return;
+  if (modal.open || aperturaEnCurso) {
+    return;
+  }
   const item = obtenerComprobante(id);
-  if (!item || item.estado !== "ok") return;
+  if (!item || item.estado !== "ok") {
+    return;
+  }
   aperturaEnCurso = true;
   let foto: ImageBitmap | null = null;
   try {
@@ -161,7 +179,9 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   } finally {
     aperturaEnCurso = false;
   }
-  if (!foto) return;
+  if (!foto) {
+    return;
+  }
   if (esFotoInsuficiente(foto)) {
     foto.close();
     return;
@@ -178,7 +198,9 @@ export async function abrirRecorte(id: number, deps?: DepsOcr): Promise<void> {
   depsVigentes = deps;
   modal.showModal();
   dimensionarCanvases(foto);
-  if (!pintarBase(foto)) return;
+  if (!pintarBase(foto)) {
+    return;
+  }
   restablecer();
 }
 
@@ -189,7 +211,8 @@ function restablecer(): void {
 }
 
 function cerrarAnterior(): void {
-  sesion++; // invalida la confirmación en vuelo (ya no es su diálogo)
+  // invalida la confirmación en vuelo (ya no es su diálogo)
+  sesion += 1;
   if (raf !== null) {
     cancelAnimationFrame(raf);
     raf = null;
@@ -202,7 +225,9 @@ function cerrarAnterior(): void {
 }
 
 function pedirGuia(): void {
-  if (raf !== null) return;
+  if (raf !== null) {
+    return;
+  }
   raf = requestAnimationFrame(() => {
     raf = null;
     dibujarGuia();
@@ -211,9 +236,13 @@ function pedirGuia(): void {
 
 /** Solo overlay (la base es estática): velo fuera del rect + 8 tiradores. */
 function dibujarGuia(): void {
-  if (!bmp) return;
+  if (!bmp) {
+    return;
+  }
   const ctx = guia.getContext("2d");
-  if (!ctx) return;
+  if (!ctx) {
+    return;
+  }
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, cw + MARGEN * 2, ch + MARGEN * 2);
@@ -227,7 +256,7 @@ function dibujarGuia(): void {
   ctx.lineWidth = 2;
   ctx.strokeStyle = "#fff";
   ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-  TIRADORES.forEach((t, i) => {
+  for (const [i, t] of TIRADORES.entries()) {
     const hx = rect.x + rect.w * t.fx;
     const hy = rect.y + rect.h * t.fy;
     const l = LADO_VISUAL / 2;
@@ -236,7 +265,7 @@ function dibujarGuia(): void {
     ctx.lineWidth = 2;
     ctx.strokeStyle = i === activo ? "#1d7a3a" : "#fff";
     ctx.strokeRect(hx - l, hy - l, LADO_VISUAL, LADO_VISUAL);
-  });
+  }
 }
 
 function punto(e: PointerEvent): { x: number; y: number } {
@@ -249,7 +278,9 @@ function tiradorEn(p: { x: number; y: number }): number {
     const radio = t.fx !== 0.5 && t.fy !== 0.5 ? RADIO_ESQUINA : RADIO_LADO;
     const hx = rect.x + rect.w * t.fx;
     const hy = rect.y + rect.h * t.fy;
-    if (Math.hypot(p.x - hx, p.y - hy) <= radio) return i;
+    if (Math.hypot(p.x - hx, p.y - hy) <= radio) {
+      return i;
+    }
   }
   return -1;
 }
@@ -263,7 +294,10 @@ function conVertice(
   esqFin: Borde,
   lado: Borde,
 ): Borde {
-  return p < ini + RADIO_ESQUINA ? esqIni : p > fin - RADIO_ESQUINA ? esqFin : lado;
+  if (p < ini + RADIO_ESQUINA) {
+    return esqIni;
+  }
+  return p > fin - RADIO_ESQUINA ? esqFin : lado;
 }
 
 /** Línea más próxima en banda, con esquinas que mandan cerca del vértice. */
@@ -279,11 +313,19 @@ function bandaGanadora(
   const dO = Math.abs(p.x - izq);
   const dE = Math.abs(p.x - der);
   const d = Math.min(dN, dS, dO, dE);
-  if (d > BANDA_BORDE) return null;
+  if (d > BANDA_BORDE) {
+    return null;
+  }
   // Cerca de un vértice manda la esquina (coherente con el radio generoso).
-  if (d === dN) return conVertice(p.x, izq, der, "no", "ne", "n");
-  if (d === dS) return conVertice(p.x, izq, der, "so", "se", "s");
-  if (d === dO) return conVertice(p.y, arr, aba, "no", "so", "o");
+  if (d === dN) {
+    return conVertice(p.x, izq, der, "no", "ne", "n");
+  }
+  if (d === dS) {
+    return conVertice(p.x, izq, der, "so", "se", "s");
+  }
+  if (d === dO) {
+    return conVertice(p.y, arr, aba, "no", "so", "o");
+  }
   return conVertice(p.y, arr, aba, "ne", "se", "e");
 }
 
@@ -291,7 +333,9 @@ function bandaGanadora(
 function bordeEn(p: { x: number; y: number }): Borde | null {
   const i = tiradorEn(p);
   // ponytail: i viene de tiradorEn (índice válido de la tabla); sin fallback.
-  if (i >= 0) return (TIRADORES[i] as Tirador).b;
+  if (i >= 0) {
+    return (TIRADORES[i] as Tirador).b;
+  }
   const izq = rect.x;
   const arr = rect.y;
   const der = rect.x + rect.w;
@@ -301,8 +345,9 @@ function bordeEn(p: { x: number; y: number }): Borde | null {
     p.x > der + BANDA_BORDE ||
     p.y < arr - BANDA_BORDE ||
     p.y > aba + BANDA_BORDE
-  )
+  ) {
     return null;
+  }
   return bandaGanadora(p, izq, arr, der, aba);
 }
 
@@ -348,10 +393,18 @@ function moverA(b: Borde, p: { x: number; y: number }): void {
   let aba = aba0;
   // ponytail: mínimo en ambas unidades (con upscale, 24 display < 8 naturales).
   const minLado = Math.max(MIN_LADO, Math.ceil(MIN_NATURAL / escala));
-  if (tocaArriba(b)) arr = Math.min(Math.max(p.y, MARGEN), aba0 - minLado);
-  if (tocaAbajo(b)) aba = Math.max(Math.min(p.y, abaMax), arr + minLado);
-  if (tocaIzquierda(b)) izq = Math.min(Math.max(p.x, MARGEN), der0 - minLado);
-  if (tocaDerecha(b)) der = Math.max(Math.min(p.x, derMax), izq + minLado);
+  if (tocaArriba(b)) {
+    arr = Math.min(Math.max(p.y, MARGEN), aba0 - minLado);
+  }
+  if (tocaAbajo(b)) {
+    aba = Math.max(Math.min(p.y, abaMax), arr + minLado);
+  }
+  if (tocaIzquierda(b)) {
+    izq = Math.min(Math.max(p.x, MARGEN), der0 - minLado);
+  }
+  if (tocaDerecha(b)) {
+    der = Math.max(Math.min(p.x, derMax), izq + minLado);
+  }
   rect = { x: izq, y: arr, w: der - izq, h: aba - arr };
   pedirGuia();
 }
@@ -376,12 +429,16 @@ async function recortarBlobDe(foto: ImageBitmap, crear: typeof crearReal): Promi
   lienzo.width = w;
   lienzo.height = h;
   const ctx = lienzo.getContext("2d");
-  if (!ctx) throw new Error("sin contexto 2d");
+  if (!ctx) {
+    throw new Error("sin contexto 2d");
+  }
   ctx.drawImage(foto, sx, sy, w, h, 0, 0, w, h);
-  const recortado = await new Promise<Blob | null>((res) =>
-    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP),
-  );
-  if (!recortado) throw new Error("sin blob recortado");
+  const recortado = await new Promise<Blob | null>((res) => {
+    lienzo.toBlob(res, "image/webp", CALIDAD_WEBP);
+  });
+  if (!recortado) {
+    throw new Error("sin blob recortado");
+  }
   return recortado;
 }
 
@@ -395,7 +452,9 @@ async function commitearYReleer(
 ): Promise<boolean> {
   // ponytail: sesión cruzada (cerrar+reabrir en vuelo): la confirmación vieja
   // no commitea y no toca el diálogo nuevo (sin close: ya no es suyo).
-  if (sesion !== miSesion) return false;
+  if (sesion !== miSesion) {
+    return false;
+  }
   // ponytail: commit tras los awaits (igual que la cola: sin dueño no se
   // guarda). Sin dueño o descarte en vuelo se cierra (el evento close limpia
   // el bitmap rancio).
@@ -411,7 +470,9 @@ async function commitearYReleer(
   // ponytail: import antes del close (si falla, el catch dice la verdad:
   // nada se commiteó todavía). Sesión cruzada: el diálogo nuevo sigue abierto.
   const { renderHojas } = await import("./sheets");
-  if (sesion !== miSesion) return false;
+  if (sesion !== miSesion) {
+    return false;
+  }
   modal.close();
   renderHojas();
   // ponytail: el giro programa su relectura con debounce (si el recorte
@@ -422,19 +483,26 @@ async function commitearYReleer(
 }
 
 /** Confirma: recorta en píxeles naturales, commitea y relee el OCR. Nunca lanza. */
-let confirmando = false; // anti doble-clic/Enter (dos commits solapados revocaban URLs vivas)
+// anti doble-clic/Enter (dos commits solapados revocaban URLs vivas)
+let confirmando = false;
 async function confirmar(): Promise<void> {
   const id = idAbierto;
   const foto = bmp;
   const miSesion = sesion;
-  if (id === null || !foto || confirmando) return;
+  if (id === null || !foto || confirmando) {
+    return;
+  }
   const item = obtenerComprobante(id);
-  if (!item || item.estado !== "ok") return;
+  if (!item || item.estado !== "ok") {
+    return;
+  }
   const crear = crearVigente();
   confirmando = true;
   try {
     const recortado = await recortarBlobDe(foto, crear);
-    if (!recortado) return;
+    if (!recortado) {
+      return;
+    }
     await commitearYReleer(item, recortado, id, miSesion);
   } catch {
     avisar("No se pudo recortar la imagen.");
@@ -449,7 +517,9 @@ function cablearBotonesModal(): void {
     void confirmar();
   });
   btnReset.addEventListener("click", () => {
-    if (bmp) restablecer();
+    if (bmp) {
+      restablecer();
+    }
   });
   modal.addEventListener("close", () => {
     state.cierreRecorte = Date.now();
@@ -458,31 +528,39 @@ function cablearBotonesModal(): void {
   // ponytail: descarte explícito (sin depender de closedby): el clic en el
   // velo tiene como target el propio dialog; el de la foto/barra, a sus hijos.
   modal.addEventListener("click", (e) => {
-    if (e.target === modal && modal.open) modal.close();
+    if (e.target === modal && modal.open) {
+      modal.close();
+    }
   });
 }
 
 /** Arranque de arrastre: tirador o interior; captura el puntero. */
 function cablearPunteroAbajo(): void {
   guia.addEventListener("pointerdown", (e) => {
-    if (!bmp || !e.isPrimary) return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (!bmp || !e.isPrimary) {
+      return;
+    }
+    if (e.pointerType === "mouse" && e.button !== 0) {
+      return;
+    }
     const p = punto(e);
     const b = bordeEn(p);
     e.preventDefault();
-    if (!b) {
-      // Interior sin borde cerca: se mueve el área completa.
-      if (!dentroDe(p)) return;
-      moviendoEntero = true;
-      agarreX = p.x - rect.x;
-      agarreY = p.y - rect.y;
-    } else {
+    if (b) {
       borde = b;
       activo = Math.max(
         0,
         TIRADORES.findIndex((t) => t.b === b),
       );
       enArrastre = true;
+    } else {
+      // Interior sin borde cerca: se mueve el área completa.
+      if (!dentroDe(p)) {
+        return;
+      }
+      moviendoEntero = true;
+      agarreX = p.x - rect.x;
+      agarreY = p.y - rect.y;
     }
     try {
       guia.setPointerCapture(e.pointerId);
@@ -506,7 +584,9 @@ function cursorDeGuia(p: { x: number; y: number }): string {
 /** Arrastre y cursor de la zona bajo el puntero. */
 function cablearPunteroGuia(): void {
   guia.addEventListener("pointermove", (e) => {
-    if (!bmp) return;
+    if (!bmp) {
+      return;
+    }
     const p = punto(e);
     if (enArrastre) {
       moverA(borde, p);
@@ -529,7 +609,9 @@ function cablearPunteroGuia(): void {
 
 /** [ ] rotan el tirador activo (y su borde); false si la tecla no es esa. */
 function rotarTirador(e: KeyboardEvent): boolean {
-  if (e.key !== "[" && e.key !== "]") return false;
+  if (e.key !== "[" && e.key !== "]") {
+    return false;
+  }
   e.preventDefault();
   activo = (activo + (e.key === "[" ? TIRADORES.length - 1 : 1)) % TIRADORES.length;
   // ponytail: activo se mantiene módulo TIRADORES.length; índice válido.
@@ -544,22 +626,30 @@ function destinoTecla(e: KeyboardEvent, t: Tirador): { x: number; y: number } | 
   const hx = rect.x + rect.w * t.fx;
   const hy = rect.y + rect.h * t.fy;
   const paso = (e.shiftKey ? 5 : 1) * PASO_TECLA;
-  return e.key === "ArrowUp"
-    ? { x: hx, y: hy - paso }
-    : e.key === "ArrowDown"
-      ? { x: hx, y: hy + paso }
-      : e.key === "ArrowLeft"
-        ? { x: hx - paso, y: hy }
-        : e.key === "ArrowRight"
-          ? { x: hx + paso, y: hy }
-          : null;
+  if (e.key === "ArrowUp") {
+    return { x: hx, y: hy - paso };
+  }
+  if (e.key === "ArrowDown") {
+    return { x: hx, y: hy + paso };
+  }
+  if (e.key === "ArrowLeft") {
+    return { x: hx - paso, y: hy };
+  }
+  if (e.key === "ArrowRight") {
+    return { x: hx + paso, y: hy };
+  }
+  return null;
 }
 
 /** Teclado: [ ] rotan el tirador activo, flechas lo mueven, Enter confirma. */
 function cablearTecladoGuia(): void {
   guia.addEventListener("keydown", (e) => {
-    if (!bmp) return;
-    if (rotarTirador(e)) return;
+    if (!bmp) {
+      return;
+    }
+    if (rotarTirador(e)) {
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       void confirmar();
@@ -568,7 +658,9 @@ function cablearTecladoGuia(): void {
     // ponytail: activo se mantiene módulo TIRADORES.length; índice válido.
     const t = TIRADORES[activo] as Tirador;
     const d = destinoTecla(e, t);
-    if (!d) return;
+    if (!d) {
+      return;
+    }
     e.preventDefault();
     moverA(t.b, d);
   });
@@ -576,7 +668,9 @@ function cablearTecladoGuia(): void {
 
 export function initRecorte(): void {
   // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
-  if (modal.dataset["init"] === "1") return;
+  if (modal.dataset["init"] === "1") {
+    return;
+  }
   modal.dataset["init"] = "1";
   cablearBotonesModal();
   cablearPunteroAbajo();

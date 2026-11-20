@@ -4,13 +4,13 @@
    (0 generaciones). El exportador convierte a JPEG al embeber en el docx. */
 
 /** Lado mayor máximo tras normalizar (más píxeles no ayudan al OCR). */
-export const LADO_MAX_IMAGEN: number = 2000;
+export const LADO_MAX_IMAGEN = 2000;
 
 /** Calidad JPEG única (conversión de salida a Word). */
-export const CALIDAD_JPEG: number = 0.9;
+export const CALIDAD_JPEG = 0.9;
 
 /** Calidad WebP del pipeline (intake, warp, giros, recortes, páginas PDF). */
-export const CALIDAD_WEBP: number = 0.85;
+export const CALIDAD_WEBP = 0.85;
 
 /** Formatos que pasan crudos si no hay nada que corregir (sin recompresión). */
 const TIPOS_DIRECTOS: ReadonlySet<string> = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -53,7 +53,9 @@ export function esWebp(head: Uint8Array): boolean {
 /** true si el blob ya es jpg/png/webp (por MIME o firma mágica si el type viene vacío). */
 export async function esFormatoDirecto(f: Blob): Promise<boolean> {
   const t = (f.type ?? "").toLowerCase().trim();
-  if (t !== "") return TIPOS_DIRECTOS.has(t);
+  if (t !== "") {
+    return TIPOS_DIRECTOS.has(t);
+  }
   // ponytail: type vacío (algunos Android): firma de 12 bytes, sin decode.
   let head: Uint8Array;
   try {
@@ -61,7 +63,9 @@ export async function esFormatoDirecto(f: Blob): Promise<boolean> {
   } catch {
     return false;
   }
-  if (head.length < 4) return false;
+  if (head.length < 4) {
+    return false;
+  }
   // ponytail: índices OOB dan undefined y `===` corta a false igual que el original.
   return esJpeg(head) || esPng(head) || esWebp(head);
 }
@@ -90,7 +94,9 @@ export function esFondoBlanco(datos: Uint8ClampedArray, i: number): boolean {
 // ponytail: umbral fijo 245/99.5%; conteo por texto/OCR si hay falsos positivos en tickets ralos.
 export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
   const ctx = ctxLectura(lienzo);
-  if (!ctx || lienzo.width < 1 || lienzo.height < 1) return false;
+  if (!ctx || lienzo.width < 1 || lienzo.height < 1) {
+    return false;
+  }
   let datos: Uint8ClampedArray;
   try {
     datos = ctx.getImageData(0, 0, lienzo.width, lienzo.height).data;
@@ -101,7 +107,9 @@ export function esPaginaBlanca(lienzo: HTMLCanvasElement): boolean {
   let total = 0;
   for (let i = 0; i + 3 < datos.length; i += 4 * BLANCO_MUESTRA) {
     total += 1;
-    if (esFondoBlanco(datos, i)) blancos += 1;
+    if (esFondoBlanco(datos, i)) {
+      blancos += 1;
+    }
   }
   return total > 0 && blancos / total >= BLANCO_RATIO;
 }
@@ -129,7 +137,9 @@ export function esFondoNegro(datos: Uint8ClampedArray, i: number): boolean {
 // ponytail: espejo de esPaginaBlanca, no abstracción; el umbral vive aquí, no en config.
 export function esPaginaNegra(lienzo: HTMLCanvasElement): boolean {
   const ctx = ctxLectura(lienzo);
-  if (!ctx || lienzo.width < 1 || lienzo.height < 1) return false;
+  if (!ctx || lienzo.width < 1 || lienzo.height < 1) {
+    return false;
+  }
   let datos: Uint8ClampedArray;
   try {
     datos = ctx.getImageData(0, 0, lienzo.width, lienzo.height).data;
@@ -140,7 +150,9 @@ export function esPaginaNegra(lienzo: HTMLCanvasElement): boolean {
   let total = 0;
   for (let i = 0; i + 3 < datos.length; i += 4 * BLANCO_MUESTRA) {
     total += 1;
-    if (esFondoNegro(datos, i)) negros += 1;
+    if (esFondoNegro(datos, i)) {
+      negros += 1;
+    }
   }
   return total > 0 && negros / total >= NEGRO_RATIO;
 }
@@ -180,8 +192,10 @@ interface Bbox {
 
 /** Mediana por canal (elemento central del ordenado; vacío → 0). */
 export function medianaCanal(v: number[]): number {
-  if (v.length === 0) return 0;
-  const o = [...v].sort((a, b) => a - b);
+  if (v.length === 0) {
+    return 0;
+  }
+  const o = v.toSorted((a, b) => a - b);
   // ponytail: length ≥ 1 ⇒ floor(len/2) < len.
   return o[Math.floor(o.length / 2)] as number;
 }
@@ -198,7 +212,9 @@ export function medianaBorde(
   for (let k = 0; k < n; k += 1) {
     const i = toma(k);
     // ponytail: toma calcula índices dentro de la imagen (i..i+3 in-bounds).
-    if ((datos[i + 3] as number) < 128) continue;
+    if ((datos[i + 3] as number) < 128) {
+      continue;
+    }
     rs.push(datos[i] as number);
     gs.push(datos[i + 1] as number);
     bs.push(datos[i + 2] as number);
@@ -231,11 +247,17 @@ export function tramoFondo(
   ref: RGB,
 ): [number, number] | null {
   let a = 0;
-  while (a < largo && iguala(datos, toma(a), refIni)) a += 1;
+  while (a < largo && iguala(datos, toma(a), refIni)) {
+    a += 1;
+  }
   let b = largo - 1;
-  while (b >= a && iguala(datos, toma(b), refFin)) b -= 1;
+  while (b >= a && iguala(datos, toma(b), refFin)) {
+    b -= 1;
+  }
   for (let k = a; k <= b; k += 1) {
-    if (!iguala(datos, toma(k), ref)) return null;
+    if (!iguala(datos, toma(k), ref)) {
+      return null;
+    }
   }
   return [a, b];
 }
@@ -266,14 +288,20 @@ function colFondo(
 
 /** Avanza k mientras el tramo siga siendo fondo (pasada ascendente). */
 export function sube(k: number, hasta: number, fondo: (n: number) => boolean): number {
-  while (k < hasta && fondo(k)) k += 1;
-  return k;
+  let i = k;
+  while (i < hasta && fondo(i)) {
+    i += 1;
+  }
+  return i;
 }
 
 /** Retrocede k mientras el tramo siga siendo fondo (pasada descendente). */
 export function baja(k: number, hasta: number, fondo: (n: number) => boolean): number {
-  while (k > hasta && fondo(k)) k -= 1;
-  return k;
+  let i = k;
+  while (i > hasta && fondo(i)) {
+    i -= 1;
+  }
+  return i;
 }
 
 /**
@@ -296,14 +324,20 @@ export function bboxRecorte(
   const y1 = baja(alto - 1, y0, (k) => fila(k, refAbajo));
   const x0 = sube(0, ancho - 1, (k) => col(k, refIzq));
   const x1 = baja(ancho - 1, x0, (k) => col(k, refDer));
-  if (fila(y0, refArriba) && col(x0, refIzq)) return null;
+  if (fila(y0, refArriba) && col(x0, refIzq)) {
+    return null;
+  }
   return { x0, y0, x1, y1 };
 }
 
 /** El recorte no colapsa (≥15% del área) ni es ya el lienzo entero. */
 export function recorteViable(w: number, h: number, ancho: number, alto: number): boolean {
-  if (w * h < ancho * alto * AREA_MINIMA) return false;
-  if (w >= ancho && h >= alto) return false;
+  if (w * h < ancho * alto * AREA_MINIMA) {
+    return false;
+  }
+  if (w >= ancho && h >= alto) {
+    return false;
+  }
   return true;
 }
 
@@ -319,9 +353,13 @@ export function recortarMargenesBlancos(
 ): HTMLCanvasElement {
   const ancho = src.width;
   const alto = src.height;
-  if (ancho < 1 || alto < 1) return src;
+  if (ancho < 1 || alto < 1) {
+    return src;
+  }
   const ctx = ctxLectura(src);
-  if (!ctx) return src;
+  if (!ctx) {
+    return src;
+  }
   let datos: Uint8ClampedArray;
   try {
     datos = ctx.getImageData(0, 0, ancho, alto).data;
@@ -334,19 +372,25 @@ export function recortarMargenesBlancos(
   const refIzq = medianaBorde(datos, (y) => px(0, y), alto);
   const refDer = medianaBorde(datos, (y) => px(ancho - 1, y), alto);
   const box = bboxRecorte(datos, ancho, alto, refArriba, refAbajo, refIzq, refDer);
-  if (!box) return src;
+  if (!box) {
+    return src;
+  }
   const sx = Math.max(0, box.x0 - MARGEN_RECORTE);
   const sy = Math.max(0, box.y0 - MARGEN_RECORTE);
   const ex = Math.min(ancho - 1, box.x1 + MARGEN_RECORTE);
   const ey = Math.min(alto - 1, box.y1 + MARGEN_RECORTE);
   const w = ex - sx + 1;
   const h = ey - sy + 1;
-  if (!recorteViable(w, h, ancho, alto)) return src;
+  if (!recorteViable(w, h, ancho, alto)) {
+    return src;
+  }
   const out = crear();
   out.width = Math.max(1, w);
   out.height = Math.max(1, h);
   const octx = out.getContext("2d");
-  if (!octx) return src;
+  if (!octx) {
+    return src;
+  }
   try {
     octx.drawImage(src, sx, sy, w, h, 0, 0, w, h);
   } catch {
@@ -383,18 +427,26 @@ export async function normalizarImagen(
     lienzo.width = Math.max(1, Math.round(bmp.width * escala));
     lienzo.height = Math.max(1, Math.round(bmp.height * escala));
     const ctx = ctxLectura(lienzo);
-    if (!ctx) throw new Error("ilegible");
+    if (!ctx) {
+      throw new Error("ilegible");
+    }
     ctx.drawImage(bmp, 0, 0, lienzo.width, lienzo.height);
     // ponytail: mismo recorte que el PDF (el aire tuerce el quad de DocAligner).
     const recortado = recortarMargenesBlancos(lienzo, crear);
-    if (esPaginaBlanca(recortado) || esPaginaNegra(recortado)) throw new Error("blanca");
+    if (esPaginaBlanca(recortado) || esPaginaNegra(recortado)) {
+      throw new Error("blanca");
+    }
     // ponytail: sin nada que corregir el original pasa intacto (0 generaciones);
     // si no, la copia ya corregida se empaqueta a WebP (más liviano que PNG).
-    if (directo && escala === 1 && recortado === lienzo) return f;
-    const blob = await new Promise<Blob | null>((res) =>
-      recortado.toBlob(res, "image/webp", CALIDAD_WEBP),
-    );
-    if (!blob) throw new Error("ilegible");
+    if (directo && escala === 1 && recortado === lienzo) {
+      return f;
+    }
+    const blob = await new Promise<Blob | null>((res) => {
+      recortado.toBlob(res, "image/webp", CALIDAD_WEBP);
+    });
+    if (!blob) {
+      throw new Error("ilegible");
+    }
     return blob;
   } finally {
     bmp?.close();

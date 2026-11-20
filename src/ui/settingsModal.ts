@@ -25,7 +25,7 @@ const btnBorrarModelos: HTMLButtonElement = getEl<HTMLButtonElement>("btnBorrarM
 
 function textoModelos(bytes: number): string {
   return bytes > 0
-    ? `Modelos: ~${Math.round(bytes / 1048576)} MB en este navegador`
+    ? `Modelos: ~${Math.round(bytes / 1_048_576)} MB en este navegador`
     : "Modelos: no descargados";
 }
 
@@ -42,7 +42,9 @@ async function pintarModelos(): Promise<void> {
 let modelosOcupado = false;
 
 function ocuparModelos(): boolean {
-  if (modelosOcupado) return false;
+  if (modelosOcupado) {
+    return false;
+  }
   modelosOcupado = true;
   btnProbarIa.disabled = true;
   btnDescargarModelos.disabled = true;
@@ -74,16 +76,21 @@ export function initSettings(): void {
     renderHojas();
   });
   btnProbarIa.addEventListener("click", () => {
-    if (!ocuparModelos()) return;
-    reactivarIa(); // sin enfriamiento ni latch de EPs: la prueba nace fresca
+    if (!ocuparModelos()) {
+      return;
+    }
+    // sin enfriamiento ni latch de EPs: la prueba nace fresca
+    reactivarIa();
     estadoModelos.textContent = "IA: probando (descarga y sesiones GPU)…";
     void (async (): Promise<void> => {
       try {
-        await obtenerSesion(); // recorte: fastvit
-        await obtenerNucleo(); // OCR: det+rec (en serie: la GPU no compite)
+        // recorte: fastvit
+        await obtenerSesion();
+        // OCR: det+rec (en serie: la GPU no compite)
+        await obtenerNucleo();
         estadoModelos.textContent = "IA: sesiones listas — recorte y OCR van bien";
-      } catch (e: unknown) {
-        const msj = e instanceof Error ? e.message : String(e);
+      } catch (error: unknown) {
+        const msj = error instanceof Error ? error.message : String(error);
         estadoModelos.textContent = esImportDinamicoMuerto(msj)
           ? "IA: sin archivos de la app (recargá el navegador — hay versión nueva)"
           : `IA: no disponible (${msj}). Probá de nuevo o borrá los modelos`;
@@ -93,35 +100,41 @@ export function initSettings(): void {
     })();
   });
   btnDescargarModelos.addEventListener("click", () => {
-    if (!ocuparModelos()) return;
+    if (!ocuparModelos()) {
+      return;
+    }
     estadoModelos.textContent = "Modelos: descargando…";
-    void Promise.all([descargarPesos(), descargarPesosOcr()])
-      .then(
-        () => pintarModelos(),
-        (e: unknown) => {
-          console.warn("modelos:", e);
-          estadoModelos.textContent =
-            "Modelos: no se pudo descargar: falta espacio o conexión. Probá de nuevo";
-        },
-      )
-      .finally(() => soltarModelos());
+    void (async (): Promise<void> => {
+      try {
+        await Promise.all([descargarPesos(), descargarPesosOcr()]);
+        await pintarModelos();
+      } catch (error: unknown) {
+        console.warn("modelos:", error);
+        estadoModelos.textContent =
+          "Modelos: no se pudo descargar: falta espacio o conexión. Probá de nuevo";
+      } finally {
+        soltarModelos();
+      }
+    })();
   });
   btnBorrarModelos.addEventListener("click", () => {
-    if (!ocuparModelos()) return;
-    void borrarModelos()
-      .then(
-        (habia) => {
-          estadoModelos.textContent = habia
-            ? "Modelos: borrados (se descargan de nuevo al usarse)"
-            : "Modelos: no había nada descargado";
-        },
-        (e: unknown) => {
-          console.warn("modelos:", e);
-          estadoModelos.textContent =
-            "Modelos: no se pudo borrar: hay algo bloqueando el almacenamiento. Probá de nuevo";
-        },
-      )
-      .finally(() => soltarModelos());
+    if (!ocuparModelos()) {
+      return;
+    }
+    void (async (): Promise<void> => {
+      try {
+        const habia = await borrarModelos();
+        estadoModelos.textContent = habia
+          ? "Modelos: borrados (se descargan de nuevo al usarse)"
+          : "Modelos: no había nada descargado";
+      } catch (error: unknown) {
+        console.warn("modelos:", error);
+        estadoModelos.textContent =
+          "Modelos: no se pudo borrar: hay algo bloqueando el almacenamiento. Probá de nuevo";
+      } finally {
+        soltarModelos();
+      }
+    })();
   });
   formAjustes.addEventListener("submit", () => {
     state.moneda = isMoneda(cfgMoneda.value) ? cfgMoneda.value : MONEDA_DEFAULT;

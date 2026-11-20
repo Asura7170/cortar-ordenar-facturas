@@ -2,38 +2,42 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("./state", () => ({
-  cargar: vi.fn(),
-  crearHoja: vi.fn(() => ({})),
+  cargar: vi.fn<() => void>(),
+  crearHoja: vi.fn<() => unknown>(() => ({})),
   state: { hojas: [] as unknown[] },
 }));
 vi.mock("./ui/sheets", () => {
   const registro = globalThis as unknown as { __initSheetsArgs?: unknown[][] };
   registro.__initSheetsArgs ??= [];
   return {
-    initSheets: vi.fn((...args: unknown[]) => {
+    initSheets: vi.fn<(...args: unknown[]) => void>((...args: unknown[]) => {
       registro.__initSheetsArgs?.push(args);
     }),
-    renderHojas: vi.fn(),
+    renderHojas: vi.fn<() => void>(),
   };
 });
 vi.mock("./ui/sidebar", () => ({
-  agregarArchivos: vi.fn(),
-  elegirArchivos: vi.fn(),
-  initSidebar: vi.fn(),
-  pegarEnCelda: vi.fn(),
-  renderCodigo: vi.fn(),
+  agregarArchivos:
+    vi.fn<(files: FileList | readonly File[] | null | undefined, hojaId?: number | null) => void>(),
+  elegirArchivos: vi.fn<(hojaId: number) => void>(),
+  initSidebar: vi.fn<() => void>(),
+  pegarEnCelda: vi.fn<(hojaId: number, slotIdx: number) => Promise<void> | void>(),
+  renderCodigo: vi.fn<() => void>(),
 }));
-vi.mock("./ui/ocrMode", () => ({ initOcrMode: vi.fn(), renderOcrToggle: vi.fn() }));
-vi.mock("./ui/settingsModal", () => ({ initSettings: vi.fn() }));
-vi.mock("./ui/github", () => ({ initGithub: vi.fn() }));
-vi.mock("./ui/recorte", () => ({ initRecorte: vi.fn() }));
-vi.mock("./export/salidas", () => ({ initExport: vi.fn() }));
+vi.mock("./ui/ocrMode", () => ({
+  initOcrMode: vi.fn<() => void>(),
+  renderOcrToggle: vi.fn<() => void>(),
+}));
+vi.mock("./ui/settingsModal", () => ({ initSettings: vi.fn<() => void>() }));
+vi.mock("./ui/github", () => ({ initGithub: vi.fn<() => Promise<void>>() }));
+vi.mock("./ui/recorte", () => ({ initRecorte: vi.fn<() => void>() }));
+vi.mock("./export/salidas", () => ({ initExport: vi.fn<() => void>() }));
 vi.mock("./utils", () => ({
-  getEl: vi.fn(() => ({
+  getEl: vi.fn<(id: string) => unknown>(() => ({
     title: "",
     setAttribute: (_k: string, _v: string) => {},
     addEventListener: (_ev: string, fn: () => void) => {
-      const g = globalThis as unknown as { __temaClicks?: Array<() => void> };
+      const g = globalThis as unknown as { __temaClicks?: (() => void)[] };
       g.__temaClicks ??= [];
       g.__temaClicks.push(fn);
     },
@@ -67,9 +71,11 @@ describe("resolverTema", () => {
 
 describe("toggle con storage bloqueado", () => {
   it("aplica el tema aunque el guardado falle", () => {
-    const g = globalThis as unknown as { __temaClicks?: Array<() => void> };
+    const g = globalThis as unknown as { __temaClicks?: (() => void)[] };
     const handler = g.__temaClicks?.[0];
-    if (!handler) throw new Error("sin handler de tema");
+    if (!handler) {
+      throw new Error("sin handler de tema");
+    }
     const original = localStorage.setItem.bind(localStorage);
     Object.defineProperty(localStorage, "setItem", {
       value: () => {
@@ -94,6 +100,8 @@ describe("cableado de hojas", () => {
   it("initSheets recibe pegarEnCelda (sin esta red el clic muere en silencio)", () => {
     const llamadas = argsInitSheets()[0] as unknown[];
     expect(argsInitSheets()).toHaveLength(1);
-    expect(llamadas[0]).toEqual(expect.objectContaining({ pegarEnCelda: expect.any(Function) }));
+    expect(llamadas[0]).toStrictEqual(
+      expect.objectContaining({ pegarEnCelda: expect.any(Function) }),
+    );
   });
 });

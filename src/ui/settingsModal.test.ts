@@ -5,9 +5,9 @@ import { montarFixture, el } from "../test/fixture";
 
 // Sesiones IA falsas: el toque real necesita GPU/wasm; el modal solo reporta.
 const iaFalsa = vi.hoisted(() => ({
-  sesion: vi.fn(),
-  nucleo: vi.fn(),
-  reactiva: vi.fn(),
+  sesion: vi.fn<() => Promise<unknown>>(),
+  nucleo: vi.fn<() => Promise<unknown>>(),
+  reactiva: vi.fn<() => void>(),
 }));
 vi.mock("../pipeline/docaligner", async (importOriginal) => {
   const real = await importOriginal<typeof import("../pipeline/docaligner")>();
@@ -85,7 +85,10 @@ describe("Restablecer", () => {
 });
 
 describe("Modelos", () => {
-  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+  const pausa = (): Promise<void> =>
+    new Promise((res) => {
+      setTimeout(res, 10);
+    });
 
   function conRed(tienda: Map<unknown, unknown>, fetchFn: ReturnType<typeof vi.fn>): () => void {
     const g = globalThis as Record<string, unknown>;
@@ -107,7 +110,7 @@ describe("Modelos", () => {
           return tienda.get(url) ?? undefined;
         },
         put: async (k: unknown, v: unknown): Promise<void> => {
-          const cuerpo = (v as { cuerpo?: ArrayBuffer }).cuerpo;
+          const { cuerpo } = v as { cuerpo?: ArrayBuffer };
           tienda.set(k, {
             arrayBuffer: async () => bytes,
             headers: { get: () => String(cuerpo?.byteLength ?? 0) },
@@ -124,8 +127,11 @@ describe("Modelos", () => {
     return () => {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     };
   }
 
@@ -138,7 +144,9 @@ describe("Modelos", () => {
       await pausa();
       expect(estadoModelos.textContent).toBe("Modelos: no descargados");
     } finally {
-      if (realCaches !== undefined) g["caches"] = realCaches;
+      if (realCaches !== undefined) {
+        g["caches"] = realCaches;
+      }
       modalAjustes.close();
     }
   });
@@ -146,7 +154,7 @@ describe("Modelos", () => {
   it("descargar pinta el tamaño y borrar lo vacía", async () => {
     const tienda = new Map<unknown, unknown>();
     const grande = new ArrayBuffer(60_000_000);
-    const fetchFn = vi.fn(async () => ({
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,
       arrayBuffer: async () => grande,
@@ -171,7 +179,7 @@ describe("Modelos", () => {
 
   it("descarga fallida muestra el motivo fijo y libera los botones", async () => {
     const tienda = new Map<unknown, unknown>();
-    const fetchFn = vi.fn(async () => {
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => {
       throw new Error("red caída");
     });
     const restaurar = conRed(tienda, fetchFn);
@@ -201,8 +209,11 @@ describe("Modelos", () => {
       // La IA degrada a red directa sin caché; aquí solo se ve "no hay nada".
       expect(estadoModelos.textContent).toContain("Modelos: no descargados");
     } finally {
-      if (realCaches === undefined) delete g["caches"];
-      else g["caches"] = realCaches;
+      if (realCaches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = realCaches;
+      }
       modalAjustes.close();
     }
   });
@@ -222,14 +233,20 @@ describe("Modelos", () => {
       expect(estadoModelos.textContent).toContain("no se pudo borrar");
       expect(estadoModelos.textContent).not.toContain("denegado");
     } finally {
-      if (realCaches === undefined) delete g["caches"];
-      else g["caches"] = realCaches;
+      if (realCaches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = realCaches;
+      }
     }
   });
 });
 
 describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
-  const pausa = (): Promise<void> => new Promise((res) => setTimeout(res, 10));
+  const pausa = (): Promise<void> =>
+    new Promise((res) => {
+      setTimeout(res, 10);
+    });
 
   beforeEach(() => {
     iaFalsa.sesion.mockReset();
@@ -241,13 +258,14 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
     iaFalsa.sesion.mockResolvedValue({});
     iaFalsa.nucleo.mockResolvedValue({});
     btnAjustes.click();
-    await pausa(); // deja asentar el estado de modelos antes de la prueba
+    // deja asentar el estado de modelos antes de la prueba
+    await pausa();
     btnProbarIa.click();
     await pausa();
     expect(estadoModelos.textContent).toContain("IA: sesiones listas");
     expect(btnProbarIa.disabled).toBe(false);
     expect(btnDescargarModelos.disabled).toBe(false);
-    expect(iaFalsa.reactiva).toHaveBeenCalledTimes(1);
+    expect(iaFalsa.reactiva).toHaveBeenCalledOnce();
   });
 
   it("sesiones caídas: motivo visible y botón repuesto (no queda bloqueado)", async () => {
@@ -266,7 +284,11 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
   it("fieldset ocupado: Borrar/Descargar/2º Probar quedan excluidos hasta que vuela", async () => {
     let suelta: (v: unknown) => void = () => {};
     iaFalsa.sesion.mockResolvedValue({});
-    iaFalsa.nucleo.mockReturnValue(new Promise((r) => (suelta = r)));
+    iaFalsa.nucleo.mockReturnValue(
+      new Promise((r) => {
+        suelta = r;
+      }),
+    );
     btnAjustes.click();
     await pausa();
     btnProbarIa.click();
@@ -280,7 +302,8 @@ describe("Probar IA (sesiones reales con presupuesto fresco)", () => {
     expect(btnProbarIa.disabled).toBe(true);
     expect(btnDescargarModelos.disabled).toBe(true);
     expect(btnBorrarModelos.disabled).toBe(true);
-    expect(iaFalsa.reactiva).toHaveBeenCalledTimes(1); // el 2º Probar no repite
+    // el 2º Probar no repite
+    expect(iaFalsa.reactiva).toHaveBeenCalledOnce();
     suelta({});
     await pausa();
     expect(estadoModelos.textContent).toContain("IA: sesiones listas");
@@ -295,6 +318,6 @@ describe("secciones del modal", () => {
     const leyendas = [...formAjustes.querySelectorAll("fieldset.grupo-modelos > legend")].map(
       (l) => l.textContent,
     );
-    expect(leyendas).toEqual(["Moneda", "Modelos en este equipo"]);
+    expect(leyendas).toStrictEqual(["Moneda", "Modelos en este equipo"]);
   });
 });

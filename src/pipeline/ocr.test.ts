@@ -67,14 +67,16 @@ function lienzoFalso(pixeles: Uint8ClampedArray): {
 }
 
 function bitmapFalso(w: number, h: number): ImageBitmap {
-  return { width: w, height: h, close: vi.fn() } as unknown as ImageBitmap;
+  return { width: w, height: h, close: vi.fn<() => void>() } as unknown as ImageBitmap;
 }
 
 /** Mapa 16x8 con rect brillante x2-5/y2-5 (una línea de texto). */
 function mapaUnaLinea(): { data: Float32Array; dims: number[] } {
   const data = new Float32Array(16 * 8).fill(0.01);
   for (let y = 2; y <= 5; y += 1) {
-    for (let x = 2; x <= 5; x += 1) data[y * 16 + x] = 0.9;
+    for (let x = 2; x <= 5; x += 1) {
+      data[y * 16 + x] = 0.9;
+    }
   }
   return { data, dims: [1, 1, 8, 16] };
 }
@@ -121,25 +123,25 @@ const BLANCO32 = new Uint8ClampedArray(32 * 32 * 4).fill(255);
 
 describe("tamanoDet", () => {
   it("2000x1000 → 960x480 (solo reduce, múltiplo de 32)", () => {
-    expect(tamanoDet(2000, 1000)).toEqual({ w: 960, h: 480 });
+    expect(tamanoDet(2000, 1000)).toStrictEqual({ w: 960, h: 480 });
   });
 
   it("100x50 → 96x64", () => {
-    expect(tamanoDet(100, 50)).toEqual({ w: 96, h: 64 });
+    expect(tamanoDet(100, 50)).toStrictEqual({ w: 96, h: 64 });
   });
 
   it("10x10 → mínimo 32", () => {
-    expect(tamanoDet(10, 10)).toEqual({ w: 32, h: 32 });
+    expect(tamanoDet(10, 10)).toStrictEqual({ w: 32, h: 32 });
   });
 
   it("cero → cero", () => {
-    expect(tamanoDet(0, 5)).toEqual({ w: 0, h: 0 });
+    expect(tamanoDet(0, 5)).toStrictEqual({ w: 0, h: 0 });
   });
 });
 
 describe("bgrDesdeRgba", () => {
   it("rota canales e ignora alfa", () => {
-    expect(bgrDesdeRgba(new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 128]))).toEqual(
+    expect(bgrDesdeRgba(new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 128]))).toStrictEqual(
       new Uint8Array([0, 0, 255, 0, 255, 0]),
     );
   });
@@ -155,7 +157,7 @@ describe("tensorDet", () => {
 
   it("desde RGBA equivale bit a bit a la vía en 2 pasos", () => {
     const rgba = new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 128, 10, 20, 30, 255]);
-    expect(tensorDetDesdeRgba(rgba, 3, 1)).toEqual(tensorDet(bgrDesdeRgba(rgba), 3, 1));
+    expect(tensorDetDesdeRgba(rgba, 3, 1)).toStrictEqual(tensorDet(bgrDesdeRgba(rgba), 3, 1));
   });
 
   it("BGR corto usa 0 en los canales ausentes (guarda ??)", () => {
@@ -167,13 +169,15 @@ describe("tensorDet", () => {
 });
 
 describe("envolver", () => {
-  const sesion = (shape: ReadonlyArray<number | string>) =>
+  const sesion = (shape: readonly (number | string)[]) =>
     ({
       outputMetadata: [{ name: "x", isTensor: true, type: 1, shape }],
     }) as unknown as import("onnxruntime-web").InferenceSession;
+
   it("rec con clases distintas al dict lanza en init", () => {
-    expect(() => envolver({} as never, sesion([100, 80, 999]), "rec")).toThrow(/999 clases/);
+    expect(() => envolver({} as never, sesion([100, 80, 999]), "rec")).toThrow(/999 clases/u);
   });
+
   it("rec compatible no lanza", () => {
     expect(() => envolver({} as never, sesion([100, 80, DICT_OCR.length]), "rec")).not.toThrow();
   });
@@ -182,7 +186,9 @@ describe("envolver", () => {
 describe("matrizInversa", () => {
   it("traslación → traslación opuesta", () => {
     // +0 normaliza el −0 del álgebra (idéntico para canvas).
-    expect(matrizInversa([1, 0, 0, 1, 10, 10])?.map((v) => v + 0)).toEqual([1, 0, 0, 1, -10, -10]);
+    expect(matrizInversa([1, 0, 0, 1, 10, 10])?.map((v) => v + 0)).toStrictEqual([
+      1, 0, 0, 1, -10, -10,
+    ]);
   });
 
   it("compuesta con la original → identidad sobre p0 y p1", () => {
@@ -245,24 +251,25 @@ describe("extraerTexto", () => {
     const diag = diagVacio();
     const texto = await extraerTexto(new Blob(["x"]), deps, undefined, diag);
     expect(texto).toBe("AA");
-    expect(espia.det).toEqual([[[1, 3, 32, 64]]]);
+    expect(espia.det).toStrictEqual([[[1, 3, 32, 64]]]);
     expect(espia.rec).toHaveLength(1);
-    expect((espia.rec[0] as number[][])?.[0]?.slice(0, 3)).toEqual([1, 3, 48]);
-    expect(transforms).toHaveLength(1); // warp afín aplicado
-    expect(diag).toEqual({ cajas: 1, lote: 1, anchoMax: 320, fallback: false, recRuns: 1 });
+    expect((espia.rec[0] as number[][])?.[0]?.slice(0, 3)).toStrictEqual([1, 3, 48]);
+    // warp afín aplicado
+    expect(transforms).toHaveLength(1);
+    expect(diag).toStrictEqual({ cajas: 1, lote: 1, anchoMax: 320, fallback: false, recRuns: 1 });
   });
 
   it("mapa vacío → sin texto y sin rec", async () => {
     const vacio = { data: new Float32Array(16 * 8).fill(0.01), dims: [1, 1, 8, 16] };
     const { deps, espia } = base(vacio, logitsAA());
-    expect(await extraerTexto(new Blob(["x"]), deps)).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps)).resolves.toBe("");
     expect(espia.rec).toHaveLength(0);
   });
 
   it("rec todo blank → línea vacía filtrada", async () => {
     const n = DICT_OCR.length;
     const { deps } = base(mapaUnaLinea(), { data: new Float32Array(n), dims: [1, 1, n] });
-    expect(await extraerTexto(new Blob(["x"]), deps)).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps)).resolves.toBe("");
   });
 
   it("núcleo caído → sin lanzar", async () => {
@@ -288,7 +295,8 @@ describe("extraerTexto", () => {
   it("reuse del enderezado: no repite el det (L1)", async () => {
     const { deps, espia } = base();
     const { lienzo } = lienzoFalso(BLANCO32);
-    lienzo.width = 32; // en prod ver() siempre fija dims (mínimo 32)
+    // en prod ver() siempre fija dims (mínimo 32)
+    lienzo.width = 32;
     lienzo.height = 32;
     const texto = await extraerTexto(new Blob(["x"]), deps, {
       cajas: [
@@ -311,12 +319,16 @@ describe("extraerTexto", () => {
 
   it("reuse sin base ni cajas → decode fresca", async () => {
     const { deps, espia } = base();
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas: [], base: null })).toBe("AA");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas: [], base: null })).resolves.toBe(
+      "AA",
+    );
     expect(espia.det).toHaveLength(1);
     const { lienzo } = lienzoFalso(BLANCO32);
     lienzo.width = 32;
     lienzo.height = 32;
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas: [], base: lienzo })).toBe("AA");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas: [], base: lienzo })).resolves.toBe(
+      "AA",
+    );
   });
 
   it("reuse chico → vacío directo sin decode", async () => {
@@ -335,7 +347,7 @@ describe("extraerTexto", () => {
         puntaje: 0.9,
       },
     ];
-    expect(await extraerTexto(new Blob(["x"]), deps, { cajas, base: lienzo })).toBe("");
+    await expect(extraerTexto(new Blob(["x"]), deps, { cajas, base: lienzo })).resolves.toBe("");
     expect(espia.det).toHaveLength(0);
     expect(espia.rec).toHaveLength(0);
   });
@@ -344,7 +356,8 @@ describe("extraerTexto", () => {
     const { deps } = base();
     const texto = await extraerTexto(new Blob(["x"]), {
       ...deps,
-      crear: () => document.createElement("canvas"), // jsdom: getContext null
+      // jsdom: getContext null
+      crear: () => document.createElement("canvas"),
     });
     expect(texto).toBe("");
   });
@@ -369,6 +382,7 @@ describe("extraerTexto", () => {
       const texto = await extraerTexto(new Blob(["x"]), {
         cargar: () => Promise.resolve(bitmapFalso(64, 32)),
         crear: () => lienzo,
+        // oxlint-disable-next-line eslint/prefer-promise-reject-errors -- rechazo no-Error es el caso bajo prueba
         nucleo: () => Promise.reject("corte de luz"),
       });
       expect(texto).toBe("");
@@ -381,7 +395,8 @@ describe("extraerTexto", () => {
   it("reuse del enderezado: sin lienzo temporal, solo el del recorte (hilo #4)", async () => {
     const { deps } = base();
     const { lienzo } = lienzoFalso(BLANCO32);
-    lienzo.width = 32; // en prod ver() siempre fija dims (mínimo 32)
+    // en prod ver() siempre fija dims (mínimo 32)
+    lienzo.width = 32;
     lienzo.height = 32;
     let creados = 0;
     let decodes = 0;
@@ -411,8 +426,10 @@ describe("extraerTexto", () => {
       base: lienzo,
     });
     expect(texto).toBe("AA");
-    expect(creados).toBe(1); // solo recorteCaja; antes eran 2 (base temporal + recorte)
-    expect(decodes).toBe(0); // Fase 2: en reuse no se decodifica el blob
+    // solo recorteCaja; antes eran 2 (base temporal + recorte)
+    expect(creados).toBe(1);
+    // Fase 2: en reuse no se decodifica el blob
+    expect(decodes).toBe(0);
   });
 });
 
@@ -445,7 +462,7 @@ describe("girarBlob", () => {
     expect(fuera).toBeInstanceOf(Blob);
     expect(lienzo.width).toBe(20);
     expect(lienzo.height).toBe(10);
-    expect(pedidos).toEqual([{ tipo: "image/webp", calidad: 0.85 }]);
+    expect(pedidos).toStrictEqual([{ tipo: "image/webp", calidad: 0.85 }]);
   });
 
   it("sin contexto o sin blob → null sin lanzar", async () => {
@@ -497,7 +514,7 @@ describe("reconocerCaja", () => {
       },
       () => sinCtx,
     );
-    expect(r).toEqual({ texto: "", puntaje: 0 });
+    expect(r).toStrictEqual({ texto: "", puntaje: 0 });
     expect(espia.rec).toHaveLength(0);
   });
 
@@ -508,8 +525,14 @@ describe("reconocerCaja", () => {
     let h = 0;
     const crear = (): HTMLCanvasElement =>
       ({
+        get width(): number {
+          return w;
+        },
         set width(v: number) {
           w = v;
+        },
+        get height(): number {
+          return h;
         },
         set height(v: number) {
           h = v;
@@ -545,7 +568,7 @@ describe("reconocerCaja", () => {
       crear,
     );
     // aristas 200.8×20 → 201×20 (el bbox daría 200×38 y estiraría los glifos).
-    expect([w, h]).toEqual([201, 20]);
+    expect([w, h]).toStrictEqual([201, 20]);
   });
 });
 
@@ -600,10 +623,10 @@ describe("reconocerLote", () => {
       () => lienzo,
       diag,
     );
-    expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
+    expect(rs.map((r) => r.texto)).toStrictEqual(["AA", "AA"]);
     expect(espia.rec).toHaveLength(1);
-    expect((espia.rec[0] as number[][])?.[0]).toEqual([2, 3, 48, 320]);
-    expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: false, recRuns: 1 });
+    expect((espia.rec[0] as number[][])?.[0]).toStrictEqual([2, 3, 48, 320]);
+    expect(diag).toStrictEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: false, recRuns: 1 });
   });
 
   it("lote rechazado → fallback individual sin lanzar (L2)", async () => {
@@ -614,20 +637,23 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         llamadas.push(formas);
-        if ((formas[0] ?? 0) > 1) return Promise.reject(new Error("sin batch"));
+        if ((formas[0] ?? 0) > 1) {
+          return Promise.reject(new Error("sin batch"));
+        }
         return Promise.resolve({ fetch_name_0: logitsAA() });
       },
     };
     const { lienzo } = lienzoFalso(BLANCO32);
     const diag = diagVacio();
     const rs = await reconocerLote(rec, lienzo, [caja10(0.9), caja10(0.8)], () => lienzo, diag);
-    expect(rs.map((r) => r.texto)).toEqual(["AA", "AA"]);
-    expect(llamadas).toHaveLength(3); // 1 lote + 2 individuales
+    expect(rs.map((r) => r.texto)).toStrictEqual(["AA", "AA"]);
+    // 1 lote + 2 individuales
+    expect(llamadas).toHaveLength(3);
     expect(llamadas[0]?.[0]).toBe(2);
     // Hilo #3: el lote fallido también es un run (antes se omitía).
-    expect(diag).toEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 3 });
+    expect(diag).toStrictEqual({ cajas: 0, lote: 2, anchoMax: 320, fallback: true, recRuns: 3 });
   });
 
   it("fallback conserva chunks exitosos y cuenta el chunk fallido (hilo #3)", async () => {
@@ -641,10 +667,12 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         llamadas.push(formas);
         n += 1;
-        if (n === 2) return Promise.reject(new Error("chunk caído"));
+        if (n === 2) {
+          return Promise.reject(new Error("chunk caído"));
+        }
         const b = formas[0] ?? 0;
         const data = new Float32Array(b * 3 * clases);
         for (let k = 0; k < b; k += 1) {
@@ -661,7 +689,7 @@ describe("reconocerLote", () => {
     expect(rs).toHaveLength(20);
     expect(rs.every((r) => r.texto === "AA")).toBe(true);
     // 1 chunk ok [16] + 1 chunk fallido [4] + 4 individuales (solo el caído)
-    expect(llamadas).toEqual([
+    expect(llamadas).toStrictEqual([
       [16, 3, 48, 320],
       [4, 3, 48, 320],
       [1, 3, 48, 320],
@@ -669,7 +697,7 @@ describe("reconocerLote", () => {
       [1, 3, 48, 320],
       [1, 3, 48, 320],
     ]);
-    expect(diag).toEqual({ cajas: 0, lote: 20, anchoMax: 320, fallback: true, recRuns: 6 });
+    expect(diag).toStrictEqual({ cajas: 0, lote: 20, anchoMax: 320, fallback: true, recRuns: 6 });
   });
 
   /** rec stub que deletrea "AA" por lote con la forma que le pidan. */
@@ -682,7 +710,7 @@ describe("reconocerLote", () => {
         formas: [...formas],
       }),
       run: (feeds: Record<string, unknown>): Promise<Record<string, SalidaOcr>> => {
-        const formas = (feeds["x"] as { formas: number[] }).formas;
+        const { formas } = feeds["x"] as { formas: number[] };
         formasRun.push(formas);
         const b = formas[0] ?? 0;
         const data = new Float32Array(b * 3 * n);
@@ -703,7 +731,7 @@ describe("reconocerLote", () => {
     const rs = await reconocerLote(recLotes(formasRun), lienzo, cajas, () => lienzo, diag);
     expect(rs).toHaveLength(20);
     expect(rs.every((r) => r.texto === "AA")).toBe(true);
-    expect(formasRun).toEqual([
+    expect(formasRun).toStrictEqual([
       [16, 3, 48, 320],
       [4, 3, 48, 320],
     ]);
@@ -728,7 +756,7 @@ describe("reconocerLote", () => {
     const rs = await reconocerLote(recLotes(formasRun), lienzo, cajas, () => lienzo);
     expect(rs).toHaveLength(18);
     // 16 angostas con W=320; la ancha (W=1536) queda aislada en el 2º chunk.
-    expect(formasRun).toEqual([
+    expect(formasRun).toStrictEqual([
       [16, 3, 48, 320],
       [2, 3, 48, 1536],
     ]);
@@ -738,7 +766,7 @@ describe("reconocerLote", () => {
     const espia = { det: [] as unknown[][], rec: [] as unknown[][] };
     const nucleo = nucleoFalso(mapaUnaLinea(), logitsLoteAA(), espia);
     const { lienzo } = lienzoFalso(BLANCO32);
-    expect(await reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).toEqual([]);
+    await expect(reconocerLote(nucleo.rec, lienzo, [], () => lienzo)).resolves.toStrictEqual([]);
     expect(espia.rec).toHaveLength(0);
   });
 
@@ -755,7 +783,7 @@ describe("reconocerLote", () => {
       ] as const,
       puntaje: 0.9,
     };
-    expect(await reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).toEqual([
+    await expect(reconocerLote(nucleo.rec, lienzo, [mala], () => lienzo)).resolves.toStrictEqual([
       { texto: "", puntaje: 0 },
     ]);
     expect(espia.rec).toHaveLength(0);
@@ -820,7 +848,7 @@ describe("enderezar (decisión rec)", () => {
 
   /** Núcleo falso: det por nº de llamada det, rec con conf por nº de llamada rec. */
   function nucleoGiros(
-    mapas: Array<{ data: Float32Array; dims: number[] }>,
+    mapas: { data: Float32Array; dims: number[] }[],
     confs: number[],
     detLlamadas: number[],
     recLlamadas: number[],
@@ -851,7 +879,9 @@ describe("enderezar (decisión rec)", () => {
           recLlamadas.push(ri);
           const n = ri;
           ri += 1;
-          if (n === fallaRecEn) return Promise.reject(new Error("rec roto"));
+          if (n === fallaRecEn) {
+            return Promise.reject(new Error("rec roto"));
+          }
           return Promise.resolve({
             fetch_name_0: logitsConf("A", confs[Math.min(n, confs.length - 1)] ?? 0),
           });
@@ -861,7 +891,7 @@ describe("enderezar (decisión rec)", () => {
   }
 
   function base(
-    mapas: Array<{ data: Float32Array; dims: number[] }>,
+    mapas: { data: Float32Array; dims: number[] }[],
     confs: number[],
     fallaRecEn?: number,
   ): {
@@ -900,8 +930,8 @@ describe("enderezar (decisión rec)", () => {
     expect(r.grados).toBe(0);
     expect(r.cajas).toHaveLength(1);
     expect(r.base).not.toBeNull();
-    expect(detLlamadas).toEqual([0]);
-    expect(recLlamadas).toEqual([0]);
+    expect(detLlamadas).toStrictEqual([0]);
+    expect(recLlamadas).toStrictEqual([0]);
   });
 
   it("0° baja + 270° alta → gira con 2 det (early-exit, sin 90/180)", async () => {
@@ -912,9 +942,9 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).not.toBe(blob);
     expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1]);
+    expect(detLlamadas).toStrictEqual([0, 1]);
     // rot270 del bitmap 64x32: 4º lienzo (rot0, base0, rec0, rot270).
-    expect([lienzos[3]?.width, lienzos[3]?.height]).toEqual([32, 64]);
+    expect([lienzos[3]?.width, lienzos[3]?.height]).toStrictEqual([32, 64]);
   });
 
   it("sin OK → gana el más alto (270) con loop completo", async () => {
@@ -924,7 +954,7 @@ describe("enderezar (decisión rec)", () => {
     );
     const r = await enderezar(new Blob(["foto"]), deps);
     expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+    expect(detLlamadas).toStrictEqual([0, 1, 2, 3]);
   });
 
   it("todo bajo sin OK → gana el más alto aunque sea bajo (270)", async () => {
@@ -935,7 +965,7 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).not.toBe(blob);
     expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+    expect(detLlamadas).toStrictEqual([0, 1, 2, 3]);
   });
 
   it("fondo tenue sin cajas → loop completo y quieta", async () => {
@@ -946,8 +976,8 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(detLlamadas).toEqual([0, 1, 2, 3]);
-    expect(recLlamadas).toEqual([]);
+    expect(detLlamadas).toStrictEqual([0, 1, 2, 3]);
+    expect(recLlamadas).toStrictEqual([]);
   });
 
   it("mapa cero → quieta con 1 det (sin texto: ni giros)", async () => {
@@ -955,20 +985,20 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(detLlamadas).toEqual([0]);
-    expect(recLlamadas).toEqual([]);
+    expect(detLlamadas).toStrictEqual([0]);
+    expect(recLlamadas).toStrictEqual([]);
   });
 
   it("lote rec falla en 270 → reintenta individual y gana 270 (L2)", async () => {
     const { deps, detLlamadas, recLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
-      [0.3, 0.0, 0.95],
+      [0.3, 0, 0.95],
       1,
     );
     const r = await enderezar(new Blob(["foto"]), deps);
     expect(r.grados).toBe(270);
-    expect(detLlamadas).toEqual([0, 1]);
-    expect(recLlamadas).toEqual([0, 1, 2]);
+    expect(detLlamadas).toStrictEqual([0, 1]);
+    expect(recLlamadas).toStrictEqual([0, 1, 2]);
   });
 
   it("núcleo caído → quieto sin lanzar", async () => {
@@ -996,20 +1026,21 @@ describe("enderezar (decisión rec)", () => {
     });
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(detLlamadas).toEqual([]);
-    expect(recLlamadas).toEqual([]);
+    expect(detLlamadas).toStrictEqual([]);
+    expect(recLlamadas).toStrictEqual([]);
   });
 
   it("sin contexto 2d → quieta (rot nulo)", async () => {
     const blob = new Blob(["foto"]);
     const r = await enderezar(blob, {
       cargar: () => Promise.resolve(bitmapFalso(64, 32)),
-      crear: () => document.createElement("canvas"), // jsdom: getContext null
+      // jsdom: getContext null
+      crear: () => document.createElement("canvas"),
       nucleo: () => Promise.resolve(nucleoGiros([mapaUnaLinea()], [0.95], [], [])),
     });
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(r.cajas).toEqual([]);
+    expect(r.cajas).toStrictEqual([]);
   });
 
   it("det sin dims → giros vacíos y quieta", async () => {
@@ -1018,9 +1049,9 @@ describe("enderezar (decisión rec)", () => {
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(r.cajas).toEqual([]);
-    expect(detLlamadas).toEqual([0]);
-    expect(recLlamadas).toEqual([]);
+    expect(r.cajas).toStrictEqual([]);
+    expect(detLlamadas).toStrictEqual([0]);
+    expect(recLlamadas).toStrictEqual([]);
   });
 
   it("det caído → quieta sin lanzar", async () => {
@@ -1068,19 +1099,19 @@ describe("enderezar (decisión rec)", () => {
   it("rec blank → conf 0 y gana 0°", async () => {
     const { blob, deps, detLlamadas, recLlamadas } = base(
       [mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea(), mapaUnaLinea()],
-      [0.0, 0.0, 0.0, 0.0],
+      [0, 0, 0, 0],
     );
     const r = await enderezar(blob, deps);
     expect(r.blob).toBe(blob);
     expect(r.grados).toBe(0);
-    expect(detLlamadas).toEqual([0, 1, 2, 3]);
+    expect(detLlamadas).toStrictEqual([0, 1, 2, 3]);
     expect(recLlamadas).toHaveLength(4);
   });
 
   it("sin deps → quieta sin lanzar (reales no disponibles en jsdom)", async () => {
     const r = await enderezar(new Blob(["x"]));
     expect(r.grados).toBe(0);
-    expect(r.cajas).toEqual([]);
+    expect(r.cajas).toStrictEqual([]);
   });
 });
 
@@ -1089,8 +1120,9 @@ describe("descargarPesosOcr", () => {
     const g = globalThis as Record<string, unknown>;
     const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
     const tienda = new Map<unknown, unknown>();
-    const bytes = new ArrayBuffer(12_000_000); // pasa los mínimos det/rec
-    const fetchFn = vi.fn(async () => ({
+    // pasa los mínimos det/rec
+    const bytes = new ArrayBuffer(12_000_000);
+    const fetchFn = vi.fn<(url: unknown) => Promise<unknown>>(async () => ({
       ok: true,
       status: 200,
       arrayBuffer: async () => bytes,
@@ -1120,8 +1152,11 @@ describe("descargarPesosOcr", () => {
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches === undefined) delete g["caches"];
-      else g["caches"] = real.caches;
+      if (real.caches === undefined) {
+        delete g["caches"];
+      } else {
+        g["caches"] = real.caches;
+      }
     }
   });
 
@@ -1133,18 +1168,20 @@ describe("descargarPesosOcr", () => {
     const g = globalThis as Record<string, unknown>;
     const real = { fetch: g["fetch"], caches: g["caches"], Response: g["Response"] };
     delete g["caches"];
-    g["fetch"] = vi.fn(
+    g["fetch"] = vi.fn<(_u: unknown, o?: { signal?: AbortSignal }) => Promise<Response>>(
       async (_u: unknown, o?: { signal?: AbortSignal }): Promise<Response> =>
         new Promise((_res, rej) => {
           o?.signal?.addEventListener("abort", () => rej(new Error("abortado")));
         }),
     );
     try {
-      await expect(descargarPesosOcr(50)).rejects.toThrow();
+      await expect(descargarPesosOcr(50)).rejects.toThrow("abortado");
     } finally {
       g["fetch"] = real.fetch;
       g["Response"] = real.Response;
-      if (real.caches !== undefined) g["caches"] = real.caches;
+      if (real.caches !== undefined) {
+        g["caches"] = real.caches;
+      }
     }
   });
 });

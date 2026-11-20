@@ -18,5 +18,8 @@ coverage/
 archivos-test/
 
 # Referencia local generada (cheatsheets)
-docs/
+docs/*
+# Config de agentes y ADRs: sí se versionan
+!docs/agents/
+!docs/adr/
 .vitest/

@@ -8,11 +8,17 @@ export async function initGithub(): Promise<void> {
   try {
     const estrellas: HTMLElement = getEl("githubStars");
     const res = await fetch(URL_REPO);
-    if (!res.ok) return;
+    if (!res.ok) {
+      return;
+    }
     const datos: unknown = await res.json();
-    if (typeof datos !== "object" || datos === null || !("stargazers_count" in datos)) return;
+    if (typeof datos !== "object" || datos === null || !("stargazers_count" in datos)) {
+      return;
+    }
     const n: unknown = datos.stargazers_count;
-    if (typeof n !== "number") return;
+    if (typeof n !== "number") {
+      return;
+    }
     estrellas.textContent = String(n);
   } catch {
     /* offline/rate-limit: el botón estático sigue valiendo */

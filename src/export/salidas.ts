@@ -40,15 +40,17 @@ const BANDA_CODIGO = 0.3;
 /** Calle entre imágenes vecinas (el rect de cada casilla se encoge GUTTER/2 por lado). */
 export const GUTTER = 0.15;
 /** 1" = 914400 EMU (offsets); transformation en px @96dpi → 1px = 9525 EMU. */
-const EMU_POR_PULGADA = 914400;
+const EMU_POR_PULGADA = 914_400;
 const EMU_POR_PX = 9525;
 
 export function codigoValido(): boolean {
-  if (!state.codigoActivo) return true;
-  return /^\d+$/.test(state.codigoValor);
+  if (!state.codigoActivo) {
+    return true;
+  }
+  return /^\d+$/u.test(state.codigoValor);
 }
 
-export function nombreArchivo(ext: string = "docx"): string {
+export function nombreArchivo(ext = "docx"): string {
   const cod = state.codigoActivo ? state.codigoValor : "sincodigo";
   return `${cod}-comprobante.${ext}`;
 }
@@ -86,7 +88,9 @@ export function encajar(
 ): { readonly w: number; readonly h: number } {
   const rectW = Math.max(1, Math.round(rect.w / EMU_POR_PX));
   const rectH = Math.max(1, Math.round(rect.h / EMU_POR_PX));
-  if (ancho < 1 || alto < 1) return { w: rectW, h: rectH };
+  if (ancho < 1 || alto < 1) {
+    return { w: rectW, h: rectH };
+  }
   const escala = Math.min(rectW / ancho, rectH / alto);
   return { w: Math.max(1, Math.floor(ancho * escala)), h: Math.max(1, Math.floor(alto * escala)) };
 }
@@ -102,8 +106,11 @@ async function medirImagen(blob: Blob): Promise<{ readonly w: number; readonly h
 // ponytail: blobDe local (6 líneas); importar queue.ts arrastraría onnxruntime a este módulo y sus tests.
 /** Blob full-res del comprobante: file, o el imgUrl local. */
 async function blobDe(c: Comprobante): Promise<Blob> {
-  if (c.file) return c.file;
-  return await (await fetch(c.imgUrl)).blob();
+  if (c.file) {
+    return c.file;
+  }
+  const respuesta = await fetch(c.imgUrl);
+  return await respuesta.blob();
 }
 
 /** JPEG para el docx (declara jpg): todo pasa por decode con EXIF + re-encode.
@@ -117,14 +124,19 @@ async function blobAjpg(blob: Blob): Promise<ArrayBuffer> {
     lienzo.width = bmp.width;
     lienzo.height = bmp.height;
     const ctx = lienzo.getContext("2d");
-    if (!ctx) throw new Error("sin contexto 2d");
-    ctx.fillStyle = "#fff"; // JPEG sin alfa: sin fondo el transparente sale negro
+    if (!ctx) {
+      throw new Error("sin contexto 2d");
+    }
+    // JPEG sin alfa: sin fondo el transparente sale negro
+    ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, lienzo.width, lienzo.height);
     ctx.drawImage(bmp, 0, 0);
-    const jpg = await new Promise<Blob | null>((res) =>
-      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG),
-    );
-    if (!jpg) throw new Error("sin blob jpeg");
+    const jpg = await new Promise<Blob | null>((res) => {
+      lienzo.toBlob(res, "image/jpeg", CALIDAD_JPEG);
+    });
+    if (!jpg) {
+      throw new Error("sin blob jpeg");
+    }
     return jpg.arrayBuffer();
   } finally {
     bmp.close();
@@ -143,10 +155,12 @@ function parrafoCodigo(codigo: string, posicion: PosicionCodigo): Paragraph {
 async function parrafoHoja(hoja: Hoja, posicion: PosicionCodigo): Promise<Paragraph> {
   const rects = geometria(hoja.layout, posicion);
   const runs: ImageRun[] = [];
-  for (let i = 0; i < hoja.slots.length; i++) {
+  for (let i = 0; i < hoja.slots.length; i += 1) {
     const item = hoja.slots[i];
     const rect = rects[i];
-    if (!item || !rect) continue;
+    if (!item || !rect) {
+      continue;
+    }
     const blob = await blobDe(item);
     const dims = await medirImagen(blob);
     const t = encajar(dims.w, dims.h, rect);
@@ -182,7 +196,9 @@ export async function construirDocumento(
   const supra = posicion.startsWith("sup");
   const hijos: Paragraph[] = [];
   for (const hoja of hojas) {
-    if (hijos.length > 0) hijos.push(new Paragraph({ children: [new PageBreak()] }));
+    if (hijos.length > 0) {
+      hijos.push(new Paragraph({ children: [new PageBreak()] }));
+    }
     hijos.push(await parrafoHoja(hoja, posicion));
   }
   return new Document({
@@ -206,13 +222,12 @@ export async function construirDocumento(
           },
         },
         // Sin código no hay banda que rotular: se omite el elemento.
-        ...(codigo === ""
-          ? {}
-          : supra
-            ? { headers: { default: new Header({ children: [parrafoCodigo(codigo, posicion)] }) } }
-            : {
-                footers: { default: new Footer({ children: [parrafoCodigo(codigo, posicion)] }) },
-              }),
+        ...(codigo !== "" && supra
+          ? { headers: { default: new Header({ children: [parrafoCodigo(codigo, posicion)] }) } }
+          : {}),
+        ...(codigo !== "" && !supra
+          ? { footers: { default: new Footer({ children: [parrafoCodigo(codigo, posicion)] }) } }
+          : {}),
         children: hijos,
       },
     ],
@@ -256,7 +271,9 @@ export async function descargarWord(): Promise<void> {
 
 export function initExport(): void {
   // ponytail: guard anti doble-cableado (HMR/tests llaman más de una vez).
-  if (initListo) return;
+  if (initListo) {
+    return;
+  }
   initListo = true;
   btnWord.addEventListener("click", () => {
     void descargarWord().catch(() => {});
@@ -273,7 +290,9 @@ export function initExport(): void {
 
 /** Banda del código (null si no hay código que mostrar). */
 function codigoPrint(codigo: string, posicion: PosicionCodigo): HTMLElement | null {
-  if (codigo === "") return null;
+  if (codigo === "") {
+    return null;
+  }
   const el = document.createElement("div");
   el.className = "codigo-print";
   el.textContent = codigo;
@@ -290,14 +309,18 @@ export function hojaPrint(hoja: Hoja, codigo: string, posicion: PosicionCodigo):
   seccion.style.paddingTop = supra ? "0.6in" : "0.3in";
   seccion.style.paddingBottom = supra ? "0.3in" : "0.6in";
   const banda = codigoPrint(codigo, posicion);
-  if (supra && banda) seccion.append(banda);
+  if (supra && banda) {
+    seccion.append(banda);
+  }
   const rejilla = document.createElement("div");
   rejilla.className = "rejilla-print";
   rejilla.style.gridTemplateColumns = `repeat(${p.cols}, 1fr)`;
   rejilla.style.gridTemplateRows = `repeat(${p.filas}, 1fr)`;
-  p.pos.forEach(([fila, col, span, spanFila], i) => {
+  for (const [i, [fila, col, span, spanFila]] of p.pos.entries()) {
     const item = hoja.slots[i];
-    if (!item) return;
+    if (!item) {
+      continue;
+    }
     const celda = document.createElement("div");
     celda.className = "celda-print";
     celda.style.gridRow = `${fila} / span ${spanFila ?? 1}`;
@@ -308,9 +331,11 @@ export function hojaPrint(hoja: Hoja, codigo: string, posicion: PosicionCodigo):
     img.alt = item.nombre;
     celda.append(img);
     rejilla.append(celda);
-  });
+  }
   seccion.append(rejilla);
-  if (!supra && banda) seccion.append(banda);
+  if (!supra && banda) {
+    seccion.append(banda);
+  }
   return seccion;
 }
 
@@ -353,18 +378,26 @@ async function esperarImagenes(): Promise<void> {
 /** Imprime la zona ya montada; conTitulo = truco filename PDF vía document.title. */
 async function imprimirZona(conTitulo: boolean): Promise<void> {
   // ponytail: sin re-entrada (doble clic apilaba diálogos y ensuciaba el título).
-  if (printEnVuelo) return;
+  if (printEnVuelo) {
+    return;
+  }
   printEnVuelo = true;
   const titulo = document.title;
   try {
     await esperarImagenes();
     // ponytail: título DESPUÉS del await: un 2.º clic nunca captura el temporal.
-    if (conTitulo) document.title = nombreArchivo("pdf").replace(/\.pdf$/, "");
+    if (conTitulo) {
+      document.title = nombreArchivo("pdf").replace(/\.pdf$/u, "");
+    }
     let listo = false;
     const limpiar = (): void => {
-      if (listo) return;
+      if (listo) {
+        return;
+      }
       listo = true;
-      if (conTitulo) document.title = titulo;
+      if (conTitulo) {
+        document.title = titulo;
+      }
       limpiarZona();
       window.removeEventListener("afterprint", limpiar);
     };
@@ -373,7 +406,9 @@ async function imprimirZona(conTitulo: boolean): Promise<void> {
     // ponytail: fallback si afterprint no dispara (headless/crash); la preview ya se generó.
     setTimeout(limpiar, 60_000);
   } catch {
-    if (conTitulo) document.title = titulo;
+    if (conTitulo) {
+      document.title = titulo;
+    }
     limpiarZona();
   } finally {
     printEnVuelo = false;
@@ -381,12 +416,16 @@ async function imprimirZona(conTitulo: boolean): Promise<void> {
 }
 
 export async function descargarPdf(): Promise<void> {
-  if (!montarZona()) return;
+  if (!montarZona()) {
+    return;
+  }
   await imprimirZona(true);
 }
 
 export async function imprimir(): Promise<void> {
-  if (!montarZona()) return;
+  if (!montarZona()) {
+    return;
+  }
   await imprimirZona(false);
 }
 
@@ -400,7 +439,9 @@ function avisar(texto: string): void {
 // el fixture y rompería estos tests); sidebar.ts la levanta al teclear.
 function resaltarCodigo(): void {
   const input = document.getElementById("inputCodigo");
-  if (!(input instanceof HTMLInputElement) || input.disabled) return;
+  if (!(input instanceof HTMLInputElement) || input.disabled) {
+    return;
+  }
   input.classList.remove("sacudir");
   void input.offsetWidth;
   input.classList.add("codigo-error", "sacudir");

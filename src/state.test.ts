@@ -33,8 +33,8 @@ describe("crearHoja", () => {
   it("por defecto es u4x2 con 4 slots vacíos", () => {
     const h = crearHoja();
     expect(h.layout).toBe("u4x2");
-    expect(h.slots).toEqual([null, null, null, null]);
-    expect(h.id).toEqual(expect.any(Number));
+    expect(h.slots).toStrictEqual([null, null, null, null]);
+    expect(h.id).toStrictEqual(expect.any(Number));
   });
 
   it("respeta la capacidad de la plantilla pedida", () => {
@@ -91,7 +91,7 @@ describe("guardar/cargar por ventana", () => {
     guardarAjustes();
 
     const raw = JSON.parse(localStorage.getItem(LS_KEY) ?? "{}") as Record<string, unknown>;
-    expect(Object.keys(raw).sort()).toEqual([
+    expect(Object.keys(raw).toSorted()).toStrictEqual([
       "codigoActivo",
       "codigoPosicion",
       "codigoValor",
@@ -170,7 +170,7 @@ describe("guardar/cargar por ventana", () => {
     expect(state.moneda).toBe("USD");
     expect(localStorage.getItem("jev-api-key")).toBeNull();
     expect(sessionStorage.getItem("jev-api-key")).toBeNull();
-    expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toEqual({
+    expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toStrictEqual({
       codigoActivo: false,
       codigoValor: "",
       moneda: "USD",
@@ -183,7 +183,7 @@ describe("guardar/cargar por ventana", () => {
       JSON.stringify({ codigoActivo: true, codigoValor: "12345678", codigoLongitud: 8 }),
     );
     cargar();
-    expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toEqual({
+    expect(JSON.parse(localStorage.getItem(LS_KEY) ?? "{}")).toStrictEqual({
       codigoActivo: true,
       codigoValor: "12345678",
     });
@@ -278,7 +278,7 @@ describe("redistribuir", () => {
     state.hojas.push(h);
     redistribuir();
     expect(state.hojas).toHaveLength(1);
-    expect(state.hojas[0]?.slots).toEqual([a, b, null, null]);
+    expect(state.hojas[0]?.slots).toStrictEqual([a, b, null, null]);
   });
 
   it("recompacta en hojas existentes preservando su layout", () => {
@@ -297,7 +297,7 @@ describe("redistribuir", () => {
     expect(state.hojas).toHaveLength(3);
     expect(state.hojas.every((x) => x.layout === "u2h")).toBe(true);
     const ids = state.hojas.flatMap((x) => x.slots.map((c) => c?.id ?? null));
-    expect(ids).toEqual([...items.map((c) => c.id), null]);
+    expect(ids).toStrictEqual([...items.map((c) => c.id), null]);
   });
 
   it("cambio de plantilla: el resto refluye a hojas nuevas con el default", () => {
@@ -311,8 +311,8 @@ describe("redistribuir", () => {
     expect(state.hojas[0]?.layout).toBe("u1");
     expect(state.hojas[1]?.layout).toBe("u4x2");
     // orden preservado: 1 en la u1, 3 en la nueva
-    expect(state.hojas[0]?.slots).toEqual([items[0] ?? null]);
-    expect(state.hojas[1]?.slots).toEqual([...items.slice(1), null]);
+    expect(state.hojas[0]?.slots).toStrictEqual([items[0] ?? null]);
+    expect(state.hojas[1]?.slots).toStrictEqual([...items.slice(1), null]);
   });
 
   it("el resto no hereda el layout de la última hoja aunque sea no-default", () => {
@@ -325,8 +325,8 @@ describe("redistribuir", () => {
     a.layout = "u1";
     redistribuir();
     // u1(1) + u2h(2) + la sobrante a una u4x2 (no u2h heredado)
-    expect(state.hojas.map((x) => x.layout)).toEqual(["u1", "u2h", "u4x2"]);
-    expect(state.hojas[2]?.slots).toEqual([items[3] ?? null, null, null, null]);
+    expect(state.hojas.map((x) => x.layout)).toStrictEqual(["u1", "u2h", "u4x2"]);
+    expect(state.hojas[2]?.slots).toStrictEqual([items[3] ?? null, null, null, null]);
   });
 
   it("layoutNuevas pisa el default para 'aplicar a todas'", () => {
@@ -366,7 +366,7 @@ describe("hojaPorId / buscarSlot", () => {
     const c = comprobante();
     h.slots[2] = c;
     state.hojas.push(h);
-    expect(buscarSlot(c.id)).toEqual({ hoja: h, idx: 2 });
+    expect(buscarSlot(c.id)).toStrictEqual({ hoja: h, idx: 2 });
     expect(buscarSlot(-1)).toBeNull();
   });
 });

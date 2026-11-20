@@ -18,7 +18,7 @@ import type { DocumentoPdf } from "./pdf";
 // documento falso, entrando por el default de expandirPdf (la función real).
 vi.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
-  getDocument: vi.fn(),
+  getDocument: vi.fn<typeof import("pdfjs-dist").getDocument>(),
 }));
 
 const pdfjsFalso = await import("pdfjs-dist");
@@ -55,17 +55,19 @@ describe("admiteTamanoPdf", () => {
 describe("admitirPdf", () => {
   it("admite ≤ 10 páginas y rechaza 11+", async () => {
     const contar = async (): Promise<number> => 5;
-    expect(await admitirPdf(pdfDe("a.pdf", "application/pdf", 100), contar)).toEqual({
+    await expect(admitirPdf(pdfDe("a.pdf", "application/pdf", 100), contar)).resolves.toStrictEqual(
+      {
+        admite: true,
+      },
+    );
+    await expect(
+      admitirPdf(pdfDe("b.pdf", "application/pdf", 100), () => Promise.resolve(10)),
+    ).resolves.toStrictEqual({
       admite: true,
     });
-    expect(
-      await admitirPdf(pdfDe("b.pdf", "application/pdf", 100), () => Promise.resolve(10)),
-    ).toEqual({
-      admite: true,
-    });
-    expect(
-      await admitirPdf(pdfDe("c.pdf", "application/pdf", 100), () => Promise.resolve(11)),
-    ).toEqual({
+    await expect(
+      admitirPdf(pdfDe("c.pdf", "application/pdf", 100), () => Promise.resolve(11)),
+    ).resolves.toStrictEqual({
       admite: false,
       motivo: "paginas",
     });
@@ -73,8 +75,10 @@ describe("admitirPdf", () => {
   });
 
   it("rechaza por tamaño sin abrir el documento", async () => {
-    const contar = vi.fn(async (): Promise<number> => 5);
-    expect(await admitirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), contar)).toEqual({
+    const contar = vi.fn<(f: File) => Promise<number>>(async (): Promise<number> => 5);
+    await expect(
+      admitirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), contar),
+    ).resolves.toStrictEqual({
       admite: false,
       motivo: "tamano",
     });
@@ -82,8 +86,8 @@ describe("admitirPdf", () => {
   });
 
   it("cero bytes es ilegible sin abrir", async () => {
-    const contar = vi.fn(async (): Promise<number> => 5);
-    expect(await admitirPdf(pdfDe("v.pdf", "application/pdf", 0), contar)).toEqual({
+    const contar = vi.fn<(f: File) => Promise<number>>(async (): Promise<number> => 5);
+    await expect(admitirPdf(pdfDe("v.pdf", "application/pdf", 0), contar)).resolves.toStrictEqual({
       admite: false,
       motivo: "ilegible",
     });
@@ -96,14 +100,14 @@ describe("admitirPdf", () => {
       e.name = "PasswordException";
       throw e;
     };
-    expect(await admitirPdf(pdfDe("c.pdf", "application/pdf", 100), clave)).toEqual({
+    await expect(admitirPdf(pdfDe("c.pdf", "application/pdf", 100), clave)).resolves.toStrictEqual({
       admite: false,
       motivo: "cifrado",
     });
     const roto = (): Promise<number> => {
       throw new Error("bytes basura");
     };
-    expect(await admitirPdf(pdfDe("r.pdf", "application/pdf", 100), roto)).toEqual({
+    await expect(admitirPdf(pdfDe("r.pdf", "application/pdf", 100), roto)).resolves.toStrictEqual({
       admite: false,
       motivo: "ilegible",
     });
@@ -191,12 +195,18 @@ describe("expandirPdf", () => {
   } {
     let cerrado = false;
     // Tinta gris media: ni blanca ni negra para los gates (el 2x2 solo muestrea el píxel 0).
-    const tin = (blanca: boolean, negra: boolean): number[] =>
-      negra ? [0, 0, 0, 255] : blanca ? [255, 255, 255, 255] : [100, 100, 100, 255];
+    const tin = (blanca: boolean, negra: boolean): number[] => {
+      if (negra) {
+        return [0, 0, 0, 255];
+      }
+      return blanca ? [255, 255, 255, 255] : [100, 100, 100, 255];
+    };
     const abrir = async (): Promise<DocumentoPdf> => ({
       total: opc.total ?? 3,
       renderizar: async (i: number): Promise<HTMLCanvasElement | null> => {
-        if (opc.rotas?.includes(i)) throw new Error("rota");
+        if (opc.rotas?.includes(i)) {
+          throw new Error("rota");
+        }
         const nula = opc.nulas?.includes(i) ?? false;
         const negra = opc.negras?.includes(i) ?? false;
         const t = tin(opc.blancas?.includes(i) ?? false, negra);
@@ -227,7 +237,9 @@ describe("expandirPdf", () => {
         } as unknown as HTMLCanvasElement;
       },
       cerrar: async (): Promise<void> => {
-        if (opc.cerrarRota) throw new Error("destroy caído");
+        if (opc.cerrarRota) {
+          throw new Error("destroy caído");
+        }
         cerrado = true;
       },
     });
@@ -237,7 +249,7 @@ describe("expandirPdf", () => {
   it("3 páginas con 1 blanca → 2 útiles en orden, y cierra", async () => {
     const { abrir, fueCerrado } = abrirFalso({ blancas: [2] });
     const pags = await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir);
-    expect(pags.map((p) => [p.indice, p.total])).toEqual([
+    expect(pags.map((p) => [p.indice, p.total])).toStrictEqual([
       [1, 3],
       [3, 3],
     ]);
@@ -248,15 +260,15 @@ describe("expandirPdf", () => {
   it("página rota no tumba a las hermanas", async () => {
     const { abrir } = abrirFalso({ rotas: [2] });
     const pags = await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir);
-    expect(pags.map((p) => p.indice)).toEqual([1, 3]);
+    expect(pags.map((p) => p.indice)).toStrictEqual([1, 3]);
   });
 
   it("peso excedido → [] sin abrir", async () => {
     const { abrir } = abrirFalso();
-    const espia = vi.fn(abrir);
-    expect(await expandirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), espia)).toEqual(
-      [],
-    );
+    const espia = vi.fn<(f: File) => Promise<DocumentoPdf>>(abrir);
+    await expect(
+      expandirPdf(pdfDe("g.pdf", "application/pdf", PDF_MAX_BYTES + 1), espia),
+    ).resolves.toStrictEqual([]);
     expect(espia).not.toHaveBeenCalled();
   });
 
@@ -264,30 +276,36 @@ describe("expandirPdf", () => {
     const abrir = async (): Promise<DocumentoPdf> => {
       throw new Error("ilegible");
     };
-    await expect(expandirPdf(pdfDe("r.pdf", "application/pdf", 100), abrir)).resolves.toEqual([]);
+    await expect(expandirPdf(pdfDe("r.pdf", "application/pdf", 100), abrir)).resolves.toStrictEqual(
+      [],
+    );
   });
 
   it("más de 10 páginas → [] (gate de contador)", async () => {
     const { abrir, fueCerrado } = abrirFalso({ total: 12 });
-    expect(await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).toEqual([]);
+    await expect(expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).resolves.toStrictEqual(
+      [],
+    );
     expect(fueCerrado()).toBe(true);
   });
 
   it("0 páginas → [] (gate inferior)", async () => {
     const { abrir } = abrirFalso({ total: 0 });
-    expect(await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).toEqual([]);
+    await expect(expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir)).resolves.toStrictEqual(
+      [],
+    );
   });
 
   it("página negra y toBlob nulo se saltan (la útil sobrevive)", async () => {
     const { abrir } = abrirFalso({ total: 3, negras: [1], nulas: [3] });
     const pags = await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir);
-    expect(pags.map((p) => p.indice)).toEqual([2]);
+    expect(pags.map((p) => p.indice)).toStrictEqual([2]);
   });
 
   it("cerrar que lanza no afecta la expansión", async () => {
     const { abrir } = abrirFalso({ cerrarRota: true });
     const pags = await expandirPdf(pdfDe("f.pdf", "application/pdf", 100), abrir);
-    expect(pags.map((p) => p.indice)).toEqual([1, 2, 3]);
+    expect(pags.map((p) => p.indice)).toStrictEqual([1, 2, 3]);
   });
 });
 
@@ -313,16 +331,17 @@ describe("abrirPdfReal (default de expandirPdf, pdfjs falso)", () => {
     destruida = false;
     getDocumentFalso.mockReturnValue(tareaFalsa({ width: 200, height: 250 }) as never);
     const pags = await expandirPdf(pdfReal());
-    expect(pags).toEqual([]);
+    expect(pags).toStrictEqual([]);
     expect(destruida).toBe(true);
   });
 
   it("MediaBox extremo: vista insegura → null y cierra", async () => {
     destruida = false;
-    pdfjsFalso.GlobalWorkerOptions.workerSrc = "fijado"; // cubre ||= ya configurado
+    // cubre ||= ya configurado
+    pdfjsFalso.GlobalWorkerOptions.workerSrc = "fijado";
     getDocumentFalso.mockReturnValue(tareaFalsa({ width: 1, height: 4000 }) as never);
     const pags = await expandirPdf(pdfReal());
-    expect(pags).toEqual([]);
+    expect(pags).toStrictEqual([]);
     expect(destruida).toBe(true);
   });
 
@@ -330,16 +349,18 @@ describe("abrirPdfReal (default de expandirPdf, pdfjs falso)", () => {
     getDocumentFalso.mockImplementation(() => {
       throw new Error("ilegible");
     });
-    await expect(expandirPdf(pdfReal())).resolves.toEqual([]);
+    await expect(expandirPdf(pdfReal())).resolves.toStrictEqual([]);
   });
 });
 
 describe("vistaSegura", () => {
   it("normal sí; MediaBox extremo (1pt ancho, NaN, área gigante) no", () => {
     expect(vistaSegura(720, 1000)).toBe(true);
-    expect(vistaSegura(1, 1000)).toBe(true); // base angosta pero real; el escalado la filtra
-    expect(vistaSegura(720, 720000)).toBe(false); // 518M px colgaría la pestaña
-    expect(vistaSegura(NaN, 100)).toBe(false);
+    // base angosta pero real; el escalado la filtra
+    expect(vistaSegura(1, 1000)).toBe(true);
+    // 518M px colgaría la pestaña
+    expect(vistaSegura(720, 720_000)).toBe(false);
+    expect(vistaSegura(Number.NaN, 100)).toBe(false);
     expect(vistaSegura(0, 100)).toBe(false);
   });
 });

@@ -4,10 +4,12 @@
    singleton queda reutilizable (ninguna promesa podrida cacheada). */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
-const { crearFalso } = vi.hoisted(() => ({ crearFalso: vi.fn() }));
+const { crearFalso } = vi.hoisted(() => ({
+  crearFalso: vi.fn<typeof import("onnxruntime-web/webgpu").InferenceSession.create>(),
+}));
 vi.mock("onnxruntime-web/webgpu", () => ({
   env: { wasm: { wasmPaths: "", numThreads: 0 } },
-  Tensor: vi.fn(),
+  Tensor: vi.fn<typeof import("onnxruntime-web/webgpu").Tensor>(),
   InferenceSession: { create: crearFalso },
 }));
 
@@ -17,8 +19,10 @@ const { iaOk, notarSesionOk, reactivarIa } = await import("./docaligner");
 // Mismas plantillas que las consts privadas de ocr.ts (no exportadas a propósito).
 const DET = `${import.meta.env.BASE_URL}models/ocr/det.onnx`;
 const REC = `${import.meta.env.BASE_URL}models/ocr/rec.onnx`;
-const BUF_DET = new ArrayBuffer(5_000_000); // minBytes det (ocr.ts)
-const BUF_REC = new ArrayBuffer(10_000_000); // minBytes rec
+// minBytes det (ocr.ts)
+const BUF_DET = new ArrayBuffer(5_000_000);
+// minBytes rec
+const BUF_REC = new ArrayBuffer(10_000_000);
 
 // jsdom no trae Response: dummy con arrayBuffer (el put falso ignora el init).
 class RespuestaFalsa {
@@ -43,7 +47,7 @@ function claveDe(k: unknown): string {
 
 beforeEach(() => {
   tienda = new Map();
-  subida = vi.fn(async (url: unknown): Promise<unknown> => ({
+  subida = vi.fn<(url: unknown) => Promise<unknown>>(async (url: unknown): Promise<unknown> => ({
     ok: true,
     status: 200,
     arrayBuffer: async () => (String(url).endsWith("det.onnx") ? BUF_DET : BUF_REC),
@@ -56,7 +60,7 @@ beforeEach(() => {
       put: async (k: unknown, r: unknown): Promise<void> => {
         tienda.set(claveDe(k), r as RespuestaFalsa);
       },
-      keys: async (): Promise<Array<{ url: string }>> => [...tienda.keys()].map((url) => ({ url })),
+      keys: async (): Promise<{ url: string }[]> => [...tienda.keys()].map((url) => ({ url })),
       delete: async (k: unknown): Promise<boolean> => tienda.delete(claveDe(k)),
     }),
   };
@@ -68,8 +72,11 @@ beforeEach(() => {
 afterEach(() => {
   g["fetch"] = real.fetch;
   g["Response"] = real.Response;
-  if (real.caches === undefined) delete g["caches"];
-  else g["caches"] = real.caches;
+  if (real.caches === undefined) {
+    delete g["caches"];
+  } else {
+    g["caches"] = real.caches;
+  }
   vi.restoreAllMocks();
   reactivarIa();
   notarSesionOk(DET);
@@ -97,7 +104,9 @@ describe("nucleoReal (ORT falso, det/rec reales en la red falsa)", () => {
 
   it("la baja de red de rec no expulsa a det sano (strike por clave, no en bloque)", async () => {
     subida.mockImplementation(async (url: unknown) => {
-      if (String(url).endsWith("rec.onnx")) throw new Error("la bajada de rec murió");
+      if (String(url).endsWith("rec.onnx")) {
+        throw new Error("la bajada de rec murió");
+      }
       return { ok: true, status: 200, arrayBuffer: async () => BUF_DET };
     });
     // Bajada 1: det baja y cachea; rec falla → strike 1 SOLO de rec.

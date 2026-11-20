@@ -2,16 +2,19 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import { montarFixture } from "../test/fixture";
+import type { CargarBitmap, CrearLienzo } from "./imagen";
 
 // El render real necesita grilla; los tests asertan estado, no DOM.
-vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn() }));
+vi.mock("../ui/sheets", () => ({ renderHojas: vi.fn<() => void>() }));
 // Sin onnx en jsdom: el giro real + texto stub (lienzoGirado sigue real).
 vi.mock("./ocr", async (importOriginal) => {
   const real = await importOriginal<typeof import("./ocr")>();
-  return { ...real, extraerTexto: vi.fn(async () => "TOTAL LEÍDO") };
+  return { ...real, extraerTexto: vi.fn<typeof real.extraerTexto>(async () => "TOTAL LEÍDO") };
 });
 // El re-chequeo post-giro va mockeado en tests (rotar lo llama tras releer OCR).
-vi.mock("./extract", () => ({ extraerPendientes: vi.fn((): void => {}) }));
+vi.mock("./extract", () => ({
+  extraerPendientes: vi.fn<typeof import("./extract").extraerPendientes>((): void => {}),
+}));
 
 montarFixture();
 const { buscarSlot, crearHoja, state } = await import("../state");
@@ -32,12 +35,12 @@ afterEach(() => {
 /** Bitmap + lienzo falsos (suficiente para el lienzoGirado real). */
 function depsGiro() {
   const creados: { width: number; height: number }[] = [];
-  const bmp = { width: 10, height: 20, close: vi.fn() };
+  const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
   return {
     creados,
     deps: {
-      cargar: vi.fn(async () => bmp as unknown as ImageBitmap),
-      crear: vi.fn(() => {
+      cargar: vi.fn<CargarBitmap>(async () => bmp as unknown as ImageBitmap),
+      crear: vi.fn<CrearLienzo>(() => {
         const lienzo = {
           width: 0,
           height: 0,
@@ -66,7 +69,7 @@ function sembrar(): ReturnType<typeof comprobante> {
 
 describe("girarYReleer", () => {
   it("no-op sin item o sin estado ok", async () => {
-    await expect(girarYReleer(999999, 90)).resolves.toBeUndefined();
+    await expect(girarYReleer(999_999, 90)).resolves.toBeUndefined();
     const c = sembrar();
     c.estado = "pendiente";
     await girarYReleer(c.id, 90);
@@ -90,9 +93,10 @@ describe("girarYReleer", () => {
     expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.textoOcr).toBe("TOTAL LEÍDO");
-    expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
-    expect(c.montoCents).toBeNull(); // el lote lo relee (mock: queda manual)
-    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
+    // el lote lo relee (mock: queda manual)
+    expect(c.montoCents).toBeNull();
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
     // giro + procesando + ok + reapertura (el null se pinta aunque el lote sea no-op)
     expect(vi.mocked(renderHojas)).toHaveBeenCalledTimes(4);
   });
@@ -115,7 +119,9 @@ describe("girarYReleer", () => {
     vi.mocked(extraerTexto).mockImplementation(async (b: Blob) => {
       const tag = b === blobA ? "A" : "B";
       eventos.push(`${tag}-ini`);
-      await new Promise((r) => setTimeout(r, 10));
+      await new Promise((r) => {
+        setTimeout(r, 10);
+      });
       eventos.push(`${tag}-fin`);
       return "LEÍDO";
     });
@@ -124,7 +130,7 @@ describe("girarYReleer", () => {
     const blobB = new Blob(["b"]);
     try {
       await Promise.all([releerTrasEdicion(c.id, blobA), releerTrasEdicion(c.id, blobB)]);
-      expect(eventos).toEqual(["A-ini", "A-fin", "B-ini", "B-fin"]);
+      expect(eventos).toStrictEqual(["A-ini", "A-fin", "B-ini", "B-fin"]);
       expect(c.textoOcr).toBe("LEÍDO");
     } finally {
       vi.mocked(extraerTexto).mockResolvedValue("TOTAL LEÍDO");
@@ -144,8 +150,8 @@ describe("girarYReleer", () => {
       state.colaEnProceso = false;
       await vi.advanceTimersByTimeAsync(1000);
       await p;
-      expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
+      expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
       expect(c.estado).toBe("ok");
     } finally {
       state.colaEnProceso = false;
@@ -160,8 +166,10 @@ describe("girarYReleer", () => {
     await girarYReleer(c.id, 90, deps);
     vi.mocked(extraerTexto).mockRejectedValueOnce(new Error("ocr caído"));
     await vi.advanceTimersByTimeAsync(1500);
-    expect(c.estado).toBe("ok"); // no queda atascada en procesando
-    expect(c.textoOcr).toBe(""); // el viejo es de otra orientación: no vale
+    // no queda atascada en procesando
+    expect(c.estado).toBe("ok");
+    // el viejo es de otra orientación: no vale
+    expect(c.textoOcr).toBe("");
     expect(c.montoCents).toBeNull();
     expect(document.getElementById("aviso")?.textContent).toBe(
       "No se pudo releer el texto girado.",
@@ -188,12 +196,13 @@ describe("girarYReleer", () => {
     const p1 = girarYReleer(c.id, 90, deps);
     const p2 = girarYReleer(c.id, 90, deps);
     await Promise.all([p1, p2]);
-    expect(creados).toHaveLength(2); // ambos giros aplicados en cadena
+    // ambos giros aplicados en cadena
+    expect(creados).toHaveLength(2);
     expect(c.textoOcr).toBe("VIEJO");
     await vi.advanceTimersByTimeAsync(1500);
     expect(c.textoOcr).toBe("TOTAL LEÍDO");
-    expect(vi.mocked(extraerTexto)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(extraerTexto)).toHaveBeenCalledOnce();
+    expect(vi.mocked(extraerPendientes)).toHaveBeenCalledOnce();
   });
 
   it("giros separados por la quietud: un OCR por giro", async () => {
@@ -225,11 +234,14 @@ describe("girarYReleer", () => {
     const { candidatos } = await vi.importActual<typeof import("./extract")>("./extract");
     // Lote simulado con la lógica real de inclusión: si la celda es candidata, la rellena.
     vi.mocked(extraerPendientes).mockImplementationOnce((): void => {
-      if (candidatos().some((x) => x.id === c.id)) c.montoCents = 999;
+      if (candidatos().some((x) => x.id === c.id)) {
+        c.montoCents = 999;
+      }
     });
     await girarYReleer(c.id, 90, deps);
     await vi.advanceTimersByTimeAsync(1500);
-    expect(c.montoCents).toBe(999); // antes: quedaba en null (procesando la excluía)
+    // antes: quedaba en null (procesando la excluía)
+    expect(c.montoCents).toBe(999);
   });
 
   it("celda manual: conserva el total y no llama al lote", async () => {
@@ -261,7 +273,7 @@ describe("girarYReleer", () => {
 
   it("limpiado a mitad del giro: no escribe ni resucita", async () => {
     let soltar: ((b: ImageBitmap) => void) | undefined;
-    const bmp = { width: 10, height: 20, close: vi.fn() };
+    const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
     const c = sembrar();
     const p = girarYReleer(c.id, 90, {
       cargar: () =>
@@ -269,21 +281,26 @@ describe("girarYReleer", () => {
           soltar = res;
         }),
     });
-    for (let i = 0; i < 100 && !soltar; i++) await Promise.resolve();
+    // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- soltar lo muta el executor; cota 100
+    for (let i = 0; i < 100 && !soltar; i += 1) {
+      await Promise.resolve();
+    }
     soltar?.(bmp as unknown as ImageBitmap);
     const urlAntes = c.imgUrl;
-    state.hojas = [crearHoja()]; // Limpiar reemplaza el array a mitad del giro
+    // Limpiar reemplaza el array a mitad del giro
+    state.hojas = [crearHoja()];
     await p;
     expect(buscarSlot(c.id)).toBeNull();
-    expect(c.imgUrl).toBe(urlAntes); // el giro huérfano se descarta
+    // el giro huérfano se descarta
+    expect(c.imgUrl).toBe(urlAntes);
   });
 
   it("giro huérfano revoca el imgUrl nuevo (sin fuga)", async () => {
     const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
-    const crearUrl = vi.spyOn(URL, "createObjectURL").mockImplementation(() => "blob:nuevo");
+    const crearUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:nuevo");
     try {
       let soltar: ((b: ImageBitmap) => void) | undefined;
-      const bmp = { width: 10, height: 20, close: vi.fn() };
+      const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
       const c = sembrar();
       const urlAntes = c.imgUrl;
       const p = girarYReleer(c.id, 90, {
@@ -299,9 +316,13 @@ describe("girarYReleer", () => {
             toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
           }) as unknown as HTMLCanvasElement,
       });
-      for (let i = 0; i < 100 && !soltar; i++) await Promise.resolve();
+      // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- soltar lo muta el executor; cota 100
+      for (let i = 0; i < 100 && !soltar; i += 1) {
+        await Promise.resolve();
+      }
       soltar?.(bmp as unknown as ImageBitmap);
-      state.hojas = [crearHoja()]; // Limpiar durante el await.
+      // Limpiar durante el await.
+      state.hojas = [crearHoja()];
       await p;
       expect(revocar).toHaveBeenCalledWith("blob:nuevo");
       expect(c.imgUrl).toBe(urlAntes);
@@ -322,11 +343,13 @@ describe("girarYReleer", () => {
     const crearBase = deps.crear.getMockImplementation();
     let llamadas = 0;
     deps.crear.mockImplementation(() => {
-      llamadas++;
+      llamadas += 1;
       const lienzo = (crearBase?.() ?? {}) as {
         toBlob: (cb: (b: Blob | null) => void) => void;
       } & Record<string, unknown>;
-      if (llamadas === 2) lienzo.toBlob = (cb) => cb(null);
+      if (llamadas === 2) {
+        lienzo.toBlob = (cb) => cb(null);
+      }
       return lienzo as unknown as HTMLCanvasElement;
     });
     await girarYReleer(c.id, 90, deps);
@@ -342,9 +365,11 @@ describe("girarYReleer", () => {
     try {
       const { deps } = depsGiro();
       const c = sembrar();
-      await girarYReleer(c.id, 90, deps); // programa el timer diferido
+      // programa el timer diferido
+      await girarYReleer(c.id, 90, deps);
       expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
-      c.file = new Blob(["otro"]); // un recorte commitió después del giro
+      // un recorte commitió después del giro
+      c.file = new Blob(["otro"]);
       await vi.advanceTimersByTimeAsync(2000);
       expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
       expect(c.textoOcr).toBe("VIEJO");
@@ -355,11 +380,11 @@ describe("girarYReleer", () => {
 
   it("giro y recorte en vuelo: el último commit gana entero, sin mezcla", async () => {
     const ctx = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      setTransform: vi.fn(),
-      clearRect: vi.fn(),
-      fillRect: vi.fn(),
-      strokeRect: vi.fn(),
-      drawImage: vi.fn(),
+      setTransform: vi.fn<CanvasRenderingContext2D["setTransform"]>(),
+      clearRect: vi.fn<CanvasRenderingContext2D["clearRect"]>(),
+      fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
+      strokeRect: vi.fn<CanvasRenderingContext2D["strokeRect"]>(),
+      drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
     } as unknown as CanvasRenderingContext2D);
     const crearUrl = vi
       .spyOn(URL, "createObjectURL")
@@ -368,11 +393,11 @@ describe("girarYReleer", () => {
     const { cancelarRelecturaProgramada } = await import("./rotar");
     initRecorte();
     try {
-      const bmpGiro = { width: 10, height: 20, close: vi.fn() };
+      const bmpGiro = { width: 10, height: 20, close: vi.fn<() => void>() };
       const previoBlob = new Blob(["previo"]);
       let soltarGiro: ((b: ImageBitmap) => void) | undefined;
       let soltarPrevio: ((b: ImageBitmap) => void) | undefined;
-      const depsGiro = {
+      const depsGiroEnVuelo = {
         // Puertas por fuente: el giro se suspende en el previo, a mitad del commit.
         cargar: (f: Blob) => {
           if (f === previoBlob) {
@@ -384,44 +409,67 @@ describe("girarYReleer", () => {
             soltarGiro = res;
           });
         },
-        crear: vi.fn(() => ({
-          width: 0,
-          height: 0,
-          getContext: () => ({ setTransform: vi.fn(), drawImage: vi.fn() }),
-          toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
-        })),
+        crear: vi.fn<CrearLienzo>(
+          () =>
+            ({
+              width: 0,
+              height: 0,
+              getContext: () => ({
+                setTransform: vi.fn<CanvasRenderingContext2D["setTransform"]>(),
+                drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
+              }),
+              toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["girado"])),
+            }) as unknown as HTMLCanvasElement,
+        ),
       };
-      const bmpCrop = { width: 100, height: 80, close: vi.fn() };
+      const bmpCrop = { width: 100, height: 80, close: vi.fn<() => void>() };
       const depsCrop = {
-        cargar: vi.fn(async () => bmpCrop),
-        crear: vi.fn(() => ({
-          width: 0,
-          height: 0,
-          getContext: () => ({ drawImage: vi.fn() }),
-          toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["recorte"])),
-        })),
+        cargar: vi.fn<CargarBitmap>(async () => bmpCrop as unknown as ImageBitmap),
+        crear: vi.fn<CrearLienzo>(
+          () =>
+            ({
+              width: 0,
+              height: 0,
+              getContext: () => ({ drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>() }),
+              toBlob: (cb: (b: Blob | null) => void) => cb(new Blob(["recorte"])),
+            }) as unknown as HTMLCanvasElement,
+        ),
       };
       const c = sembrar();
       c.previoDocAligner = previoBlob;
-      const pg = girarYReleer(c.id, 90, depsGiro as never);
+      const pg = girarYReleer(c.id, 90, depsGiroEnVuelo as never);
       await abrirRecorte(c.id, depsCrop as never);
-      for (let i = 0; i < 100 && !soltarGiro; i++) await Promise.resolve();
+      // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- lo muta el executor; cota 100
+      for (let i = 0; i < 100 && !soltarGiro; i += 1) {
+        await Promise.resolve();
+      }
       soltarGiro?.(bmpGiro as unknown as ImageBitmap);
       // El giro queda suspendido entre imgUrl= y file= (código viejo): ahí
       // commitea el recorte entero y recién después termina el giro.
-      for (let i = 0; i < 200 && !soltarPrevio; i++) await Promise.resolve();
+      // oxlint-disable-next-line eslint/no-unmodified-loop-condition -- lo muta el executor; cota 200
+      for (let i = 0; i < 200 && !soltarPrevio; i += 1) {
+        await Promise.resolve();
+      }
       document.getElementById("btnRecorteOk")?.click();
-      await new Promise((r) => setTimeout(r, 200)); // confirmar entero (C gana píxeles)
-      expect(await (c.file as Blob).text()).toBe("recorte");
+      // confirmar entero (C gana píxeles)
+      await new Promise((r) => {
+        setTimeout(r, 200);
+      });
+      await expect((c.file as Blob).text()).resolves.toBe("recorte");
       soltarPrevio?.(bmpGiro as unknown as ImageBitmap);
       await pg;
-      await new Promise((r) => setTimeout(r, 100));
-      cancelarRelecturaProgramada(c.id); // el timer del giro no fuga al resto
+      await new Promise((r) => {
+        setTimeout(r, 100);
+      });
+      // el timer del giro no fuga al resto
+      cancelarRelecturaProgramada(c.id);
       // El giro terminó último: todo G ("girado" 6B), nada de C ("recorte" 7B).
-      expect(await (c.file as Blob).text()).toBe("girado");
+      await expect((c.file as Blob).text()).resolves.toBe("girado");
       expect(c.imgUrl).toBe("blob:6");
       const modal = document.getElementById("modalRecorte") as HTMLDialogElement | null;
-      if (modal?.open) modal.close();
+      if (modal?.open) {
+        modal.close();
+      }
     } finally {
       ctx.mockRestore();
       crearUrl.mockRestore();
@@ -434,7 +482,8 @@ describe("ramas de cubrimiento (lote 10)", () => {
     vi.useFakeTimers();
     const { deps } = depsGiro();
     const h = crearHoja();
-    const c = comprobante({ estado: "ok", montoCents: 123, textoOcr: "VIEJO" }); // sin file
+    // sin file
+    const c = comprobante({ estado: "ok", montoCents: 123, textoOcr: "VIEJO" });
     h.slots[0] = c;
     state.hojas.push(h);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
@@ -445,19 +494,19 @@ describe("ramas de cubrimiento (lote 10)", () => {
       await girarYReleer(c.id, 90, deps);
       expect(fetchSpy).toHaveBeenCalledWith(urlOrigen);
       expect(c.file).toBeInstanceOf(Blob);
-      expect(await (c.file as Blob).text()).toBe("girado");
+      await expect((c.file as Blob).text()).resolves.toBe("girado");
     } finally {
       fetchSpy.mockRestore();
     }
   });
 
   it("contexto 2d ausente: aborta el giro con aviso y sin commit", async () => {
-    const bmp = { width: 10, height: 20, close: vi.fn() };
+    const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
     const c = sembrar();
     const antes = c.file;
     await girarYReleer(c.id, 90, {
-      cargar: vi.fn(async () => bmp as unknown as ImageBitmap),
-      crear: vi.fn(
+      cargar: vi.fn<CargarBitmap>(async () => bmp as unknown as ImageBitmap),
+      crear: vi.fn<CrearLienzo>(
         () =>
           ({
             width: 0,
@@ -468,17 +517,18 @@ describe("ramas de cubrimiento (lote 10)", () => {
       ),
     });
     expect(c.file).toBe(antes);
-    expect(c.imgUrl).toBe("blob:mock-1"); // el giro abortó: ni file ni url nuevos
+    // el giro abortó: ni file ni url nuevos
+    expect(c.imgUrl).toBe("blob:mock-1");
     expect(document.getElementById("aviso")?.textContent).toBe("No se pudo girar la imagen.");
   });
 
   it("toBlob nulo en el giro principal: aborta con aviso sin commit", async () => {
-    const bmp = { width: 10, height: 20, close: vi.fn() };
+    const bmp = { width: 10, height: 20, close: vi.fn<() => void>() };
     const c = sembrar();
     const antes = c.file;
     await girarYReleer(c.id, 90, {
-      cargar: vi.fn(async () => bmp as unknown as ImageBitmap),
-      crear: vi.fn(
+      cargar: vi.fn<CargarBitmap>(async () => bmp as unknown as ImageBitmap),
+      crear: vi.fn<CrearLienzo>(
         () =>
           ({
             width: 0,
@@ -493,8 +543,11 @@ describe("ramas de cubrimiento (lote 10)", () => {
   });
 
   it("relectura con id ausente: no-op silenciosa", async () => {
-    if (document.getElementById("aviso")) document.getElementById("aviso")!.textContent = "";
-    await expect(releerTrasEdicion(999999, new Blob(["x"]))).resolves.toBeUndefined();
+    const aviso = document.getElementById("aviso");
+    if (aviso) {
+      aviso.textContent = "";
+    }
+    await expect(releerTrasEdicion(999_999, new Blob(["x"]))).resolves.toBeUndefined();
     expect(vi.mocked(extraerTexto)).not.toHaveBeenCalled();
     expect(vi.mocked(renderHojas)).not.toHaveBeenCalled();
     expect(document.getElementById("aviso")?.textContent).toBe("");
@@ -520,8 +573,10 @@ describe("ramas de cubrimiento (lote 10)", () => {
     state.colaEnProceso = true;
     try {
       const p = releerTrasEdicion(c.id, new Blob(["x"]));
-      await vi.advanceTimersByTimeAsync(250); // la relectura espera su turno (cola activa)
-      state.hojas = [crearHoja()]; // el item murió mientras la cola trabajaba
+      // la relectura espera su turno (cola activa)
+      await vi.advanceTimersByTimeAsync(250);
+      // el item murió mientras la cola trabajaba
+      state.hojas = [crearHoja()];
       state.colaEnProceso = false;
       await vi.advanceTimersByTimeAsync(1000);
       await p;

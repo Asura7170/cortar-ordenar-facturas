@@ -1,5 +1,8 @@
 /* Tests P0: montos en cents y colecciones (monto.ts necesita #montoTotal al importar). */
+
 import { describe, expect, it } from "vite-plus/test";
+
+import type { Hoja } from "../types";
 
 document.body.innerHTML =
   '<div id="montoTotal"></div><button id="btnCalcular" type="button"></button><button id="btnWord" type="button"></button><button id="btnPdf" type="button"></button><button id="btnImprimir" type="button"></button><button id="btnLimpiar" type="button"></button>';
@@ -22,7 +25,6 @@ const {
   totalItems,
 } = await import("./monto");
 const { comprobante } = await import("../test/factoria");
-import type { Hoja } from "../types";
 
 function hojaCon(montos: (number | null)[]): Hoja {
   const h = crearHoja("u6x2");
@@ -34,7 +36,7 @@ function hojaCon(montos: (number | null)[]): Hoja {
 describe("formatearMoneda", () => {
   it("formato en-US con 2 decimales y miles", () => {
     state.moneda = "USD";
-    expect(formatearMoneda(123456)).toBe("US$ 1,234.56");
+    expect(formatearMoneda(123_456)).toBe("US$ 1,234.56");
     expect(formatearMoneda(0)).toBe("US$ 0.00");
   });
 
@@ -64,7 +66,7 @@ describe("colecciones", () => {
   it("aplanar preserva el orden visual entre hojas", () => {
     const a = hojaCon([10, 20]);
     const b = hojaCon([30]);
-    expect(aplanar()).toEqual([...itemsDe(a), ...itemsDe(b)]);
+    expect(aplanar()).toStrictEqual([...itemsDe(a), ...itemsDe(b)]);
   });
 
   it("sumaTotal trata null como 0 y totalItems solo cuenta ocupados", () => {
@@ -76,7 +78,8 @@ describe("colecciones", () => {
 
 describe("pasos", () => {
   it("subir avanza hacia arriba con 1 barrido extra", () => {
-    expect(pasos(9, 0, true)).toBe(11); // 4→…→0 cruzando el 9: 1 paso + 1 barrido
+    // 4→…→0 cruzando el 9: 1 paso + 1 barrido
+    expect(pasos(9, 0, true)).toBe(11);
     expect(pasos(0, 1, true)).toBe(11);
     expect(pasos(3, 7, true)).toBe(14);
   });
@@ -93,10 +96,14 @@ describe("pasos", () => {
 
 describe("pasoDesde", () => {
   it("continuación: camina desde donde está la ruleta, con el signo del delta", () => {
-    expect(pasoDesde(14, 1, true)).toBe(7); // el arranque que antes bajaba (14→1) ya camina arriba
-    expect(pasoDesde(11, 1, true)).toBe(0); // ya está en el objetivo ⇒ estática
-    expect(pasoDesde(5, 1, false)).toBe(-4); // baja camina hacia abajo
-    expect(pasoDesde(6, 2, true)).toBe(6); // 6→…→12: aterriza en 2 (8 células arriba)
+    // el arranque que antes bajaba (14→1) ya camina arriba
+    expect(pasoDesde(14, 1, true)).toBe(7);
+    // ya está en el objetivo ⇒ estática
+    expect(pasoDesde(11, 1, true)).toBe(0);
+    // baja camina hacia abajo
+    expect(pasoDesde(5, 1, false)).toBe(-4);
+    // 6→…→12: aterriza en 2 (8 células arriba)
+    expect(pasoDesde(6, 2, true)).toBe(6);
   });
 });
 
@@ -115,6 +122,9 @@ describe("desplazamiento y aterrizaje", () => {
     expect(celdaDesdeMatriz("matrix(1, 0, 0, 1, 0, -96)", -2, 24)).toBe(2);
     expect(celdaDesdeMatriz("none", -2, 24)).toBeNull();
     expect(celdaDesdeMatriz("", 0, 24)).toBeNull();
+    // regresión: Number("") es 0 y devolvía `base` en vez de null
+    expect(celdaDesdeMatriz("matrix()", 0, 24)).toBeNull();
+    expect(celdaDesdeMatriz("matrix( )", 0, 24)).toBeNull();
   });
 });
 
@@ -124,46 +134,70 @@ describe("renderMonto", () => {
   }
   function tiraDe(c: HTMLElement): HTMLElement {
     const t = c.querySelector<HTMLElement>(".monto-tira");
-    if (!t) throw new Error("sin tira");
+    if (!t) {
+      throw new Error("sin tira");
+    }
     return t;
   }
 
   it("total legible en aria-label; plano: cada dígito clavado en su número", () => {
     state.moneda = "USD";
-    hojaCon([123456]);
-    renderMonto(); // primera vez: plano
+    hojaCon([123_456]);
+    // primera vez: plano
+    renderMonto();
     const montoEl = document.getElementById("montoTotal");
-    if (!montoEl) throw new Error("sin #montoTotal");
+    if (!montoEl) {
+      throw new Error("sin #montoTotal");
+    }
     expect(montoEl.getAttribute("aria-label")).toBe("US$ 1,234.56");
     const colasPlano = cols();
-    expect(colasPlano.map((c) => c.dataset["muestra"])).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(colasPlano.map((c) => c.dataset["muestra"])).toStrictEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+    ]);
     // regresión del "8": la ventana cae sobre la célula del dígito, no de la base
     expect(tiraDe(colasPlano[0] as HTMLElement).style.transform).toBe("translateY(-48px)");
     // las estáticas del plano no portan filtro de blur
-    for (const c of colasPlano) expect(tiraDe(c).style.filter).toBe("");
+    for (const c of colasPlano) {
+      expect(tiraDe(c).style.filter).toBe("");
+    }
   });
 
   it("aumento: lo que cambia rueda hacia arriba, incluidas las posiciones nuevas", () => {
     state.moneda = "USD";
-    hojaCon([99999]);
+    hojaCon([99_999]);
     // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
     state.moneda = "BOB";
     renderMonto();
     state.moneda = "USD";
     renderMonto();
     state.hojas.pop();
-    hojaCon([100099]); // US$ 1,000.99 → crece una cifra
+    // US$ 1,000.99 → crece una cifra
+    hojaCon([100_099]);
     renderMonto();
     // sufN "1,000.99" alineado con "  999.99": 1 nace y sube (fin 11 > 0),
     // los 9→0 suben (fin 20 > 9); los 9 finales quedan fijos. El bug del
     // pop-que-bajaba muere aquí: ninguna posición nueva desciende.
     const colasAlto = cols();
-    expect(colasAlto.map((c) => c.dataset["muestra"])).toEqual(["11", "20", "20", "20", "9", "9"]);
+    expect(colasAlto.map((c) => c.dataset["muestra"])).toStrictEqual([
+      "11",
+      "20",
+      "20",
+      "20",
+      "9",
+      "9",
+    ]);
     // la ventana nunca sale de la tira (regresión del "desaparecen")
     for (const c of colasAlto) {
       const celulas = [...c.querySelectorAll<HTMLElement>(".monto-digito")];
-      const ultima = celulas[celulas.length - 1];
-      if (!ultima) throw new Error("sin células");
+      const ultima = celulas.at(-1);
+      if (!ultima) {
+        throw new Error("sin células");
+      }
       expect(Number(c.dataset["muestra"])).toBeLessThanOrEqual(Number(ultima.dataset["i"]));
     }
     // solo giratorias portan filtro (las estáticas sin blur fantasma; jsdom cita la url)
@@ -173,49 +207,55 @@ describe("renderMonto", () => {
 
   it("disminución: la rueda baja (fin negativo = descendió por el ciclo)", () => {
     state.moneda = "USD";
-    hojaCon([35000]);
+    hojaCon([35_000]);
     // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
     state.moneda = "BOB";
     renderMonto();
     state.moneda = "USD";
     renderMonto();
     state.hojas.pop();
-    hojaCon([10000]); // US$ 100.00
+    // US$ 100.00
+    hojaCon([10_000]);
     renderMonto();
     // sufV= sufN "350.00"→"100.00": 3→1 baja -12 (fin -9), 5→0 baja -15 (fin -10)
-    expect(cols().map((c) => c.dataset["muestra"])).toEqual(["-9", "-10", "0", "0", "0"]);
+    expect(cols().map((c) => c.dataset["muestra"])).toStrictEqual(["-9", "-10", "0", "0", "0"]);
   });
 
   it("dígito sin cambio queda fijo: transition none y clavado en su dígito", () => {
     state.moneda = "USD";
-    hojaCon([35000]);
+    hojaCon([35_000]);
     // plano doble: mata todo rAF pendiente y fija el texto previo (determinismo)
     state.moneda = "BOB";
     renderMonto();
     state.moneda = "USD";
     renderMonto();
     state.hojas.pop();
-    hojaCon([35100]); // US$ 351.00: solo el 0→1 del sufijo rueda
+    // US$ 351.00: solo el 0→1 del sufijo rueda
+    hojaCon([35_100]);
     renderMonto();
     const colas = cols();
-    expect(colas.map((c) => c.dataset["muestra"])).toEqual(["11", "0", "0"]);
+    expect(colas.map((c) => c.dataset["muestra"])).toStrictEqual(["11", "0", "0"]);
     expect(tiraDe(colas[1] as HTMLElement).style.transition).toBe("none");
     expect(tiraDe(colas[2] as HTMLElement).style.transition).toBe("none");
   });
 
   it("cambio de moneda reescribe plano, sin rueda", () => {
     state.moneda = "USD";
-    hojaCon([35100]);
-    renderMonto(); // sincroniza
-    state.moneda = "ARS"; // mismos cents, otro texto
+    hojaCon([35_100]);
+    // sincroniza
     renderMonto();
-    expect(cols().map((c) => c.dataset["muestra"])).toEqual(["3", "5", "1", "0", "0"]);
-    for (const c of cols()) expect(tiraDe(c).style.transition).toBe("none");
+    // mismos cents, otro texto
+    state.moneda = "ARS";
+    renderMonto();
+    expect(cols().map((c) => c.dataset["muestra"])).toStrictEqual(["3", "5", "1", "0", "0"]);
+    for (const c of cols()) {
+      expect(tiraDe(c).style.transition).toBe("none");
+    }
   });
 
   it("llamada duplicada no toca el DOM", () => {
     state.moneda = "USD";
-    hojaCon([123456]);
+    hojaCon([123_456]);
     renderMonto();
     const antes = document.getElementById("montoTotal")?.innerHTML ?? "";
     renderMonto();
@@ -224,41 +264,47 @@ describe("renderMonto", () => {
 
   it("vuelo a mitad (retarget): la dirección sigue la del delta total", () => {
     state.moneda = "USD";
-    hojaCon([99999]);
-    renderMonto(); // agenda rAF ⇒ el siguiente render corre EN VUELO
+    hojaCon([99_999]);
+    // agenda rAF ⇒ el siguiente render corre EN VUELO
+    renderMonto();
     state.hojas.pop();
-    hojaCon([100099]); // sube: US$ 1,000.99
+    // sube: US$ 1,000.99
+    hojaCon([100_099]);
     renderMonto();
     // aterriza en el dígito correcto (sea barrido limpio o continuación)
     const normal = (nn: number): number => ((nn % 10) + 10) % 10;
     const esperados = [1, 0, 0, 0, 9, 9];
-    cols().forEach((c, i) =>
-      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
-    );
+    for (const [i, c] of cols().entries()) {
+      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number);
+    }
     // y toda rueda avanza hacia arriba, nunca hacia abajo (delta +)
-    for (const c of cols()) {
-      const fin = Number(c.dataset["muestra"]);
-      const arranque = Number(c.dataset["arranque"]);
-      if (fin !== arranque) expect(fin - arranque).toBeGreaterThan(0);
+    const saltos = cols().map((c) => Number(c.dataset["muestra"]) - Number(c.dataset["arranque"]));
+    // al menos una rueda se movió
+    expect(saltos.some((salto) => salto !== 0)).toBe(true);
+    for (const salto of saltos.filter((s) => s !== 0)) {
+      expect(salto).toBeGreaterThan(0);
     }
   });
 
   it("vuelo a mitad condelta invertido: el cambio de sentido también respeta el delta", () => {
     state.moneda = "USD";
-    hojaCon([100099]); // dejamos una rueda agendada del vuelo previo
+    // dejamos una rueda agendada del vuelo previo
+    hojaCon([100_099]);
     renderMonto();
     state.hojas.pop();
-    hojaCon([35000]); // baja: US$ 350.00
+    // baja: US$ 350.00
+    hojaCon([35_000]);
     renderMonto();
     const normal = (nn: number): number => ((nn % 10) + 10) % 10;
     const esperados = [3, 5, 0, 0, 0];
-    cols().forEach((c, i) =>
-      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number),
-    );
-    for (const c of cols()) {
-      const fin = Number(c.dataset["muestra"]);
-      const arranque = Number(c.dataset["arranque"]);
-      if (fin !== arranque) expect(fin - arranque).toBeLessThan(0);
+    for (const [i, c] of cols().entries()) {
+      expect(normal(Number(c.dataset["muestra"] ?? ""))).toBe(esperados[i] as number);
+    }
+    const saltos = cols().map((c) => Number(c.dataset["muestra"]) - Number(c.dataset["arranque"]));
+    // al menos una rueda se movió
+    expect(saltos.some((salto) => salto !== 0)).toBe(true);
+    for (const salto of saltos.filter((s) => s !== 0)) {
+      expect(salto).toBeLessThan(0);
     }
   });
 });
@@ -266,14 +312,17 @@ describe("renderMonto", () => {
 describe("barraBoton", () => {
   function botonCalcular(): HTMLButtonElement {
     const b = document.getElementById("btnCalcular");
-    if (!(b instanceof HTMLButtonElement)) throw new Error("sin #btnCalcular");
+    if (!(b instanceof HTMLButtonElement)) {
+      throw new TypeError("sin #btnCalcular");
+    }
     return b;
   }
 
   it("siempre visible: 0/0, mitad y lleno", () => {
     state.moneda = "USD";
     const btn = botonCalcular();
-    renderMonto(); // sin hojas
+    // sin hojas
+    renderMonto();
     expect(btn.textContent).toBe("Calcular totales");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0");
     const h = crearHoja("u6x2");
@@ -295,11 +344,11 @@ describe("barraBoton", () => {
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
     state.hojas.push(h);
     renderMonto();
-    expect([...btn.querySelectorAll(".calculo-txt")].map((s) => s.textContent)).toEqual([
+    expect([...btn.querySelectorAll(".calculo-txt")].map((s) => s.textContent)).toStrictEqual([
       "Montos extraídos: ",
       "Montos extraídos: ",
     ]);
-    expect([...btn.querySelectorAll(".calculo-cuenta")].map((s) => s.textContent)).toEqual([
+    expect([...btn.querySelectorAll(".calculo-cuenta")].map((s) => s.textContent)).toStrictEqual([
       "1/2",
       "1/2",
     ]);
@@ -315,16 +364,21 @@ describe("barraBoton", () => {
     renderMonto();
     expect(btn.textContent).toBe("Montos extraídos: 1/1");
     h.slots[1] = comprobante({ estado: "ok", textoOcr: "TOTAL 7" });
-    renderMonto(); // mismo total: el odómetro no se toca…
+    // mismo total: el odómetro no se toca…
+    renderMonto();
     expect(document.getElementById("montoTotal")?.getAttribute("aria-label")).toBe("US$ 5.00");
-    expect(btn.textContent).toBe("Montos extraídos: 1/2"); // …pero la barra sí se mueve
+    // …pero la barra sí se mueve
+    expect(btn.textContent).toBe("Montos extraídos: 1/2");
     expect(btn.style.getPropertyValue("--progreso")).toBe("0.5");
   });
 
   it("btnLimpiar deshabilitado con lote vacío, habilitado con items", () => {
     const limpiar = document.getElementById("btnLimpiar");
-    if (!(limpiar instanceof HTMLButtonElement)) throw new Error("sin #btnLimpiar");
-    renderMonto(); // sin hojas
+    if (!(limpiar instanceof HTMLButtonElement)) {
+      throw new TypeError("sin #btnLimpiar");
+    }
+    // sin hojas
+    renderMonto();
     expect(limpiar.disabled).toBe(true);
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5" });
@@ -336,41 +390,55 @@ describe("barraBoton", () => {
   it("lote vacío: TODOS los botones de acción de la sidebar deshabilitados", () => {
     const botones = ["btnCalcular", "btnWord", "btnPdf", "btnImprimir", "btnLimpiar"].map((id) => {
       const b = document.getElementById(id);
-      if (!(b instanceof HTMLButtonElement)) throw new Error(`sin #${id}`);
+      if (!(b instanceof HTMLButtonElement)) {
+        throw new TypeError(`sin #${id}`);
+      }
       return b;
     });
-    renderMonto(); // sin hojas
-    botones.forEach((b) => expect(b.disabled).toBe(true));
+    // sin hojas
+    renderMonto();
+    for (const b of botones) {
+      expect(b.disabled).toBe(true);
+    }
     const h = crearHoja("u6x2");
     h.slots[0] = comprobante({ estado: "ok", textoOcr: "TOTAL 5" });
     state.hojas.push(h);
     renderMonto();
-    botones.forEach((b) => expect(b.disabled).toBe(false));
+    for (const b of botones) {
+      expect(b.disabled).toBe(false);
+    }
   });
 });
 
 describe("parsearMonto", () => {
   it("US: miles con coma, decimal con punto, plano", () => {
-    expect(parsearMonto("1,234.56")).toBe(123456);
-    expect(parsearMonto("1234.56")).toBe(123456);
-    expect(parsearMonto("1,234,567.89")).toBe(123456789);
-    expect(parsearMonto("500")).toBe(50000);
+    expect(parsearMonto("1,234.56")).toBe(123_456);
+    expect(parsearMonto("1234.56")).toBe(123_456);
+    expect(parsearMonto("1,234,567.89")).toBe(123_456_789);
+    expect(parsearMonto("500")).toBe(50_000);
     expect(parsearMonto("12.5")).toBe(1250);
-    expect(parsearMonto("  $ 1,234.56 ")).toBe(123456);
+    expect(parsearMonto("  $ 1,234.56 ")).toBe(123_456);
   });
 
   it("inválidos → null", () => {
     expect(parsearMonto("")).toBeNull();
     expect(parsearMonto("abc")).toBeNull();
-    expect(parsearMonto("1234,56")).toBeNull(); // coma decimal EU: solo vale punto
-    expect(parsearMonto("1,234")).toBeNull(); // miles sin decimales: escribir 1234
+    // coma decimal EU: solo vale punto
+    expect(parsearMonto("1234,56")).toBeNull();
+    // miles sin decimales: escribir 1234
+    expect(parsearMonto("1,234")).toBeNull();
     expect(parsearMonto("12.345")).toBeNull();
     expect(parsearMonto("-5")).toBeNull();
-    expect(parsearMonto("1,,234.56")).toBeNull(); // grupo vacío
-    expect(parsearMonto("1.234.56")).toBeNull(); // mismo separador en miles y decimal
-    expect(parsearMonto("1,234,56")).toBeNull(); // grupo de 2
-    expect(parsearMonto("1.2.3")).toBeNull(); // grupo de 1
-    expect(parsearMonto("12,34.56")).toBeNull(); // grupo de 2
+    // grupo vacío
+    expect(parsearMonto("1,,234.56")).toBeNull();
+    // mismo separador en miles y decimal
+    expect(parsearMonto("1.234.56")).toBeNull();
+    // grupo de 2
+    expect(parsearMonto("1,234,56")).toBeNull();
+    // grupo de 1
+    expect(parsearMonto("1.2.3")).toBeNull();
+    // grupo de 2
+    expect(parsearMonto("12,34.56")).toBeNull();
   });
 });
 

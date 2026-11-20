@@ -7,10 +7,10 @@ import { montarFixture, el, puntoPorDefecto } from "../test/fixture";
 montarFixture();
 
 const ctx = {
-  setTransform: vi.fn(),
-  clearRect: vi.fn(),
-  fillRect: vi.fn(),
-  drawImage: vi.fn(),
+  setTransform: vi.fn<CanvasRenderingContext2D["setTransform"]>(),
+  clearRect: vi.fn<CanvasRenderingContext2D["clearRect"]>(),
+  fillRect: vi.fn<CanvasRenderingContext2D["fillRect"]>(),
+  drawImage: vi.fn<CanvasRenderingContext2D["drawImage"]>(),
   imageSmoothingEnabled: false,
   imageSmoothingQuality: "low",
 };
@@ -22,11 +22,17 @@ const { crearHoja, state } = await import("../state");
 const { initSheets, renderHojas } = await import("./sheets");
 const { comprobante } = await import("../test/factoria");
 
-initSheets({ agregarArchivos: vi.fn(), pedirArchivos: vi.fn() });
+initSheets({
+  agregarArchivos:
+    vi.fn<(files: FileList | File[] | null | undefined, hojaId?: number | null) => void>(),
+  pedirArchivos: vi.fn<(hojaId: number) => void>(),
+});
 
 afterEach(() => {
   const btn = el<HTMLButtonElement>("btnLupa");
-  if (btn.getAttribute("aria-pressed") === "true") btn.click();
+  if (btn.getAttribute("aria-pressed") === "true") {
+    btn.click();
+  }
   ctx.clearRect.mockClear();
   ctx.fillRect.mockClear();
   ctx.drawImage.mockClear();
@@ -42,8 +48,12 @@ function moverLupa(x: number, y: number): void {
 async function esperar(cond: () => boolean, ms = 2000): Promise<void> {
   const t0 = Date.now();
   while (!cond()) {
-    if (Date.now() - t0 > ms) throw new Error("timeout esperando rAF");
-    await new Promise((r) => setTimeout(r, 10));
+    if (Date.now() - t0 > ms) {
+      throw new Error("timeout esperando rAF");
+    }
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
   }
 }
 
@@ -53,9 +63,9 @@ describe("dibujarLupa", () => {
     // luego rojo (el fondo se resuelve en el propio nodo).
     const panel = document.createElement("div");
     panel.style.backgroundColor = "transparent";
-    document.body.appendChild(panel);
+    document.body.append(panel);
     Object.defineProperty(document, "elementFromPoint", {
-      value: vi.fn(() => panel),
+      value: vi.fn<Document["elementFromPoint"]>(() => panel),
       configurable: true,
     });
     try {
@@ -85,8 +95,9 @@ describe("dibujarLupa", () => {
     renderHojas();
     const cell = document.querySelector(".cell");
     const img = cell?.querySelector("img");
-    if (!(cell instanceof HTMLElement) || !(img instanceof HTMLImageElement))
-      throw new Error("sin celda con imagen");
+    if (!(cell instanceof HTMLElement) || !(img instanceof HTMLImageElement)) {
+      throw new TypeError("sin celda con imagen");
+    }
     Object.defineProperty(img, "naturalWidth", { value: 100, configurable: true });
     Object.defineProperty(img, "naturalHeight", { value: 100, configurable: true });
     const rect = vi.spyOn(img, "getBoundingClientRect").mockReturnValue({
@@ -101,7 +112,7 @@ describe("dibujarLupa", () => {
       toJSON: () => ({}),
     } as DOMRect);
     Object.defineProperty(document, "elementFromPoint", {
-      value: vi.fn(() => cell),
+      value: vi.fn<Document["elementFromPoint"]>(() => cell),
       configurable: true,
     });
     try {
